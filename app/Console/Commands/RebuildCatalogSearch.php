@@ -6,8 +6,8 @@ namespace App\Console\Commands;
 
 use App\Enums\CatalogSearchIndexStatus;
 use App\Models\CatalogSearchIndexState;
-use App\Models\SeasonvarImportRun;
 use App\Services\Catalog\Search\CatalogSearchIndexer;
+use App\Services\Seasonvar\SeasonvarImportActivity;
 use App\Services\Seasonvar\SeasonvarImportErrorSanitizer;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
@@ -21,9 +21,10 @@ class RebuildCatalogSearch extends Command
 {
     public function handle(
         CatalogSearchIndexer $indexer,
+        SeasonvarImportActivity $imports,
         SeasonvarImportErrorSanitizer $errors,
     ): int {
-        if (SeasonvarImportRun::query()->whereIn('status', ['queued', 'running'])->exists()) {
+        if ($imports->active()) {
             $this->error('Пересборка поиска остановлена: активен импорт Seasonvar. Дождитесь его завершения.');
 
             return self::FAILURE;

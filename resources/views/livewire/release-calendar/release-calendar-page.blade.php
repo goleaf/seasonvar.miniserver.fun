@@ -54,6 +54,8 @@
         </section>
     @endif
 
+    @island(name: 'release-calendar-pagination', always: true, with: $this->paginationIslandPage)
+    <x-ui.pagination-region name="release-calendar-results">
     @if (! $schemaReady)
         <section class="rounded-panel border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-900" role="status">{{ __('calendar.unavailable') }}</section>
     @elseif ($queryFailed)
@@ -110,7 +112,9 @@
                 </section>
             @endforeach
             </div>
-            @if ($entries->hasPages())<nav class="mt-5" aria-label="{{ __('calendar.pagination') }}">{{ $entries->links() }}</nav>@endif
+            @if ($entries->hasPages())<nav class="mt-5" aria-label="{{ __('calendar.pagination') }}">{{ $entries->links(data: ['region' => 'release-calendar-results']) }}</nav>@endif
         </section>
     @endif
+    </x-ui.pagination-region>
+    @endisland
 </div>

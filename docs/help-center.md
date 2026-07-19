@@ -137,6 +137,8 @@ Usefulness — только `helpful`/`not_helpful`. Для negative response н
 
 Report reasons: instructions, screenshot, broken link, unclear, incorrect, translation, removed feature, other. Details очищаются как plain text и ограничены 1000 символами. Dedupe включает translation, actor, reason и version translation: повтор текущей версии не создаёт запись, после реального обновления возможен новый report. Лимит — 5/час. Reporter/actor/private note видны только admin queue; один negative vote ничего автоматически не снимает с публикации.
 
+Малая public report form остаётся в DOM и скрывается modifier-free `wire:show="showReportForm"`; `wire:cloak` предотвращает flash false initial state. Toggle имеет stable `aria-controls`/`aria-expanded`, скрытый form не получает autofocus или dialog semantics. Visibility — только presentation: `submitReport` по-прежнему server-side валидирует reason/details, применяет actor/rate/dedupe boundary, после успеха сбрасывает draft и закрывает form.
+
 Article/search views и полные search queries не сохраняются, поэтому retention для help analytics сейчас не требуется. Feedback/report сохраняются как редакционный audit evidence; account export включает только собственные submissions, deletion обнуляет FK reporter/user, сохраняя обезличенный факт. Internal note, aggregate и записи других пользователей не экспортируются. Public HTML/cache не содержит feedback state, actor key, account details, ticket IDs или private analytics.
 
 ## Cache, queries и indexes

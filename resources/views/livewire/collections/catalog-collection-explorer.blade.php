@@ -23,12 +23,16 @@
 
     <div wire:loading.delay wire:target="search,sort,applySearch,clearSearch" role="status" aria-live="polite"><div class="flex items-center gap-2 rounded-control bg-sky-50 px-4 py-3 text-sm font-bold text-sky-700"><x-ui.icon name="fa-solid fa-spinner fa-spin" /><span>{{ __('collections.page.loading') }}</span></div></div>
 
+    @island(name: 'collection-explorer-pagination', always: true, with: $this->paginationIslandPage)
+    <x-ui.pagination-region name="collection-explorer-results">
     @if ($collections->isEmpty())
         <div class="rounded-panel border border-dashed border-slate-300 bg-white p-8 text-center"><x-ui.icon name="fa-solid fa-folder-open text-3xl text-slate-300" /><h3 class="mt-3 text-lg font-black text-slate-700">{{ $search !== '' ? __('collections.directory.no_results') : __('collections.directory.empty') }}</h3>@if ($search !== '')<button type="button" wire:click="clearSearch" class="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-slate-100 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-200"><x-ui.icon name="fa-solid fa-xmark" /><span>{{ __('collections.directory.clear') }}</span></button>@endif</div>
     @else
         <div class="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" aria-label="{{ __('collections.navigation.public_collections') }}">
             @foreach ($collections as $collection)<x-collections.collection-card wire:key="discovery-collection-{{ $collection->public_id }}" :collection="$collection" compact />@endforeach
         </div>
-        <nav aria-label="{{ __('collections.page.pagination') }}">{{ $collections->links() }}</nav>
+        <nav aria-label="{{ __('collections.page.pagination') }}">{{ $collections->links(data: ['region' => 'collection-explorer-results']) }}</nav>
     @endif
+    </x-ui.pagination-region>
+    @endisland
 </section>

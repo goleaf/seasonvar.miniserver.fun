@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Policies;
 
+use App\Enums\AdminPermission;
 use App\Enums\CatalogCollectionType;
 use App\Enums\CatalogCollectionVisibility;
 use App\Models\CatalogCollection;
@@ -73,7 +74,7 @@ final class CatalogCollectionPolicy
 
     public function moderate(User $user): bool
     {
-        return Gate::forUser($user)->allows('manage-catalog');
+        return Gate::forUser($user)->allows(AdminPermission::CollectionsModerate->value);
     }
 
     public function feature(User $user, CatalogCollection $collection): bool

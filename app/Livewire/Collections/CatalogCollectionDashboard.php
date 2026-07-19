@@ -8,6 +8,7 @@ use App\DTOs\CatalogCollectionData;
 use App\Enums\CatalogCollectionType;
 use App\Enums\CatalogCollectionVisibility;
 use App\Livewire\Concerns\InteractsWithCollectionLocale;
+use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Models\CatalogCollection;
 use App\Models\User;
 use App\Services\Auth\AccountSettingsService;
@@ -29,6 +30,7 @@ final class CatalogCollectionDashboard extends Component
     private const AUTHORING_LOCALE = 'ru';
 
     use InteractsWithCollectionLocale;
+    use InteractsWithPaginationIslands;
     use WithPagination;
 
     public bool $showCreate = false;

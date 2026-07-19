@@ -9,6 +9,8 @@
 
     <div wire:loading.delay wire:target="query,category,clearSearch" role="status" aria-live="polite" class="rounded-control bg-sky-50 px-4 py-3 text-sm font-bold text-sky-800">{{ __('help.states.searching') }}</div>
 
+    @island(name: 'help-search-pagination', always: true, with: $this->paginationIslandPage)
+    <x-ui.pagination-region name="help-search-results">
     @if (! $schemaReady)
         <x-ui.panel><p role="status">{{ __('help.states.unavailable') }}</p></x-ui.panel>
     @elseif ($queryFailed)
@@ -52,7 +54,7 @@
                             <x-help.article-card :article="$article" wire:key="help-result-{{ $article->publicId }}" />
                         @endforeach
                     </div>
-                    <nav aria-label="{{ __('help.accessibility.pagination') }}">{{ $results->links() }}</nav>
+                    <nav aria-label="{{ __('help.accessibility.pagination') }}">{{ $results->links(data: ['region' => 'help-search-results']) }}</nav>
                 @endif
             </section>
 
@@ -66,4 +68,6 @@
             </aside>
         </div>
     @endif
+    </x-ui.pagination-region>
+    @endisland
 </div>

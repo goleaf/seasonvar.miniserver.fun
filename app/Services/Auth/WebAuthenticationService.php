@@ -14,6 +14,7 @@ final class WebAuthenticationService
     public function __construct(
         private readonly AccountSettingsService $settings,
         private readonly AuthenticationAuditService $audit,
+        private readonly AccountAccessResolver $accountAccess,
     ) {}
 
     public function attempt(
@@ -38,6 +39,15 @@ final class WebAuthenticationService
         $user = Auth::guard('web')->user();
 
         if ($user instanceof User) {
+            if (! $this->accountAccess->canAuthenticate($user)) {
+                Auth::guard('web')->logout();
+                Session::invalidate();
+                Session::regenerateToken();
+                $this->audit->record(AuthenticationEvent::LoginFailed, email: $email);
+
+                return false;
+            }
+
             try {
                 $this->settings->adoptLocaleIfUnset($user, app()->getLocale());
             } catch (\Throwable $exception) {

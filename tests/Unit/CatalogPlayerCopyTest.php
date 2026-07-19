@@ -23,6 +23,9 @@ final class CatalogPlayerCopyTest extends TestCase
                 'preparing', 'loading', 'ready', 'playing', 'paused', 'seeking',
                 'buffering', 'retryingNetwork', 'retryingMedia', 'expired',
                 'playbackError', 'fatal', 'ended', 'captionsUnavailable',
+                'offline', 'stalled', 'sourceFallback', 'sourceChanged',
+                'authorizationRefreshed', 'fallbackUnavailable', 'finalEpisode',
+                'autoplayCancelled', 'restartFailed',
             ], array_keys($payloads[$locale]['runtime']));
             $this->assertSame([
                 'restart', 'rewind', 'play', 'pause', 'fastForward', 'seek',

@@ -121,6 +121,8 @@
         </div>
     </div>
 
+    @island(name: 'collection-editor-pagination', always: true, with: $this->paginationIslandPage)
+    <x-ui.pagination-region name="collection-editor-results">
     <x-ui.panel :title="$itemsTitle" :subtitle="__('collections.ordering.hint')" icon="fa-solid fa-list-ol" :pad="false">
         @if ($items->isEmpty())
             <div class="p-8 text-center">
@@ -130,28 +132,35 @@
                 </a>
             </div>
         @else
-            <ol class="divide-y divide-slate-200">
+            <ol wire:sort="sortItem" class="divide-y divide-slate-200">
                 @foreach ($items as $item)
-                    <li wire:key="collection-edit-item-{{ $item->collection_item_id }}" class="relative min-w-0">
+                    <li wire:key="collection-edit-item-{{ $item->collection_item_id }}" wire:sort:item="{{ $item->collection_item_id }}" class="relative min-w-0">
                         <x-catalog.title-card :title="$item" layout="list" :show-description="false" readable />
                         <div class="relative z-20 flex flex-wrap gap-2 border-t border-slate-100 px-3 pb-3 pt-2 sm:px-4 md:pl-28">
+                            <span wire:sort:handle aria-hidden="true" class="inline-flex min-h-11 min-w-11 cursor-grab items-center justify-center rounded-control bg-slate-100 text-slate-500 active:cursor-grabbing">
+                                <x-ui.icon name="fa-solid fa-grip-vertical" />
+                            </span>
                             <span class="inline-flex min-h-11 items-center rounded-control bg-slate-50 px-3 text-xs font-bold text-slate-500">{{ $item->collection_position_label }}</span>
-                            <button type="button" wire:click="moveItem({{ $item->collection_item_id }}, -1)" wire:loading.attr="disabled" @disabled(! $item->collection_can_move_up) aria-label="{{ $item->collection_move_up_label }}" class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-control bg-slate-100 px-3 text-sm font-bold text-slate-700 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none">
-                                <x-ui.icon name="fa-solid fa-arrow-up" />{{ __('collections.actions.move_up') }}
-                            </button>
-                            <button type="button" wire:click="moveItem({{ $item->collection_item_id }}, 1)" wire:loading.attr="disabled" @disabled(! $item->collection_can_move_down) aria-label="{{ $item->collection_move_down_label }}" class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-control bg-slate-100 px-3 text-sm font-bold text-slate-700 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none">
-                                <x-ui.icon name="fa-solid fa-arrow-down" />{{ __('collections.actions.move_down') }}
-                            </button>
-                            <button type="button" wire:click="removeItem({{ $item->id }})" wire:confirm="{{ __('collections.confirmations.remove_item') }}" wire:loading.attr="disabled" class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-control bg-rose-50 px-3 text-sm font-bold text-rose-700 hover:bg-rose-100 sm:flex-none">
-                                <x-ui.icon name="fa-solid fa-xmark" />{{ __('collections.actions.remove') }}
-                            </button>
+                            <div wire:sort:ignore class="contents">
+                                <button type="button" wire:click="moveItem({{ $item->collection_item_id }}, -1)" wire:loading.attr="disabled" @disabled(! $item->collection_can_move_up) aria-label="{{ $item->collection_move_up_label }}" class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-control bg-slate-100 px-3 text-sm font-bold text-slate-700 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none">
+                                    <x-ui.icon name="fa-solid fa-arrow-up" />{{ __('collections.actions.move_up') }}
+                                </button>
+                                <button type="button" wire:click="moveItem({{ $item->collection_item_id }}, 1)" wire:loading.attr="disabled" @disabled(! $item->collection_can_move_down) aria-label="{{ $item->collection_move_down_label }}" class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-control bg-slate-100 px-3 text-sm font-bold text-slate-700 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none">
+                                    <x-ui.icon name="fa-solid fa-arrow-down" />{{ __('collections.actions.move_down') }}
+                                </button>
+                                <button type="button" wire:click="removeItem({{ $item->id }})" wire:confirm="{{ __('collections.confirmations.remove_item') }}" wire:loading.attr="disabled" class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-control bg-rose-50 px-3 text-sm font-bold text-rose-700 hover:bg-rose-100 sm:flex-none">
+                                    <x-ui.icon name="fa-solid fa-xmark" />{{ __('collections.actions.remove') }}
+                                </button>
+                            </div>
                         </div>
                     </li>
                 @endforeach
             </ol>
-            <nav class="p-4" aria-label="{{ __('collections.page.pagination') }}">{{ $items->links() }}</nav>
+            <nav class="p-4" aria-label="{{ __('collections.page.pagination') }}">{{ $items->links(data: ['region' => 'collection-editor-results']) }}</nav>
         @endif
     </x-ui.panel>
+    </x-ui.pagination-region>
+    @endisland
 
     @if ($unavailableItems->isNotEmpty())
         <x-ui.panel :title="__('collections.page.unavailable')" :subtitle="__('collections.page.unavailable_hint')" icon="fa-solid fa-eye-slash">

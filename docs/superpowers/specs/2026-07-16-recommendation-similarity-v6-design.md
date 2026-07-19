@@ -159,7 +159,7 @@ Builder и evaluator считают watchable только media, которое
 
 ## Инкрементальное обновление
 
-После устойчивого full `v6` targeted import помечает изменённый title и titles из затронутых inverted-feature buckets. Scoped rebuild обновляет source-title и bounded neighbours. Если dirty set превышает настраиваемый предел или меняется algorithm/feature version, выполняется полный build.
+После устойчивого full `v6` targeted import помечает изменённый title и titles из затронутых inverted-feature buckets. Scoped rebuild обновляет source-title и bounded neighbours. Если dirty set превышает настраиваемый предел или меняется algorithm/feature version, полный build остаётся безопасным fallback, но queued Seasonvar finalizer не выполняет его внутри ограниченного 900-секундного job: он возвращает `deferred`, сохраняет dirty rows и завершает импорт. Full shadow build принадлежит контролируемому synchronous maintenance-запуску той же единственной публичной команды `seasonvar:import`, где оператор может наблюдать build без повторного page import и без бесконечного queue retry.
 
 Persistence сравнивает hash/rank payload и не переписывает неизменённые rows. Это уменьшает churn и invalidation, но full rebuild остаётся безопасным fallback.
 

@@ -19,5 +19,9 @@
     @endif
 
     <div wire:loading.delay role="status" aria-live="polite" class="rounded-control bg-sky-50 p-3 text-sm font-bold text-sky-800">{{ __('issues.states.loading') }}</div>
-    @if (! $schemaReady)<p class="rounded-control bg-amber-50 p-4 text-sm font-bold text-amber-900">{{ __('issues.states.schema_unavailable') }}</p>@elseif ($issues->isEmpty())<section class="rounded-panel border border-dashed border-slate-300 bg-white p-8 text-center"><h2 class="font-black text-slate-900">{{ __('issues.states.support_empty') }}</h2><button type="button" wire:click="clearFilters" class="mt-4 min-h-11 rounded-control bg-slate-100 px-4 font-bold text-slate-700">{{ __('issues.actions.clear_filters') }}</button></section>@else<div class="grid gap-4 lg:grid-cols-2">@foreach ($issues as $issue)<x-technical-issues.card :issue="$issue" staff selectable :selected="in_array($issue->id, $selectedIssues, true)" />@endforeach</div><div>{{ $issues->links() }}</div>@endif
+    @island(name: 'technical-issue-administration-pagination', always: true, with: $this->paginationIslandPage)
+    <x-ui.pagination-region name="technical-issue-administration-results">
+    @if (! $schemaReady)<p class="rounded-control bg-amber-50 p-4 text-sm font-bold text-amber-900">{{ __('issues.states.schema_unavailable') }}</p>@elseif ($issues->isEmpty())<section class="rounded-panel border border-dashed border-slate-300 bg-white p-8 text-center"><h2 class="font-black text-slate-900">{{ __('issues.states.support_empty') }}</h2><button type="button" wire:click="clearFilters" class="mt-4 min-h-11 rounded-control bg-slate-100 px-4 font-bold text-slate-700">{{ __('issues.actions.clear_filters') }}</button></section>@else<div class="grid gap-4 lg:grid-cols-2">@foreach ($issues as $issue)<x-technical-issues.card :issue="$issue" staff selectable :selected="in_array($issue->id, $selectedIssues, true)" />@endforeach</div><div>{{ $issues->links(data: ['region' => 'technical-issue-administration-results']) }}</div>@endif
+    </x-ui.pagination-region>
+    @endisland
 </div>

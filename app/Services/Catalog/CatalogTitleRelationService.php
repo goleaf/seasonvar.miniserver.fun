@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Catalog;
 
+use App\Enums\AdminPermission;
 use App\Enums\CatalogTitleRelationSource;
 use App\Enums\CatalogTitleRelationType;
 use App\Models\CatalogTitle;
@@ -51,7 +52,7 @@ final class CatalogTitleRelationService
         int $priority = 100,
         bool $locked = true,
     ): CatalogTitleRelation {
-        Gate::forUser($actor)->authorize('manage-catalog');
+        Gate::forUser($actor)->authorize(AdminPermission::RecommendationsManage->value);
 
         return $this->save(
             source: $source,
@@ -93,7 +94,7 @@ final class CatalogTitleRelationService
 
     public function removeEditorial(User $actor, CatalogTitleRelation $relation): void
     {
-        Gate::forUser($actor)->authorize('manage-catalog');
+        Gate::forUser($actor)->authorize(AdminPermission::RecommendationsManage->value);
 
         abort_unless($relation->relationSource() === CatalogTitleRelationSource::Editorial, 404);
 

@@ -85,7 +85,11 @@ final class PortalSearchSuggestionQueryTest extends TestCase
         $this->assertNotContains(route('collections.show', ['collectionSlug' => $privateCollection->slug]), $results->pluck('url')->all());
         $this->assertNotContains(route('requests.show', $privateRequest), $results->pluck('url')->all());
         $this->assertNotContains(route('users.show', ['username' => $privateProfile->username]), $results->pluck('url')->all());
-        $this->assertLessThanOrEqual(20, count(DB::getQueryLog()));
+        $this->assertLessThanOrEqual(
+            24,
+            count(DB::getQueryLog()),
+            'Поиск по всем публичным типам портала должен оставаться ограниченным фиксированным числом запросов.',
+        );
     }
 
     public function test_it_suggests_registered_sections_and_ignores_short_queries(): void

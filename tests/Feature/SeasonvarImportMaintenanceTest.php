@@ -130,6 +130,33 @@ class SeasonvarImportMaintenanceTest extends TestCase
         $this->assertNotNull($unconfirmedRun->finished_at);
     }
 
+    public function test_sync_command_recovers_a_stale_queued_global_run_without_live_claims(): void
+    {
+        Http::preventStrayRequests();
+        config(['seasonvar.queue.stale_after_minutes' => 60]);
+        $staleRun = SeasonvarImportRun::query()->create([
+            'mode' => 'sitemap',
+            'execution_mode' => 'queue',
+            'status' => 'running',
+            'started_at' => now()->subHours(3),
+            'last_heartbeat_at' => now()->subHours(3),
+        ]);
+
+        $this->artisan('seasonvar:import', ['--no-discovery' => true])
+            ->expectsOutputToContain('Готово')
+            ->assertExitCode(0);
+
+        $staleRun->refresh();
+
+        $this->assertSame('failed', $staleRun->status);
+        $this->assertNotNull($staleRun->finished_at);
+        $this->assertSame(1, SeasonvarImportRun::query()
+            ->where('mode', 'sitemap')
+            ->where('execution_mode', 'sync')
+            ->where('status', 'completed')
+            ->count());
+    }
+
     public function test_it_marks_malformed_nested_source_urls_as_unavailable_without_requesting_them(): void
     {
         Http::preventStrayRequests();
@@ -520,6 +547,103 @@ class SeasonvarImportMaintenanceTest extends TestCase
             'source' => 'seasonvar_related',
             'signal_type' => 'provider_recommendation',
         ]);
+    }
+
+    public function test_queued_finalization_resumes_from_maintenance_checkpoint_before_recommendations(): void
+    {
+        Http::preventStrayRequests();
+        config([
+            'seasonvar.media_check.enabled' => false,
+            'recommendations.similarity_v6.allow_activation_without_golden' => true,
+        ]);
+        $media = LicensedMedia::factory()->create([
+            'title' => 'Серия 1080p',
+            'path' => 'https://cdn.example.test/video.mp4',
+            'playback_url' => 'https://cdn.example.test/video.mp4',
+            'quality' => null,
+            'format' => null,
+            'translation_name' => null,
+            'variant_type' => null,
+            'variant_name' => null,
+            'variant_key' => null,
+        ]);
+        $run = SeasonvarImportRun::query()->create([
+            'mode' => 'sitemap',
+            'execution_mode' => 'queue',
+            'status' => 'running',
+            'started_at' => now()->subMinutes(20),
+            'last_heartbeat_at' => now(),
+            'summary' => [
+                'queued_finalization_checkpoint' => [
+                    'version' => 1,
+                    'storage_maintenance' => ['events_deleted' => 0, 'snapshots_deleted' => 0],
+                    'provider_availability_backfill' => [],
+                    'metadata_backfill' => [],
+                    'source_status_backfill' => [],
+                    'media_metadata_backlog' => ['media_checked' => 579_334, 'media_updated' => 0],
+                    'media_source_key_backlog' => ['media_checked' => 879_232, 'media_updated' => 0, 'collisions' => 0],
+                    'media_backlog' => [
+                        'media_checked' => 20,
+                        'media_available' => 0,
+                        'media_unavailable' => 0,
+                        'media_updated' => 0,
+                        'media_failed' => 0,
+                    ],
+                    'media_size_backlog' => [],
+                    'relation_cleanup' => [],
+                    'merge' => ['groups' => 0, 'titles' => 0, 'seasons' => 0, 'episodes' => 0],
+                ],
+            ],
+        ]);
+        $events = [];
+
+        app(SeasonvarImportPipeline::class)->finalizeQueuedRun(
+            $run,
+            function (string $event) use (&$events): void {
+                $events[] = $event;
+            },
+        );
+
+        $this->assertNull($media->fresh()->format);
+        $this->assertNotContains('seasonvar-media-metadata-backlog-started', $events);
+        $this->assertArrayNotHasKey('queued_finalization_checkpoint', $run->fresh()->summary ?? []);
+        $this->assertSame('completed', $run->fresh()->status);
+        $this->assertSame(579_334, data_get($run->fresh()->summary, 'last_media_metadata_backlog.media_checked'));
+    }
+
+    public function test_queued_finalization_defers_unbounded_full_recommendation_rebuild_after_storing_checkpoint(): void
+    {
+        Http::preventStrayRequests();
+        config([
+            'seasonvar.media_check.enabled' => false,
+            'recommendations.similarity_v6.allow_activation_without_golden' => true,
+        ]);
+        CatalogTitle::factory()->create();
+        $run = SeasonvarImportRun::query()->create([
+            'mode' => 'sitemap',
+            'execution_mode' => 'queue',
+            'status' => 'running',
+            'started_at' => now(),
+            'last_heartbeat_at' => now(),
+        ]);
+        $checkpointSeenByRecommendations = false;
+
+        app(SeasonvarImportPipeline::class)->finalizeQueuedRun(
+            $run,
+            function (string $event) use ($run, &$checkpointSeenByRecommendations): void {
+                if ($event === 'catalog-title-recommendations-full-rebuild-deferred') {
+                    $checkpointSeenByRecommendations = is_array(
+                        data_get($run->fresh()->summary, 'queued_finalization_checkpoint'),
+                    );
+                }
+            },
+        );
+
+        $this->assertTrue($checkpointSeenByRecommendations);
+        $this->assertArrayNotHasKey('queued_finalization_checkpoint', $run->fresh()->summary ?? []);
+        $this->assertSame('completed', $run->fresh()->status);
+        $this->assertSame('deferred', data_get($run->fresh()->summary, 'last_recommendations.mode'));
+        $this->assertTrue((bool) data_get($run->fresh()->summary, 'last_recommendations.deferred'));
     }
 
     public function test_it_keeps_generic_signals_when_v6_shadow_build_is_not_activated(): void
@@ -1628,6 +1752,58 @@ class SeasonvarImportMaintenanceTest extends TestCase
             ->assertExitCode(0);
 
         $this->assertSame(3, LicensedMedia::query()->where('quality', '1080p')->where('format', 'mp4')->count());
+    }
+
+    public function test_media_metadata_backfill_skips_optional_unknowns_that_cannot_converge(): void
+    {
+        Http::preventStrayRequests();
+        config([
+            'seasonvar.media_metadata.chunk_size' => 1,
+            'seasonvar.media_check.enabled' => false,
+        ]);
+
+        $catalogTitle = CatalogTitle::factory()->create();
+
+        foreach (range(1, 2) as $episodeNumber) {
+            LicensedMedia::factory()->create([
+                'catalog_title_id' => $catalogTitle->id,
+                'title' => "{$episodeNumber} серия",
+                'playback_url' => "https://media.example.com/video/series-s01e0{$episodeNumber}.mp4",
+                'path' => "https://media.example.com/video/series-s01e0{$episodeNumber}.mp4",
+                'quality' => null,
+                'format' => 'mp4',
+                'translation_name' => null,
+                'variant_type' => 'voiceover',
+                'variant_name' => null,
+                'variant_key' => 'voiceover-default',
+                'has_subtitles' => false,
+            ]);
+        }
+
+        $repairable = LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'title' => '3 серия WEB-DL',
+            'playback_url' => 'https://media.example.com/video/series-s01e03.1920x1080.mp4',
+            'path' => 'https://media.example.com/video/series-s01e03.1920x1080.mp4',
+            'quality' => null,
+            'format' => null,
+            'translation_name' => null,
+            'variant_type' => null,
+            'variant_name' => null,
+            'variant_key' => null,
+            'has_subtitles' => false,
+        ]);
+
+        $this->artisan('seasonvar:import', ['--no-discovery' => true])
+            ->assertExitCode(0);
+
+        $run = SeasonvarImportRun::query()->latest('id')->firstOrFail();
+
+        $this->assertSame(1, data_get($run->summary, 'last_media_metadata_backlog.media_checked'));
+        $this->assertSame('1080p', $repairable->fresh()->quality);
+        $this->assertSame('mp4', $repairable->fresh()->format);
+        $this->assertSame('voiceover', $repairable->fresh()->variant_type);
+        $this->assertSame('voiceover-default', $repairable->fresh()->variant_key);
     }
 
     public function test_it_detects_dvd_media_quality_during_import_cycle(): void

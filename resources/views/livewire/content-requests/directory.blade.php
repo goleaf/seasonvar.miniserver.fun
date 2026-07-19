@@ -24,6 +24,8 @@
 
     <div wire:loading.delay wire:target="search,type,status,sort,clearFilters" role="status" aria-live="polite" class="rounded-control bg-sky-50 px-4 py-3 text-sm font-bold text-sky-700">{{ __('requests.states.loading') }}</div>
 
+    @island(name: 'content-request-directory-pagination', always: true, with: $this->paginationIslandPage)
+    <x-ui.pagination-region name="content-request-directory-results">
     @if (! $schemaReady)
         <x-ui.panel><p role="status" class="text-sm text-slate-600">{{ __('requests.states.unavailable') }}</p></x-ui.panel>
     @elseif ($queryFailed)
@@ -39,6 +41,8 @@
                 <x-content-requests.card :request="$request" />
             @endforeach
         </section>
-        <nav aria-label="{{ __('requests.fields.pagination') }}">{{ $requests->links() }}</nav>
+        <nav aria-label="{{ __('requests.fields.pagination') }}">{{ $requests->links(data: ['region' => 'content-request-directory-results']) }}</nav>
     @endif
+    </x-ui.pagination-region>
+    @endisland
 </div>

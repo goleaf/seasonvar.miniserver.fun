@@ -60,7 +60,20 @@
                         </fieldset>
                     @endif
                     <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
-                        <span class="text-sm font-bold text-slate-500" aria-live="polite">{{ $selectedCountLabel }}</span>
+                        <div class="min-w-0">
+                            <span
+                                class="block text-sm font-bold text-slate-500"
+                                aria-live="polite"
+                                wire:text="@js(__('collections.membership.selected', ['count' => '__livewire_count__'])).replace('__livewire_count__', selectedCollectionPublicIds.length)"
+                            >{{ $selectedCountLabel }}</span>
+                            <span
+                                role="status"
+                                aria-live="polite"
+                                wire:dirty
+                                wire:target="selectedCollectionPublicIds"
+                                class="mt-1 text-sm font-bold text-amber-800"
+                            >{{ __('collections.membership.unsaved') }}</span>
+                        </div>
                         <div class="flex w-full gap-2 sm:w-auto">
                             <button type="button" data-collection-dialog-close wire:click="closeSelector" class="inline-flex min-h-11 flex-1 items-center justify-center rounded-control bg-slate-100 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-200 sm:flex-none">{{ __('collections.actions.cancel') }}</button>
                             <button type="submit" wire:loading.attr="disabled" wire:target="apply" class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-600 disabled:cursor-wait disabled:opacity-60 sm:flex-none">

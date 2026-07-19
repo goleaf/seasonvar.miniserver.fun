@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Collections;
 
 use App\Livewire\Concerns\InteractsWithCollectionLocale;
+use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Models\User;
 use App\Services\Collections\CatalogCollectionQuery;
 use App\Services\Collections\CatalogCollectionSchema;
@@ -19,6 +20,7 @@ use Livewire\WithPagination;
 final class CatalogCollectionProfile extends Component
 {
     use InteractsWithCollectionLocale;
+    use InteractsWithPaginationIslands;
     use WithPagination;
 
     #[Locked]

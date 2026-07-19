@@ -14,6 +14,8 @@
         <textarea id="profile-moderation-private-note" wire:model="privateNote" rows="3" maxlength="2000" class="mt-2 w-full rounded-control border border-slate-300 px-3 py-2.5 text-sm leading-6 text-slate-800"></textarea>
     </label>
 
+    @island(name: 'profile-administration-pagination', always: true, with: $this->paginationIslandPage)
+    <x-ui.pagination-region name="profile-administration-results">
     @if ($reports === null)
         <div role="alert" class="rounded-panel border border-rose-200 bg-rose-50 p-8 text-center shadow-panel">
             <p class="text-sm font-semibold text-rose-800">{{ __('profiles.errors.load_failed') }}</p>
@@ -47,6 +49,8 @@
                 </article>
             @endforeach
         </div>
-        <nav aria-label="{{ __('profiles.pagination') }}">{{ $reports->links() }}</nav>
+        <nav aria-label="{{ __('profiles.pagination') }}">{{ $reports->links(data: ['region' => 'profile-administration-results']) }}</nav>
     @endif
+    </x-ui.pagination-region>
+    @endisland
 </div>

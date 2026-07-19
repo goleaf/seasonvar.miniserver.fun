@@ -17,6 +17,7 @@ use App\Services\Api\V1\Sync\ApiSyncReadiness;
 use App\Services\UserPortal\UserPortalIdPaginator;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Pagination\LengthAwarePaginator as ConcreteLengthAwarePaginator;
 use Illuminate\Support\Facades\Schema;
 
 final readonly class UserLibraryQuery
@@ -27,6 +28,7 @@ final readonly class UserLibraryQuery
         private ApiSyncReadiness $syncReadiness,
         private CatalogPersonalUpdateQuery $personalUpdates,
         private UserPortalIdPaginator $paginator,
+        private CatalogTitleCardCountLoader $cardCounts,
     ) {}
 
     /** @return LengthAwarePaginator<int, CatalogTitleUserState> */
@@ -40,7 +42,7 @@ final readonly class UserLibraryQuery
             ->where('in_watchlist', true)
             ->tap(fn (Builder $query): Builder => $this->applyOrder($query, $filters, 'watchlist_updated_at'));
 
-        return $this->paginator->paginate(
+        return $this->hydrateCardCounts($this->paginator->paginate(
             $user,
             'library-watchlist',
             $this->dimensions($filters),
@@ -48,7 +50,7 @@ final readonly class UserLibraryQuery
             $filters->perPage,
             $pageName,
             $refresh,
-        );
+        ), $user);
     }
 
     /** @return LengthAwarePaginator<int, CatalogTitleUserState> */
@@ -61,7 +63,10 @@ final readonly class UserLibraryQuery
             ->whereNotNull('rating')
             ->tap(fn (Builder $query): Builder => $this->applyOrder($query, $filters, 'rating_updated_at'));
 
-        return $this->paginator->paginate($user, 'library-ratings', $this->dimensions($filters), $query, $filters->perPage, $pageName);
+        return $this->hydrateCardCounts(
+            $this->paginator->paginate($user, 'library-ratings', $this->dimensions($filters), $query, $filters->perPage, $pageName),
+            $user,
+        );
     }
 
     /** @return LengthAwarePaginator<int, CatalogTitleUserState> */
@@ -77,7 +82,10 @@ final readonly class UserLibraryQuery
 
         $query->orderByDesc('recommendation_feedback_updated_at')->orderByDesc('id');
 
-        return $this->paginator->paginate($user, 'library-recommendation-feedback', [], $query, 24, $pageName);
+        return $this->hydrateCardCounts(
+            $this->paginator->paginate($user, 'library-recommendation-feedback', [], $query, 24, $pageName),
+            $user,
+        );
     }
 
     /** @return LengthAwarePaginator<int, CatalogTitleUserState> */
@@ -91,14 +99,14 @@ final readonly class UserLibraryQuery
             ->where('watch_status', $status->value)
             ->tap(fn (Builder $query): Builder => $this->applyOrder($query, $filters, 'watch_status_updated_at'));
 
-        return $this->paginator->paginate(
+        return $this->hydrateCardCounts($this->paginator->paginate(
             $user,
             'library-watch-status',
             [...$this->dimensions($filters), 'status' => $status->value],
             $query,
             $filters->perPage,
             $pageName,
-        );
+        ), $user);
     }
 
     /** @return LengthAwarePaginator<int, CatalogTitleUserState> */
@@ -117,14 +125,14 @@ final readonly class UserLibraryQuery
 
         $query->orderByDesc('recommendation_feedback_updated_at')->orderByDesc('id');
 
-        return $this->paginator->paginate(
+        return $this->hydrateCardCounts($this->paginator->paginate(
             $user,
             'library-recommendation-feedback-type',
             ['feedback' => $feedback->value],
             $query,
             24,
             $pageName,
-        );
+        ), $user);
     }
 
     /** @return LengthAwarePaginator<int, CatalogTitleUserState> */
@@ -156,6 +164,7 @@ final readonly class UserLibraryQuery
             $filters->perPage,
             $pageName,
         );
+        $this->hydrateCardCounts($paginator, $user);
         $this->personalUpdates->hydrateIndicators($user, $paginator->getCollection());
 
         return $paginator;
@@ -298,7 +307,7 @@ final readonly class UserLibraryQuery
         }
 
         return $query->with([
-            'catalogTitle' => function ($relation) use ($user): void {
+            'catalogTitle' => function ($relation): void {
                 $relation->getQuery()
                     ->select([
                         'id',
@@ -311,10 +320,27 @@ final readonly class UserLibraryQuery
                         'poster_url',
                         'indexed_at',
                     ])
-                    ->with($this->taxonomies->cardSummaryLoads())
-                    ->withCount($this->titles->publicCardCounts($user));
+                    ->with($this->taxonomies->cardSummaryLoads());
             },
         ]);
+    }
+
+    /**
+     * @template TModel of \Illuminate\Database\Eloquent\Model
+     *
+     * @param  ConcreteLengthAwarePaginator<int, TModel>  $paginator
+     * @return ConcreteLengthAwarePaginator<int, TModel>
+     */
+    private function hydrateCardCounts(ConcreteLengthAwarePaginator $paginator, User $user): ConcreteLengthAwarePaginator
+    {
+        $titles = $paginator->getCollection()
+            ->pluck('catalogTitle')
+            ->filter(fn (mixed $title): bool => $title instanceof CatalogTitle)
+            ->values();
+
+        $this->cardCounts->load($titles, $user);
+
+        return $paginator;
     }
 
     /**

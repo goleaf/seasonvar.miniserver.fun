@@ -8,6 +8,9 @@ export APP_ENV="${APP_ENV:-testing}"
 export APP_DEBUG="${APP_DEBUG:-false}"
 export APP_KEY="${APP_KEY:-base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}"
 export APP_URL="${APP_URL:-http://localhost}"
+export APP_MAINTENANCE_DRIVER="${APP_MAINTENANCE_DRIVER:-cache}"
+export APP_MAINTENANCE_STORE="${APP_MAINTENANCE_STORE:-array}"
+export PROJECT_DOCS_PUBLIC_BASE_URL="${PROJECT_DOCS_PUBLIC_BASE_URL:-https://seasonvar.miniserver.fun}"
 export BROADCAST_CONNECTION="${BROADCAST_CONNECTION:-null}"
 export CACHE_STORE="${CACHE_STORE:-array}"
 export COMPOSER_ALLOW_SUPERUSER="${COMPOSER_ALLOW_SUPERUSER:-1}"
@@ -51,6 +54,13 @@ run_laravel_cache_validation() (
     php artisan view:cache --no-interaction
 )
 
+run_docs() (
+    trap clear_laravel_cache_artifacts EXIT
+    export DB_CONNECTION=sqlite
+    export DB_DATABASE=:memory:
+    php artisan project:docs-refresh --check --no-interaction
+)
+
 run_backend() (
     trap clear_laravel_cache_artifacts EXIT
     export DB_CONNECTION=sqlite
@@ -61,9 +71,9 @@ run_backend() (
     clear_laravel_cache_artifacts
     ./vendor/bin/pint --test --format=agent
     composer rector:check
-    find app bootstrap config database routes tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+    find app bootstrap config database routes tests -path 'bootstrap/cache' -prune -o -type f -name '*.php' -print0 | xargs -0 -n1 php -l
     composer analyse
-    php artisan project:docs-refresh --check --no-interaction
+    run_docs
     run_laravel_cache_validation
     php artisan test
 )
@@ -105,6 +115,9 @@ run_browser() (
 profile="${1:-full}"
 
 case "$profile" in
+    docs)
+        run_docs
+        ;;
     backend)
         run_backend
         ;;
@@ -125,7 +138,7 @@ case "$profile" in
         ;;
     *)
         echo "Неизвестный профиль проверки CI: $profile" >&2
-        echo "Допустимые профили: backend, frontend, browser, pre-push, full." >&2
+        echo "Допустимые профили: docs, backend, frontend, browser, pre-push, full." >&2
         exit 2
         ;;
 esac

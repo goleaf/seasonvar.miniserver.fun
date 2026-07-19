@@ -10,6 +10,21 @@
 
 `CODE_STANDARDS.md` владеет правилами PHP/Laravel и именования. Архитектурные boundaries принадлежат `architecture.md`, интерфейсные правила — `UI_STANDARDS.md`, а эксплуатационная история — `MAINTENANCE_LOG.md`.
 
+## Постоянные требования продукта и repository
+
+- Это существующий production-style каталог и serial streaming portal, а не новый проект. Перед изменением нужно полностью проверить текущую реализацию и её dependants.
+- Всё подтверждённо работающее поведение сохраняется. Изменения по умолчанию additive и backward-compatible; destructive migration допустима только с обоснованной документированной migration/rollback/data-recovery strategy.
+- Нельзя создавать fake controls, fake data, fake integrations, fake providers, fake payments, fake analytics, fake health, fake progress или любую другую фиктивную функциональность. Каждый видимый control обязан реально работать.
+- Для каждого интерфейса реализуются truthful loading, empty, failure, unauthorized, unavailable и unsupported states; внутренние ошибки, secrets и недоступные provider capabilities пользователю не симулируются.
+- Используются фактически установленные версии: Laravel 13, Livewire 4 и Tailwind CSS 4, пока dependency inventory подтверждает эти major versions. Flux/Flux Pro разрешены только когда они действительно установлены; Laravel Volt запрещён.
+- Нельзя создавать вторую конкурирующую architecture существующей feature. Сначала переиспользуются существующие services, actions, DTO, value objects, enums, query objects, policies, notifications и components.
+- Внешняя infrastructure не добавляется без доказанной необходимости. Cron, queue, scheduler, supervisor, workers и background services не становятся обязательными, если текущая feature может безопасно работать через существующую synchronous/optional boundary.
+- Automated tests создаются и запускаются согласно текущему постоянному testing contract. Task-specific historical запрет тестов действует только внутри явно зафиксированной прежней задачи, не повреждает test infrastructure и не переносится на будущие изменения автоматически.
+- Проверка изменения сочетает применимые automated tests со static inspection, route/schema/query inspection, browser smoke, security inspection и manual acceptance checklist. Ни один отдельный вид evidence не заменяет остальные необходимые gates.
+- Работа ведётся только в существующей `main`; временные ветки не создаются. Затронутая документация, русский `CHANGELOG.md` и при visitor-visible изменении `README.md` обновляются до commit; завершённая работа commit-ится и отправляется в configured remote.
+
+Администрация обязана интегрироваться с каждой из 26 основных областей портала, не дублируя их: (1) multilingual home, (2) catalog taxonomy и title pages, (3) global search и discovery, (4) read-only/mobile API, (5) importer/parser, (6) media/source availability, (7) playback и authorized delivery, (8) seasons/episodes, (9) personal library/progress/history, (10) collections, (11) tags, (12) comments/discussions, (13) reviews/ratings, (14) public profiles/privacy, (15) authentication/sessions/account lifecycle, (16) account settings, (17) release calendar, (18) recommendations, (19) content requests, (20) technical support, (21) help center, (22) premium/billing, (23) responsive/mobile browser behavior, (24) rights-holder/legal restrictions, (25) advertiser/commercial boundaries и (26) canonical administration/operations. Если область ещё не реализована, administration показывает только truthful unavailable state и не создаёт fake domain.
+
 ## Постоянные требования системной интеграции
 
 - Каждая feature использует канонические shared services и не копирует domain logic в соседний модуль.

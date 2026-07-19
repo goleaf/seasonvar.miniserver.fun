@@ -7,6 +7,7 @@ namespace App\Livewire\Library;
 use App\Enums\CatalogPublicationType;
 use App\Enums\CatalogRecommendationFeedback;
 use App\Enums\CatalogWatchStatus;
+use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Livewire\Forms\Library\LibraryFilters;
 use App\Models\CatalogTitle;
 use App\Models\EpisodePlaybackMarker;
@@ -34,6 +35,7 @@ use Livewire\WithPagination;
 
 final class UserLibraryPage extends Component
 {
+    use InteractsWithPaginationIslands;
     use WithPagination;
 
     private const SECTIONS = [

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Profile;
 
+use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Models\User;
 use App\Services\Profiles\UserProfileModerationService;
 use Illuminate\Contracts\View\View;
@@ -14,6 +15,7 @@ use Throwable;
 
 final class UserProfileAdministrationManager extends Component
 {
+    use InteractsWithPaginationIslands;
     use WithPagination;
 
     public string $privateNote = '';

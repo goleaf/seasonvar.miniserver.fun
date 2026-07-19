@@ -5,6 +5,8 @@ use App\Http\Middleware\ApplyAccountPreferences;
 use App\Http\Middleware\AssignApiRequestId;
 use App\Http\Middleware\CachePublicPage;
 use App\Http\Middleware\CatalogCollectionResponseHeaders;
+use App\Http\Middleware\EnsureAccountAccess;
+use App\Http\Middleware\EnsureAdministrator;
 use App\Http\Middleware\EnsureMobileEmailIsVerified;
 use App\Http\Middleware\PrivateAccountResponse;
 use App\Http\Middleware\PublicHttpCacheHeaders;
@@ -74,6 +76,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'collection.locale' => SetInterfaceLocale::class,
             'collection.response' => CatalogCollectionResponseHeaders::class,
             'account.private' => PrivateAccountResponse::class,
+            'account.active' => EnsureAccountAccess::class,
+            'admin.access' => EnsureAdministrator::class,
             'verified.api' => EnsureMobileEmailIsVerified::class,
         ]);
         $middleware->web(append: [

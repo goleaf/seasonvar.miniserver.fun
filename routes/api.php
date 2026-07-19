@@ -110,7 +110,7 @@ Route::middleware('throttle:api-catalog-sync')->prefix('v1/sync')->name('api.v1.
     Route::get('/changes', [SyncController::class, 'catalog'])->name('changes');
 });
 
-Route::middleware('auth.optional.sanctum')->prefix('v1')->name('api.v1.')->group(function (): void {
+Route::middleware(['auth.optional.sanctum', 'account.active'])->prefix('v1')->name('api.v1.')->group(function (): void {
     Route::post('/titles/{titleSlug}/playback-sessions', PlaybackSessionController::class)
         ->middleware('throttle:api-playback-session')
         ->where('titleSlug', '[^/]+')
@@ -136,7 +136,7 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
         ->middleware([SetSignedAuthenticationLocale::class, 'signed'])
         ->name('auth.verify');
     Route::post('/auth/email/verification-notification', ResendVerificationController::class)
-        ->middleware(['auth:sanctum', 'throttle:mobile-verification'])
+        ->middleware(['auth:sanctum', 'account.active', 'throttle:mobile-verification'])
         ->name('auth.verification-notification');
     Route::post('/auth/forgot-password', ForgotPasswordController::class)
         ->middleware('throttle:mobile-forgot-password')
@@ -148,10 +148,10 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
     Route::put('/titles/{titleSlug}/episodes/{episode}/progress', PlaybackProgressController::class)
         ->where('titleSlug', '[^/]+')
         ->whereNumber('episode')
-        ->middleware(['auth:sanctum', 'abilities:mobile:write', 'verified.api', 'throttle:api-playback-progress'])
+        ->middleware(['auth:sanctum', 'account.active', 'abilities:mobile:write', 'verified.api', 'throttle:api-playback-progress'])
         ->name('titles.episodes.progress.update');
 
-    Route::middleware(['auth:sanctum', 'abilities:mobile:read'])->group(function (): void {
+    Route::middleware(['auth:sanctum', 'account.active', 'abilities:mobile:read'])->group(function (): void {
         Route::get('/auth/devices', [TokenController::class, 'index'])
             ->name('auth.devices.index');
 
@@ -169,7 +169,7 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
         });
     });
 
-    Route::middleware(['auth:sanctum', 'abilities:mobile:read'])->group(function (): void {
+    Route::middleware(['auth:sanctum', 'account.active', 'abilities:mobile:read'])->group(function (): void {
         Route::get('/me', [AccountController::class, 'show'])->name('me.show');
         Route::get('/me/sync', [SyncController::class, 'user'])->name('me.sync.show');
         Route::get('/me/watchlist', [UserLibraryController::class, 'watchlist'])

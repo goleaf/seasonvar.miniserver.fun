@@ -13,6 +13,8 @@
         </div>
     </header>
 
+    @island(name: 'profile-collections-pagination', always: true, with: $this->paginationIslandPage)
+    <x-ui.pagination-region name="profile-collections-results">
     @if ($collections->isEmpty())
         <section class="rounded-panel border border-dashed border-slate-300 bg-white p-8 text-center shadow-panel">
             <p class="text-sm font-semibold text-slate-600">{{ __('collections.profile.empty') }}</p>
@@ -24,6 +26,8 @@
                 <x-collections.collection-card wire:key="profile-collection-{{ $collection->public_id }}" :collection="$collection" />
             @endforeach
         </section>
-        <nav aria-label="{{ __('collections.page.pagination') }}">{{ $collections->links() }}</nav>
+        <nav aria-label="{{ __('collections.page.pagination') }}">{{ $collections->links(data: ['region' => 'profile-collections-results']) }}</nav>
     @endif
+    </x-ui.pagination-region>
+    @endisland
 </div>

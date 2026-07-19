@@ -8,6 +8,19 @@
 
 Пункт считается исправленным только после конкретного code/configuration change и доступной проверки. Непроверенные provider, production или credential-dependent boundaries отмечаются `unresolved`/`not_performed`, а не «secure».
 
+## Постоянные security и privacy rules
+
+- Каждое private действие авторизуется server-side; IDOR, CSRF и mass assignment предотвращаются. Enum/type values и все resource relationships валидируются до использования.
+- Reflected/stored XSS, path traversal, SSRF, open redirects и executable uploads предотвращаются allowlist-based validation и безопасными responders.
+- Upload проверяется по declared MIME и фактическому содержимому. Private files хранятся вне public executable paths и выдаются только через authorized/signed download boundary.
+- Public/private errors не раскрывают stack traces, SQL, class names, storage paths, credentials, protected source URLs, payment tokens, session IDs или unnecessary internal user IDs.
+- Passwords/tokens не логируются. Secrets не включаются в cache keys; private data не получает global/public cache, а browser authorization state не считается authority.
+- Authentication credentials не хранятся в insecure browser storage. Payment/webhook operations используют official provider security и idempotency для retryable financial/state-changing действий.
+- Public information, private staff notes, billing/legal evidence и operational diagnostics разделены. Administration применяет least privilege и meaningful secret-free audit.
+- Account merge, export и deletion сохраняют privacy, retention и correction contracts. Advertisers никогда не получают portal-user personal data.
+- Rights-holder case data и identity/authority/legal documents доступны только отдельно авторизованным staff. Private technical-ticket data не публикуется и не попадает в public cache/search.
+- Invasive device fingerprinting и inference sensitive personal traits запрещены.
+
 Task 27 verified account lifecycle against every SQLite FK to `users`. Единственный `RESTRICT` — immutable `admin_audit_events.actor_id`; `AccountService` теперь проверяет его до cleanup и возвращает локализованную retention validation вместо SQL error/partial deletion. Generic morph notifications, не защищённые FK, удаляются явно. Export выдаёт database notification data только по stable type/field allowlist и не включает private notes, message body, raw URL или неизвестные future fields.
 
 ## Security requirements для upgrades

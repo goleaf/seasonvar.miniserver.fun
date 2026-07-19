@@ -7,4 +7,5 @@ return [
     'showing' => 'Showing',
     'of' => 'of',
     'page' => 'Page :page',
+    'loading' => 'Loading page',
 ];

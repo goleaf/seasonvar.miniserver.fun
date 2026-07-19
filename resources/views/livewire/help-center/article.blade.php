@@ -74,9 +74,8 @@
             @endif
 
             <section class="rounded-panel border border-slate-200 bg-white p-5 shadow-panel sm:p-6">
-                <button type="button" wire:click="$toggle('showReportForm')" class="min-h-11 rounded-control px-2 text-left text-sm font-black text-emerald-700 hover:underline" aria-expanded="{{ $showReportForm ? 'true' : 'false' }}">{{ __('help.reports.open') }}</button>
-                @if ($showReportForm)
-                    <form wire:submit="submitReport" class="mt-4 max-w-2xl space-y-4" aria-label="{{ __('help.accessibility.report_form') }}">
+                <button type="button" wire:click="$toggle('showReportForm')" class="min-h-11 rounded-control px-2 text-left text-sm font-black text-emerald-700 hover:underline" aria-controls="help-report-form" aria-expanded="{{ $showReportForm ? 'true' : 'false' }}">{{ __('help.reports.open') }}</button>
+                <form id="help-report-form" wire:show="showReportForm" wire:cloak wire:submit="submitReport" class="mt-4 max-w-2xl space-y-4" aria-label="{{ __('help.accessibility.report_form') }}">
                         <div>
                             <label for="help-report-reason" class="block text-sm font-bold text-slate-700">{{ __('help.reports.reason_label') }}</label>
                             <select id="help-report-reason" wire:model="reportReason" required class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2 text-sm">
@@ -96,8 +95,7 @@
                             <button type="submit" wire:loading.attr="disabled" wire:target="submitReport" class="min-h-11 rounded-control bg-emerald-700 px-4 py-2 text-sm font-black text-white">{{ __('help.reports.submit') }}</button>
                             <button type="button" wire:click="$set('showReportForm', false)" class="min-h-11 rounded-control bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700">{{ __('help.reports.cancel') }}</button>
                         </div>
-                    </form>
-                @endif
+                </form>
             </section>
 
             @if ($statusMessage !== null)

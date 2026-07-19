@@ -133,7 +133,9 @@ final readonly class HelpCenterQuery
         return $translation instanceof HelpCategoryTranslation
             ? HelpCategory::query()
                 ->visible()
-                ->with(['translations' => fn ($query) => $query->whereIn('locale', array_unique([$requestedLocale, $fallback]))])
+                ->with(['translations' => fn ($query) => $query
+                    ->select(['id', 'help_category_id', 'locale', 'slug', 'title', 'description'])
+                    ->whereIn('locale', array_unique([$requestedLocale, $fallback]))])
                 ->find($translation->help_category_id)
             : null;
     }
@@ -280,7 +282,9 @@ final readonly class HelpCenterQuery
         $locales = array_values(array_unique([$requestedLocale, $fallback]));
         $categories = HelpCategory::query()
             ->visible()
-            ->with(['translations' => fn ($query) => $query->whereIn('locale', $locales)])
+            ->with(['translations' => fn ($query) => $query
+                ->select(['id', 'help_category_id', 'locale', 'slug', 'title', 'description'])
+                ->whereIn('locale', $locales)])
             ->withCount(['articles as visible_articles_count' => fn (Builder $query) => $this->resolver
                 ->constrainVisible($query, $user)
                 ->whereHas('translations', fn (Builder $translation) => $translation
@@ -351,9 +355,14 @@ final readonly class HelpCenterQuery
                 ->whereIn('locale', $locales)
                 ->where('is_published', true))
             ->with([
-                'translations' => fn ($query) => $query->whereIn('locale', $locales)->where('is_published', true),
+                'translations' => fn ($query) => $query
+                    ->select(['id', 'help_article_id', 'locale', 'slug', 'title', 'summary', 'is_published'])
+                    ->whereIn('locale', $locales)
+                    ->where('is_published', true),
                 'category:id,code',
-                'category.translations' => fn ($query) => $query->whereIn('locale', $locales),
+                'category.translations' => fn ($query) => $query
+                    ->select(['id', 'help_category_id', 'locale', 'slug', 'title'])
+                    ->whereIn('locale', $locales),
             ]);
     }
 

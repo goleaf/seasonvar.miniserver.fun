@@ -18,6 +18,8 @@
         @endif
     </div>
 
+    @island(name: 'comment-administration-pagination', always: true, with: $this->paginationIslandPage)
+    <x-ui.pagination-region name="comment-administration-results">
     @if (! $available)
         <div class="rounded-panel border border-slate-200 bg-white p-6 text-center shadow-panel">
             <p class="text-sm font-semibold text-slate-600">{{ __('comments.states.comments_disabled') }}</p>
@@ -123,10 +125,12 @@
             </ol>
 
             @if ($comments->hasPages())
-                <nav aria-label="{{ __('comments.accessibility.pagination') }}">{{ $comments->links() }}</nav>
+                <nav aria-label="{{ __('comments.accessibility.pagination') }}">{{ $comments->links(data: ['region' => 'comment-administration-results']) }}</nav>
             @endif
         @endif
     @endif
+    </x-ui.pagination-region>
+    @endisland
 
     @if (! $queryFailed && $selectedCommentId !== null)
         <dialog data-comment-dialog data-comment-dialog-open class="max-h-[calc(100dvh-2rem)] w-[min(48rem,calc(100%-2rem))] overflow-y-auto rounded-panel border-0 bg-white p-0 shadow-2xl backdrop:bg-slate-950/60" aria-labelledby="comment-moderation-dialog-title">

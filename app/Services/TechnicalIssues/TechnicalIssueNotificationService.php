@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Services\TechnicalIssues;
 
+use App\Enums\AdminPermission;
 use App\Enums\TechnicalIssueNotificationType;
 use App\Models\TechnicalIssue;
 use App\Models\TechnicalIssueNotificationPreference;
 use App\Models\User;
 use App\Notifications\TechnicalIssueActivityNotification;
+use App\Services\Admin\AdminEligibleUserQuery;
 use App\Support\DeterministicUuid;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -16,6 +18,8 @@ use Throwable;
 
 final class TechnicalIssueNotificationService
 {
+    public function __construct(private readonly AdminEligibleUserQuery $eligibleAdministrators) {}
+
     public function submitted(int $issueId): void
     {
         $this->safely(function () use ($issueId): void {
@@ -25,7 +29,7 @@ final class TechnicalIssueNotificationService
                 return;
             }
 
-            $admins = User::query()->whereIn('email', (array) config('seasonvar.admin_emails', []))->get(['id', 'name']);
+            $admins = $this->eligibleAdministrators->forPermission(AdminPermission::TicketsSupport)->get(['id', 'name']);
             $recipients = $admins->when($issue->requester instanceof User, fn ($users) => $users->push($issue->requester))->unique('id');
 
             foreach ($recipients as $recipient) {

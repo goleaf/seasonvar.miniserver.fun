@@ -59,6 +59,7 @@
         </nav>
 
         <div class="min-w-0">
+            @island(name: 'account-settings-pagination', always: true, with: $this->paginationIslandPage)
             @switch($activeSection->value)
                 @case('profile')
                     <section aria-labelledby="settings-profile-title" class="rounded-panel border border-slate-200 bg-white p-4 shadow-panel sm:p-6">
@@ -334,6 +335,7 @@
 
                 @case('premium')
                     <section aria-labelledby="settings-premium-title" class="space-y-4">
+                        <x-ui.pagination-region name="account-premium-payments-results">
                         <div class="rounded-panel border border-slate-200 bg-white p-4 shadow-panel sm:p-6">
                             <div class="flex min-w-0 flex-wrap items-start justify-between gap-4">
                                 <div class="min-w-0">
@@ -444,10 +446,11 @@
                                         @endforeach
                                     </ul>
                                 </div>
-                                <nav class="mt-4" aria-label="{{ __('premium.a11y.payment_history') }}">{{ $premiumPayments->links() }}</nav>
+                                <nav class="mt-4" aria-label="{{ __('premium.a11y.payment_history') }}">{{ $premiumPayments->links(data: ['region' => 'account-premium-payments-results']) }}</nav>
                             @endif
                             <p class="mt-4 text-xs font-semibold leading-5 text-slate-500">{{ __('premium.settings.refund_policy') }}</p>
                         </div>
+                        </x-ui.pagination-region>
                     </section>
                     @break
 
@@ -470,6 +473,7 @@
                     </section>
                     @break
             @endswitch
+            @endisland
         </div>
     </div>
 

@@ -130,6 +130,8 @@
         </div>
     </div>
 
+    @island(name: 'collection-page-pagination', always: true, with: $this->paginationIslandPage)
+    <x-ui.pagination-region name="collection-page-results">
     <x-ui.panel :title="$itemResultTitle" icon="fa-solid fa-clapperboard" :pad="false">
         @if ($items->isEmpty())
             <div class="p-8 text-center">
@@ -153,9 +155,11 @@
                     </li>
                 @endforeach
             </ol>
-            <nav class="p-4" aria-label="{{ __('collections.page.pagination') }}">{{ $items->links() }}</nav>
+            <nav class="p-4" aria-label="{{ __('collections.page.pagination') }}">{{ $items->links(data: ['region' => 'collection-page-results']) }}</nav>
         @endif
     </x-ui.panel>
+    </x-ui.pagination-region>
+    @endisland
 
     @if ($unavailableItems->isNotEmpty())
         <x-ui.panel :title="__('collections.page.unavailable')" :subtitle="__('collections.page.unavailable_hint')" icon="fa-solid fa-eye-slash">

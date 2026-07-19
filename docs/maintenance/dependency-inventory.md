@@ -1,6 +1,6 @@
 # Канонический реестр прямых зависимостей
 
-Аудит: 18.07.2026; дополнено 19.07.2026 после установки Laravel Debugbar. Источники: `composer.json`, `composer.lock`, `composer show --direct --format=json`, `composer licenses --format=json`, `package.json`, `package-lock.json`, `npm ls --depth=0`, package manifest и полный repository usage search. Основные таблицы содержат только direct dependencies; transitive packages упоминаются лишь там, где они образуют production boundary. Версия означает состояние lock-файла, а не рекомендацию обновиться.
+Аудит: 18.07.2026; повторно сверен 19.07.2026 после установки Laravel Debugbar и последующих repository changes. Источники: `composer.json`, `composer.lock`, `composer show --direct --format=json`, `composer licenses --format=json`, `package.json`, `package-lock.json`, `npm ls --depth=0`, package manifest и полный repository usage search. Основные таблицы содержат только 27 direct dependencies; transitive packages упоминаются лишь там, где они образуют production boundary. Версия означает состояние lock-файла, а не рекомендацию обновиться.
 
 ## Composer: назначение и решение
 
@@ -9,7 +9,7 @@
 | `laravel/framework` | `13.20.0` / `^13.20` | production | HTTP, Eloquent, auth, validation, cache, queue, mail, filesystem, console; весь портал | `bootstrap/app.php`, `config/*.php`, application providers | retain; canonical framework |
 | `laravel/sanctum` | `4.3.2` / `^4.3` | production | Mobile/API token authentication and abilities | `config/sanctum.php`, API middleware, `User::HasApiTokens` | retain; required by mobile API |
 | `laravel/tinker` | `3.0.2` / `^3.0` | production/operations | Controlled local REPL for repository operators; not exposed to HTTP or admin | auto-discovered command only | retain; review production install policy before any removal |
-| `livewire/livewire` | `4.3.3` / `^4.3` | production | All full-page interactive HTML, pagination, uploads, navigation and server state | `config/livewire.php`, `app/Livewire`, hashed endpoints, `resources/js/app.js` | retain; canonical UI state boundary; no Volt |
+| `livewire/livewire` | `4.3.3` / `^4.3` | production | All full-page interactive HTML, pagination, uploads, navigation and server state | `config/livewire.php`, `app/Livewire`, hashed endpoints, `resources/js/app.js`; generator explicitly uses `type=class` | retain and configure; canonical UI state boundary; no Volt/SFC drift |
 | `wddyousuf/eloquent-autocache` | `0.2.4` / `^0.2.3` | production | Opt-in cache for the bounded public Country/Genre Top lists only | `config/autocache.php`, `CachesCatalogFilterOptions` | retain; isolated and disableable fallback |
 | `driftingly/rector-laravel` | `2.5.0` / `^2.5` | development | Laravel-aware Rector rules | `rector.php`, `rector-max.php` | retain; static upgrade audit |
 | `fakerphp/faker` | `1.24.1` / `^1.23` | development | Factories and existing fixture/test data only | `database/factories`, tests | retain; no runtime bundle |
@@ -45,14 +45,14 @@
 
 | Package | Routes / commands / migrations | Bundle and runtime | Mandatory / replacement difficulty | Removal condition and compatibility limitation | Maintenance / license / owner |
 | --- | --- | --- | --- | --- | --- |
-| `laravel/framework` | `/up` health plus framework commands; application owns 101 migrations | PHP `^8.3`; all requests and CLI | mandatory / very high | only staged major framework migration preserving every public contract | active installed line; MIT; architecture/operations |
+| `laravel/framework` | `/up` health plus framework commands; application owns 110 migrations at the Task 29 final audit | PHP `^8.3`; all requests and CLI | mandatory / very high | only staged major framework migration preserving every public contract | active installed line; MIT; architecture/operations |
 | `laravel/sanctum` | `/sanctum/csrf-cookie`, `sanctum:prune-expired`; project migration owns `personal_access_tokens` | no frontend bundle; token/session runtime | mandatory / high | replacement must migrate tokens, abilities, pruning and mobile auth | audit clean; MIT; authentication/API |
 | `laravel/tinker` | `tinker`; no routes/migrations | CLI only | optional operations / low code, medium workflow | prove no runbook/operator dependency and remove config/provider/docs | audit clean; MIT; development/operations |
 | `livewire/livewire` | hashed asset/update/upload/preview routes and generator/config commands; no project data migration | package browser runtime plus hydration requests | mandatory / very high | only full page/state/navigation migration; preserve hashed endpoint/firewall contract | audit clean; MIT; frontend/Livewire |
 | `wddyousuf/eloquent-autocache` | `autocache:clear|flush|stats|warm`; no routes/migrations | server cache only; no bundle | optional with fallback / medium | disable, rebuild config, reload processes, prove Country/Genre query fallback, then remove trait/config/cache namespace | audit clean, not abandoned; MIT; catalog/cache |
 | `driftingly/rector-laravel` | `rector` rules via vendor binary; no runtime effects | development PHP memory/process | optional gate / low | replace rules/config and prove required profile parity | audit clean; MIT; development |
 | `fakerphp/faker` | none | development only | required by existing factories / low | usage-free factories/tests or compatible generator migration | audit clean; MIT; testing |
-| `fruitcake/laravel-debugbar` | `_debugbar/*` routes and four local diagnostic commands only while the package guard can boot; no migrations | development HTTP collectors and package-served assets; no Vite entry | optional / low | remove direct package/config, rebuild autoload/config and prove local app boots; production already installs `--no-dev` | audit clean on 19.07.2026; MIT; development diagnostics |
+| `fruitcake/laravel-debugbar` | `_debugbar/*` routes and four local diagnostic commands only while the package guard can boot; ships an optional storage migration that the project neither publishes nor loads | development HTTP collectors and package-served assets; no Vite entry | optional / low | remove direct package/config, rebuild autoload/config and prove local app boots; production already installs `--no-dev` | audit clean on 19.07.2026; MIT; development diagnostics |
 | `larastan/larastan` | `phpstan` integration; no runtime effects | development analysis memory | required by static gate / medium | replace only with equivalent Laravel type coverage | audit clean; MIT; development |
 | `laravel/boost` | Boost/MCP development commands; no intended production route | auto-discovered development tooling | optional / low | remove project/Codex integrations and docs together | audit clean; MIT; development |
 | `laravel/pail` | `pail`; no route/migration | development log reader | optional / low | remove from `composer dev` and operator docs | audit clean; MIT; development |
@@ -79,7 +79,7 @@
 - `fruitcake/laravel-debugbar` 4.4.0 adds development-only `php-debugbar/php-debugbar` 3.8.0 and `php-debugbar/symfony-bridge` 1.1.0. Both are MIT and share the same local-debug/no-production purpose; they are not separate application integration decisions.
 - No direct payment, OAuth, external search, image-processing, Redis-client or Memcached-client Composer package is installed. Payment providers are unconfigured, search uses application/Eloquent/SQLite FTS boundaries, images use installed PHP Imagick/GD extensions, and cache clients are PHP extensions/runtime services.
 - Composer plugin policy has no installed or locked plugin. Task 29 removed stale permissions for `pestphp/pest-plugin` and `php-http/discovery`; any future plugin needs its own purpose/security/scripts decision before permission is granted.
-- Composer auto-discovery registers framework/dev providers plus Sanctum, Tinker, Livewire and AutoCache. Application providers remain exactly `AppServiceProvider`, `ApiServiceProvider` and `SeasonvarQueueServiceProvider`; no duplicate registration was found.
+- Installed Composer manifest auto-discovers 13 package providers and four aliases (`Debugbar`, `Mcp`, `Livewire`, `AutoCache`); production `--no-dev` dry-run removes all 46 dev packages. Application providers remain exactly `AppServiceProvider`, `ApiServiceProvider` and `SeasonvarQueueServiceProvider`; no duplicate registration, external call or database query during provider boot was found.
 
 ## Application command audit
 
@@ -96,7 +96,7 @@ Seven scheduler entries remain bounded and named; no cron, queue, provider call 
 
 ## Lock and licensing policy
 
-- The four dependency files were hashed before maintenance work and are protected from unrelated rewrite. Task 29 changed no package version or lock entry; the separate 19.07.2026 Debugbar decision adds exactly three Composer lock entries with no update or removal.
-- `composer audit --locked` reports no advisory, malware-policy or abandoned-package record. `npm audit` reports zero known vulnerabilities across the 113 locked npm dependencies. These are dated tooling results, not a permanent safety claim.
+- The four dependency files were rehashed on 19.07.2026 and are protected from unrelated rewrite. The repeat audit changes no package version or lock entry; the earlier Debugbar decision added exactly three Composer lock entries with no update or removal.
+- Fresh 19.07.2026 `composer audit --locked` reports no advisory, malware-policy or abandoned-package record. Fresh `npm audit` reports zero known vulnerabilities across the 113 locked npm dependencies. These are dated tooling results, not a permanent safety claim.
 - Direct Composer licenses are MIT except Mockery/PHPUnit (BSD-3-Clause). Direct npm licenses are documented above; FontAwesome attribution/license obligations and axe-core MPL-2.0 must remain in any distribution/legal review.
 - A successful install or clean advisory command never replaces feature, production, privacy, accessibility or rollback verification.

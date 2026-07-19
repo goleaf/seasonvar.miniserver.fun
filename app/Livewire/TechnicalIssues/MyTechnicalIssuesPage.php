@@ -7,6 +7,7 @@ namespace App\Livewire\TechnicalIssues;
 use App\Enums\TechnicalIssueSort;
 use App\Enums\TechnicalIssueStatus;
 use App\Enums\TechnicalIssueType;
+use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Models\User;
 use App\Services\TechnicalIssues\TechnicalIssueQuery;
 use App\Services\TechnicalIssues\TechnicalIssueSchema;
@@ -23,6 +24,7 @@ use Throwable;
 
 final class MyTechnicalIssuesPage extends Component
 {
+    use InteractsWithPaginationIslands;
     use WithPagination;
 
     #[Locked]

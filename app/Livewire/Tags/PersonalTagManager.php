@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Tags;
 
 use App\DTOs\PersonalTagData;
+use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Models\User;
 use App\Services\Catalog\CatalogTitleQuery;
 use App\Services\Tags\PersonalTagLibraryQuery;
@@ -17,6 +18,7 @@ use Livewire\WithPagination;
 
 final class PersonalTagManager extends Component
 {
+    use InteractsWithPaginationIslands;
     use WithPagination;
 
     public string $search = '';

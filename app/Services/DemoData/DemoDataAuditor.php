@@ -448,6 +448,7 @@ final class DemoDataAuditor
     private function auditAssets(array $userIds, array &$violations): int
     {
         $assets = [];
+        $assetDisk = (string) config('demo-data.asset_disk');
         $profiles = DB::table((new UserProfile)->getTable())
             ->whereIn('user_id', $userIds)
             ->get(['user_id', 'avatar_disk', 'avatar_path', 'avatar_mime_type', 'cover_disk', 'cover_path', 'cover_mime_type']);
@@ -456,29 +457,38 @@ final class DemoDataAuditor
         foreach ($profiles as $profile) {
             $expectedPrefix = 'user-profiles/'.($publicIds[$profile->user_id] ?? '').'/';
 
-            if ($profile->avatar_mime_type !== 'image/webp'
+            if ($profile->avatar_disk !== $assetDisk
+                || $profile->cover_disk !== $assetDisk
+                || $profile->avatar_mime_type !== 'image/webp'
                 || $profile->cover_mime_type !== 'image/webp'
                 || ! str_starts_with((string) $profile->avatar_path, $expectedPrefix.'avatar/')
                 || ! str_starts_with((string) $profile->cover_path, $expectedPrefix.'cover/')) {
                 $violations[] = 'Профиль демонстрационного пользователя содержит недоставляемое изображение.';
             }
 
-            $assets[] = [(string) $profile->avatar_disk, (string) $profile->avatar_path];
-            $assets[] = [(string) $profile->cover_disk, (string) $profile->cover_path];
+            if ($profile->avatar_disk === $assetDisk && is_string($profile->avatar_path) && $profile->avatar_path !== '') {
+                $assets[] = [$profile->avatar_disk, $profile->avatar_path];
+            }
+
+            if ($profile->cover_disk === $assetDisk && is_string($profile->cover_path) && $profile->cover_path !== '') {
+                $assets[] = [$profile->cover_disk, $profile->cover_path];
+            }
         }
 
         $collections = DB::table((new CatalogCollection)->getTable())
             ->whereIn('owner_id', $userIds)
-            ->whereNotNull('cover_path')
             ->get(['public_id', 'cover_disk', 'cover_path', 'cover_mime_type']);
 
         foreach ($collections as $collection) {
-            if ($collection->cover_mime_type !== 'image/webp'
+            if ($collection->cover_disk !== $assetDisk
+                || $collection->cover_mime_type !== 'image/webp'
                 || ! str_starts_with((string) $collection->cover_path, 'catalog-collections/'.$collection->public_id.'/')) {
                 $violations[] = 'Демонстрационная коллекция содержит недоставляемую обложку.';
             }
 
-            $assets[] = [(string) $collection->cover_disk, (string) $collection->cover_path];
+            if ($collection->cover_disk === $assetDisk && is_string($collection->cover_path) && $collection->cover_path !== '') {
+                $assets[] = [$collection->cover_disk, $collection->cover_path];
+            }
         }
 
         $attachments = DB::table((new TechnicalIssueAttachment)->getTable().' as attachments')

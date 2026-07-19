@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\Catalog\CatalogViewingActivityQuery;
 use App\Services\Catalog\CatalogViewingActivityService;
 use Illuminate\Contracts\View\View;
+use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -47,12 +48,7 @@ final class ViewingActivity extends Component
 
     public function render(): View
     {
-        $user = $this->user();
-
-        return view('livewire.viewing-activity', [
-            'continueWatching' => $this->activity->continueWatching($user),
-            'history' => $this->activity->history($user),
-        ])->extends('layouts.app', [
+        return view('livewire.viewing-activity', $this->paginationPage)->extends('layouts.app', [
             'title' => __('catalog.viewing.title'),
             'seo' => [
                 'title' => __('catalog.viewing.title'),
@@ -61,6 +57,20 @@ final class ViewingActivity extends Component
                 'canonical' => route('viewing-activity'),
             ],
         ])->section('content');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    #[Computed]
+    public function paginationPage(): array
+    {
+        $user = $this->user();
+
+        return [
+            'continueWatching' => $this->activity->continueWatching($user),
+            'history' => $this->activity->history($user),
+        ];
     }
 
     private function user(): User

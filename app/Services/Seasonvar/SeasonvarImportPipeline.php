@@ -30,6 +30,10 @@ use Throwable;
 
 class SeasonvarImportPipeline
 {
+    private const QUEUED_FINALIZATION_CHECKPOINT = 'queued_finalization_checkpoint';
+
+    private const QUEUED_FINALIZATION_CHECKPOINT_VERSION = 1;
+
     private bool $stopRequested = false;
 
     private ?Carbon $lastRunHeartbeatAt = null;
@@ -219,17 +223,56 @@ class SeasonvarImportPipeline
         );
 
         try {
-            $storageMaintenanceResult = $this->storageMaintenance->prune();
-            $sourceAvailabilityBackfillResult = $this->sourceAvailabilityBackfill->run($loggedProgress);
-            $metadataBackfillResult = $this->metadataBackfill->run($loggedProgress);
-            $sourceStatusBackfillResult = $this->backfillParsedSourcePageStatuses($loggedProgress);
-            $mediaMetadataResult = $this->refreshMediaMetadataBacklog($loggedProgress);
-            $mediaSourceKeyResult = $this->backfillMediaSourceKeys($loggedProgress);
-            $mediaBacklogResult = $this->refreshMediaBacklog($loggedProgress);
-            $mediaSizeBacklogResult = $this->refreshMediaFileSizeBacklog($loggedProgress);
-            $relationCleanupResult = $this->metadataDeduplicator->run($loggedProgress);
-            $mergeResult = $this->titleMerger->merge($loggedProgress);
-            $recommendationResult = $this->recommendations->rebuildDirty($loggedProgress);
+            $checkpoint = $this->queuedFinalizationCheckpoint($run);
+
+            if ($checkpoint === null) {
+                $storageMaintenanceResult = $this->storageMaintenance->prune();
+                $sourceAvailabilityBackfillResult = $this->sourceAvailabilityBackfill->run($loggedProgress);
+                $metadataBackfillResult = $this->metadataBackfill->run($loggedProgress);
+                $sourceStatusBackfillResult = $this->backfillParsedSourcePageStatuses($loggedProgress);
+                $mediaMetadataResult = $this->refreshMediaMetadataBacklog($loggedProgress);
+                $mediaSourceKeyResult = $this->backfillMediaSourceKeys($loggedProgress);
+                $mediaBacklogResult = $this->refreshMediaBacklog($loggedProgress);
+                $mediaSizeBacklogResult = $this->refreshMediaFileSizeBacklog($loggedProgress);
+                $relationCleanupResult = $this->metadataDeduplicator->run($loggedProgress);
+                $mergeResult = $this->titleMerger->merge($loggedProgress);
+                $checkpoint = [
+                    'version' => self::QUEUED_FINALIZATION_CHECKPOINT_VERSION,
+                    'storage_maintenance' => $storageMaintenanceResult,
+                    'provider_availability_backfill' => $sourceAvailabilityBackfillResult,
+                    'metadata_backfill' => $metadataBackfillResult,
+                    'source_status_backfill' => $sourceStatusBackfillResult,
+                    'media_metadata_backlog' => $mediaMetadataResult,
+                    'media_source_key_backlog' => $mediaSourceKeyResult,
+                    'media_backlog' => $mediaBacklogResult,
+                    'media_size_backlog' => $mediaSizeBacklogResult,
+                    'relation_cleanup' => $relationCleanupResult,
+                    'merge' => $mergeResult,
+                ];
+                $this->storeQueuedFinalizationCheckpoint($run, $checkpoint);
+                $loggedProgress('seasonvar-queued-finalization-checkpoint-stored', [
+                    'version' => self::QUEUED_FINALIZATION_CHECKPOINT_VERSION,
+                ]);
+            } else {
+                $storageMaintenanceResult = $checkpoint['storage_maintenance'];
+                $sourceAvailabilityBackfillResult = $checkpoint['provider_availability_backfill'];
+                $metadataBackfillResult = $checkpoint['metadata_backfill'];
+                $sourceStatusBackfillResult = $checkpoint['source_status_backfill'];
+                $mediaMetadataResult = $checkpoint['media_metadata_backlog'];
+                $mediaSourceKeyResult = $checkpoint['media_source_key_backlog'];
+                $mediaBacklogResult = $checkpoint['media_backlog'];
+                $mediaSizeBacklogResult = $checkpoint['media_size_backlog'];
+                $relationCleanupResult = $checkpoint['relation_cleanup'];
+                $mergeResult = $checkpoint['merge'];
+                $loggedProgress('seasonvar-queued-finalization-checkpoint-resumed', [
+                    'version' => self::QUEUED_FINALIZATION_CHECKPOINT_VERSION,
+                ]);
+            }
+
+            $recommendationResult = $this->recommendations->rebuildDirty(
+                $loggedProgress,
+                allowFullRebuild: false,
+            );
             $recommendationSignalPruneResult = $this->pruneRecommendationSignalsAfterActivation(
                 $recommendationResult,
                 $loggedProgress,
@@ -254,8 +297,12 @@ class SeasonvarImportPipeline
                 'last_recommendation_signal_prune' => $recommendationSignalPruneResult,
             ]);
 
-            $run->refresh()->fill([
+            $run->refresh();
+            $summary = $run->summary ?? [];
+            unset($summary[self::QUEUED_FINALIZATION_CHECKPOINT]);
+            $run->fill([
                 'status' => $run->completionStatus(),
+                'summary' => $summary,
                 'finished_at' => now(),
                 'last_heartbeat_at' => now(),
             ])->save();
@@ -263,8 +310,12 @@ class SeasonvarImportPipeline
 
             return $run->refresh();
         } catch (Throwable $exception) {
+            $run->refresh();
+            $summary = $run->summary ?? [];
+            unset($summary[self::QUEUED_FINALIZATION_CHECKPOINT]);
             $run->fill([
                 'status' => 'failed',
+                'summary' => $summary,
                 'last_error' => $this->errors->fromException($exception),
                 'finished_at' => now(),
                 'last_heartbeat_at' => now(),
@@ -273,6 +324,55 @@ class SeasonvarImportPipeline
 
             throw $exception;
         }
+    }
+
+    /** @return array<string, mixed>|null */
+    private function queuedFinalizationCheckpoint(SeasonvarImportRun $run): ?array
+    {
+        $checkpoint = data_get($run->refresh()->summary, self::QUEUED_FINALIZATION_CHECKPOINT);
+
+        if (! is_array($checkpoint)
+            || ($checkpoint['version'] ?? null) !== self::QUEUED_FINALIZATION_CHECKPOINT_VERSION
+        ) {
+            return null;
+        }
+
+        foreach ($this->queuedFinalizationCheckpointResultKeys() as $key) {
+            if (! is_array($checkpoint[$key] ?? null)) {
+                return null;
+            }
+        }
+
+        return $checkpoint;
+    }
+
+    /** @param array<string, mixed> $checkpoint */
+    private function storeQueuedFinalizationCheckpoint(SeasonvarImportRun $run, array $checkpoint): void
+    {
+        $run->refresh();
+        $summary = $run->summary ?? [];
+        $summary[self::QUEUED_FINALIZATION_CHECKPOINT] = $checkpoint;
+        $run->update([
+            'summary' => $summary,
+            'last_heartbeat_at' => now(),
+        ]);
+    }
+
+    /** @return list<string> */
+    private function queuedFinalizationCheckpointResultKeys(): array
+    {
+        return [
+            'storage_maintenance',
+            'provider_availability_backfill',
+            'metadata_backfill',
+            'source_status_backfill',
+            'media_metadata_backlog',
+            'media_source_key_backlog',
+            'media_backlog',
+            'media_size_backlog',
+            'relation_cleanup',
+            'merge',
+        ];
     }
 
     /**
@@ -1097,10 +1197,8 @@ class SeasonvarImportPipeline
         $chunkSize = $this->mediaMetadataChunkSize();
         $mediaQuery = LicensedMedia::query()
             ->where(function ($query): void {
-                $query->whereNull('quality')
-                    ->orWhereNull('format')
+                $query->whereNull('format')
                     ->orWhere('format', '')
-                    ->orWhereNull('translation_name')
                     ->orWhereNull('variant_type')
                     ->orWhere('variant_type', '')
                     ->orWhereNull('variant_key')

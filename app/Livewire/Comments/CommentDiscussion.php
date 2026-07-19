@@ -20,6 +20,7 @@ use App\Enums\CommentSort;
 use App\Enums\CommentStatus;
 use App\Enums\CommentTargetType;
 use App\Exceptions\Comments\CommentActionException;
+use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Models\Comment;
 use App\Models\User;
 use App\Services\Comments\CommentDiscussionQuery;
@@ -42,6 +43,7 @@ use Throwable;
 
 final class CommentDiscussion extends Component
 {
+    use InteractsWithPaginationIslands;
     use WithPagination;
 
     #[Locked]

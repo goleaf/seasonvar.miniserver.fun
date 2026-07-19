@@ -17,6 +17,7 @@ use App\Enums\ReviewReportCategory;
 use App\Enums\ReviewSort;
 use App\Enums\ReviewStatus;
 use App\Exceptions\Reviews\ReviewActionException;
+use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleReview;
 use App\Models\CatalogTitleUserState;
@@ -46,6 +47,7 @@ use Throwable;
 
 final class CatalogTitleReviews extends Component
 {
+    use InteractsWithPaginationIslands;
     use WithPagination;
 
     #[Locked]

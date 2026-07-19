@@ -6,6 +6,11 @@ use App\Enums\CatalogRecommendationType;
 use App\Enums\CatalogTopListCategory;
 use App\Http\Middleware\SetSignedAuthenticationLocale;
 use App\Http\Requests\MigrateAnonymousPreferencesRequest;
+use App\Livewire\Administration\AdminAccessManagementPage;
+use App\Livewire\Administration\AdminAuditPage;
+use App\Livewire\Administration\AdministrationDashboardPage;
+use App\Livewire\Administration\AdminOperationsPage;
+use App\Livewire\Administration\AdminUserDirectoryPage;
 use App\Livewire\Auth\ConfirmPasswordPage;
 use App\Livewire\Auth\ForgotPasswordPage;
 use App\Livewire\Auth\LoginPage;
@@ -190,7 +195,7 @@ Route::get('/email/verify/{id}/{hash}', fn (int $id, string $hash, AccountEmailV
     ->middleware([SetSignedAuthenticationLocale::class, 'signed'])
     ->name('verification.verify');
 
-Route::middleware(['auth', 'auth.session', 'account.private'])->group(function (): void {
+Route::middleware(['auth', 'auth.session', 'account.private', 'account.active'])->group(function (): void {
     Route::get('/premium/return/{checkout}', PremiumPaymentReturnPage::class)
         ->whereUuid('checkout')
         ->name('premium.return');
@@ -475,44 +480,34 @@ foreach (CatalogDirectoryRegistry::routeMap() as $directory => $config) {
 Route::get('/titles', CatalogSeries::class)
     ->middleware('public.page:catalog')
     ->name('titles.index');
-Route::get('/admin/imports', SeasonvarImportManager::class)
-    ->middleware(['auth', 'auth.session', 'account.private', 'can:manage-seasonvar-imports'])
-    ->name('admin.imports');
-Route::get('/admin/catalog', CatalogAdministrationPage::class)
-    ->middleware(['auth', 'auth.session', 'account.private', 'can:manage-catalog'])
-    ->name('admin.catalog');
-Route::get('/admin/comments', CommentAdministrationManager::class)
-    ->middleware(['auth', 'auth.session', 'account.private', 'can:manage-comments'])
-    ->name('admin.comments');
-Route::get('/admin/reviews', ReviewModerationManager::class)
-    ->middleware(['auth', 'auth.session', 'account.private', 'can:manage-reviews'])
-    ->name('admin.reviews');
-Route::get('/admin/profiles', UserProfileAdministrationManager::class)
-    ->middleware(['auth', 'auth.session', 'account.private', 'can:manage-catalog'])
-    ->name('admin.profiles');
-Route::get('/admin/tags', TagAdministrationManager::class)
-    ->middleware(['auth', 'auth.session', 'account.private', 'can:manage-catalog'])
-    ->name('admin.tags');
-Route::get('/admin/requests', ContentRequestAdministrationManager::class)
-    ->middleware(['auth', 'auth.session', 'account.private', 'can:manage-content-requests'])
-    ->name('admin.requests');
-Route::get('/admin/issues', TechnicalIssueAdministrationManager::class)
-    ->middleware(['auth', 'auth.session', 'account.private', 'can:manage-technical-issues'])
-    ->name('admin.issues');
-Route::get('/admin/calendar', ReleaseCalendarAdministrationManager::class)
-    ->middleware(['auth', 'auth.session', 'account.private', 'can:manage-release-calendar'])
-    ->name('admin.calendar');
-Route::get('/admin/premium', PremiumAdministrationManager::class)
-    ->middleware(['auth', 'auth.session', 'account.private', 'can:view-premium-administration'])
-    ->name('admin.premium');
-Route::get('/admin/help', HelpCenterAdministrationPage::class)
-    ->middleware(['auth', 'auth.session', 'account.private', 'can:manage-help-center'])
-    ->name('admin.help');
-Route::get('/admin/help/articles/{helpArticle}/preview/{locale}', HelpArticlePreviewPage::class)
-    ->whereUuid('helpArticle')
-    ->whereIn('locale', config('help-center.supported_locales', ['ru']))
-    ->middleware(['auth', 'auth.session', 'account.private', 'can:manage-help-center'])
-    ->name('admin.help.preview');
+Route::prefix('admin')
+    ->name('admin.')
+    ->middleware(['auth', 'auth.session', 'verified', 'account.private', 'account.active', 'admin.access', 'throttle:administration'])
+    ->group(function (): void {
+        Route::get('/', AdministrationDashboardPage::class)
+            ->middleware('can:administration.dashboard.view')
+            ->name('index');
+        Route::get('/users', AdminUserDirectoryPage::class)->middleware('can:users.view')->name('users');
+        Route::get('/access', AdminAccessManagementPage::class)->middleware('can:administration.roles.view')->name('access');
+        Route::get('/audit', AdminAuditPage::class)->middleware('can:audit.view')->name('audit');
+        Route::get('/operations', AdminOperationsPage::class)->middleware('can:operations.view')->name('operations');
+        Route::get('/imports', SeasonvarImportManager::class)->middleware('can:imports.execute')->name('imports');
+        Route::get('/catalog', CatalogAdministrationPage::class)->middleware('can:content.view')->name('catalog');
+        Route::get('/comments', CommentAdministrationManager::class)->middleware('can:moderation.comments')->name('comments');
+        Route::get('/reviews', ReviewModerationManager::class)->middleware('can:moderation.reviews')->name('reviews');
+        Route::get('/profiles', UserProfileAdministrationManager::class)->middleware('can:moderation.profiles')->name('profiles');
+        Route::get('/tags', TagAdministrationManager::class)->middleware('can:content.manage')->name('tags');
+        Route::get('/requests', ContentRequestAdministrationManager::class)->middleware('can:moderation.requests')->name('requests');
+        Route::get('/issues', TechnicalIssueAdministrationManager::class)->middleware('can:support.tickets')->name('issues');
+        Route::get('/calendar', ReleaseCalendarAdministrationManager::class)->middleware('can:calendar.manage')->name('calendar');
+        Route::get('/premium', PremiumAdministrationManager::class)->middleware('can:premium.view')->name('premium');
+        Route::get('/help', HelpCenterAdministrationPage::class)->middleware('can:help.manage')->name('help');
+        Route::get('/help/articles/{helpArticle}/preview/{locale}', HelpArticlePreviewPage::class)
+            ->whereUuid('helpArticle')
+            ->whereIn('locale', config('help-center.supported_locales', ['ru']))
+            ->middleware('can:help.manage')
+            ->name('help.preview');
+    });
 Route::get('/titles/year/{year}', CatalogSeries::class)
     ->where('year', '(?:19|20)\d{2}')
     ->middleware('public.page:catalog')

@@ -53,12 +53,19 @@ final class WarmUserPortalCache extends Command
     private function resolveUsers(): Collection
     {
         if ((bool) $this->option('all-demo')) {
+            $userCount = max(0, min(1_000, (int) config('demo-data.user_count', 100)));
+
+            if ($userCount === 0) {
+                return collect();
+            }
+
+            $emails = collect(range(1, $userCount))
+                ->map(fn (int $index): string => "user{$index}@example.com");
+
             return User::query()
-                ->where('email', 'like', 'user%@example.com')
+                ->whereIn('email', $emails)
                 ->orderBy('id')
-                ->limit(1_000)
                 ->get()
-                ->filter(fn (User $user): bool => preg_match('/^user\d+@example\.com$/D', Str::lower($user->email)) === 1)
                 ->values();
         }
 

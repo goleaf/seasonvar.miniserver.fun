@@ -58,7 +58,9 @@ final class VisibleCatalogTitleCacheWarmSchedulerTest extends TestCase
         Queue::fake();
         $titles = CatalogTitle::factory()->count(2)->create();
 
-        $this->get(route('titles.index'))->assertOk();
+        $this->get(route('titles.index'))
+            ->assertOk()
+            ->assertHeader('X-Seasonvar-Page-Cache', 'MISS');
 
         Queue::assertPushed(WarmCatalogTitlePage::class, 2);
         foreach ($titles as $title) {
@@ -66,7 +68,17 @@ final class VisibleCatalogTitleCacheWarmSchedulerTest extends TestCase
         }
 
         Queue::fake();
-        $this->get(route('titles.index'))->assertOk();
+        $this->get(route('titles.index'))
+            ->assertOk()
+            ->assertHeader('X-Seasonvar-Page-Cache', 'HIT');
+        Queue::assertPushed(WarmCatalogTitlePage::class, 2);
+
+        Queue::fake();
+        $this->travel(400)->seconds();
+        app()->forgetInstance('cache.__memoized:'.config('cache-architecture.stores.domain'));
+        $this->get(route('titles.index'))
+            ->assertOk()
+            ->assertHeader('X-Seasonvar-Page-Cache', 'STALE');
         Queue::assertPushed(WarmCatalogTitlePage::class, 2);
 
         Queue::fake();

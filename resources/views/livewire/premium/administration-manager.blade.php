@@ -10,6 +10,7 @@
         @if ($actionError !== '')<div class="rounded-control border border-rose-200 bg-rose-50 p-4 text-sm font-bold text-rose-800" role="alert">{{ $actionError }}</div>@endif
     </div>
 
+    @island(name: 'premium-administration-pagination', always: true, with: $this->paginationIslandPage)
     @if (! $schemaReady)
         <p class="rounded-panel border border-amber-200 bg-amber-50 p-5 font-semibold text-amber-900">{{ __('premium.settings.unavailable') }}</p>
     @else
@@ -61,8 +62,9 @@
         </section>@endif
 
         <section class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
-            @if ($canViewAudit)<div class="rounded-panel border border-slate-200 bg-white p-4 shadow-panel sm:p-6"><h2 class="text-lg font-black text-slate-900">{{ __('premium.admin.audit_title') }}</h2>@if ($audits->isEmpty())<p class="mt-3 text-sm text-slate-600">{{ __('premium.admin.no_audit') }}</p>@else<ul class="mt-4 divide-y divide-slate-200">@foreach ($audits as $event)<li class="py-3"><div class="flex min-w-0 flex-wrap justify-between gap-2"><span class="break-words font-bold text-slate-800">{{ $event['action'] }}</span><time class="text-xs font-semibold text-slate-500">{{ $event['occurred_at'] }}</time></div><p class="mt-1 text-sm text-slate-600">{{ $event['actor'] }} · {{ $event['resource_type'] }}</p></li>@endforeach</ul>{{ $audits->links() }}@endif</div>@endif
+            @if ($canViewAudit)<x-ui.pagination-region name="premium-audit-results"><div class="rounded-panel border border-slate-200 bg-white p-4 shadow-panel sm:p-6"><h2 class="text-lg font-black text-slate-900">{{ __('premium.admin.audit_title') }}</h2>@if ($audits->isEmpty())<p class="mt-3 text-sm text-slate-600">{{ __('premium.admin.no_audit') }}</p>@else<ul class="mt-4 divide-y divide-slate-200">@foreach ($audits as $event)<li class="py-3"><div class="flex min-w-0 flex-wrap justify-between gap-2"><span class="break-words font-bold text-slate-800">{{ $event['action'] }}</span><time class="text-xs font-semibold text-slate-500">{{ $event['occurred_at'] }}</time></div><p class="mt-1 text-sm text-slate-600">{{ $event['actor'] }} · {{ $event['resource_type'] }}</p></li>@endforeach</ul>{{ $audits->links(data: ['region' => 'premium-audit-results']) }}@endif</div></x-ui.pagination-region>@endif
             <aside class="rounded-panel border border-slate-200 bg-white p-4 shadow-panel sm:p-6"><h2 class="text-lg font-black text-slate-900">{{ __('premium.admin.providers_title') }}</h2>@if ($providerCodes === [])<p class="mt-3 text-sm leading-6 text-slate-600">{{ __('premium.admin.providers_empty') }}</p>@else<ul class="mt-3 space-y-2">@foreach ($providerCodes as $providerCode)<li class="rounded-control bg-slate-50 p-3 font-mono text-sm font-bold text-slate-700">{{ $providerCode }}</li>@endforeach</ul>@endif</aside>
         </section>
     @endif
+    @endisland
 </div>

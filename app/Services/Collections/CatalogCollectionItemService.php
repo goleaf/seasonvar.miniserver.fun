@@ -273,6 +273,75 @@ final class CatalogCollectionItemService
         $this->cache->changed($collection);
     }
 
+    public function moveWithinWindow(
+        User $actor,
+        CatalogCollection $collection,
+        int $itemId,
+        int $targetIndex,
+        int $windowStart,
+        int $windowSize,
+    ): bool {
+        Gate::forUser($actor)->authorize('manageItems', $collection);
+        $this->rateLimiter->ensure($actor, 'reorder', 'order');
+        $maximumWindow = max(1, (int) config('catalog-collections.maximum_reorder_items', 500));
+
+        if ($itemId < 1 || $windowStart < 0 || $windowSize < 1 || $windowSize > $maximumWindow) {
+            throw ValidationException::withMessages(['order' => [__('collections.errors.invalid_order')]]);
+        }
+
+        $changed = DB::transaction(function () use ($actor, $collection, $itemId, $targetIndex, $windowStart, $windowSize): bool {
+            $locked = CatalogCollection::query()->lockForUpdate()->findOrFail($collection->id);
+            Gate::forUser($actor)->authorize('manageItems', $locked);
+            $orderedItemIds = CatalogCollectionItem::query()
+                ->whereBelongsTo($locked, 'collection')
+                ->orderBy('position')
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->pluck('id')
+                ->map(fn (mixed $id): int => (int) $id)
+                ->all();
+            $currentIndex = array_search($itemId, $orderedItemIds, true);
+
+            abort_if($currentIndex === false, 404);
+
+            $windowEnd = min(count($orderedItemIds), $windowStart + $windowSize);
+
+            if (
+                $currentIndex < $windowStart
+                || $currentIndex >= $windowEnd
+                || $targetIndex < $windowStart
+                || $targetIndex >= $windowEnd
+            ) {
+                throw ValidationException::withMessages(['order' => [__('collections.errors.invalid_order')]]);
+            }
+
+            if ($currentIndex === $targetIndex) {
+                return false;
+            }
+
+            $moved = array_splice($orderedItemIds, $currentIndex, 1);
+            array_splice($orderedItemIds, $targetIndex, 0, $moved);
+            $firstChangedIndex = min($currentIndex, $targetIndex);
+            $lastChangedIndex = max($currentIndex, $targetIndex);
+
+            for ($index = $firstChangedIndex; $index <= $lastChangedIndex; $index++) {
+                CatalogCollectionItem::query()
+                    ->whereKey($orderedItemIds[$index])
+                    ->update(['position' => $index + 1]);
+            }
+
+            $this->touch($locked);
+
+            return true;
+        }, attempts: 3);
+
+        if ($changed) {
+            $this->cache->changed($collection);
+        }
+
+        return $changed;
+    }
+
     public function move(User $actor, CatalogCollection $collection, int $itemId, int $direction): bool
     {
         Gate::forUser($actor)->authorize('manageItems', $collection);

@@ -71,6 +71,7 @@ class SeasonvarCatalogImporter
         private readonly SeasonvarCatalogRelationSyncer $relationSyncer,
         private readonly SeasonvarRelationMetadataNormalizer $relationMetadata,
         private readonly SeasonvarDatabaseTransaction $databaseTransaction,
+        private readonly SeasonvarReleaseObservationSynchronizer $releaseObservations,
         private readonly RecordSeasonvarPageFailure $recordPageFailure,
         private readonly SeasonvarTitlePageStateSynchronizer $titlePageStateSynchronizer,
         private readonly SeasonvarImportErrorSanitizer $errors,
@@ -547,6 +548,11 @@ class SeasonvarCatalogImporter
             $this->syncCatalogReviews($catalogTitle, $page, $data->reviews, $progress);
             $seasons = $this->syncSeasons($catalogTitle, $page, $data->seasons, $progress);
             $this->syncEpisodes($seasons, $page, $data->episodes, $progress);
+            $currentSeason = $seasons[$data->currentSeasonNumber] ?? null;
+
+            if ($currentSeason instanceof Season) {
+                $this->releaseObservations->synchronize($catalogTitle, $currentSeason, $page);
+            }
 
             $page->update([
                 'content_hash' => $prepared->contentHash,

@@ -1,6 +1,6 @@
 # Blade-шаблоны
 
-Обновлено: 18.07.2026
+Обновлено: 20.07.2026
 
 ## Правило без inline PHP
 
@@ -18,7 +18,7 @@
 - `App\View\ViewData\AppLayoutData` через view composer в `AppServiceProvider` готовит explicit layout contract: SEO scalars, normalized breadcrumbs/flags, hex-safe JSON-LD strings и header/footer URL, active/audience/permission state с полными Tailwind class maps как immutable `LayoutNavigationItem`. Blade только проверяет готовые flags, итерирует готовые элементы и выводит один audited raw JSON-LD scalar; `json_encode()` в шаблонах запрещён regression-тестом.
 - `App\View\ViewModels\CatalogTitlesViewModel` готовит подписи фильтров и параметры ссылок каталога.
 - `App\Support\CatalogAlphabet` без запросов к базе задаёт канонический порядок символов, кириллицы и `A`–`Z`; `CatalogTitlesViewModel` и `CatalogDirectoryPageBuilder` передают Blade готовые группы. Query-free компонент `x-catalog.alphabet-filter` только выводит эти группы и готовые query-ссылки каталога.
-- `App\Livewire\CatalogSeries` разделяет render-local данные на computed `catalogPage` и `catalogFacets`; Eloquent-коллекции не хранятся в публичных properties. Связанные Livewire islands `catalog-live` атомарно обновляют фильтры и карточки, а первый SSR не вычисляет facets. Карточки и строки используют `catalog-title-{id}` как стабильный `wire:key`.
+- `App\Livewire\CatalogSeries` разделяет render-local данные на computed `catalogPage` и `catalogFacets`; Eloquent-коллекции не хранятся в публичных properties. Связанные Livewire islands `catalog-live` атомарно обновляют фильтры и карточки, а первый SSR не вычисляет facets. Lazy-island placeholder получает от Livewire один `wire:intersect.once`, сохраняет `aria-busy` и объявляет локализованную загрузку через `role="status"`; application Blade не вызывает internal action напрямую. Карточки и строки используют `catalog-title-{id}` как стабильный `wire:key`.
 - `App\View\ViewModels\CatalogTitlesViewModel` нормализует scalar/list query-state через `scalarState()` и `listState()`, чтобы шаблоны не читали raw query-параметры напрямую.
 - `App\View\ViewModels\CatalogTitlesViewModel` готовит состояние единой формы фильтров: скрытые поля содержат только параметры без видимого control, поэтому годы, справочники, публикация, субтитры и расширенные поля не дублируются. ViewModel также готовит общий active count и максимальный календарный год; вычисления в Blade не дублируются.
 - Класс-компонент `App\View\Components\Catalog\UnifiedTitleFilters` рендерит единую GET/Livewire-форму в отдельном deferred sibling island, а `App\View\Components\Catalog\TitleFilters` получает готовый массив `catalogFacets` и добавляет в неё годы и справочники. Компоненты не выполняют запросы; checkbox/select используют `wire:model.live`, а форма явно адресует связанные islands через `wire:island="catalog-live"`.
@@ -44,7 +44,7 @@
 - `CatalogTitlePageBuilder` передаёт Blade одну коллекцию `recommendationItems`: precomputed `v3` и объединённый genre/year fallback используют одинаковые строки, последовательные ranks и дедупликацию по ID. Blade не объединяет коллекции и не выполняет запросы.
 - Специализированная строка новой серии готовит подписи в PHP/page builder и составляет shell через `x-ui.poster-card`; история просмотра и `/stats` также используют общий shell, не передавая туда авторизацию или проверку внешнего URL. Главная, `/titles`, directory hubs, рекомендации и личная библиотека группируют контент только вертикальными списками; структурные grid-раскладки форм, навигации, player/admin и статистики остаются отдельным layout-решением.
 - Публичное имя тайтла берётся из `CatalogTitle::display_title`: совпадающий суффикс `/original_title` не повторяется в основном заголовке, а `display_original_title` выводится отдельной вторичной строкой. Исходные поля базы и поисковый индекс не изменяются.
-- Стандартный вызов `$paginator->links()` использует русский светлый override `vendor.pagination.tailwind`; Livewire callers передают scoped `scrollTo` в отдельный override `vendor.livewire.tailwind`.
+- Обычный `$paginator->links()` использует русский светлый override `vendor.pagination.tailwind`. Каждый Livewire caller помещает выдачу и controls в уникальные `@island(... with: $this->...Page)` и `x-ui.pagination-region`, а в `vendor.livewire.tailwind` передаёт `links(data: ['region' => '...'])`; произвольные `scrollTo`, inline JavaScript и duplicate spinner markup не используются.
 - Пустая выдача каталога показывает точный запрос; запрос только из стоп-слов получает отдельное сообщение «слишком общий». Пустое состояние не подменяется ближайшими карточками.
 
 ## Представление коллекций
@@ -54,6 +54,12 @@
 `CatalogDiscoveryPage` является единственным full-page owner публичного discovery. Только `popular` монтирует `CatalogCollectionExplorer`, который хранит отдельные URL-backed search/sort/page поля и рендерит компактные `x-collections.collection-card` в responsive 1/2/3/4-column grid. `CatalogAdministrationPage` аналогично владеет `/admin/catalog` и условно монтирует один из двух manager fragments; вложенные компоненты не расширяют layout и не создают второй `<h1>`.
 
 Collection Livewire views содержат только passive loops/conditions над prepared values. Locked UUID/title IDs остаются в component, policy and criteria — в PHP. Нет `@php`, model/service/database calls, inline CSS или inline business JavaScript. Empty/search-empty/unavailable/moderation/status/loading/error/report/share/delete/restore states имеют реальные controls или safe text; absent likes/follows/collaboration не изображаются неработающими кнопками.
+
+Title membership selector оставляет checkbox на deferred `wire:model="selectedCollectionPublicIds"`, а локализованный счётчик использует `wire:text` от `selectedCollectionPublicIds.length`. Точно нацеленный на этот массив `wire:dirty` показывает локализованный текстовый status до Apply и исчезает при совпадении draft с server snapshot. Серверный `selectedCountLabel` остаётся SSR/no-JavaScript fallback; оптимистическая presentation не сохраняет membership и не заменяет `apply()`, policy или validation.
+
+Панель формы создания подборки существует только при `CatalogCollectionDashboard::$showCreate` и получает безымянный `wire:transition` через attribute bag `x-ui.panel`. Переход ограничен этой add/remove boundary, не управляет authorization, validation или persistence и не сопровождается custom CSS/JavaScript, способным обойти reduced-motion либо unsupported-browser fallback Livewire.
+
+Manual item list `CatalogCollectionEditor` имеет единственный `wire:sort="sortItem"`; каждый `<li>` совмещает stable `wire:key` и canonical `wire:sort:item` collection-item ID. Отдельная `wire:sort:handle` ручка является pointer/touch enhancement, а wrapper кнопок имеет `wire:sort:ignore`; up/down/remove остаются обычными focusable buttons. Handler принимает только ID и page-local position, все membership/window/persistence decisions принадлежат PHP service.
 
 Editorial editor выводит одну форму без locale fieldset, RU/EN buttons и подписи «Русский»: locked PHP boundary загружает и сохраняет `ru`. Existing English translation rows остаются в базе, но не являются переключаемым authoring UI.
 
@@ -123,6 +129,8 @@ Homepage показывает не более одной recommendation section;
 
 `livewire/technical-issues/*` и `components/technical-issues/*` получают prepared DTO/options из Livewire/query/presenter. Create, My Tickets, detail, notifications и staff queue используют existing light Tailwind panels/forms/badges, stable `wire:key`, responsive wrapping, visible focus, minimum touch targets, labelled upload/status/timeline controls и ARIA live regions. Follower view не получает requester evidence; internal notes/raw diagnostics никогда не передаются в normal-user view.
 
+Create-form не дублирует общий layout offline alert. Только её final submit получает component-scoped `wire:offline.attr="disabled"` рядом с существующим targeted loading attribute; остальные поля остаются редактируемыми, а серверный submit после восстановления использует прежний action/validation/upload pipeline.
+
 `resources/js/issues.js` — единственный Vite boundary для optional client summary, attachment preview cleanup, player position и focus/live announcements. Blade не содержит model/service/database calls, `@php`, inline CSS или ticket business JavaScript. Полный responsive/accessibility contract: [`technical-issues.md`](technical-issues.md).
 
 ## Responsive shell и mobile presentation Task 23
@@ -145,11 +153,19 @@ Catalog filter presentation остаётся одним component tree: `<detail
 
 Server-rendered article/TOC/FAQ, search form/results, category/article cards, feedback/report и escalation повторно используют existing light UI, focus/touch/loading/live-region/empty/error patterns. `help-center.js` отвечает только за autocomplete interaction и editor unsaved guard. Полный responsive/accessibility contract: [`help-center.md`](help-center.md).
 
+Outdated-report form имеет stable `id="help-report-form"`, modifier-free `wire:show="showReportForm"` и `wire:cloak`: скрытие меняет только `display`, не удаляя draft controls из DOM. Toggle сохраняет server `$toggle` и связывается с form через `aria-controls`/`aria-expanded`; submit/cancel и errors остаются Livewire actions. Другие условные sections не получают `wire:show` без требования сохранять DOM identity.
+
 ## Представление канонического плеера Task 07
 
 `livewire/catalog-title-player.blade.php` получает prepared DTO/view-model data: stable IDs, localized labels, canonical navigation, one selected signed grant и grouped authorized options выбранной серии. Шаблон не разрешает source URL, не запрашивает БД/service, не содержит `@php`, inline CSS или business JavaScript. Empty menus для отсутствующих audio/subtitle/quality capability не выводятся.
 
+Parent `catalog-title-detail.blade.php` назначает единственному child player статический `wire:ref="player"` рядом с независимым stable `wire:key`. Ref служит только component-scoped адресом refresh event; он не становится DOM ID, selector API, authorization boundary или заменой keyed identity.
+
 Native buttons/links/dialog имеют семантику, visible focus, минимум 44 px, translated ARIA/live regions, mobile wrapping и working href fallback. Plyr остаётся владельцем core controls; portal controls не имитируют unsupported browser features. Полный presentation checklist: [`audits/video-playback-report.md`](audits/video-playback-report.md).
+
+Только keyed `data-player-shell` имеет полный `wire:ignore`, потому что Plyr/HLS изменяют всё его поддерево. `wire:ignore.self` недостаточен, а расширение boundary на loading overlay, media options, ошибки или portal controls запрещено: эти sibling-элементы обязаны получать server-owned Livewire morphs.
+
+`wire:replace.self` используется ровно в четырёх template pattern `title-filters.blade.php` и только на leaf-checkbox с `wire:model.live`: заменяется сам input после grouped island response, окружающие label/counter/group остаются morph-owned. Bare subtree replacement, replacement на player, forms/dialogs/editors и text/search inputs запрещены без воспроизводящего дефект теста и доказательства, что узкий key/component/lifecycle boundary недостаточен.
 
 ## Представление личной библиотеки Task 09
 

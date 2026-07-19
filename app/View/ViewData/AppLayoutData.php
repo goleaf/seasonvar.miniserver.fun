@@ -7,13 +7,14 @@ namespace App\View\ViewData;
 use App\DTOs\CatalogDirectoryDefinition;
 use App\Http\Middleware\PrivateAccountResponse;
 use App\Models\CatalogTitle;
+use App\Services\Admin\AdminAccessResolver;
+use App\Services\Admin\AdminNavigationQuery;
 use App\Services\Auth\AuthenticationRedirectService;
 use App\Services\Catalog\CatalogDirectoryRegistry;
 use App\Services\Localization\LocalizedRouteResolver;
 use App\Services\TechnicalIssues\TechnicalIssueContext;
 use App\Support\PlainText;
 use App\View\ViewModels\LayoutNavigationItem;
-use Illuminate\Contracts\Auth\Access\Gate;
 use Illuminate\Contracts\Translation\Translator;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Router;
@@ -30,8 +31,9 @@ final class AppLayoutData
     public function __construct(
         private readonly CatalogDirectoryRegistry $directories,
         private readonly AuthenticationRedirectService $authenticationRoutes,
+        private readonly AdminAccessResolver $adminAccess,
+        private readonly AdminNavigationQuery $adminNavigation,
         private readonly Request $request,
-        private readonly Gate $gate,
         private readonly Router $router,
         private readonly UrlGenerator $urls,
         private readonly Translator $translator,
@@ -56,24 +58,12 @@ final class AppLayoutData
         $isPrivatePage = collect($this->request->route()?->gatherMiddleware() ?? [])->contains(
             fn (string $middleware): bool => in_array($middleware, ['account.private', PrivateAccountResponse::class], true),
         );
-        $canManageImports = $authenticatedUser !== null
-            && $this->gate->forUser($authenticatedUser)->allows('manage-seasonvar-imports');
-        $canManageCatalog = $authenticatedUser !== null
-            && $this->gate->forUser($authenticatedUser)->allows('manage-catalog');
-        $canManageComments = $authenticatedUser !== null
-            && $this->gate->forUser($authenticatedUser)->allows('manage-comments');
-        $canManageReviews = $authenticatedUser !== null
-            && $this->gate->forUser($authenticatedUser)->allows('manage-reviews');
-        $canManageContentRequests = $authenticatedUser !== null
-            && $this->gate->forUser($authenticatedUser)->allows('manage-content-requests');
-        $canManageTechnicalIssues = $authenticatedUser !== null
-            && $this->gate->forUser($authenticatedUser)->allows('manage-technical-issues');
-        $canManageReleaseCalendar = $authenticatedUser !== null
-            && $this->gate->forUser($authenticatedUser)->allows('manage-release-calendar');
-        $canManagePremium = $authenticatedUser !== null
-            && $this->gate->forUser($authenticatedUser)->allows('view-premium-administration');
-        $canManageHelpCenter = $authenticatedUser !== null
-            && $this->gate->forUser($authenticatedUser)->allows('manage-help-center');
+        $canAccessAdministration = $authenticatedUser !== null
+            && $this->adminAccess->isAdministrator($authenticatedUser);
+        $isAdminPage = $this->request->routeIs('admin.*');
+        $layoutAdminNavigation = $isAdminPage && $authenticatedUser !== null
+            ? $this->adminNavigation->for($authenticatedUser)
+            : [];
         $canCreateTechnicalIssue = (bool) config('technical-issues.enabled', true)
             && $authenticatedUser !== null;
         $layoutHeaderNavigation = [
@@ -192,85 +182,12 @@ final class AppLayoutData
                     $this->request->routeIs('issues.*', 'localized.issues.*'),
                 );
             }
-            if ($canManageImports) {
+            if ($canAccessAdministration && $this->router->has('admin.index')) {
                 $layoutHeaderNavigation[] = $this->headerLink(
-                    'admin.imports',
-                    'fa-solid fa-cloud-arrow-down',
-                    __('catalog.layout.import'),
-                    $this->request->routeIs('admin.imports'),
-                );
-            }
-
-            if ($canManageCatalog && $this->router->has('admin.catalog')) {
-                $layoutHeaderNavigation[] = $this->headerLink(
-                    'admin.catalog',
-                    'fa-solid fa-list-check',
-                    __('collections.navigation.admin'),
-                    $this->request->routeIs('admin.catalog'),
-                );
-            }
-            if ($canManageComments && $this->router->has('admin.comments')) {
-                $layoutHeaderNavigation[] = $this->headerLink(
-                    'admin.comments',
-                    'fa-solid fa-shield-halved',
-                    __('comments.navigation.administration'),
-                    $this->request->routeIs('admin.comments'),
-                );
-            }
-            if ($canManageReviews && $this->router->has('admin.reviews')) {
-                $layoutHeaderNavigation[] = $this->headerLink(
-                    'admin.reviews',
-                    'fa-solid fa-star-half-stroke',
-                    __('reviews.navigation.administration'),
-                    $this->request->routeIs('admin.reviews'),
-                );
-            }
-            if ($canManageCatalog && $this->router->has('admin.tags')) {
-                $layoutHeaderNavigation[] = $this->headerLink(
-                    'admin.tags',
-                    'fa-solid fa-tags',
-                    __('tags.admin.title'),
-                    $this->request->routeIs('admin.tags'),
-                );
-            }
-            if ($canManageContentRequests && $this->router->has('admin.requests')) {
-                $layoutHeaderNavigation[] = $this->headerLink(
-                    'admin.requests',
-                    'fa-solid fa-inbox',
-                    __('requests.admin.title'),
-                    $this->request->routeIs('admin.requests'),
-                );
-            }
-            if ($canManageTechnicalIssues && $this->router->has('admin.issues')) {
-                $layoutHeaderNavigation[] = $this->headerLink(
-                    'admin.issues',
-                    'fa-solid fa-headset',
-                    __('issues.support_queue'),
-                    $this->request->routeIs('admin.issues'),
-                );
-            }
-            if ($canManageReleaseCalendar && $this->router->has('admin.calendar')) {
-                $layoutHeaderNavigation[] = $this->headerLink(
-                    'admin.calendar',
-                    'fa-regular fa-calendar-check',
-                    __('calendar.admin.title'),
-                    $this->request->routeIs('admin.calendar'),
-                );
-            }
-            if ($canManagePremium && $this->router->has('admin.premium')) {
-                $layoutHeaderNavigation[] = $this->headerLink(
-                    'admin.premium',
-                    'fa-solid fa-crown',
-                    __('premium.admin.title'),
-                    $this->request->routeIs('admin.premium'),
-                );
-            }
-            if ($canManageHelpCenter && $this->router->has('admin.help')) {
-                $layoutHeaderNavigation[] = $this->headerLink(
-                    'admin.help',
-                    'fa-solid fa-book-open',
-                    __('help.admin.title'),
-                    $this->request->routeIs('admin.help*'),
+                    'admin.index',
+                    'fa-solid fa-user-shield',
+                    __('administration.navigation.entry'),
+                    $this->request->routeIs('admin.*'),
                 );
             }
         } else {
@@ -444,6 +361,8 @@ final class AppLayoutData
             'layoutFooter',
             'layoutHeadUrls',
             'layoutSearchQuery',
+            'layoutAdminNavigation',
+            'isAdminPage',
             'isPrivatePage',
             'htmlLang',
             'robots',

@@ -10,26 +10,36 @@ use Tests\TestCase;
 
 final class CiQualityGateContractTest extends TestCase
 {
-    public function test_workflow_uses_supported_node_24_action_majors(): void
+    public function test_workflow_pins_supported_actions_and_runner_image(): void
     {
         $workflow = File::get(base_path('.github/workflows/ci.yml'));
 
         foreach ([
-            'actions/checkout@v6',
-            'actions/cache@v5',
-            'actions/setup-node@v6',
-            'actions/upload-artifact@v7',
+            'actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6',
+            'actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5',
+            'actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6',
+            'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7',
+            'shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2',
         ] as $action) {
             $this->assertStringContainsString($action, $workflow);
         }
 
+        $this->assertSame(3, substr_count($workflow, 'runs-on: ubuntu-24.04'));
+        $this->assertSame(3, substr_count($workflow, 'persist-credentials: false'));
+        $this->assertStringNotContainsString('runs-on: ubuntu-latest', $workflow);
+
         foreach ([
+            'actions/checkout@v6',
             'actions/checkout@v4',
             'actions/checkout@v7',
+            'actions/cache@v5',
             'actions/cache@v4',
             'actions/cache@v6',
+            'actions/setup-node@v6',
             'actions/setup-node@v7',
+            'actions/upload-artifact@v7',
             'actions/upload-artifact@v4',
+            'shivammathur/setup-php@v2',
             '--format=github',
         ] as $unsupportedContract) {
             $this->assertStringNotContainsString($unsupportedContract, $workflow);
@@ -92,7 +102,7 @@ final class CiQualityGateContractTest extends TestCase
         $backendPosition = strpos($qualityGate, 'run_backend() (');
         $connectionPosition = strpos($qualityGate, 'export DB_CONNECTION=sqlite', $backendPosition);
         $databasePosition = strpos($qualityGate, 'export DB_DATABASE=:memory:', $backendPosition);
-        $documentationPosition = strpos($qualityGate, 'php artisan project:docs-refresh --check --no-interaction', $backendPosition);
+        $documentationPosition = strpos($qualityGate, 'run_docs', $backendPosition);
 
         $this->assertIsInt($backendPosition);
         $this->assertIsInt($connectionPosition);
@@ -108,7 +118,7 @@ final class CiQualityGateContractTest extends TestCase
         $qualityGate = File::get(base_path('scripts/ci-check.sh'));
         $pintPosition = strpos($qualityGate, './vendor/bin/pint --test --format=agent');
         $rectorPosition = strpos($qualityGate, 'composer rector:check');
-        $syntaxPosition = strpos($qualityGate, "find app bootstrap config database routes tests -type f -name '*.php'");
+        $syntaxPosition = strpos($qualityGate, "find app bootstrap config database routes tests -path 'bootstrap/cache' -prune -o -type f -name '*.php'");
         $analysisPosition = strpos($qualityGate, 'composer analyse');
 
         $this->assertIsInt($pintPosition);
@@ -119,6 +129,14 @@ final class CiQualityGateContractTest extends TestCase
         $this->assertTrue($rectorPosition < $syntaxPosition);
         $this->assertTrue($syntaxPosition < $analysisPosition);
         $this->assertSame(1, substr_count($qualityGate, 'composer rector:check'));
+    }
+
+    public function test_backend_syntax_check_ignores_generated_laravel_cache_manifests(): void
+    {
+        $qualityGate = File::get(base_path('scripts/ci-check.sh'));
+
+        $this->assertStringContainsString("-path 'bootstrap/cache' -prune", $qualityGate);
+        $this->assertStringContainsString("-o -type f -name '*.php' -print0", $qualityGate);
     }
 
     public function test_browser_profile_exports_one_absolute_fixture_database_path(): void
@@ -161,6 +179,20 @@ final class CiQualityGateContractTest extends TestCase
         $this->assertStringContainsString('$repo_root/output/playwright/$ci_run_id/browser.sqlite', $qualityGate);
     }
 
+    public function test_all_profiles_ignore_a_shared_file_based_maintenance_marker(): void
+    {
+        $qualityGate = File::get(base_path('scripts/ci-check.sh'));
+
+        $this->assertStringContainsString(
+            'export APP_MAINTENANCE_DRIVER="${APP_MAINTENANCE_DRIVER:-cache}"',
+            $qualityGate,
+        );
+        $this->assertStringContainsString(
+            'export APP_MAINTENANCE_STORE="${APP_MAINTENANCE_STORE:-array}"',
+            $qualityGate,
+        );
+    }
+
     public function test_browser_profile_exports_process_scoped_runtime_and_port_defaults(): void
     {
         $qualityGate = File::get(base_path('scripts/ci-check.sh'));
@@ -184,6 +216,31 @@ final class CiQualityGateContractTest extends TestCase
             'bash scripts/check-changelog-policy.sh CHANGELOG.md',
             $qualityGate,
         );
+    }
+
+    public function test_documentation_freshness_gate_runs_before_commit_and_in_backend_ci(): void
+    {
+        $hook = File::get(base_path('.githooks/pre-commit'));
+        $qualityGate = File::get(base_path('scripts/ci-check.sh'));
+
+        $guardPosition = strpos($hook, 'seasonvar_git_guard_require_no_untracked_files');
+        $documentationPosition = strpos($hook, 'bash "$repo_root/scripts/ci-check.sh" docs');
+        $readmePosition = strpos($hook, 'check-readme-policy.sh');
+
+        $this->assertIsInt($guardPosition);
+        $this->assertIsInt($documentationPosition);
+        $this->assertIsInt($readmePosition);
+        $this->assertTrue($guardPosition < $documentationPosition);
+        $this->assertTrue($documentationPosition < $readmePosition);
+
+        $this->assertStringContainsString("run_docs() (\n    trap clear_laravel_cache_artifacts EXIT\n    export DB_CONNECTION=sqlite\n    export DB_DATABASE=:memory:", $qualityGate);
+        $this->assertStringContainsString(
+            'export PROJECT_DOCS_PUBLIC_BASE_URL="${PROJECT_DOCS_PUBLIC_BASE_URL:-https://seasonvar.miniserver.fun}"',
+            $qualityGate,
+        );
+        $this->assertStringContainsString('php artisan project:docs-refresh --check --no-interaction', $qualityGate);
+        $this->assertStringContainsString("    docs)\n        run_docs", $qualityGate);
+        $this->assertStringContainsString("    run_docs\n    run_laravel_cache_validation", $qualityGate);
     }
 
     public function test_pre_push_runs_the_same_local_quality_gate_before_upload(): void

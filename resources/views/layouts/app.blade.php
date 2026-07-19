@@ -81,6 +81,9 @@
         <x-layout.site-header :site-name="$siteName" :search-query="$layoutSearchQuery" :header="$layoutHeader" />
 
         <main id="main-content" class="app-safe-inline app-shell-main mx-auto max-w-[1760px] py-4 sm:py-6" itemscope itemtype="https://schema.org/WebPageElement" itemid="{{ $canonicalUrl }}#main-content">
+            @if ($isAdminPage)
+                <x-administration.navigation :groups="$layoutAdminNavigation" />
+            @endif
             @if ($showBreadcrumbs)
                 <nav aria-label="{{ __('catalog.layout.breadcrumbs') }}" class="mb-4 rounded-panel border border-slate-200 bg-white px-3 py-2 text-sm shadow-panel">
                     <ol class="flex flex-wrap items-center gap-2 text-slate-500">

@@ -32,7 +32,7 @@ final class CheckInfrastructureHealthCommandTest extends TestCase
         $response->assertOk()
             ->assertHeader('Cache-Control', 'no-store, private')
             ->assertJsonPath('ready', true)
-            ->assertJsonPath('status', 'degraded');
+            ->assertJsonPath('status', 'ok');
         $this->assertStringNotContainsString(base_path(), $response->getContent());
     }
 }

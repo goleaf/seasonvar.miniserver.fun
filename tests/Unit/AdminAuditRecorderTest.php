@@ -13,6 +13,7 @@ use App\Services\Admin\AdminAuditRecorder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 use LogicException;
 use Tests\TestCase;
@@ -152,5 +153,24 @@ class AdminAuditRecorderTest extends TestCase
         );
 
         $this->assertDatabaseCount('admin_audit_events', 1);
+    }
+
+    public function test_correlation_identity_accepts_only_a_bounded_uuid_and_never_raw_request_data(): void
+    {
+        $actor = User::factory()->create();
+        $first = CatalogTitle::factory()->create();
+        $second = CatalogTitle::factory()->create();
+        $version = hash('sha256', 'correlation-version');
+        $correlationId = (string) Str::uuid();
+
+        request()->attributes->set('request_id', 'secret-token-that-must-not-be-stored');
+        app(AdminAuditRecorder::class)->record($actor, AdminAuditAction::TitleUpdated, $first, $version, $version, ['title']);
+
+        request()->attributes->set('request_id', $correlationId);
+        app(AdminAuditRecorder::class)->record($actor, AdminAuditAction::TitleUpdated, $second, $version, $version, ['title']);
+
+        $events = AdminAuditEvent::query()->orderBy('id')->get();
+        $this->assertNull($events[0]->correlation_id);
+        $this->assertSame($correlationId, $events[1]->correlation_id);
     }
 }

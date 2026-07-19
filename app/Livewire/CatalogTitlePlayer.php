@@ -26,7 +26,6 @@ use App\Services\Catalog\CatalogPrimaryActionResolver;
 use App\Services\Catalog\CatalogTitlePlaybackQuery;
 use App\Services\Catalog\CatalogUserStateService;
 use App\Services\Catalog\PlaybackTimeFormatter;
-use App\Services\HelpCenter\HelpContextualLinkService;
 use App\Services\Media\ExternalMediaFileType;
 use App\Services\Media\ExternalMediaMetadata;
 use App\Services\Media\LicensedMediaDownloadFilename;
@@ -104,8 +103,6 @@ class CatalogTitlePlayer extends Component
 
     protected TechnicalIssueContext $technicalIssueContext;
 
-    protected HelpContextualLinkService $helpLinks;
-
     protected ?AccountSettingsData $resolvedAccountSettings = null;
 
     protected ?CatalogTitle $resolvedTitle = null;
@@ -132,7 +129,6 @@ class CatalogTitlePlayer extends Component
         ExternalMediaFileType $mediaFileTypes,
         HumanFileSizeFormatter $fileSizes,
         TechnicalIssueContext $technicalIssueContext,
-        HelpContextualLinkService $helpLinks,
     ): void {
         $this->playback = $playback;
         $this->primaryActions = $primaryActions;
@@ -147,7 +143,6 @@ class CatalogTitlePlayer extends Component
         $this->mediaFileTypes = $mediaFileTypes;
         $this->fileSizes = $fileSizes;
         $this->technicalIssueContext = $technicalIssueContext;
-        $this->helpLinks = $helpLinks;
     }
 
     public function mount(int $catalogTitleId): void
@@ -672,12 +667,6 @@ class CatalogTitlePlayer extends Component
             : null;
         $routeLocale = request()->route('locale');
         $routeLocale = is_string($routeLocale) ? $routeLocale : null;
-        $playerHelp = $this->helpLinks->primary(
-            HelpFeature::Player,
-            $playbackSource->isPlayable() ? 'controls' : 'error',
-            app()->getLocale(),
-            $routeLocale,
-        );
         $selectedProgress = $user !== null && $selectedEpisode !== null
             ? $this->manualPlayback->progress($user, $title, $selectedEpisode->id)
             : null;
@@ -731,7 +720,9 @@ class CatalogTitlePlayer extends Component
             'isAuthenticated' => $user !== null,
             'canInteract' => $user?->hasVerifiedEmail() === true,
             'technicalIssueUrl' => $technicalIssueUrl,
-            'playerHelp' => $playerHelp,
+            'playerHelpFeature' => HelpFeature::Player->value,
+            'playerHelpContext' => $playbackSource->isPlayable() ? 'controls' : 'error',
+            'playerHelpRouteLocale' => $routeLocale,
             'playerCopy' => $playerCopy->current(),
             'mediaSession' => [
                 'title' => $selectedEpisode?->title ?: ($selectedEpisode !== null

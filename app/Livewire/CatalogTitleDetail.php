@@ -94,7 +94,7 @@ class CatalogTitleDetail extends Component
     {
         $this->pages->forget($this->catalogTitleId, $this->user());
         $this->dispatch('catalog-title-refreshed', catalogTitleId: $this->catalogTitleId)
-            ->to(component: CatalogTitlePlayer::class);
+            ->to(ref: 'player');
     }
 
     public function setRecommendationFeedback(mixed $catalogTitleId, mixed $feedback): void
@@ -187,6 +187,7 @@ class CatalogTitleDetail extends Component
 
         return view('livewire.catalog-title-detail', [
             ...$page,
+            'refreshShouldInitialize' => $this->refreshes->shouldRequest($title, $refreshState),
             'refreshIsActive' => $refreshState->isActive(),
             'refreshStatus' => $this->refreshStatus($refreshState),
             'publicCollections' => $this->collections->publicForTitle($this->catalogTitleId),

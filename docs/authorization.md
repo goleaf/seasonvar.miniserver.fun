@@ -7,9 +7,9 @@
 - Публичные страницы каталога, карточек, sitemap, RSS, OpenSearch и `llms.txt` доступны гостям.
 - Операционные и диагностические write/import-control endpoints не должны оставаться публичными.
 - `/stats` доступен гостям как read-only Livewire-страница состояния каталога; чувствительные raw URLs, stack traces и внутренние технические имена не выводятся.
-- `/admin/imports` защищён route middleware и gate `manage-seasonvar-imports`; allowlist берётся из `SEASONVAR_IMPORT_ADMIN_EMAILS`. Каждый Livewire action повторно применяет gate и не принимает user ID от browser.
-- `/admin/catalog` защищён route middleware и gate `manage-catalog` из того же allowlist. Livewire повторяет gate при mount/render, а `CatalogAdministrationService` применяет `CatalogTitlePolicy` до каждой записи; episode/media IDs всегда разрешаются внутри выбранной title hierarchy.
-- В проекте пока нет role/permission и admin-login пакета, поэтому email allowlist — узкая операционная граница, а не новая RBAC-система. Пустой allowlist закрывает доступ всем.
+- Все 17 `/admin` routes используют одну группу `auth`, `throttle:administration`, `auth.session`, `verified`, `account.private`, `account.active`, `admin.access` и отдельный action-level permission. `EnsureAdministrator` применяет persistent membership/status и exact legacy compatibility; suspended/revoked/expired membership и blocking account restriction отказывают server-side.
+- `/admin/imports` требует `imports.execute`; `/admin/catalog` требует `content.view`, а create/manage/publish/delete/source/collection/recommendation actions разделены отдельными permission codes и resource policies. Старые gates `manage-seasonvar-imports` и `manage-catalog` остаются compatibility aliases, но не являются новой identity или глобальным bypass.
+- `AdminRoleCode`, `AdminPermission`, `admin_roles`, `admin_permissions`, `admin_role_permissions` и `admin_user_roles` образуют canonical RBAC. Legacy email allowlists временно сохраняют только прежние capabilities; empty allowlist не выдаёт permission. Billing refund/reconciliation и legal identity/authority documents не наследуются даже `superadministrator` автоматически.
 - Blade-шаблоны не принимают решений авторизации. Допустимы только простые display checks: `@can`, `@cannot`, `@auth`, `@guest`.
 - Web registration/login/password recovery реализованы Livewire-компонентами на стандартной session boundary. Гостевые routes закрыты `guest`; `/email/verify`, `/confirm-password`, `/profile`, `/profile/security` и `/library/*` защищены одновременно `auth` и `auth.session`, поэтому сменившийся password hash завершает устаревшую browser session. Successful login регенерирует session ID, logout инвалидирует session и обновляет CSRF token.
 - Signed `/email/verify/{id}/{hash}` подтверждает адрес владельца ссылки без автоматического входа: уже вошедший владелец переходит в библиотеку, остальные — на login. Страница `/email/verify` остаётся доступной unverified user для повторной отправки. Password reset и смена пароля используют общие account-сервисы с API: reset отзывает все mobile tokens, web-смена пароля отзывает API tokens и сохраняет текущую browser session.
@@ -22,7 +22,7 @@
 - Laravel Sanctum является единственной mobile token boundary. `User` хранит только hashed personal access token, каждый token имеет ограниченные `mobile:read`/`mobile:write` abilities и expiry не более 90 дней; plaintext допустим только в issuance/rotation response и не восстанавливается из базы.
 - Mobile token не получает admin/import abilities и не заменяет существующие gates/policies. Наличие Bearer token не даёт автоматического доступа к authenticated-audience или write операциям: route ability, verification и domain policy проверяются отдельно на соответствующей границе.
 - Mobile self-service не принимает user ID: `/api/v1/me` всегда получает owner из `auth:sanctum`, read требует `mobile:read`, а profile/password/delete и device revocation — также `mobile:write`. Device ID разрешается только через relation текущего пользователя, поэтому чужой ID возвращает 404 и не раскрывает существование token.
-- Mobile playback session доступна гостю только для public audience. Если передан Bearer token, optional Sanctum boundary требует валидный token с `mobile:read` и не разрешает fallback к guest; authenticated audience по-прежнему решает `CatalogEntitlementService`, а не сам token. Progress разрешён только verified пользователю с `mobile:write`.
+- Mobile playback session доступна гостю только для public audience. Если передан Bearer token, optional Sanctum boundary требует валидный token с `mobile:read`, применяет `account.active` и не разрешает fallback к guest; blocking restriction поэтому не обходится stale/social-equivalent token. Authenticated audience по-прежнему решает `CatalogEntitlementService`, а не сам token. Progress разрешён только verified пользователю с `mobile:write`.
 - Публичные `GET /api/v1/sync/manifest` и `/sync/changes` содержат только catalog invalidations. `GET /api/v1/me/sync` требует `mobile:read`, привязывает подписанный cursor к authenticated owner и никогда не принимает user/profile ID. `POST /api/v1/me/sync` дополнительно требует `mobile:write` и verified email; каждая операция снова проходит visibility, policy, hierarchy ownership и playback-session проверки существующих доменных сервисов.
 - Offline optimistic version не является разрешением доступа и не доверяется как глобальный sequence. Watchlist/rating mutation сравнивает owner-scoped version под row lock; чужой или устаревший идентификатор не меняет состояние. `history.delete` начинает lookup с relation текущего пользователя, а progress повторно связывает title/episode/media с authenticated owner.
 - Signed mobile delivery URL авторизует только один media grant на короткое время и не является reusable login credential. Grant привязан к nullable user ID и media ID; endpoint повторно проверяет существование user и полный entitlement непосредственно перед provider redirect, поэтому удаление аккаунта, снятие релиза с публикации или отзыв доступа действует на уже выданный URL.
@@ -46,6 +46,15 @@
 
 `AUTH_REGISTRATION_ENABLED=false` удаляет create routes web/API при route build; login, recovery, verification и существующие accounts продолжают работать. Обычный unverified user может войти и управлять безопасными account actions, но verified domain policies по-прежнему запрещают catalog writes. Suspended/disabled/deleted status model в проекте отсутствует; hard-deleted row не может пройти Eloquent provider или Sanctum ownership resolution.
 
+## Canonical administrator RBAC
+
+- Registry содержит 14 необходимых ролей; labels переводятся, но persistence и gates используют только stable codes. Every role включает `administration.access`, а остальные permissions выдаются явно по domain/action.
+- `AdminAccessResolver` request-scoped: active membership, non-expired assignment и active role загружаются bounded eager-load; один suspended membership fail-closed отключает administrative access. `AdminGateRegistrar` регистрирует каждый stable permission и legacy aliases.
+- Назначение role требует `administration.roles.manage`, recent password confirmation, verified target, active role, stable reason и наличие у actor каждого permission назначаемой роли. Повтор той же assignment/expiry idempotent.
+- Revoke/suspend требует explicit confirmation и recent authentication. Final active non-expired `superadministrator` нельзя revoke или suspend; каждое реальное изменение пишет append-only secret-free `admin_audit_events` и очищает текущий resolver state.
+- `superadministrator` остаётся аварийной общей ролью, но не получает автоматически `billing.refund`, `billing.reconcile`, `legal.identity_documents` или `legal.authority_documents`. Sensitive domain access выдаётся отдельной role/bootstrap procedure и не обходится silently.
+- Current authenticated user никогда не передаётся из Livewire public state. Navigation hiding — только presentation; route middleware, action gate и resource policy повторяются независимо.
+
 ## Реализация
 
 - Route `/stats` доступен без авторизации, потому что отдаёт только очищенную read-only сводку.
@@ -61,7 +70,7 @@ Household/детские профили, PIN, billing, подписки/поку
 
 ## Матрица доступа коллекций
 
-`CatalogCollectionPolicy` — единственная authorization boundary коллекций. `view` разрешает approved public/unlisted или owner/admin и иначе отвечает `denyAsNotFound`; private name, count, owner и canonical slug не раскрываются. `create` требует authenticated verified user, `createEditorial`, moderation и feature используют `manage-catalog`; update/delete/restore/force-delete/item/reorder/cover повторно разрешают stable resolved record. System record изменяет только admin, а feature разрешена только approved public editorial collection.
+`CatalogCollectionPolicy` — единственная authorization boundary коллекций. `view` разрешает approved public/unlisted или owner/admin и иначе отвечает `denyAsNotFound`; private name, count, owner и canonical slug не раскрываются. `create` требует authenticated verified user; `createEditorial` и изменение system/editorial content требуют `content.manage`, а moderation/feature — отдельный `collections.moderate`. Update/delete/restore/force-delete/item/reorder/cover повторно разрешают stable resolved record. Drag reorder передаёт только item ID/position: service повторно проверяет ownership, item membership и current/target page window под collection lock, поэтому DOM order не является authority. System record изменяет только content manager, а feature разрешена только approved public editorial collection.
 
 Owner берётся из authenticated actor внутри service; client не передаёт `owner_id`, type/moderation/feature не mass-assignятся из public form. Title ID повторно проходит `CatalogTitlePolicy::interact`/visible query, collection UUID batch сравнивается с полным owner-scoped manageable set, item IDs проверяются внутри locked collection. Report разрешён verified non-owner только для directly public-viewable target и имеет отдельный limiter/deduplication key; moderator decision повторно проверяет gate уже после row lock, поэтому stale Livewire payload не обходит актуальную authority/state boundary.
 
@@ -120,7 +129,7 @@ Public user tags, unlisted tags, community global assignment, tag reporting и s
 
 ## Матрица доступа профилей пользователей
 
-| Действие | Guest | Active public viewer | Owner | `manage-catalog` |
+| Действие | Guest | Active public viewer | Owner | `moderation.profiles` |
 | --- | --- | --- | --- | --- |
 | Public active profile/explicit public section | Да | Да, кроме bilateral block | Да | Да |
 | Private/hidden/suspended profile | Нет, safe 404 | Нет, safe 404 | Да | Да |
@@ -213,7 +222,7 @@ Client не выбирает user, logical key, revision, actor или notificat
 
 Responsive state не даёт прав. Phone/tablet/standalone, orientation, fullscreen/PiP/Media Session, online/save-data hint, local storage и client-reported device category не участвуют в policy/gate/service decisions. Header может не выводить недоступное действие, но every Livewire/route/API mutation повторно authorizes server-side.
 
-Все staff full-page routes — imports, catalog, collections, comments, reviews, profiles, tags, requests, issues, calendar, premium и help — используют `auth`, `auth.session`, `account.private` до соответствующего gate. Это сохраняет private/no-store initial response и Livewire hydration; gate-only UI больше не является единственной initial boundary. Public canonical routes и route names не менялись.
+Все staff full-page routes — dashboard, users, access, audit, operations, imports, catalog/collections, comments, reviews, profiles, tags, requests, issues, calendar, premium и help — используют `auth`, `throttle:administration`, `auth.session`, `verified`, `account.private`, `account.active`, `admin.access` до соответствующего action gate. Это сохраняет private/no-store/noindex initial response и Livewire hydration; gate-only UI не является security boundary. Прежние feature route names сохранены.
 
 Task 23 не добавляет push/download/offline entitlement. Existing online direct-file download остаётся `LicensedMediaPolicy` + canonical entitlement/region/publication/health/format checks; mobile UI/local record не может разрешить его. Existing mobile API token abilities остаются отдельными от web session и не дают ticket/payment/admin/source access.
 

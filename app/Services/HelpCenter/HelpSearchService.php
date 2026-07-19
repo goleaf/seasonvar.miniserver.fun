@@ -88,11 +88,21 @@ final readonly class HelpSearchService
             })
             ->with([
                 'translations' => fn ($translation) => $translation
+                    ->select([
+                        'id', 'help_article_id', 'locale', 'slug', 'title', 'summary',
+                        'body_markdown', 'keywords', 'is_published',
+                    ])
                     ->whereIn('locale', $locales)
                     ->where('is_published', true),
-                'aliases' => fn ($alias) => $alias->whereIn('locale', $locales)->orderByDesc('priority')->orderBy('id'),
+                'aliases' => fn ($alias) => $alias
+                    ->select(['id', 'help_article_id', 'locale', 'normalized_alias', 'priority'])
+                    ->whereIn('locale', $locales)
+                    ->orderByDesc('priority')
+                    ->orderBy('id'),
                 'category:id,code',
-                'category.translations' => fn ($translation) => $translation->whereIn('locale', $locales),
+                'category.translations' => fn ($translation) => $translation
+                    ->select(['id', 'help_category_id', 'locale', 'slug', 'title'])
+                    ->whereIn('locale', $locales),
             ])
             ->limit(max(1, (int) config('help-center.search_candidates', 120)))
             ->get();

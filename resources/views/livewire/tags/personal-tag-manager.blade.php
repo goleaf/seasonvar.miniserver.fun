@@ -29,6 +29,7 @@
         @endif
     </x-ui.panel>
 
+    @island(name: 'personal-tag-pagination', always: true, with: $this->paginationIslandPage)
     <div class="grid min-w-0 gap-5 lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)]">
         <div class="min-w-0 space-y-5">
             <x-ui.panel :title="$editingPublicId === null ? __('tags.actions.create') : __('tags.actions.edit')" icon="fa-solid fa-tag">
@@ -108,6 +109,7 @@
             @endif
         </div>
 
+        <x-ui.pagination-region name="personal-tagged-titles-results">
         <section class="min-w-0" aria-labelledby="personal-tag-assignments-title">
             <x-ui.panel :pad="false">
                 <div class="border-b border-slate-200 px-4 py-3">
@@ -136,12 +138,14 @@
                         @endforelse
                     </div>
                     @if ($taggedTitles->hasPages())
-                        <div class="border-t border-slate-200 p-4">{{ $taggedTitles->links() }}</div>
+                        <div class="border-t border-slate-200 p-4">{{ $taggedTitles->links(data: ['region' => 'personal-tagged-titles-results']) }}</div>
                     @endif
                 @else
                     <p class="p-5 text-sm text-slate-500">{{ __('tags.personal_page.select_tag') }}</p>
                 @endif
             </x-ui.panel>
         </section>
+        </x-ui.pagination-region>
     </div>
+    @endisland
 </div>

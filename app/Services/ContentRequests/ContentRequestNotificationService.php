@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Services\ContentRequests;
 
+use App\Enums\AdminPermission;
 use App\Enums\ContentRequestNotificationType;
 use App\Enums\ContentRequestStatus;
 use App\Models\ContentRequest;
 use App\Models\ContentRequestNotificationPreference;
 use App\Models\User;
 use App\Notifications\ContentRequestActivityNotification;
+use App\Services\Admin\AdminEligibleUserQuery;
 use App\Support\DeterministicUuid;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -17,12 +19,14 @@ use Throwable;
 
 final class ContentRequestNotificationService
 {
+    public function __construct(private readonly AdminEligibleUserQuery $eligibleAdministrators) {}
+
     public function submitted(ContentRequest $request): void
     {
         $this->safely(function () use ($request): void {
             $request->loadMissing('requester:id,name');
-            $recipients = User::query()
-                ->whereIn('email', (array) config('seasonvar.admin_emails', []))
+            $recipients = $this->eligibleAdministrators
+                ->forPermission(AdminPermission::RequestsModerate)
                 ->get(['id', 'name'])
                 ->when($request->requester instanceof User, fn ($users) => $users->push($request->requester))
                 ->unique('id');

@@ -38,6 +38,8 @@
         <x-form.field :label="__('collections.directory.search_label')" for="collection-admin-search" :placeholder="__('collections.directory.search_placeholder')" wire:model.live.debounce.400ms="search" />
     </x-ui.panel>
 
+    @island(name: 'collection-administration-pagination', always: true, with: $this->paginationIslandPage)
+    <x-ui.pagination-region name="collection-administration-results">
     @if ($collections->isEmpty())
         <div class="rounded-panel border border-dashed border-slate-300 bg-white p-8 text-center text-sm font-semibold text-slate-600">{{ __('collections.admin.empty') }}</div>
     @else
@@ -86,6 +88,8 @@
                 </article>
             @endforeach
         </div>
-        <nav aria-label="{{ __('collections.page.pagination') }}">{{ $collections->links() }}</nav>
+        <nav aria-label="{{ __('collections.page.pagination') }}">{{ $collections->links(data: ['region' => 'collection-administration-results']) }}</nav>
     @endif
+    </x-ui.pagination-region>
+    @endisland
 </div>

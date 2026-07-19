@@ -18,6 +18,8 @@
     </section>
 
     <div wire:loading.delay role="status" aria-live="polite" class="rounded-control bg-sky-50 p-3 text-sm font-bold text-sky-800">{{ __('issues.states.loading') }}</div>
+    @island(name: 'my-technical-issues-pagination', always: true, with: $this->paginationIslandPage)
+    <x-ui.pagination-region name="my-technical-issues-results">
     @if (! $schemaReady)
         <p role="status" class="rounded-control bg-amber-50 p-4 text-sm font-bold text-amber-900">{{ __('issues.states.schema_unavailable') }}</p>
     @elseif ($issues->isEmpty())
@@ -28,6 +30,8 @@
                 <x-technical-issues.card :issue="$issue" />
             @endforeach
         </div>
-        <div>{{ $issues->links() }}</div>
+        <div>{{ $issues->links(data: ['region' => 'my-technical-issues-results']) }}</div>
     @endif
+    </x-ui.pagination-region>
+    @endisland
 </div>

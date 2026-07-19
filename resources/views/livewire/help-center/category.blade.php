@@ -13,6 +13,8 @@
 
     <div wire:loading.delay role="status" aria-live="polite" class="rounded-control bg-sky-50 px-4 py-3 text-sm font-bold text-sky-800">{{ __('help.states.loading') }}</div>
 
+    @island(name: 'help-category-pagination', always: true, with: $this->paginationIslandPage)
+    <x-ui.pagination-region name="help-category-results">
     @if ($queryFailed)
         <x-ui.panel><p role="alert" class="font-bold text-rose-700">{{ __('help.states.query_failed') }}</p></x-ui.panel>
     @elseif ($articles->isEmpty())
@@ -26,6 +28,8 @@
                 <x-help.article-card :article="$article" wire:key="help-category-{{ $article->publicId }}" />
             @endforeach
         </section>
-        <nav aria-label="{{ __('help.accessibility.pagination') }}">{{ $articles->links() }}</nav>
+        <nav aria-label="{{ __('help.accessibility.pagination') }}">{{ $articles->links(data: ['region' => 'help-category-results']) }}</nav>
     @endif
+    </x-ui.pagination-region>
+    @endisland
 </div>

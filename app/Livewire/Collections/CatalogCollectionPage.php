@@ -9,6 +9,7 @@ use App\Enums\CatalogCollectionReportReason;
 use App\Enums\CatalogCollectionSort;
 use App\Enums\CatalogCollectionVisibility;
 use App\Livewire\Concerns\InteractsWithCollectionLocale;
+use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Models\User;
 use App\Services\Collections\CatalogCollectionCoverService;
 use App\Services\Collections\CatalogCollectionItemService;
@@ -30,6 +31,7 @@ use Livewire\WithPagination;
 final class CatalogCollectionPage extends Component
 {
     use InteractsWithCollectionLocale;
+    use InteractsWithPaginationIslands;
     use WithPagination;
 
     #[Locked]

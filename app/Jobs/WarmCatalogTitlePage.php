@@ -9,8 +9,10 @@ use App\Models\CatalogTitle;
 use App\Services\Catalog\PublicPageCacheWarmer;
 use App\Services\Seasonvar\SeasonvarImportActivity;
 use App\Support\Cache\CacheEntryState;
+use App\Support\Cache\CacheVersionUnavailable;
 use App\Support\Cache\PublicPageCachePolicy;
 use App\Support\Cache\TieredCache;
+use DateTimeInterface;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -31,18 +33,25 @@ final class WarmCatalogTitlePage implements ShouldBeUnique, ShouldQueue
     use Queueable;
     use SerializesModels;
 
-    public int $tries = 3;
+    public int $tries = 0;
 
     public int $timeout;
 
     public int $uniqueFor;
 
+    private readonly int $retryUntilTimestamp;
+
     public function __construct(public readonly int $titleId)
     {
         $requestTimeout = max(1, (int) config('cache-architecture.page_cache.warm_timeout_seconds', 10));
         $requestAttempts = max(1, (int) config('cache-architecture.page_cache.warm_retry_times', 2));
+        $retryWindow = max(300, (int) config('cache-architecture.warming.visible_titles.retry_window_seconds', 86_400));
         $this->timeout = max(30, min(120, ($requestTimeout * $requestAttempts) + 10));
-        $this->uniqueFor = max(60, (int) config('cache-architecture.warming.visible_titles.unique_seconds', 600));
+        $this->uniqueFor = max(
+            $retryWindow + 300,
+            (int) config('cache-architecture.warming.visible_titles.unique_seconds', 86_700),
+        );
+        $this->retryUntilTimestamp = now()->addSeconds($retryWindow)->getTimestamp();
         $this->onConnection((string) config('cache-architecture.warming.connection', 'redis'));
         $this->onQueue((string) config('cache-architecture.warming.queue', 'cache-warm-v2'));
         $this->afterCommit();
@@ -62,7 +71,19 @@ final class WarmCatalogTitlePage implements ShouldBeUnique, ShouldQueue
 
         $title = CatalogTitle::query()->availableTo(null)->whereKey($this->titleId)->first();
 
-        if ($title === null || ($context = $policy->canonicalTitleContext($title)) === null) {
+        if ($title === null) {
+            return;
+        }
+
+        try {
+            $context = $policy->canonicalTitleContext($title);
+        } catch (CacheVersionUnavailable) {
+            $this->release($this->unavailablePauseSeconds());
+
+            return;
+        }
+
+        if ($context === null) {
             return;
         }
 
@@ -74,7 +95,7 @@ final class WarmCatalogTitlePage implements ShouldBeUnique, ShouldQueue
         );
 
         if ($state === CacheEntryState::Unavailable) {
-            $this->release(max(15, (int) config('cache-architecture.warming.visible_titles.unavailable_pause_seconds', 60)));
+            $this->release($this->unavailablePauseSeconds());
 
             return;
         }
@@ -113,6 +134,11 @@ final class WarmCatalogTitlePage implements ShouldBeUnique, ShouldQueue
         return 'catalog-title-page:'.$this->titleId;
     }
 
+    public function retryUntil(): DateTimeInterface
+    {
+        return now()->setTimestamp($this->retryUntilTimestamp);
+    }
+
     public function uniqueVia(): Repository
     {
         return Cache::store((string) config('cache-architecture.stores.locks', 'redis-locks'));
@@ -124,5 +150,10 @@ final class WarmCatalogTitlePage implements ShouldBeUnique, ShouldQueue
             'title_id' => $this->titleId,
             'exception' => $exception !== null ? $exception::class : null,
         ]);
+    }
+
+    private function unavailablePauseSeconds(): int
+    {
+        return max(15, (int) config('cache-architecture.warming.visible_titles.unavailable_pause_seconds', 60));
     }
 }

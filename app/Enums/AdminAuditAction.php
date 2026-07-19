@@ -6,6 +6,14 @@ namespace App\Enums;
 
 enum AdminAuditAction: string
 {
+    case AdministratorRoleAssigned = 'administrator.role_assigned';
+    case AdministratorRoleRevoked = 'administrator.role_revoked';
+    case AdministratorSuspended = 'administrator.suspended';
+    case AdministratorRestored = 'administrator.restored';
+    case AccountRestrictionApplied = 'account.restriction_applied';
+    case AccountRestrictionRevoked = 'account.restriction_revoked';
+    case CacheInvalidated = 'cache.invalidated';
+    case SearchResourceReindexed = 'search.resource_reindexed';
     case TitleUpdated = 'title.updated';
     case TitleArchived = 'title.archived';
     case RelationAttached = 'relation.attached';
@@ -40,4 +48,9 @@ enum AdminAuditAction: string
     case TagAliasUpdated = 'tag.alias_updated';
     case TagSynonymUpdated = 'tag.synonym_updated';
     case TagProviderMappingUpdated = 'tag.provider_mapping_updated';
+
+    public function label(): string
+    {
+        return __('administration.audit.actions.'.str_replace('.', '_', $this->value));
+    }
 }

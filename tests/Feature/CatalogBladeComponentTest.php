@@ -400,7 +400,6 @@ class CatalogBladeComponentTest extends TestCase
             ->assertSee(e(route('titles.show', [
                 'catalogTitle' => $catalogTitle,
                 'episode' => $secondEpisode->id,
-                'media' => $secondSubtitleMedia->id,
                 'variant' => 'subtitles-subtitry',
                 'quality' => '480p',
                 'format' => 'mp4',
@@ -420,7 +419,7 @@ class CatalogBladeComponentTest extends TestCase
             ->assertDontSee('https://media.example.com/big-bang-s01e02-voice.mp4', false);
     }
 
-    public function test_title_page_shows_livewire_variant_loading_and_episode_profile_labels(): void
+    public function test_title_page_shows_livewire_variant_loading_and_preserves_profile_query_for_episode_navigation(): void
     {
         $catalogTitle = CatalogTitle::factory()->create([
             'title' => 'Бухта вдов',
@@ -514,20 +513,27 @@ class CatalogBladeComponentTest extends TestCase
             ->assertOk()
             ->assertSee('wire:loading.delay.flex', false)
             ->assertSee('wire:target="selectMedia"', false)
-            ->assertSee('grid min-h-12 grid-cols-[minmax(0,1fr)_auto] content-center items-center', false)
             ->assertSee('grid min-h-20 content-center gap-1 rounded-lg', false)
             ->assertSeeText('Переключаем вариант…')
             ->assertSeeText('Обновляем серии под выбранный вариант…')
-            ->assertSeeText('RuDub / 1080P / MP4')
             ->assertDontSeeText('1 серия 1 серия')
             ->assertDontSeeText('2 серия 2 серия')
             ->assertSee(e(route('titles.show', [
                 'catalogTitle' => $catalogTitle,
                 'episode' => $secondEpisode->id,
-                'media' => $secondEpisodePreferredMedia->id,
                 'variant' => 'voiceover-rudub',
-                'quality' => '1080p',
+                'quality' => '480p',
                 'format' => 'mp4',
             ]).'#player'), false);
+
+        $this->get(route('titles.show', [
+            'catalogTitle' => $catalogTitle,
+            'episode' => $secondEpisode->id,
+            'variant' => 'voiceover-rudub',
+            'quality' => '480p',
+            'format' => 'mp4',
+        ]))
+            ->assertOk()
+            ->assertSee('/playback/'.$secondEpisodePreferredMedia->id.'?', false);
     }
 }

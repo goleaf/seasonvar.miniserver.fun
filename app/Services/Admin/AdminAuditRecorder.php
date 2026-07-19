@@ -5,7 +5,11 @@ declare(strict_types=1);
 namespace App\Services\Admin;
 
 use App\Enums\AdminAuditAction;
+use App\Models\AccountRestriction;
 use App\Models\AdminAuditEvent;
+use App\Models\AdminOperationalEvent;
+use App\Models\AdminRole;
+use App\Models\AdminUserRole;
 use App\Models\CatalogCollection;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleReview;
@@ -21,6 +25,7 @@ use App\Models\Tag;
 use App\Models\TagProviderMapping;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 
 final class AdminAuditRecorder
@@ -29,6 +34,10 @@ final class AdminAuditRecorder
 
     /** @var array<class-string<Model>, string> */
     private const RESOURCE_TYPES = [
+        AccountRestriction::class => 'account_restriction',
+        AdminOperationalEvent::class => 'admin_operational_event',
+        AdminRole::class => 'admin_role',
+        AdminUserRole::class => 'admin_user_role',
         CatalogTitle::class => 'catalog_title',
         Season::class => 'season',
         Episode::class => 'episode',
@@ -101,6 +110,11 @@ final class AdminAuditRecorder
         'starts_at',
         'expires_at',
         'revoked_at',
+        'role_code',
+        'membership_status',
+        'assigned_at',
+        'cache_version',
+        'index_version',
     ];
 
     /** @param array<int, mixed> $changedFields */
@@ -132,16 +146,29 @@ final class AdminAuditRecorder
         }
 
         sort($fields, SORT_STRING);
+        $resourcePublicId = $resource->getAttributes()['public_id'] ?? null;
 
         AdminAuditEvent::query()->create([
             'actor_id' => $actor->id,
             'action' => $action,
             'resource_type' => $resourceType,
             'resource_id' => $resource->getKey(),
+            'resource_public_id' => is_string($resourcePublicId)
+                ? $resourcePublicId
+                : hash('sha256', $resourceType.':'.$resource->getKey()),
+            'correlation_id' => $this->correlationId(),
             'before_version' => $beforeVersion,
             'after_version' => $afterVersion,
             'changed_fields' => $fields,
             'occurred_at' => now(),
         ]);
+    }
+
+    private function correlationId(): ?string
+    {
+        $identity = request()->attributes->get('request_id')
+            ?? request()->attributes->get('api_request_id');
+
+        return is_string($identity) && Str::isUuid($identity) ? Str::lower($identity) : null;
     }
 }

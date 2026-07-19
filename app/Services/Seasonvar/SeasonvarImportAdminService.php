@@ -14,7 +14,6 @@ use App\Services\Media\LicensedMediaFileSizeBackfillSchedule;
 use App\Services\Media\LicensedMediaFileSizeBacklog;
 use App\Support\HumanFileSizeFormatter;
 use Illuminate\Contracts\Bus\Dispatcher as BusDispatcher;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -101,12 +100,7 @@ final class SeasonvarImportAdminService
 
     public function recoverStale(): int
     {
-        return $this->staleRunsQuery()->update([
-            'status' => SeasonvarImportStatus::Failed->value,
-            'last_error' => 'Запуск остановлен автоматически: heartbeat давно не обновлялся и активных задач не осталось.',
-            'finished_at' => now(),
-            'updated_at' => now(),
-        ]);
+        return $this->globalRuns->recoverStale();
     }
 
     public function markRetrying(SeasonvarImportRun $run, Throwable $exception): void
@@ -196,7 +190,7 @@ final class SeasonvarImportAdminService
         return [
             'runs' => $runs->map(fn (SeasonvarImportRun $run): array => $this->present($run))->all(),
             'has_active_run' => $this->hasActiveRun(),
-            'stale_count' => $this->staleRunsQuery()->count(),
+            'stale_count' => $this->globalRuns->staleCount(),
             'media_health' => collect([
                 ['status' => 'active', 'label' => 'Активно', 'icon' => 'fa-solid fa-circle-check', 'tone' => 'text-emerald-700'],
                 ['status' => 'degraded', 'label' => 'Нестабильно', 'icon' => 'fa-solid fa-triangle-exclamation', 'tone' => 'text-amber-700'],
@@ -275,26 +269,6 @@ final class SeasonvarImportAdminService
                 'seconds' => $number($backfillSchedule->timeBudgetSeconds),
             ]),
         ];
-    }
-
-    /** @return Builder<SeasonvarImportRun> */
-    private function staleRunsQuery(): Builder
-    {
-        $cutoff = now()->subMinutes(max(5, (int) config('seasonvar.queue.stale_after_minutes', 120)));
-
-        return SeasonvarImportRun::query()
-            ->where('execution_mode', 'queue')
-            ->where('status', SeasonvarImportStatus::Running->value)
-            ->where(function (Builder $query) use ($cutoff): void {
-                $query->where('last_heartbeat_at', '<=', $cutoff)
-                    ->orWhere(function (Builder $query) use ($cutoff): void {
-                        $query->whereNull('last_heartbeat_at')->where('updated_at', '<=', $cutoff);
-                    });
-            })
-            ->whereDoesntHave('claimedSourcePages', function (Builder $query): void {
-                $query->whereNotNull('import_claim_token')
-                    ->where('import_claim_expires_at', '>', now());
-            });
     }
 
     private function hasActiveRun(): bool

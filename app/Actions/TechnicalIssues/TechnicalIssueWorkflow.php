@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\TechnicalIssues;
 
+use App\Enums\AdminPermission;
 use App\Enums\TechnicalIssueNotificationType;
 use App\Enums\TechnicalIssuePriority;
 use App\Enums\TechnicalIssueResolutionType;
@@ -19,6 +20,7 @@ use App\Models\TechnicalIssueMessage;
 use App\Models\TechnicalIssueRedaction;
 use App\Models\TechnicalIssueStatusHistory;
 use App\Models\User;
+use App\Services\Admin\AdminEligibleUserQuery;
 use App\Services\TechnicalIssues\TechnicalIssueIdentity;
 use App\Services\TechnicalIssues\TechnicalIssueNotificationService;
 use App\Services\TechnicalIssues\TechnicalIssueOccurrenceService;
@@ -37,6 +39,7 @@ final readonly class TechnicalIssueWorkflow
         private TechnicalIssueIdentity $identity,
         private TechnicalIssueNotificationService $notifications,
         private TechnicalIssueOccurrenceService $occurrences,
+        private AdminEligibleUserQuery $eligibleAdministrators,
     ) {}
 
     /** @param array{summary?: mixed, expected_behavior?: mixed, actual_behavior?: mixed, reproduction_steps?: mixed} $data */
@@ -315,7 +318,7 @@ final readonly class TechnicalIssueWorkflow
         }
 
         $assignee = $assigneeId !== null
-            ? User::query()->whereKey($assigneeId)->whereIn('email', (array) config('seasonvar.admin_emails', []))->first(['id', 'name', 'email'])
+            ? $this->eligibleAdministrators->forPermission(AdminPermission::TicketsSupport)->whereKey($assigneeId)->first(['id', 'name', 'email'])
             : null;
 
         if ($assigneeId !== null && ! $assignee instanceof User) {

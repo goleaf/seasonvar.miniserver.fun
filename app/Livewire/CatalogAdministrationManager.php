@@ -4,17 +4,20 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Enums\AdminPermission;
 use App\Enums\CatalogPublicationType;
 use App\Enums\CatalogTitleRelationSource;
 use App\Enums\CatalogTitleRelationType;
 use App\Enums\ContentAudience;
 use App\Enums\PublicationStatus;
 use App\Enums\ReleaseKind;
+use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Models\CatalogTitle;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Models\User;
+use App\Services\Admin\AdminAccessResolver;
 use App\Services\Catalog\CatalogAdministrationQuery;
 use App\Services\Catalog\CatalogAdministrationService;
 use App\Services\Catalog\CatalogTaxonomyRegistry;
@@ -32,6 +35,7 @@ use Livewire\WithPagination;
 
 final class CatalogAdministrationManager extends Component
 {
+    use InteractsWithPaginationIslands;
     use WithPagination;
 
     #[Url(as: 'catalog_q', history: true, except: '')]
@@ -127,7 +131,7 @@ final class CatalogAdministrationManager extends Component
 
     public function mount(): void
     {
-        Gate::authorize('manage-catalog');
+        Gate::authorize(AdminPermission::ContentView->value);
     }
 
     public function updatedSearch(): void
@@ -228,7 +232,7 @@ final class CatalogAdministrationManager extends Component
         $updated = $this->administration->updateTitle($user, $title, $validated, $this->titleVersion);
 
         $this->fillTitleForm($updated);
-        $this->notice = 'Изменения сериала сохранены.';
+        $this->notice = __('administration.catalog.title_saved');
         $this->resetErrorBag();
     }
 
@@ -239,7 +243,7 @@ final class CatalogAdministrationManager extends Component
         $updated = $this->administration->archiveTitle($user, $title, $this->titleVersion);
 
         $this->fillTitleForm($updated);
-        $this->notice = 'Сериал скрыт без удаления пользовательских данных.';
+        $this->notice = __('administration.catalog.title_archived');
         $this->resetErrorBag();
     }
 
@@ -260,7 +264,7 @@ final class CatalogAdministrationManager extends Component
         );
 
         $this->fillTitleForm($updated);
-        $this->notice = 'Связь каталога сохранена.';
+        $this->notice = __('administration.catalog.relation_saved');
         $this->resetErrorBag();
     }
 
@@ -275,7 +279,7 @@ final class CatalogAdministrationManager extends Component
         $updated = $this->administration->detachRelation($user, $title, $type, $relationId, $this->titleVersion);
 
         $this->fillTitleForm($updated);
-        $this->notice = 'Связь каталога удалена.';
+        $this->notice = __('administration.catalog.relation_removed');
         $this->resetErrorBag();
     }
 
@@ -305,10 +309,10 @@ final class CatalogAdministrationManager extends Component
             'lookupForm.name' => ['required', 'string', 'max:255'],
             'lookupForm.slug' => ['required', 'string', 'max:255', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/', Rule::unique($table, 'slug')],
         ], [
-            'lookupForm.name.required' => 'Укажите название справочника.',
-            'lookupForm.slug.required' => 'Укажите slug справочника.',
-            'lookupForm.slug.regex' => 'Slug справочника имеет неверный формат.',
-            'lookupForm.slug.unique' => 'Такой slug справочника уже существует.',
+            'lookupForm.name.required' => __('administration.catalog.validation.lookup_name'),
+            'lookupForm.slug.required' => __('administration.catalog.validation.lookup_slug'),
+            'lookupForm.slug.regex' => __('administration.catalog.validation.lookup_slug_format'),
+            'lookupForm.slug.unique' => __('administration.catalog.validation.lookup_slug_unique'),
         ])->validate()['lookupForm'];
         $updated = $this->administration->createLookup(
             $user,
@@ -321,7 +325,7 @@ final class CatalogAdministrationManager extends Component
         $this->fillTitleForm($updated);
         $this->lookupForm = [];
         $this->lookupType = null;
-        $this->notice = 'Значение справочника создано и добавлено к сериалу.';
+        $this->notice = __('administration.catalog.lookup_created');
         $this->resetErrorBag();
     }
 
@@ -379,7 +383,7 @@ final class CatalogAdministrationManager extends Component
         $this->editingSeasonId = $saved->id;
         $this->fillSeasonForm($saved);
         $this->refreshTitleVersion();
-        $this->notice = 'Сезон сохранён.';
+        $this->notice = __('administration.catalog.season_saved');
         $this->resetErrorBag();
     }
 
@@ -393,7 +397,7 @@ final class CatalogAdministrationManager extends Component
 
         $this->fillSeasonForm($saved);
         $this->refreshTitleVersion();
-        $this->notice = 'Сезон скрыт без удаления серий и пользовательских данных.';
+        $this->notice = __('administration.catalog.season_archived');
         $this->resetErrorBag();
     }
 
@@ -469,7 +473,7 @@ final class CatalogAdministrationManager extends Component
         $this->editingEpisodeId = $saved->id;
         $this->fillEpisodeForm($saved);
         $this->refreshTitleVersion();
-        $this->notice = 'Серия сохранена.';
+        $this->notice = __('administration.catalog.episode_saved');
         $this->resetErrorBag();
     }
 
@@ -484,7 +488,7 @@ final class CatalogAdministrationManager extends Component
 
         $this->fillEpisodeForm($saved);
         $this->refreshTitleVersion();
-        $this->notice = 'Серия скрыта без удаления истории просмотра.';
+        $this->notice = __('administration.catalog.episode_archived');
         $this->resetErrorBag();
     }
 
@@ -546,7 +550,7 @@ final class CatalogAdministrationManager extends Component
         $this->editingMediaId = $saved->id;
         $this->fillMediaForm($saved);
         $this->refreshTitleVersion();
-        $this->notice = 'Видеоисточник сохранён.';
+        $this->notice = __('administration.catalog.media_saved');
         $this->resetErrorBag();
     }
 
@@ -562,13 +566,14 @@ final class CatalogAdministrationManager extends Component
 
         $this->fillMediaForm($saved);
         $this->refreshTitleVersion();
-        $this->notice = 'Видеоисточник снят с публикации.';
+        $this->notice = __('administration.catalog.media_archived');
         $this->resetErrorBag();
     }
 
-    public function render(): View
+    public function render(AdminAccessResolver $access): View
     {
-        Gate::authorize('manage-catalog');
+        Gate::authorize(AdminPermission::ContentView->value);
+        $user = $this->user();
 
         $selectedTitle = $this->selectedTitleId !== null
             ? $this->query->title($this->selectedTitleId)
@@ -600,13 +605,21 @@ final class CatalogAdministrationManager extends Component
             'publicationStatuses' => PublicationStatus::cases(),
             'audiences' => ContentAudience::cases(),
             'releaseKinds' => ReleaseKind::cases(),
-            'mediaStatuses' => ['draft' => 'Черновик', 'published' => 'Опубликовано', 'unavailable' => 'Недоступно'],
-            'publicationLabels' => ['draft' => 'Черновик', 'published' => 'Опубликовано', 'hidden' => 'Скрыто'],
-            'audienceLabels' => ['public' => 'Все посетители', 'authenticated' => 'Только после входа'],
-            'releaseKindLabels' => ['regular' => 'Обычный', 'special' => 'Спецвыпуск'],
+            'mediaStatuses' => collect(['draft', 'published', 'unavailable'])->mapWithKeys(fn (string $status): array => [$status => __('administration.catalog.media_statuses.'.$status)])->all(),
+            'publicationLabels' => collect(['draft', 'published', 'hidden'])->mapWithKeys(fn (string $status): array => [$status => __('administration.catalog.publication_statuses.'.$status)])->all(),
+            'audienceLabels' => collect(['public', 'authenticated'])->mapWithKeys(fn (string $audience): array => [$audience => __('administration.catalog.audiences.'.$audience)])->all(),
+            'releaseKindLabels' => collect(['regular', 'special'])->mapWithKeys(fn (string $kind): array => [$kind => __('administration.catalog.release_kinds.'.$kind)])->all(),
             'maxCatalogYear' => now()->year + 5,
             'supportedQualities' => config('playback.supported_qualities'),
             'allowedFormats' => config('playback.allowed_formats'),
+            'canManageContent' => $access->allows($user, AdminPermission::ContentManage),
+            'canCreateContent' => $access->allows($user, AdminPermission::ContentCreate),
+            'canDeleteContent' => $access->allows($user, AdminPermission::ContentDelete),
+            'canPublishContent' => $access->allows($user, AdminPermission::ContentPublish),
+            'canViewSources' => $access->allows($user, AdminPermission::SourcesView),
+            'canManageSources' => $access->allows($user, AdminPermission::SourcesManage),
+            'canDisableSources' => $access->allows($user, AdminPermission::SourcesDisable),
+            'canManageRecommendations' => $access->allows($user, AdminPermission::RecommendationsManage),
         ]);
     }
 
@@ -686,15 +699,15 @@ final class CatalogAdministrationManager extends Component
     private function titleMessages(): array
     {
         return [
-            'titleForm.title.required' => 'Укажите название сериала.',
-            'titleForm.slug.required' => 'Укажите slug сериала.',
-            'titleForm.slug.regex' => 'Slug может содержать только латинские буквы, цифры и дефисы.',
-            'titleForm.slug.unique' => 'Такой slug уже используется.',
-            'titleForm.external_id.regex' => 'Внешний ID содержит неподдерживаемые символы.',
-            'titleForm.external_id.unique' => 'Такой внешний ID уже используется этим источником.',
-            'titleForm.available_from.date_format' => 'Дата начала должна быть в формате UTC: ГГГГ-ММ-ДД ЧЧ:ММ.',
-            'titleForm.available_until.date_format' => 'Дата окончания должна быть в формате UTC: ГГГГ-ММ-ДД ЧЧ:ММ.',
-            'titleForm.available_until.after' => 'Дата окончания должна быть позже даты начала.',
+            'titleForm.title.required' => __('administration.catalog.validation.title_required'),
+            'titleForm.slug.required' => __('administration.catalog.validation.slug_required'),
+            'titleForm.slug.regex' => __('administration.catalog.validation.slug_format'),
+            'titleForm.slug.unique' => __('administration.catalog.validation.slug_unique'),
+            'titleForm.external_id.regex' => __('administration.catalog.validation.external_id_format'),
+            'titleForm.external_id.unique' => __('administration.catalog.validation.external_id_unique'),
+            'titleForm.available_from.date_format' => __('administration.catalog.validation.available_from'),
+            'titleForm.available_until.date_format' => __('administration.catalog.validation.available_until'),
+            'titleForm.available_until.after' => __('administration.catalog.validation.available_order'),
         ];
     }
 
@@ -856,11 +869,11 @@ final class CatalogAdministrationManager extends Component
     private function releaseMessages(string $form): array
     {
         return [
-            $form.'.number.required' => 'Укажите номер.',
-            $form.'.number.unique' => 'Запись с таким номером и типом уже существует.',
-            $form.'.available_from.date_format' => 'Дата начала должна быть в формате UTC: ГГГГ-ММ-ДД ЧЧ:ММ.',
-            $form.'.available_until.date_format' => 'Дата окончания должна быть в формате UTC: ГГГГ-ММ-ДД ЧЧ:ММ.',
-            $form.'.available_until.after' => 'Дата окончания должна быть позже даты начала.',
+            $form.'.number.required' => __('administration.catalog.validation.number_required'),
+            $form.'.number.unique' => __('administration.catalog.validation.number_unique'),
+            $form.'.available_from.date_format' => __('administration.catalog.validation.available_from'),
+            $form.'.available_until.date_format' => __('administration.catalog.validation.available_until'),
+            $form.'.available_until.after' => __('administration.catalog.validation.available_order'),
         ];
     }
 
@@ -904,14 +917,14 @@ final class CatalogAdministrationManager extends Component
     private function mediaMessages(): array
     {
         return [
-            'mediaForm.title.required' => 'Укажите название видеоисточника.',
-            'mediaForm.playback_url.required' => 'Укажите HTTPS-ссылку видеоисточника.',
-            'mediaForm.playback_url.url' => 'Видеоисточник должен использовать корректную HTTPS-ссылку.',
-            'mediaForm.playback_url.unique' => 'Такой видеоисточник уже существует у сериала.',
-            'mediaForm.format.required' => 'Укажите формат видео.',
-            'mediaForm.format.in' => 'Выбран неподдерживаемый формат видео.',
-            'mediaForm.quality.in' => 'Выбрано неподдерживаемое качество видео.',
-            'mediaForm.available_until.after' => 'Дата окончания должна быть позже даты начала.',
+            'mediaForm.title.required' => __('administration.catalog.validation.media_title'),
+            'mediaForm.playback_url.required' => __('administration.catalog.validation.media_url_required'),
+            'mediaForm.playback_url.url' => __('administration.catalog.validation.media_url'),
+            'mediaForm.playback_url.unique' => __('administration.catalog.validation.source_unique'),
+            'mediaForm.format.required' => __('administration.catalog.validation.media_format_required'),
+            'mediaForm.format.in' => __('administration.catalog.validation.media_format'),
+            'mediaForm.quality.in' => __('administration.catalog.validation.media_quality'),
+            'mediaForm.available_until.after' => __('administration.catalog.validation.available_order'),
         ];
     }
 
@@ -935,11 +948,11 @@ final class CatalogAdministrationManager extends Component
     private function relationGroups(CatalogTitle $title): array
     {
         $labels = [
-            'actor' => 'Актёры',
-            'director' => 'Режиссёры',
-            'genre' => 'Жанры',
-            'country' => 'Страны',
-            'translation' => 'Языки и переводы',
+            'actor' => __('administration.catalog.relation_labels.actor'),
+            'director' => __('administration.catalog.relation_labels.director'),
+            'genre' => __('administration.catalog.relation_labels.genre'),
+            'country' => __('administration.catalog.relation_labels.country'),
+            'translation' => __('administration.catalog.relation_labels.translation'),
         ];
 
         return collect($this->administration->editableRelations())

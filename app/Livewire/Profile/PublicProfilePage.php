@@ -9,6 +9,7 @@ use App\Actions\Comments\SetUserMute;
 use App\Enums\CatalogWatchStatus;
 use App\Enums\UserProfileReportCategory;
 use App\Exceptions\Comments\CommentActionException;
+use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Models\User;
 use App\Models\UserProfile;
 use App\Services\Profiles\PublicUserProfilePresenter;
@@ -29,6 +30,7 @@ use Throwable;
 
 final class PublicProfilePage extends Component
 {
+    use InteractsWithPaginationIslands;
     use WithPagination;
 
     #[Locked]

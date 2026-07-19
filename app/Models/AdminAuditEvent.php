@@ -8,9 +8,11 @@ use App\Enums\AdminAuditAction;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Str;
 use LogicException;
 
 #[Fillable([
+    'public_id',
     'actor_id',
     'action',
     'resource_type',
@@ -19,6 +21,8 @@ use LogicException;
     'after_version',
     'changed_fields',
     'occurred_at',
+    'resource_public_id',
+    'correlation_id',
 ])]
 class AdminAuditEvent extends Model
 {
@@ -32,6 +36,9 @@ class AdminAuditEvent extends Model
 
     protected static function booted(): void
     {
+        static::creating(static function (self $event): void {
+            $event->public_id ??= (string) Str::uuid();
+        });
         static::updating(static function (): never {
             throw new LogicException('События административного аудита нельзя изменять.');
         });

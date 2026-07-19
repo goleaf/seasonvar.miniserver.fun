@@ -34,7 +34,9 @@
         @endif
     </x-ui.panel>
 
+    @island(name: 'tag-administration-pagination', always: true, with: $this->paginationIslandPage)
     <div class="grid min-w-0 gap-5 xl:grid-cols-[340px_minmax(0,1fr)]">
+        <x-ui.pagination-region name="tag-administration-results">
         <x-ui.panel :title="__('tags.title')" icon="fa-solid fa-list" :pad="false">
             <div class="space-y-3 border-b border-slate-200 p-3">
                 <x-form.search-field id="admin-tag-search" name="admin_tag_search" :label="__('tags.actions.search')" :placeholder="__('tags.admin.search_placeholder')" wire:model.live.debounce.350ms="search" />
@@ -76,9 +78,10 @@
                 @endforelse
             </div>
             @if ($tagsPage->hasPages())
-                <div class="border-t border-slate-200 p-3">{{ $tagsPage->links() }}</div>
+                <div class="border-t border-slate-200 p-3">{{ $tagsPage->links(data: ['region' => 'tag-administration-results']) }}</div>
             @endif
         </x-ui.panel>
+        </x-ui.pagination-region>
 
         <div class="min-w-0 space-y-5">
             <x-ui.panel :title="$selectedTag === null ? __('tags.admin.create') : $selectedTag->name" icon="fa-solid fa-tag">
@@ -326,4 +329,5 @@
             @endif
         </div>
     </div>
+    @endisland
 </div>

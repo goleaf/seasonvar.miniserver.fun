@@ -13,6 +13,7 @@ use App\DTOs\PlaybackSettingsData;
 use App\Enums\AccountSettingsSection;
 use App\Enums\CatalogCollectionVisibility;
 use App\Enums\HelpFeature;
+use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Models\CatalogTitleReviewNotificationPreference;
 use App\Models\CommentNotificationPreference;
 use App\Models\ContentRequestNotificationPreference;
@@ -45,6 +46,7 @@ use Throwable;
 
 final class AccountSettingsPage extends Component
 {
+    use InteractsWithPaginationIslands;
     use WithPagination;
 
     #[Locked]

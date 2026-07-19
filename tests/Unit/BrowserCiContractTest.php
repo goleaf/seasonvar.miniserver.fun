@@ -51,6 +51,7 @@ final class BrowserCiContractTest extends TestCase
         $this->assertStringContainsString("withTags(['wcag2a', 'wcag2aa'])", $suite);
         $this->assertStringContainsString("['critical', 'serious'].includes(violation.impact)", $suite);
         $this->assertStringContainsString("route('**/*'", $suite);
+        $this->assertStringContainsString('page.route(/\/livewire(?:-[^/]+)?\/update', $suite);
         $this->assertStringContainsString('isLocalHttpRequest', $suite);
         $this->assertStringContainsString('scrollWidth', $suite);
         $this->assertStringContainsString('min-height', $suite);

@@ -5,6 +5,16 @@ declare(strict_types=1);
 return [
     'component_placeholder' => 'livewire.placeholder',
 
+    'make_command' => [
+        'type' => 'class',
+        'emoji' => false,
+        'with' => [
+            'js' => false,
+            'css' => false,
+            'test' => false,
+        ],
+    ],
+
     'temporary_file_upload' => [
         'middleware' => 'throttle:livewire-uploads',
         'rules' => [

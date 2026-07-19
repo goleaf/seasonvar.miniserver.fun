@@ -21,6 +21,8 @@
         </section>
     @endif
 
+    @island(name: 'review-history-pagination', always: true, with: $this->paginationIslandPage)
+    <x-ui.pagination-region name="review-history-results">
     <section aria-labelledby="review-history-list-title" class="space-y-4">
         <p role="status" wire:loading.delay wire:target="sort,status,gotoPage,nextPage,previousPage,revealReview,hideReview" class="rounded-control bg-slate-50 px-4 py-3 text-sm font-bold text-slate-600">{{ __('reviews.actions.loading') }}</p>
         <div class="rounded-panel border border-slate-200 bg-white p-4 shadow-panel sm:p-5">
@@ -55,7 +57,9 @@
         @endif
 
         @if ($reviews->hasPages())
-            {{ $reviews->links() }}
+            {{ $reviews->links(data: ['region' => 'review-history-results']) }}
         @endif
     </section>
+    </x-ui.pagination-region>
+    @endisland
 </div>

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\ReleaseCalendar;
 
 use App\Actions\ReleaseCalendar\MarkReleaseCalendarNotificationRead;
+use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Models\User;
 use App\Services\ReleaseCalendar\ReleaseCalendarNotificationQuery;
 use App\Services\ReleaseCalendar\ReleaseCalendarSchema;
@@ -15,6 +16,7 @@ use Throwable;
 
 final class ReleaseCalendarNotificationsPanel extends Component
 {
+    use InteractsWithPaginationIslands;
     use WithPagination;
 
     public string $notice = '';

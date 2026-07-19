@@ -8,6 +8,7 @@ use App\Enums\CatalogCollectionModerationStatus;
 use App\Enums\CatalogCollectionReportStatus;
 use App\Enums\CatalogCollectionType;
 use App\Enums\CatalogCollectionVisibility;
+use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Models\CatalogCollectionReport;
 use App\Models\User;
 use App\Services\Collections\CatalogCollectionModerationService;
@@ -21,6 +22,7 @@ use Livewire\WithPagination;
 
 final class CatalogCollectionAdministrationManager extends Component
 {
+    use InteractsWithPaginationIslands;
     use WithPagination;
 
     #[Url(as: 'collection_admin_q', history: true, except: '')]

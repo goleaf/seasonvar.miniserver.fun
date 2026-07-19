@@ -31,6 +31,8 @@
         <button type="button" wire:click="clearFilters" class="mt-4 inline-flex min-h-11 items-center gap-2 text-sm font-bold text-emerald-700"><x-ui.icon name="fa-solid fa-filter-circle-xmark" />{{ __('reviews.filters.clear') }}</button>
     </section>
 
+    @island(name: 'review-moderation-pagination', always: true, with: $this->paginationIslandPage)
+    <x-ui.pagination-region name="review-moderation-results">
     @if (! $communityAvailable)
         <div class="rounded-control border border-amber-200 bg-amber-50 px-4 py-5 text-sm text-amber-900">{{ __('reviews.empty.disabled') }}</div>
     @elseif ($queryFailed)
@@ -108,6 +110,8 @@
             @endforelse
         </section>
 
-        @if ($reviews->hasPages())<div class="pt-2">{{ $reviews->links() }}</div>@endif
+        @if ($reviews->hasPages())<div class="pt-2">{{ $reviews->links(data: ['region' => 'review-moderation-results']) }}</div>@endif
     @endif
+    </x-ui.pagination-region>
+    @endisland
 </div>

@@ -1,6 +1,6 @@
 # Требования к production operations
 
-Обновлено: 18.07.2026
+Обновлено: 19.07.2026
 
 Этот документ — обязательный постоянный contract для deployment, environment, storage, database, cache, sessions, queues, scheduler, backups, restore, rollback, health и incidents. Фактические версии и состояния принадлежат [`../environment.md`](../environment.md), а последовательности deployment — [`../deployment.md`](../deployment.md) и связанным runbooks. Не копируйте туда secret values.
 
@@ -33,6 +33,11 @@
 - Production устанавливает locked Composer/npm dependencies; uncontrolled update в production запрещён.
 - Любое изменение версии следует [`maintenance-and-upgrades.md`](maintenance-and-upgrades.md), имеет compatibility/production/rollback review и не смешивает unrelated major upgrades.
 - Platform requirements проверяются до activation; development packages и debug tooling не включаются в production unintentionally.
+- Framework/dependency update подтверждает совместимость фактического production runtime; PHP update — required extensions; Node update — package manager, lock format и Vite; database update — driver и schema behavior.
+- Redis update проверяет client, serializer, persistence и failover where relevant; Memcached update — client, serializer, eviction и connection; web-server update — rewrites, headers, upload limits, proxy и static assets; PHP-FPM update — pool, permissions, timeouts, OPcache и restart procedure.
+- Package release имеет явные deployment/rollback steps. Pending queue jobs и scheduled tasks проверяются при изменении class/serialization/runtime contracts; frontend release отдельно оценивает service-worker rollback, даже когда current state честно `not_installed`.
+- High-risk package/data migration запрещена без verified backup. Provider SDK update проверяет webhooks/signatures, idempotency, callbacks, retries и reconciliation; mail-library update — verification, password reset, security, billing, advertiser, ticket и legal messages с сохранением locale и safe failure behavior.
+- Deployment runbook явно перечисляет dependency/runtime changes и устанавливает только lock-resolved versions; production никогда не выполняет uncontrolled dependency resolution.
 
 ## 5. Требования к PHP extensions
 

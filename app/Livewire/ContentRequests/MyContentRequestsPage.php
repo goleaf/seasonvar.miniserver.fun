@@ -6,6 +6,7 @@ namespace App\Livewire\ContentRequests;
 
 use App\Enums\ContentRequestSort;
 use App\Enums\ContentRequestStatus;
+use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Models\User;
 use App\Services\ContentRequests\ContentRequestQuery;
 use App\Services\ContentRequests\ContentRequestSchema;
@@ -18,6 +19,7 @@ use Livewire\WithPagination;
 
 final class MyContentRequestsPage extends Component
 {
+    use InteractsWithPaginationIslands;
     use WithPagination;
 
     #[Url(history: true, except: 'created')]

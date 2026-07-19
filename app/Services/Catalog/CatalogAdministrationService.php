@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Catalog;
 
 use App\Enums\AdminAuditAction;
+use App\Enums\AdminPermission;
 use App\Enums\PublicationStatus;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRecommendation;
@@ -99,6 +100,10 @@ final class CatalogAdministrationService
     ): CatalogTitle {
         Gate::forUser($user)->authorize('update', $title);
 
+        if (($attributes['publication_status'] ?? null) !== $title->publication_status->value) {
+            Gate::forUser($user)->authorize(AdminPermission::ContentPublish->value);
+        }
+
         return $this->persistTitle($user, $title, $attributes, $expectedVersion, AdminAuditAction::TitleUpdated);
     }
 
@@ -182,7 +187,7 @@ final class CatalogAdministrationService
 
                 return $saved;
             }, attempts: 3);
-        }, 'titleForm', 'Slug или внешний ID уже занят другой записью.');
+        }, 'titleForm', __('administration.catalog.validation.title_unique'));
 
         $this->invalidate($updated, (string) $title->slug);
 
@@ -265,7 +270,7 @@ final class CatalogAdministrationService
     /** @param array<string, mixed> $attributes */
     public function createLookup(User $user, CatalogTitle $title, string $type, array $attributes, string $expectedVersion): CatalogTitle
     {
-        Gate::forUser($user)->authorize('update', $title);
+        Gate::forUser($user)->authorize(AdminPermission::ContentCreate->value);
 
         $updated = $this->withUniqueConstraintMessage(function () use ($user, $title, $type, $attributes, $expectedVersion): CatalogTitle {
             return DB::transaction(function () use ($user, $title, $type, $attributes, $expectedVersion): CatalogTitle {
@@ -291,7 +296,7 @@ final class CatalogAdministrationService
 
                 return $saved;
             }, attempts: 3);
-        }, 'lookupForm.slug', 'Такой slug справочника уже существует.');
+        }, 'lookupForm.slug', __('administration.catalog.validation.lookup_slug_unique'));
 
         $this->invalidate($updated);
 
@@ -306,7 +311,12 @@ final class CatalogAdministrationService
         ?Season $season,
         string $expectedVersion,
     ): Season {
-        Gate::forUser($user)->authorize('update', $title);
+        Gate::forUser($user)->authorize(($season === null ? AdminPermission::ContentCreate : AdminPermission::ContentManage)->value);
+
+        if (($attributes['publication_status'] ?? null) === PublicationStatus::Published->value
+            && $season?->publication_status !== PublicationStatus::Published) {
+            Gate::forUser($user)->authorize(AdminPermission::ContentPublish->value);
+        }
 
         return $this->persistSeason(
             $user,
@@ -320,7 +330,7 @@ final class CatalogAdministrationService
 
     public function archiveSeason(User $user, CatalogTitle $title, Season $season, string $expectedVersion): Season
     {
-        Gate::forUser($user)->authorize('update', $title);
+        Gate::forUser($user)->authorize(AdminPermission::ContentDelete->value);
 
         return $this->persistSeason($user, $title, [
             ...Arr::only($season->getAttributes(), ['number', 'kind', 'sort_order', 'title', 'audience', 'available_from', 'available_until']),
@@ -373,7 +383,7 @@ final class CatalogAdministrationService
 
                 return $savedSeason;
             }, attempts: 3);
-        }, 'seasonForm.number', 'Сезон с таким номером и типом уже существует.');
+        }, 'seasonForm.number', __('administration.catalog.validation.season_unique'));
 
         $this->invalidate($title);
 
@@ -389,7 +399,12 @@ final class CatalogAdministrationService
         ?Episode $episode,
         string $expectedVersion,
     ): Episode {
-        Gate::forUser($user)->authorize('update', $title);
+        Gate::forUser($user)->authorize(($episode === null ? AdminPermission::ContentCreate : AdminPermission::ContentManage)->value);
+
+        if (($attributes['publication_status'] ?? null) === PublicationStatus::Published->value
+            && $episode?->publication_status !== PublicationStatus::Published) {
+            Gate::forUser($user)->authorize(AdminPermission::ContentPublish->value);
+        }
 
         return $this->persistEpisode(
             $user,
@@ -404,7 +419,7 @@ final class CatalogAdministrationService
 
     public function archiveEpisode(User $user, CatalogTitle $title, Season $season, Episode $episode, string $expectedVersion): Episode
     {
-        Gate::forUser($user)->authorize('update', $title);
+        Gate::forUser($user)->authorize(AdminPermission::ContentDelete->value);
 
         return $this->persistEpisode($user, $title, $season, [
             ...Arr::only($episode->getAttributes(), ['number', 'kind', 'sort_order', 'title', 'released_at', 'summary', 'audience', 'available_from', 'available_until']),
@@ -459,7 +474,7 @@ final class CatalogAdministrationService
 
                 return $savedEpisode;
             }, attempts: 3);
-        }, 'episodeForm.number', 'Серия с таким номером и типом уже существует.');
+        }, 'episodeForm.number', __('administration.catalog.validation.episode_unique'));
 
         $this->invalidate($title);
 
@@ -476,7 +491,11 @@ final class CatalogAdministrationService
         ?LicensedMedia $media,
         string $expectedVersion,
     ): LicensedMedia {
-        Gate::forUser($user)->authorize('update', $title);
+        Gate::forUser($user)->authorize(AdminPermission::SourcesManage->value);
+
+        if (($attributes['status'] ?? null) === 'published' && $media?->status !== 'published') {
+            Gate::forUser($user)->authorize(AdminPermission::ContentPublish->value);
+        }
 
         return $this->persistMedia(
             $user,
@@ -492,7 +511,7 @@ final class CatalogAdministrationService
 
     public function archiveMedia(User $user, CatalogTitle $title, Season $season, Episode $episode, LicensedMedia $media, string $expectedVersion): LicensedMedia
     {
-        Gate::forUser($user)->authorize('update', $title);
+        Gate::forUser($user)->authorize(AdminPermission::SourcesDisable->value);
 
         return $this->persistMedia($user, $title, $season, $episode, [
             ...Arr::only($media->getAttributes(), ['title', 'quality', 'translation_name', 'format', 'has_subtitles', 'duration_seconds', 'audience', 'available_from', 'available_until']),
@@ -517,7 +536,7 @@ final class CatalogAdministrationService
 
         if ($media === null && $playbackUrl === null) {
             throw ValidationException::withMessages([
-                'mediaForm.playback_url' => 'Источник должен использовать разрешённый HTTPS-хост.',
+                'mediaForm.playback_url' => __('administration.catalog.validation.source_host'),
             ]);
         }
 
@@ -581,7 +600,7 @@ final class CatalogAdministrationService
 
                 return $savedMedia;
             }, attempts: 3);
-        }, 'mediaForm.playback_url', 'Такой видеоисточник уже существует у сериала.');
+        }, 'mediaForm.playback_url', __('administration.catalog.validation.source_unique'));
 
         $this->invalidate($title);
 
@@ -625,7 +644,7 @@ final class CatalogAdministrationService
     {
         if (! in_array($type, $this->editableRelations(), true)) {
             throw ValidationException::withMessages([
-                'relation' => 'Выбран неподдерживаемый тип связи.',
+                'relation' => __('administration.catalog.validation.relation_invalid'),
             ]);
         }
 
@@ -636,7 +655,7 @@ final class CatalogAdministrationService
     {
         if ($expected === '' || ! hash_equals($actual, $expected)) {
             throw ValidationException::withMessages([
-                $errorKey => 'Запись уже изменена другим процессом. Обновите форму и повторите правку.',
+                $errorKey => __('administration.catalog.validation.stale'),
             ]);
         }
     }

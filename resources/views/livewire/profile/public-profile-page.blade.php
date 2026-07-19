@@ -89,6 +89,7 @@
         </div>
     </nav>
 
+    @island(name: 'public-profile-pagination', always: true, with: $this->paginationIslandPage)
     <section id="profile-tab-panel" role="tabpanel" aria-labelledby="profile-tab-{{ $tab }}" aria-live="polite" wire:loading.class="opacity-60" wire:target="tab">
         @if ($tab === 'overview')
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -113,13 +114,16 @@
         @elseif ($items !== null && $items->isEmpty())
             <div class="rounded-panel border border-dashed border-slate-300 bg-white p-8 text-center shadow-panel"><p class="text-sm font-semibold text-slate-600">{{ __('profiles.empty.'.$tab) }}</p></div>
         @elseif ($tab === 'collections')
+            <x-ui.pagination-region name="public-profile-collections-results">
             <div class="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 @foreach ($items as $collection)
                     <x-collections.collection-card wire:key="public-profile-collection-{{ $collection->public_id }}" :collection="$collection" />
                 @endforeach
             </div>
-            <nav class="mt-5" aria-label="{{ __('profiles.pagination') }}">{{ $items->links() }}</nav>
+            <nav class="mt-5" aria-label="{{ __('profiles.pagination') }}">{{ $items->links(data: ['region' => 'public-profile-collections-results']) }}</nav>
+            </x-ui.pagination-region>
         @elseif ($tab === 'reviews')
+            <x-ui.pagination-region name="public-profile-reviews-results">
             <div class="space-y-4">
                 @foreach ($items as $item)
                     <article class="rounded-panel border border-slate-200 bg-white p-4 shadow-panel sm:p-5">
@@ -139,8 +143,10 @@
                     </article>
                 @endforeach
             </div>
-            <nav class="mt-5" aria-label="{{ __('profiles.pagination') }}">{{ $items->links() }}</nav>
+            <nav class="mt-5" aria-label="{{ __('profiles.pagination') }}">{{ $items->links(data: ['region' => 'public-profile-reviews-results']) }}</nav>
+            </x-ui.pagination-region>
         @elseif ($tab === 'comments')
+            <x-ui.pagination-region name="public-profile-comments-results">
             <div class="space-y-4">
                 @foreach ($items as $item)
                     <article class="rounded-panel border border-slate-200 bg-white p-4 shadow-panel sm:p-5">
@@ -159,8 +165,10 @@
                     </article>
                 @endforeach
             </div>
-            <nav class="mt-5" aria-label="{{ __('profiles.pagination') }}">{{ $items->links() }}</nav>
+            <nav class="mt-5" aria-label="{{ __('profiles.pagination') }}">{{ $items->links(data: ['region' => 'public-profile-comments-results']) }}</nav>
+            </x-ui.pagination-region>
         @else
+            <x-ui.pagination-region name="public-profile-titles-results">
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 @foreach ($items as $item)
                     @if ($item->url && $item->title)
@@ -171,9 +179,11 @@
                     @endif
                 @endforeach
             </div>
-            <nav class="mt-5" aria-label="{{ __('profiles.pagination') }}">{{ $items->links() }}</nav>
+            <nav class="mt-5" aria-label="{{ __('profiles.pagination') }}">{{ $items->links(data: ['region' => 'public-profile-titles-results']) }}</nav>
+            </x-ui.pagination-region>
         @endif
     </section>
+    @endisland
 
     @if ($reportOpen)
         <section role="dialog" aria-labelledby="profile-report-title" class="rounded-panel border border-amber-200 bg-amber-50 p-4 shadow-panel sm:p-5">

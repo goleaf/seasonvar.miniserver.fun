@@ -1,6 +1,6 @@
 # Переменные окружения
 
-Обновлено: 18.07.2026
+Обновлено: 19.07.2026
 
 Полный безопасный шаблон находится в `.env.example`. Реальный `.env` не изменяется deployment-кодом и не коммитится.
 
@@ -16,6 +16,12 @@
 Эта проверка не подтверждает zero downtime, automatic failover, off-host backup, external alert delivery или full restore. Операционные ограничения и runbook’и: [`operations/README.md`](operations/README.md).
 
 Canonical runtime compatibility states находятся в [`maintenance/runtime-compatibility.md`](maintenance/runtime-compatibility.md). Node 26 остаётся Current, поэтому future LTS migration требует отдельного decision и locked build verification. Composer self-update public keys устанавливаются на build host по официальной процедуре и не являются application `.env` secrets.
+
+## Повторная maintenance-сверка 19.07.2026
+
+- Все 404 literal config environment keys присутствуют в `.env.example` как active sample или commented safe placeholder; ещё 14 keys принадлежат dynamic config, standard tooling или client-safe display name. Реальные значения не читались и не выводились.
+- Финальная CLI-сверка подтверждает обязательный baseline: `APP_ENV=production`, `APP_DEBUG=false`, config cached, maintenance mode выключен. После безопасного изменения environment-owned `.env` выполнены `config:cache`, `route:cache`, graceful reload реального `php-fpm-85.service` и `queue:restart`; PHP-FPM активен, `/` и `/up` возвращают `200`, а production routes Debugbar отсутствуют. Значения секретов не читались и не выводились.
+- `migrate:status` сообщает все 110 migrations как `Ran`: другой согласованный rollout применил comment/review repair и exact-count index в batch 31, а затем пять additive administration migrations в batches 32–33. Task 29 эти migrations не запускала. Read-only проверка после rollout дала ноль несовместимых removed comment/review tombstones, наличие `comments_target_public_count_idx`, все новые administration tables/indexes и ноль ранее подтверждённых нарушений внешних ключей; 425 merged-review tombstones без actor корректны, потому что их обязательные evidence — `merged_into_id` и `ownership_released_at`, а не moderator identity. Task 29 не наблюдала и не подтверждает pre-migration backup evidence для внешних batches 31–33; любой следующий DDL по-прежнему требует recorded backup, writer pause и integrity evidence.
 
 ## Environment-variable inventory policy
 
@@ -72,7 +78,7 @@ Standalone default DBs: cache 1, queues 2, sessions 3, locks 5, broadcasting 6. 
 
 `MEMCACHED_HOST[_2|_3]`, ports и weights описывают hot pool. `MEMCACHED_HOT_PREFIX` обязан различать application/environment. Timeouts, failed-server removal, binary protocol и consistent distribution задаются отдельными переменными из `.env.example`; eviction допустим и не должен нарушать корректность.
 
-`CACHE_APPLICATION`, `CACHE_ENVIRONMENT`, `CACHE_SCHEMA_VERSION`, `CACHE_FORMAT_VERSION`, payload/dimension limits, metrics retention и warming queue policy принадлежат application layer. `PUBLIC_PAGE_CACHE_*` ограничивают compressed/uncompressed guest HTML payload, query, LRU manifest, exact-origin self-warm URL, title/URL batch, общий HTTP budget, connect/total timeout и retry; `PUBLIC_PAGE_CACHE_WARM_BASE_URL` обязан совпадать с origin `APP_URL`. `CACHE_WARM_REQUEST_*` ограничивают coalesced pending state и claim. `CACHE_USER_PORTAL_WARMING_ENABLED` включает только post-commit постановку owner-scoped прогрева в общую `CACHE_WARM_QUEUE`; отключение сохраняет authoritative database cold path. `CACHE_VISIBLE_TITLE_WARM_ENABLED`, `CACHE_VISIBLE_TITLE_WARM_MAX_TITLES`, `CACHE_VISIBLE_TITLE_WARM_IMPORT_PAUSE_SECONDS`, `CACHE_VISIBLE_TITLE_WARM_UNAVAILABLE_PAUSE_SECONDS` и `CACHE_VISIBLE_TITLE_WARM_UNIQUE_SECONDS` управляют только bounded fan-out видимых карточек `/titles`; hard cap приложения остаётся 96 независимо от environment. Любое несовместимое изменение cache payload требует format bump, изменение семантики ключей — schema bump.
+`CACHE_APPLICATION`, `CACHE_ENVIRONMENT`, `CACHE_SCHEMA_VERSION`, `CACHE_FORMAT_VERSION`, payload/dimension limits, metrics retention и warming queue policy принадлежат application layer. `PUBLIC_PAGE_CACHE_*` ограничивают compressed/uncompressed guest HTML payload, query, LRU manifest, exact-origin self-warm URL, title/URL batch, общий HTTP budget, connect/total timeout и retry; `PUBLIC_PAGE_CACHE_WARM_BASE_URL` обязан совпадать с origin `APP_URL`. `CACHE_WARM_REQUEST_*` ограничивают coalesced pending state и claim. `CACHE_USER_PORTAL_WARMING_ENABLED` включает только post-commit постановку owner-scoped прогрева в общую `CACHE_WARM_QUEUE`; отключение сохраняет authoritative database cold path. `CACHE_VISIBLE_TITLE_WARM_ENABLED`, `CACHE_VISIBLE_TITLE_WARM_MAX_TITLES`, `CACHE_VISIBLE_TITLE_WARM_IMPORT_PAUSE_SECONDS`, `CACHE_VISIBLE_TITLE_WARM_UNAVAILABLE_PAUSE_SECONDS`, `CACHE_VISIBLE_TITLE_WARM_RETRY_WINDOW_SECONDS` и `CACHE_VISIBLE_TITLE_WARM_UNIQUE_SECONDS` управляют только bounded fan-out видимых карточек `/titles`; hard cap приложения остаётся 96 независимо от environment, а unique window runtime всегда поднимает минимум до retry window плюс 300 секунд. Любое несовместимое изменение cache payload требует format bump, изменение семантики ключей — schema bump.
 
 `RUN_CACHE_INFRASTRUCTURE_TESTS=false` — только test/CI switch. Его включают в изолированном тестовом окружении с run-specific Redis/Memcached prefixes; это не runtime feature flag production-приложения.
 

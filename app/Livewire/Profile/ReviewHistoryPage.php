@@ -7,6 +7,7 @@ namespace App\Livewire\Profile;
 use App\Enums\ReviewSort;
 use App\Enums\ReviewStatus;
 use App\Exceptions\Reviews\ReviewActionException;
+use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Models\CatalogTitleReview;
 use App\Models\User;
 use App\Services\Reviews\CatalogTitleReviewQuery;
@@ -27,6 +28,7 @@ use Throwable;
 
 final class ReviewHistoryPage extends Component
 {
+    use InteractsWithPaginationIslands;
     use WithPagination;
 
     #[Locked]

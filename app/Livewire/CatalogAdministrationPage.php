@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Enums\AdminPermission;
+use App\Models\User;
+use App\Services\Admin\AdminAccessResolver;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Url;
@@ -16,7 +19,7 @@ final class CatalogAdministrationPage extends Component
 
     public function mount(): void
     {
-        Gate::authorize('manage-catalog');
+        Gate::authorize(AdminPermission::ContentView->value);
         $this->normalizeSection();
     }
 
@@ -31,9 +34,15 @@ final class CatalogAdministrationPage extends Component
         $this->normalizeSection();
     }
 
-    public function render(): View
+    public function render(AdminAccessResolver $access): View
     {
-        return view('livewire.catalog-administration-page')->extends('layouts.app', [
+        $user = request()->user();
+        abort_unless($user instanceof User, 401);
+
+        return view('livewire.catalog-administration-page', [
+            'canModerateCollections' => $access->allows($user, AdminPermission::CollectionsModerate),
+            'canImport' => $access->allows($user, AdminPermission::ImportsExecute),
+        ])->extends('layouts.app', [
             'title' => __('collections.admin.catalog_and_collections'),
             'seo' => [
                 'title' => __('collections.admin.catalog_and_collections'), 'description' => __('collections.admin.catalog_and_collections_description'),
@@ -44,6 +53,9 @@ final class CatalogAdministrationPage extends Component
 
     private function normalizeSection(): void
     {
-        $this->section = in_array($this->section, ['catalog', 'collections'], true) ? $this->section : 'catalog';
+        $allowed = Gate::allows(AdminPermission::CollectionsModerate->value)
+            ? ['catalog', 'collections']
+            : ['catalog'];
+        $this->section = in_array($this->section, $allowed, true) ? $this->section : 'catalog';
     }
 }

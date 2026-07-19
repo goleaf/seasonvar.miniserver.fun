@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Policies;
 
+use App\Enums\AdminPermission;
 use App\Models\CatalogTitle;
 use App\Models\User;
 use App\Services\Catalog\CatalogEntitlementService;
@@ -26,16 +27,16 @@ class CatalogTitlePolicy
 
     public function viewAdmin(User $user, CatalogTitle $catalogTitle): bool
     {
-        return Gate::forUser($user)->allows('manage-catalog');
+        return Gate::forUser($user)->allows(AdminPermission::ContentView->value);
     }
 
     public function update(User $user, CatalogTitle $catalogTitle): bool
     {
-        return $this->viewAdmin($user, $catalogTitle);
+        return Gate::forUser($user)->allows(AdminPermission::ContentManage->value);
     }
 
     public function archive(User $user, CatalogTitle $catalogTitle): bool
     {
-        return $this->viewAdmin($user, $catalogTitle);
+        return Gate::forUser($user)->allows(AdminPermission::ContentDelete->value);
     }
 }

@@ -141,6 +141,8 @@ Account export включает только собственные tickets, req
 
 Формы имеют visible labels, help/error association, live regions, keyboard-accessible controls, 44 px touch targets, disabled/loading states и `wire:key`. Cards/timeline/filter/dialog layouts используют существующие Tailwind/Blade patterns, wrap long prose/codes, не зависят только от color/hover и поддерживают narrow phone, landscape, tablet, desktop, zoom и reduced motion. CSS/JS business logic в Blade, Volt, `@php` и polling не используются.
 
+Общий layout-owned Vite runtime остаётся единственным видимым владельцем локализованных offline/restored уведомлений. На длинной форме создания обращения final submit дополнительно использует `wire:offline.attr="disabled"` вместе с существующим `wire:loading.attr="disabled"`: при потере соединения пользователь может продолжать редактировать поля, но не отправляет заведомо неуспешный Livewire request. Это browser UX hint, а не доказательство сети или разрешение доступа; durable offline storage, service worker и background sync не заявляются.
+
 ## Ошибки и безопасные ограничения
 
 Invalid type/target/source/track/status/severity/priority/assignment/resolution/attachment/merge ID server-side отвергается. Authorization, validation, database, duplicate, rate-limit, upload и unavailable-schema failures получают локализованное безопасное сообщение без SQL, exception/class/table/path/provider details. Mutations выполняются через Livewire POST/CSRF, destructive GET отсутствует. Attachment serving не принимает URL и исключает traversal/SSRF.

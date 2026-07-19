@@ -23,6 +23,13 @@ final class CatalogTitleRefreshCoordinator
         private readonly Dispatcher $dispatcher,
     ) {}
 
+    public function shouldRequest(CatalogTitle $catalogTitle, CatalogTitleRefreshState $state): bool
+    {
+        return trim((string) $catalogTitle->source_url) !== ''
+            && ! $state->isActive()
+            && ! $state->isFresh((int) config('seasonvar.title_refresh.fresh_minutes', 15));
+    }
+
     public function request(CatalogTitle $catalogTitle): CatalogTitleRefreshState
     {
         if (trim((string) $catalogTitle->source_url) === '') {
@@ -42,7 +49,7 @@ final class CatalogTitleRefreshCoordinator
             try {
                 $state = $this->states->read($catalogTitle->id);
 
-                if ($state->isActive() || $state->isFresh((int) config('seasonvar.title_refresh.fresh_minutes', 15))) {
+                if (! $this->shouldRequest($catalogTitle, $state)) {
                     return $state;
                 }
 

@@ -19,7 +19,7 @@ final class CatalogRecommendationTitleLoaderQueryTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_episode_counts_use_bounded_available_season_projection(): void
+    public function test_episode_counts_use_bounded_available_season_ids_without_a_derived_join(): void
     {
         $title = CatalogTitle::factory()->create();
         $season = Season::factory()->create(['catalog_title_id' => $title->id]);
@@ -27,7 +27,7 @@ final class CatalogRecommendationTitleLoaderQueryTest extends TestCase
         $episodeSql = null;
         DB::listen(function (QueryExecuted $query) use (&$episodeSql): void {
             $sql = str($query->sql)->replace(['`', '"'], '')->lower()->squish()->toString();
-            if (str_starts_with($sql, 'select available_seasons.catalog_title_id')) {
+            if (str_starts_with($sql, 'select season_id, count(*) as aggregate_count from episodes')) {
                 $episodeSql = $sql;
             }
         });
@@ -40,9 +40,9 @@ final class CatalogRecommendationTitleLoaderQueryTest extends TestCase
 
         $this->assertSame(1, $titles->first()?->getAttribute('episodes_count'));
         $this->assertIsString($episodeSql);
-        $this->assertStringContainsString('inner join (select id, catalog_title_id from seasons where', $episodeSql);
-        $this->assertStringContainsString('available_seasons.id = episodes.season_id', $episodeSql);
-        $this->assertStringContainsString('catalog_title_id in (', $episodeSql);
-        $this->assertStringNotContainsString('seasons.id in (select', $episodeSql);
+        $this->assertStringContainsString('season_id in (', $episodeSql);
+        $this->assertStringContainsString('group by season_id', $episodeSql);
+        $this->assertStringNotContainsString(' join ', $episodeSql);
+        $this->assertStringNotContainsString('select id, catalog_title_id from seasons', $episodeSql);
     }
 }

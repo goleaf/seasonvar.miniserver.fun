@@ -25,6 +25,7 @@ return [
 
     'page_cache' => [
         'enabled' => env('PUBLIC_PAGE_CACHE_ENABLED', true),
+        'canonical_locale' => env('APP_LOCALE', 'ru'),
         'max_payload_bytes' => (int) env('PUBLIC_PAGE_CACHE_MAX_PAYLOAD_BYTES', 850_000),
         'max_uncompressed_payload_bytes' => (int) env('PUBLIC_PAGE_CACHE_MAX_UNCOMPRESSED_PAYLOAD_BYTES', 1_500_000),
         'max_query_length' => (int) env('PUBLIC_PAGE_CACHE_MAX_QUERY_LENGTH', 2_048),
@@ -82,7 +83,8 @@ return [
             'max_titles' => (int) env('CACHE_VISIBLE_TITLE_WARM_MAX_TITLES', 96),
             'import_pause_seconds' => (int) env('CACHE_VISIBLE_TITLE_WARM_IMPORT_PAUSE_SECONDS', 300),
             'unavailable_pause_seconds' => (int) env('CACHE_VISIBLE_TITLE_WARM_UNAVAILABLE_PAUSE_SECONDS', 60),
-            'unique_seconds' => (int) env('CACHE_VISIBLE_TITLE_WARM_UNIQUE_SECONDS', 600),
+            'retry_window_seconds' => (int) env('CACHE_VISIBLE_TITLE_WARM_RETRY_WINDOW_SECONDS', 86_400),
+            'unique_seconds' => (int) env('CACHE_VISIBLE_TITLE_WARM_UNIQUE_SECONDS', 86_700),
         ],
     ],
 

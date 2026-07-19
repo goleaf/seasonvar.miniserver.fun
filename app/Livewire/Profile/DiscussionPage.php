@@ -12,6 +12,7 @@ use App\Actions\Reviews\MarkReviewNotificationRead;
 use App\Exceptions\Comments\CommentActionException;
 use App\Exceptions\ContentRequests\ContentRequestActionException;
 use App\Exceptions\Reviews\ReviewActionException;
+use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Models\User;
 use App\Services\Comments\CommentProfileQuery;
 use App\Services\Comments\CommentSchema;
@@ -27,6 +28,7 @@ use Throwable;
 
 final class DiscussionPage extends Component
 {
+    use InteractsWithPaginationIslands;
     use WithPagination;
 
     public ?string $notice = null;

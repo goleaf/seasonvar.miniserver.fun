@@ -10,6 +10,8 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\File;
+use Illuminate\Testing\TestResponse;
+use Livewire\Drawer\Utils;
 use Tests\TestCase;
 
 class CatalogVisualSystemTest extends TestCase
@@ -88,18 +90,19 @@ class CatalogVisualSystemTest extends TestCase
             ->assertSee('href="'.route('login').'"', false)
             ->assertSee('href="'.route('register').'"', false)
             ->assertDontSee('href="'.route('library.index').'"', false)
-            ->assertDontSee('href="'.route('admin.imports').'"', false);
+            ->assertDontSee('href="'.route('admin.index').'"', false);
 
         $this->actingAs($viewer)->get(route('home'))
             ->assertOk()
             ->assertSee('href="'.route('library.index').'"', false)
             ->assertSee('href="'.route('settings.index').'"', false)
             ->assertDontSee('href="'.route('login').'"', false)
-            ->assertDontSee('href="'.route('admin.imports').'"', false);
+            ->assertDontSee('href="'.route('admin.index').'"', false);
 
         $this->actingAs($admin)->get(route('home'))
             ->assertOk()
-            ->assertSee('href="'.route('admin.imports').'"', false);
+            ->assertSee('href="'.route('admin.index').'"', false)
+            ->assertDontSee('href="'.route('admin.imports').'"', false);
     }
 
     public function test_site_footer_has_responsive_brand_navigation_and_service_regions(): void
@@ -302,6 +305,14 @@ class CatalogVisualSystemTest extends TestCase
 
             foreach ($forbiddenClasses as $class) {
                 if (str_contains($content, $class)) {
+                    if (
+                        $class === 'overflow-x-auto'
+                        && $relativePath === 'components/administration/table.blade.php'
+                        && str_contains($content, 'data-horizontal-scroll-contract="wide-administration-table"')
+                    ) {
+                        continue;
+                    }
+
                     $violations[] = $file->getRelativePathname().': '.$class;
                 }
             }
@@ -316,6 +327,13 @@ class CatalogVisualSystemTest extends TestCase
         }
 
         $this->assertSame([], $violations, 'Внутренняя вертикальная прокрутка допустима только в явно ограниченном по высоте блоке.');
+
+        $administrationTable = file_get_contents(resource_path('views/components/administration/table.blade.php'));
+
+        $this->assertIsString($administrationTable);
+        $this->assertStringContainsString('data-horizontal-scroll-contract="wide-administration-table"', $administrationTable);
+        $this->assertStringContainsString('role="region"', $administrationTable);
+        $this->assertStringContainsString('tabindex="0"', $administrationTable);
     }
 
     public function test_title_surfaces_use_one_title_link_and_keep_relation_links_accessible(): void
@@ -366,7 +384,8 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertStringContainsString('data-catalog-results', $content);
         $this->assertStringContainsString('data-catalog-pagination', $content);
         $this->assertStringContainsString('data-pagination-control', $content);
-        $this->assertStringContainsString('data-pagination-scroll-to="[data-catalog-results]"', $content);
+        $this->assertStringContainsString('data-pagination-region="catalog-results"', $content);
+        $this->assertStringContainsString('data-pagination-scroll-target', $content);
         $this->assertDoesNotMatchRegularExpression('/<div[^>]*uppercase[^>]*>Найдено<\/div>/', $content);
     }
 
@@ -375,9 +394,7 @@ class CatalogVisualSystemTest extends TestCase
         CatalogTitle::factory()->create();
         CatalogTitle::factory()->count(24)->create();
 
-        $content = $this->get(route('titles.index'))
-            ->assertOk()
-            ->getContent();
+        $content = $this->catalogContentWithDeferredIsland(route('titles.index'));
 
         $this->assertStringContainsString('wire:model="filters.search"', $content);
         $this->assertStringNotContainsString('wire:model.live.debounce.650ms="filters.search"', $content);
@@ -385,12 +402,12 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertStringContainsString('wire:submit="applyFilters"', $content);
         $this->assertStringContainsString('wire:loading.delay', $content);
         $this->assertStringNotContainsString('wire:loading.delay.flex', $content);
-        $this->assertStringContainsString('wire:target="filters.search,applySearch,applyFilters,sortBy,setPerPage,setLetter,resetGroup,resetAdvanced,resetAdvancedFilters,clearSearch,resetAll,previousPage,nextPage,gotoPage"', $content);
+        $this->assertStringContainsString('wire:target="filters.search,applySearch,applyFilters,sortBy,setPerPage,setLetter,resetGroup,resetAdvanced,resetAdvancedFilters,clearSearch,resetAll"', $content);
         $this->assertStringContainsString('wire:loading', $content);
         $this->assertStringContainsString('wire:key="catalog-title-', $content);
         $this->assertStringContainsString('wire:click.prevent="nextPage(\'page\')"', $content);
         $this->assertStringContainsString(
-            'wire:loading.delay wire:target="filters.search,applySearch,applyFilters,sortBy,setPerPage,setLetter,resetGroup,resetAdvanced,resetAdvancedFilters,clearSearch,resetAll,previousPage,nextPage,gotoPage" class="hidden absolute',
+            'wire:loading.delay wire:target="filters.search,applySearch,applyFilters,sortBy,setPerPage,setLetter,resetGroup,resetAdvanced,resetAdvancedFilters,clearSearch,resetAll" class="hidden absolute',
             $content,
         );
     }
@@ -431,7 +448,7 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertStringNotContainsString('setView', $content);
         $this->assertStringContainsString('data-catalog-results-list', $content);
         $this->assertStringContainsString('wire:click.prevent="setPerPage(48)"', $content);
-        $this->assertStringContainsString('wire:init="__lazyLoadIsland"', $content);
+        $this->assertStringContainsString('wire:intersect.once="__lazyLoadIsland"', $content);
         $this->assertStringContainsString('name=catalog-live', $content);
         $this->assertStringContainsString('data-catalog-facets-loading', $content);
         $this->assertStringContainsString('Загружаем фильтры', $content);
@@ -475,7 +492,7 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertIsString($unifiedFilterTemplate);
         $this->assertStringContainsString('wire:island="catalog-live"', $unifiedFilterTemplate);
 
-        $deferredIslandPosition = strpos($catalogTemplate, "@island(name: 'catalog-live', defer: true)");
+        $deferredIslandPosition = strpos($catalogTemplate, "@island(name: 'catalog-live', lazy: true)");
 
         $this->assertIsInt($deferredIslandPosition);
 
@@ -487,6 +504,21 @@ class CatalogVisualSystemTest extends TestCase
             'Отложенный island фасетов не должен быть вложен в другой island с тем же именем.',
         );
         $this->assertSame(4, substr_count($catalogTemplate, "@island(name: 'catalog-live'"));
+    }
+
+    public function test_catalog_lazy_filter_island_announces_one_time_viewport_loading(): void
+    {
+        $content = $this->get(route('titles.index'))->assertOk()->getContent();
+
+        $this->assertSame(1, substr_count($content, 'wire:intersect.once="__lazyLoadIsland"'));
+        $this->assertMatchesRegularExpression(
+            '/<div(?=[^>]*wire:intersect\.once="__lazyLoadIsland")(?=[^>]*id="catalog-filters")(?=[^>]*aria-busy="true")[^>]*>/s',
+            $content,
+        );
+        $this->assertStringContainsString(
+            'data-catalog-facets-loading role="status" aria-live="polite"',
+            $content,
+        );
     }
 
     public function test_catalog_people_search_uses_targeted_livewire_loading_inside_the_catalog_island(): void
@@ -512,9 +544,9 @@ class CatalogVisualSystemTest extends TestCase
         $title = CatalogTitle::factory()->create();
         $title->genres()->attach($genre);
 
-        $content = $this->get(route('titles.index', ['genre' => ['drama']]))
-            ->assertOk()
-            ->getContent();
+        $content = $this->catalogContentWithDeferredIsland(
+            route('titles.index', ['genre' => ['drama']]),
+        );
 
         $this->assertMatchesRegularExpression('/<details[^>]*id="catalog-filters"[^>]*open/s', $content);
         $this->assertStringContainsString('data-catalog-filter-count', $content);
@@ -524,9 +556,7 @@ class CatalogVisualSystemTest extends TestCase
     {
         CatalogTitle::factory()->create();
 
-        $content = $this->get(route('titles.index'))
-            ->assertOk()
-            ->getContent();
+        $content = $this->catalogContentWithDeferredIsland(route('titles.index'));
 
         $this->assertMatchesRegularExpression('/<details[^>]*id="catalog-filters"[^>]*open/s', $content);
     }
@@ -534,7 +564,7 @@ class CatalogVisualSystemTest extends TestCase
     public function test_advanced_catalog_filters_use_four_compact_explanatory_groups(): void
     {
         CatalogTitle::factory()->create();
-        $content = $this->get(route('titles.index'))->assertOk()->getContent();
+        $content = $this->catalogContentWithDeferredIsland(route('titles.index'));
 
         $this->assertStringContainsString('data-catalog-advanced-filters', $content);
         $this->assertSame(4, substr_count($content, 'data-catalog-advanced-group='));
@@ -568,9 +598,9 @@ class CatalogVisualSystemTest extends TestCase
     {
         CatalogTitle::factory()->create();
 
-        $content = $this->get(route('titles.index', ['letter' => 'М']))
-            ->assertOk()
-            ->getContent();
+        $content = $this->catalogContentWithDeferredIsland(
+            route('titles.index', ['letter' => 'М']),
+        );
 
         $this->assertMatchesRegularExpression(
             '/data-catalog-advanced-filters.*<input type="hidden" name="letter" value="М">/s',
@@ -582,9 +612,9 @@ class CatalogVisualSystemTest extends TestCase
     {
         CatalogTitle::factory()->create();
 
-        $content = $this->get(route('titles.index', ['year_from' => 2020]))
-            ->assertOk()
-            ->getContent();
+        $content = $this->catalogContentWithDeferredIsland(
+            route('titles.index', ['year_from' => 2020]),
+        );
 
         $matched = preg_match('/<details[^>]*id="catalog-filters"[^>]*>.*?<\/details>/s', $content, $filters);
 
@@ -602,6 +632,53 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertStringNotContainsString('loadCatalogPeopleComboboxes', $script);
         $this->assertStringNotContainsString('peopleFilterUrl', $script);
         $this->assertStringNotContainsString('returnFocus', $script);
+    }
+
+    private function catalogContentWithDeferredIsland(string $url): string
+    {
+        $initialContent = $this->get($url)->assertOk()->getContent();
+        $snapshot = $this->componentSnapshot($initialContent, 'catalog-series');
+        $response = $this->livewireUpdate($snapshot, '__lazyLoadIsland')->assertOk();
+        $deferredFragments = data_get($response->json(), 'components.0.effects.islandFragments');
+
+        $this->assertIsArray($deferredFragments);
+
+        $deferredContent = implode('', array_filter($deferredFragments, is_string(...)));
+
+        return $initialContent.$deferredContent;
+    }
+
+    /** @param array<string, mixed> $snapshot */
+    private function livewireUpdate(array $snapshot, string $method): TestResponse
+    {
+        return $this
+            ->withHeader('X-Livewire', 'true')
+            ->postJson(app('livewire')->getUpdateUri(), [
+                'components' => [[
+                    'snapshot' => json_encode($snapshot, JSON_THROW_ON_ERROR),
+                    'updates' => [],
+                    'calls' => [[
+                        'path' => '',
+                        'method' => $method,
+                        'params' => [],
+                        'metadata' => [
+                            'island' => [
+                                'name' => 'catalog-live',
+                                'mode' => 'morph',
+                            ],
+                        ],
+                    ]],
+                ]],
+            ]);
+    }
+
+    /** @return array<string, mixed> */
+    private function componentSnapshot(string $html, string $name): array
+    {
+        preg_match('/<[a-z][^>]*\bwire:name="'.preg_quote($name, '/').'"[^>]*>/is', $html, $matches);
+        $this->assertNotEmpty($matches, "Livewire component {$name} was not found in the response.");
+
+        return Utils::extractAttributeDataFromHtml($matches[0], 'wire:snapshot');
     }
 
     public function test_catalog_sort_and_alphabet_links_keep_touch_sized_flat_controls(): void

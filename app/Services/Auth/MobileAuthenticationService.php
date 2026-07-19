@@ -20,6 +20,7 @@ final class MobileAuthenticationService
     public function __construct(
         private readonly AccountRegistrationService $accounts,
         private readonly AuthenticationAuditService $audit,
+        private readonly AccountAccessResolver $accountAccess,
     ) {}
 
     /**
@@ -53,6 +54,14 @@ final class MobileAuthenticationService
         }
 
         if (! Hash::check($password, $user->password)) {
+            $this->audit->record(AuthenticationEvent::LoginFailed, email: $normalizedEmail);
+
+            throw ValidationException::withMessages([
+                'email' => [__('auth.errors.invalid_credentials')],
+            ]);
+        }
+
+        if (! $this->accountAccess->canAuthenticate($user)) {
             $this->audit->record(AuthenticationEvent::LoginFailed, email: $normalizedEmail);
 
             throw ValidationException::withMessages([

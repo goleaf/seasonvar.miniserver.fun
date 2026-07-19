@@ -780,6 +780,75 @@
                 }
             }
         },
+        "/api/v1/help/suggestions": {
+            "get": {
+                "operationId": "getHelpSuggestions",
+                "summary": "Получить публичные подсказки центра помощи",
+                "parameters": [
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 120
+                        }
+                    },
+                    {
+                        "name": "locale",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "ru",
+                                "en"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Не более семи guest-visible статей без закрытого редакционного состояния",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data",
+                                        "meta"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "maxItems": 7,
+                                            "items": {
+                                                "$ref": "#/components/schemas/HelpSuggestion"
+                                            }
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "required": [
+                                                "locale"
+                                            ],
+                                            "properties": {
+                                                "locale": {
+                                                    "type": "string"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    }
+                }
+            }
+        },
         "/api/v1/search/suggestions": {
             "get": {
                 "operationId": "getSearchSuggestions",
@@ -4726,6 +4795,38 @@
                             "links"
                         ],
                         "additionalProperties": true
+                    }
+                }
+            },
+            "HelpSuggestion": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "type",
+                    "label",
+                    "meta",
+                    "url"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "help_article"
+                        ]
+                    },
+                    "label": {
+                        "type": "string"
+                    },
+                    "meta": {
+                        "type": "string"
+                    },
+                    "url": {
+                        "type": "string",
+                        "format": "uri"
                     }
                 }
             },

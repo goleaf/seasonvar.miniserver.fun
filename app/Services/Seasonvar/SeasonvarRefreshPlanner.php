@@ -14,7 +14,10 @@ use Illuminate\Support\Collection;
 
 final class SeasonvarRefreshPlanner
 {
-    public function __construct(private readonly SeasonvarPageHandlerRegistry $handlers) {}
+    public function __construct(
+        private readonly SeasonvarPageHandlerRegistry $handlers,
+        private readonly SeasonvarUrl $seasonvarUrl,
+    ) {}
 
     /**
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
@@ -142,6 +145,52 @@ final class SeasonvarRefreshPlanner
     }
 
     /**
+     * @param  list<string>  $urls
+     * @param  (callable(string, array<string, mixed>): void)|null  $progress
+     * @return iterable<Collection<int, SourcePage>>
+     */
+    public function forcedPageChunksForUrls(
+        array $urls,
+        int $chunkSize,
+        ?int $importRunId = null,
+        ?callable $progress = null,
+    ): iterable {
+        $chunkSize = max(1, $chunkSize);
+        $orderedHashes = collect($urls)
+            ->map(fn (string $url): string => $this->seasonvarUrl->hash($url))
+            ->unique()
+            ->values();
+        $pagesByHash = collect();
+
+        foreach ($orderedHashes->chunk(500) as $hashes) {
+            $this->forcedUrlQuery($importRunId)
+                ->whereIn('url_hash', $hashes->all())
+                ->get()
+                ->each(fn (SourcePage $page) => $pagesByHash->put($page->url_hash, $page));
+        }
+
+        $selected = $orderedHashes
+            ->map(fn (string $hash): ?SourcePage => $pagesByHash->get($hash))
+            ->filter(fn (?SourcePage $page): bool => $page instanceof SourcePage)
+            ->values();
+        $totalSelected = 0;
+
+        foreach ($selected->chunk($chunkSize) as $pages) {
+            $totalSelected += $pages->count();
+
+            $this->report($progress, 'seasonvar-refresh-candidates-selected', [
+                'reason' => 'forced_sitemap_tail',
+                'selected' => $pages->count(),
+                'reason_selected' => $totalSelected,
+                'total_selected' => $totalSelected,
+                'chunk_size' => $chunkSize,
+            ]);
+
+            yield $pages->values();
+        }
+    }
+
+    /**
      * @param  Collection<int, SourcePage>  $pages
      * @param  array<int, true>  $selectedIds
      * @return Collection<int, SourcePage>
@@ -253,6 +302,25 @@ final class SeasonvarRefreshPlanner
             })
             ->when($importRunId !== null, function (Builder $query) use ($importRunId): Builder {
                 return $query->where(function (Builder $query) use ($importRunId): void {
+                    $query->whereNull('last_import_run_id')
+                        ->orWhere('last_import_run_id', '!=', $importRunId);
+                });
+            });
+    }
+
+    /** @return Builder<SourcePage> */
+    private function forcedUrlQuery(?int $importRunId): Builder
+    {
+        return SourcePage::query()
+            ->with('source:id,code,base_url,crawl_delay_seconds')
+            ->where('page_type', SeasonvarPageType::Serial->value)
+            ->where(function (Builder $query): void {
+                $query->whereNull('import_claim_token')
+                    ->orWhereNull('import_claim_expires_at')
+                    ->orWhere('import_claim_expires_at', '<=', now());
+            })
+            ->when($importRunId !== null, function (Builder $query) use ($importRunId): void {
+                $query->where(function (Builder $query) use ($importRunId): void {
                     $query->whereNull('last_import_run_id')
                         ->orWhere('last_import_run_id', '!=', $importRunId);
                 });

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Premium;
 
 use App\Actions\Premium\MarkPremiumNotificationRead;
+use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Models\User;
 use App\Services\Premium\PremiumNotificationQuery;
 use Illuminate\Contracts\View\View;
@@ -14,6 +15,7 @@ use Throwable;
 
 final class PremiumNotificationsPanel extends Component
 {
+    use InteractsWithPaginationIslands;
     use WithPagination;
 
     public string $notice = '';

@@ -86,7 +86,23 @@ const smoothScrollDuration = {
     perPixel: 0.05,
 };
 
+const paginationScrollDuration = {
+    min: 520,
+    max: 820,
+    base: 460,
+    perPixel: 0.1,
+};
+
 let activeScrollAnimation = null;
+
+const cancelActiveScroll = () => {
+    if (activeScrollAnimation === null) {
+        return;
+    }
+
+    window.cancelAnimationFrame(activeScrollAnimation);
+    activeScrollAnimation = null;
+};
 
 const bounded = (min, value, max) => Math.min(max, Math.max(min, value));
 
@@ -119,28 +135,36 @@ const anchorScrollDuration = (distance) => bounded(
     smoothScrollDuration.max,
 );
 
-const smoothAnchorScroll = (target, { animate = true } = {}) => {
+const paginationScrollDurationFor = (distance) => bounded(
+    paginationScrollDuration.min,
+    paginationScrollDuration.base + distance * paginationScrollDuration.perPixel,
+    paginationScrollDuration.max,
+);
+
+const easeOutCubic = (progress) => 1 - ((1 - progress) ** 3);
+const easeInOutCubic = (progress) => (
+    progress < 0.5
+        ? 4 * progress * progress * progress
+        : 1 - ((-2 * progress + 2) ** 3) / 2
+);
+
+const smoothWindowScroll = (endY, { animate = true, duration, easing = easeOutCubic } = {}) => {
     const startY = window.scrollY;
-    const endY = targetTop(target);
     const distance = Math.abs(endY - startY);
 
-    if (activeScrollAnimation !== null) {
-        window.cancelAnimationFrame(activeScrollAnimation);
-        activeScrollAnimation = null;
-    }
+    cancelActiveScroll();
 
     if (!animate || reducedMotionQuery.matches || distance < 2) {
         window.scrollTo(0, endY);
         return;
     }
 
-    const duration = anchorScrollDuration(distance);
+    const resolvedDuration = duration ?? anchorScrollDuration(distance);
     const startedAt = window.performance.now();
-    const easeOutCubic = (progress) => 1 - ((1 - progress) ** 3);
 
     const step = (timestamp) => {
-        const progress = bounded(0, (timestamp - startedAt) / duration, 1);
-        const easedProgress = easeOutCubic(progress);
+        const progress = bounded(0, (timestamp - startedAt) / resolvedDuration, 1);
+        const easedProgress = easing(progress);
 
         window.scrollTo(0, startY + (endY - startY) * easedProgress);
 
@@ -153,6 +177,67 @@ const smoothAnchorScroll = (target, { animate = true } = {}) => {
     };
 
     activeScrollAnimation = window.requestAnimationFrame(step);
+};
+
+const smoothAnchorScroll = (target, { animate = true } = {}) => {
+    smoothWindowScroll(targetTop(target), { animate });
+};
+
+const rootLengthInPixels = (value, rootStyles) => {
+    const numericValue = Number.parseFloat(value);
+
+    if (!Number.isFinite(numericValue)) {
+        return 0;
+    }
+
+    if (value.trim().endsWith('rem')) {
+        const rootFontSize = Number.parseFloat(rootStyles.fontSize) || 16;
+
+        return numericValue * rootFontSize;
+    }
+
+    return numericValue;
+};
+
+const paginationHeaderOffset = () => {
+    const rootStyles = window.getComputedStyle(document.documentElement);
+    const configuredGap = rootLengthInPixels(
+        rootStyles.getPropertyValue('--pagination-scroll-gap'),
+        rootStyles,
+    );
+    const gap = configuredGap > 0 ? configuredGap : 16;
+    const header = document.querySelector('[data-site-header]');
+
+    if (!header) {
+        return gap;
+    }
+
+    const position = window.getComputedStyle(header).position;
+    const overlaysViewport = position === 'sticky' || position === 'fixed';
+
+    return (overlaysViewport ? Math.max(0, header.getBoundingClientRect().bottom) : 0) + gap;
+};
+
+const paginationTargetTop = (target) => {
+    const documentHeight = Math.max(
+        document.documentElement.scrollHeight,
+        document.body.scrollHeight,
+    );
+    const maxScrollTop = Math.max(0, documentHeight - window.innerHeight);
+    const targetY = window.scrollY + target.getBoundingClientRect().top - paginationHeaderOffset();
+
+    return bounded(0, targetY, maxScrollTop);
+};
+
+const startPaginationScroll = (target, { correction = false } = {}) => {
+    const endY = paginationTargetTop(target);
+    const distance = Math.abs(endY - window.scrollY);
+
+    smoothWindowScroll(endY, {
+        animate: !correction || distance >= 24,
+        duration: paginationScrollDurationFor(distance),
+        easing: easeInOutCubic,
+    });
 };
 
 const syncCatalogAnchor = (hash = window.location.hash, options = {}) => {
@@ -265,6 +350,51 @@ const loadCatalogFilterSearch = () => {
 let paginationScrollReady = false;
 let pendingPaginationScrollTo = null;
 
+const paginationComponentRoot = (componentId) => {
+    if (!componentId) {
+        return document;
+    }
+
+    return document.querySelector(`[wire\\:id="${CSS.escape(componentId)}"]`) || document;
+};
+
+const resolvePaginationScrollTarget = (pending) => {
+    const root = paginationComponentRoot(pending.componentId);
+
+    if (pending.selector) {
+        const selected = root.querySelector(pending.selector) || document.querySelector(pending.selector);
+
+        if (selected) {
+            return selected;
+        }
+    }
+
+    if (!pending.regionName) {
+        return null;
+    }
+
+    const region = root.querySelector(`[data-pagination-region="${CSS.escape(pending.regionName)}"]`);
+
+    return region?.matches('[data-pagination-scroll-target]')
+        ? region
+        : region?.querySelector('[data-pagination-scroll-target]') || null;
+};
+
+const clearPaginationScroll = () => {
+    const target = pendingPaginationScrollTo ? resolvePaginationScrollTarget(pendingPaginationScrollTo) : null;
+
+    target?.closest('[data-pagination-region]')?.setAttribute('aria-busy', 'false');
+    pendingPaginationScrollTo = null;
+};
+
+const clearPaginationScrollForComponent = (componentId) => {
+    if (!pendingPaginationScrollTo || !componentId || pendingPaginationScrollTo.componentId !== componentId) {
+        return;
+    }
+
+    clearPaginationScroll();
+};
+
 const loadPaginationScroll = () => {
     if (paginationScrollReady) {
         return;
@@ -273,31 +403,55 @@ const loadPaginationScroll = () => {
     paginationScrollReady = true;
 
     document.addEventListener('click', (event) => {
+        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+            return;
+        }
+
         const eventTarget = event.target instanceof Element ? event.target : event.target?.parentElement;
         const control = eventTarget?.closest('[data-pagination-control]');
-        const selector = control?.getAttribute('data-pagination-scroll-to') || '';
 
-        pendingPaginationScrollTo = selector === '' ? null : selector;
+        if (!control) {
+            return;
+        }
+
+        const region = control.closest('[data-pagination-region]');
+        const component = control.closest('[wire\\:id]');
+
+        pendingPaginationScrollTo = {
+            componentId: component?.getAttribute('wire:id') || '',
+            regionName: region?.getAttribute('data-pagination-region') || '',
+            selector: control.getAttribute('data-pagination-scroll-to') || '',
+        };
+
+        region?.setAttribute('aria-busy', 'true');
+
+        const target = resolvePaginationScrollTarget(pendingPaginationScrollTo);
+
+        if (target) {
+            window.requestAnimationFrame(() => startPaginationScroll(target));
+        }
     });
 };
 
 const flushPaginationScroll = () => {
-    const selector = pendingPaginationScrollTo;
+    const pending = pendingPaginationScrollTo;
 
-    pendingPaginationScrollTo = null;
-
-    if (!selector) {
+    if (!pending) {
         return;
     }
 
-    const target = document.querySelector(selector);
+    const target = resolvePaginationScrollTarget(pending);
+
+    pendingPaginationScrollTo = null;
 
     if (!target) {
         return;
     }
 
+    target.closest('[data-pagination-region]')?.setAttribute('aria-busy', 'false');
+
     window.requestAnimationFrame(() => {
-        smoothAnchorScroll(target, { animate: true });
+        startPaginationScroll(target, { correction: true });
     });
 };
 
@@ -358,6 +512,15 @@ document.addEventListener('livewire:init', () => {
 
     window.Livewire.hook('morphed', reloadAfterLivewireMorph);
     window.Livewire.hook('island.morphed', reloadAfterLivewireMorph);
+    if (typeof window.Livewire.interceptMessage === 'function') {
+        window.Livewire.interceptMessage(({ message, onFinish, onError, onFailure }) => {
+            const clearForMessage = () => clearPaginationScrollForComponent(message.component?.id);
+
+            onError(clearForMessage);
+            onFailure(clearForMessage);
+            onFinish(clearForMessage);
+        });
+    }
     window.Livewire.hook('morph.removing', ({ el }) => {
         destroyCatalogPlayersWithin(el);
         destroyPlayerNavigationWithin(el);
@@ -365,7 +528,8 @@ document.addEventListener('livewire:init', () => {
 });
 
 document.addEventListener('livewire:navigating', () => {
-    pendingPaginationScrollTo = null;
+    cancelActiveScroll();
+    clearPaginationScroll();
     flushCatalogPlayersWithin(document, 'navigation');
     destroyCatalogPlayersWithin(document, { flush: false });
     destroyPlayerNavigationWithin(document);
@@ -377,6 +541,8 @@ document.addEventListener('livewire:navigated', () => {
 });
 
 window.addEventListener('pagehide', () => {
+    cancelActiveScroll();
+    clearPaginationScroll();
     flushCatalogPlayersWithin(document, 'pagehide');
     destroyCatalogPlayersWithin(document, { flush: false });
     destroyPlayerNavigationWithin(document);

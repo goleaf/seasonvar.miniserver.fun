@@ -1,31 +1,65 @@
 # Канонический индекс требований
 
-Обновлено: 18.07.2026
+Обновлено: 19.07.2026
 
 Этот файл определяет обязательный порядок чтения постоянных требований. Он ссылается на существующие документы-владельцы и не копирует их доменные контракты.
+
+Файлы ниже обязательны, а не рекомендательны. Эквивалентные уже существующие owner-документы используются вместо создания параллельных `project-requirements.md`, `architecture-rules.md`, `development-workflow.md`, `security-and-privacy.md`, `performance-and-caching.md`, `ui-ux-accessibility.md` и `administration-requirements.md`.
+
+## Реестр канонических требований
+
+| Порядок | Канонический путь | Назначение | Scope | Обязательность | Владелец | Последнее существенное обновление |
+| ---: | --- | --- | --- | --- | --- | --- |
+| 1 | [`AGENTS.md`](../../AGENTS.md) | Ограничения выполнения задач агентами | Весь repository | Каждая задача | Project workflow | 19.07.2026 |
+| 2 | [`docs/requirements/index.md`](index.md) | Registry, read order и precedence | Весь repository | Каждая задача | Requirements governance | 19.07.2026 |
+| 3 | [`docs/CODE_STANDARDS.md`](../CODE_STANDARDS.md) | Permanent product/repository и PHP/Laravel rules | Весь portal | Каждая coding-задача | Application engineering | 19.07.2026 |
+| 4 | [`docs/architecture.md`](../architecture.md) | Backend/frontend layers, identities и integration boundaries | Весь portal | Каждая architecture/code-задача | Application architecture | 19.07.2026 |
+| 5 | [`docs/development.md`](../development.md) | Preparation, implementation, verification и Git workflow | Весь repository | Каждая задача | Development workflow | 19.07.2026 |
+| 6 | [`docs/requirements/multilingual-requirements.md`](multilingual-requirements.md) | Locale, translations и multilingual compatibility | Весь portal | Каждая задача | Localization | 19.07.2026 |
+| 7 | [`docs/security.md`](../security.md) | Security, privacy, secrets и protected data | Весь portal | Каждая задача | Security and privacy | 19.07.2026 |
+| 8 | [`docs/performance.md`](../performance.md), [`docs/caching.md`](../caching.md) | Query, payload, cache и invalidation contracts | Весь portal | Каждая data/UI задача | Performance and caching | 19.07.2026 |
+| 9 | [`docs/UI_STANDARDS.md`](../UI_STANDARDS.md), [`docs/frontend.md`](../frontend.md) | UI, UX, mobile и accessibility | User/admin interfaces | Каждая UI-задача | Frontend experience | 19.07.2026 |
+| 10 | [`docs/administration.md`](../administration.md), [`docs/authorization.md`](../authorization.md) | Administration, roles, permissions и moderation | Administration/private staff | Каждая admin-задача | Administration and authorization | 19.07.2026 |
+| 11 | [`docs/requirements/production-operations.md`](production-operations.md) | Production/data/deployment/runbook boundaries | Production-affecting work | При любом production impact | Operations | 19.07.2026 |
+| 12 | [`docs/requirements/maintenance-and-upgrades.md`](maintenance-and-upgrades.md) | Dependency/runtime/architecture upgrades | Maintenance-affecting work | При любом maintenance impact | Maintenance | 18.07.2026 |
+| 13 | [`docs/requirements/system-wide-integration.md`](system-wide-integration.md), [`docs/README.md`](../README.md) и feature owners | Cross-feature и feature-specific requirements | Затронутые domains | По scope задачи | System integration и тематические владельцы | По каждому owner-файлу |
+| 14 | [`docs/plans/current-task-plan.md`](../plans/current-task-plan.md) | Task scope, discoveries, compliance и evidence | Текущая задача | Каждая задача | Task owner | Обновляется в каждой задаче |
+| 15 | Связанные architecture, implementation, audit и runbook docs из [`docs/README.md`](../README.md) | Historical evidence и operational detail | Затронутые domains | По scope задачи | Тематические владельцы | По каждому owner-файлу |
+
+Global rules задают неизменяемые repository boundaries; feature-specific owners могут только уточнять их для своего домена. Current task plan фиксирует исполнение, но не переопределяет постоянные правила. Ссылки на текущую реализацию и историю: [`current-task-plan.md`](../plans/current-task-plan.md) и [`CHANGELOG.md`](../../CHANGELOG.md).
 
 ## Обязательный порядок чтения
 
 1. [`AGENTS.md`](../../AGENTS.md) — корневые инструкции агента.
 2. Этот индекс требований.
-3. [`CODE_STANDARDS.md`](../CODE_STANDARDS.md) — общие требования проекта и кода.
+3. [`CODE_STANDARDS.md`](../CODE_STANDARDS.md) — permanent product/repository rules.
 4. [`architecture.md`](../architecture.md) — архитектурные границы.
-5. [`development.md`](../development.md) — workflow разработки и upgrade decision record.
+5. [`development.md`](../development.md) — workflow разработки.
 6. [`multilingual-requirements.md`](multilingual-requirements.md) — постоянные multilingual-требования.
 7. [`security.md`](../security.md) — безопасность и privacy.
 8. [`performance.md`](../performance.md) и [`caching.md`](../caching.md) — производительность и кеширование.
 9. [`UI_STANDARDS.md`](../UI_STANDARDS.md) и [`frontend.md`](../frontend.md) — UI, UX, mobile и accessibility.
-10. [`administration.md`](../administration.md) — администрация и least privilege.
-11. [`production-operations.md`](production-operations.md) — обязательные production, deployment, backup, restore и incident boundaries; [`deployment.md`](../deployment.md), [`environment.md`](../environment.md) и [`operations/README.md`](../operations/README.md) содержат фактические runbooks и inventory.
-12. [`maintenance-and-upgrades.md`](maintenance-and-upgrades.md) — сопровождение, зависимости, deprecations и upgrades.
-13. [`system-wide-integration.md`](system-wide-integration.md) — обязательные cross-feature identity, state, privacy, cache и completion rules.
-14. Feature-specific документы из [`docs/README.md`](../README.md), соответствующие затронутым системам.
-15. [`docs/plans/current-task-plan.md`](../plans/current-task-plan.md) — текущий план и compliance matrix.
-16. Релевантные architecture, audit, implementation и rollback документы из [`docs/README.md`](../README.md).
+10. [`administration.md`](../administration.md) и [`authorization.md`](../authorization.md) — administration requirements.
+11. [`production-operations.md`](production-operations.md) — production operations.
+12. [`maintenance-and-upgrades.md`](maintenance-and-upgrades.md) — maintenance and upgrades.
+13. Feature-specific требования из [`docs/README.md`](../README.md); при cross-feature scope сначала читается [`system-wide-integration.md`](system-wide-integration.md).
+14. [`docs/plans/current-task-plan.md`](../plans/current-task-plan.md) — текущий план и compliance matrix.
+15. Релевантные architecture, implementation, audit и rollback документы из [`docs/README.md`](../README.md).
 
 Cross-feature integration обязательна: feature нельзя считать завершённой, пока не проверены все затронутые shared domains и related existing modules.
 
 ## Общий приоритет конфликтующих требований
+
+Канонический порядок precedence:
+
+1. Security, privacy, legal restrictions и data integrity.
+2. Постоянные project architecture rules.
+3. Постоянные multilingual и compatibility rules.
+4. Feature-specific requirements.
+5. Current task plan.
+6. Implementation convenience.
+
+Implementation convenience никогда не переопределяет постоянное требование. Для более детального выбора внутри одной категории применяется расширенная шкала ниже.
 
 1. Security, privacy, legal integrity, financial integrity и защита user/private data.
 2. Сохранность database и persistent files.

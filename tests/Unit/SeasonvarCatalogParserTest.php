@@ -123,6 +123,46 @@ class SeasonvarCatalogParserTest extends TestCase
         $this->assertSame('https://seasonvar.ru/serial-1276--6_kadrov-1-season.html', $data['seasons'][0]['source_url']);
     }
 
+    public function test_it_extracts_the_live_episode_availability_line_from_a_season_link(): void
+    {
+        $parser = app(SeasonvarCatalogParser::class);
+
+        $data = $parser->parse(
+            <<<'HTML'
+            <html>
+                <head><title>Вестис смотреть онлайн</title></head>
+                <body>
+                    <h1>Сериал Вестис/The Westies</h1>
+                    <div class="pgs-seaslist">
+                        <ul class="tabs-result">
+                            <li class="act">
+                                <h2>
+                                    <a href="/serial-49406-Vestis.html">
+                                        &gt;&gt;&gt; Сериал Вестис/The Westies
+                                        <span>(19.07.2026 3 серия (Coldfilm) из 8)</span>
+                                    </a>
+                                </h2>
+                            </li>
+                        </ul>
+                    </div>
+                    <script>
+                        var arEpisodes = [{"1_seriya":{"n":"1","next":"2"},"2_seriya":{"n":"2","next":"3"},"3_seriya":{"n":"3"}}];
+                    </script>
+                </body>
+            </html>
+            HTML,
+            'https://seasonvar.ru/serial-49406-Vestis.html',
+        );
+
+        $season = collect($data['seasons'])->firstWhere('number', 1);
+
+        $this->assertSame('2026-07-19', $season['latest_episode_released_at']);
+        $this->assertSame(3, $season['episodes_released']);
+        $this->assertSame(8, $season['episodes_total']);
+        $this->assertSame('Coldfilm', $season['translation_name']);
+        $this->assertSame('19.07.2026 3 серия (Coldfilm) из 8', $season['release_status_text']);
+    }
+
     public function test_it_keeps_the_canonical_current_season_when_the_list_only_links_other_seasons(): void
     {
         $parser = app(SeasonvarCatalogParser::class);

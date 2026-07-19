@@ -476,7 +476,7 @@ class CatalogShowViewModel
 
     /**
      * @param  Collection<int, LicensedMedia>  $mediaItems
-     * @return list<array{mediaId: int, label: string, detail: string|null, icon: string, url: string, active: bool}>
+     * @return list<array{mediaId: int, format: string|null, label: string, detail: string|null, icon: string, url: string, active: bool}>
      */
     private function playbackOptions(Collection $mediaItems, string $key, callable $valueResolver, callable $labelResolver, string $icon): array
     {
@@ -493,6 +493,7 @@ class CatalogShowViewModel
 
                 return [
                     'mediaId' => $media->id,
+                    'format' => $this->mediaFormat($media),
                     'label' => $labelResolver($media),
                     'detail' => $this->mediaDetailsLabel($media),
                     'icon' => $icon,

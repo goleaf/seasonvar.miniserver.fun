@@ -8,9 +8,11 @@ use App\Enums\ReleaseDatePrecision;
 use App\Enums\ReleaseScheduleEntryType;
 use App\Enums\ReleaseScheduleSource;
 use App\Enums\ReleaseScheduleStatus;
+use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Models\CatalogTitle;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
+use App\Models\ReleaseScheduleCorrection;
 use App\Models\ReleaseScheduleEntry;
 use App\Models\Season;
 use App\Services\ReleaseCalendar\ReleaseCalendarSchema;
@@ -29,6 +31,7 @@ use Livewire\WithPagination;
 
 final class ReleaseCalendarAdministrationManager extends Component
 {
+    use InteractsWithPaginationIslands;
     use WithPagination;
 
     public ?string $editingPublicId = null;
@@ -264,10 +267,26 @@ final class ReleaseCalendarAdministrationManager extends Component
             'mediaOptions' => $media,
             'entries' => $entries,
             'corrections' => $corrections,
-            'typeOptions' => ReleaseScheduleEntryType::cases(),
-            'statusOptions' => ReleaseScheduleStatus::cases(),
-            'precisionOptions' => ReleaseDatePrecision::cases(),
-            'sourceOptions' => ReleaseScheduleSource::cases(),
+            'typeOptions' => $this->enumOptions(ReleaseScheduleEntryType::cases()),
+            'statusOptions' => $this->enumOptions(ReleaseScheduleStatus::cases()),
+            'precisionOptions' => $this->enumOptions(ReleaseDatePrecision::cases()),
+            'sourceOptions' => $this->enumOptions(ReleaseScheduleSource::cases()),
+            'correctionPresentation' => $corrections
+                ->mapWithKeys(fn (ReleaseScheduleCorrection $correction): array => [
+                    $correction->id => [
+                        'statusLabel' => $correction->new_status->label(),
+                        'precisionLabel' => $correction->new_precision->label(),
+                        'createdAt' => $correction->created_at?->toAtomString() ?? '',
+                    ],
+                ])->all(),
+            'entryPresentation' => $entries?->getCollection()
+                ->mapWithKeys(fn (ReleaseScheduleEntry $entry): array => [
+                    $entry->id => [
+                        'typeLabel' => $entry->entry_type->label(),
+                        'statusLabel' => $entry->status->label(),
+                        'precisionLabel' => $entry->precision->label(),
+                    ],
+                ])->all() ?? [],
         ])->extends('layouts.app', [
             'title' => __('calendar.admin.title'),
             'seo' => ['title' => __('calendar.admin.title'), 'description' => __('calendar.admin.description'), 'canonical' => route('admin.calendar'), 'robots' => 'noindex, nofollow'],
@@ -291,5 +310,17 @@ final class ReleaseCalendarAdministrationManager extends Component
         $this->isPublic = true;
         $this->notificationsEnabled = true;
         $this->resetValidation();
+    }
+
+    /**
+     * @param  array<int, ReleaseScheduleEntryType|ReleaseScheduleStatus|ReleaseDatePrecision|ReleaseScheduleSource>  $cases
+     * @return list<array{value: string, label: string}>
+     */
+    private function enumOptions(array $cases): array
+    {
+        return array_map(static fn ($case): array => [
+            'value' => $case->value,
+            'label' => $case->label(),
+        ], $cases);
     }
 }

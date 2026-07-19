@@ -9,7 +9,10 @@
 - Mutations повторно авторизуют user/resource; locked property не считается authorization.
 - Public state не содержит query builders, service objects или permanent upstream media URL.
 - Catalog/directory/library use paginator links and stable entity keys; browser tests validate URL restoration and hydration.
-- Player uses the smallest practical `wire:ignore` boundary and a dedicated browser lifecycle module.
+- Player uses the only application `wire:ignore` on its keyed Plyr/HLS-owned media shell and a dedicated browser lifecycle module. `.self` is intentionally absent because the library mutates descendants; Livewire loading, selection, errors and portal controls remain outside the boundary.
+- Application replacement inventory is limited to four `wire:replace.self` template patterns on live leaf checkboxes in contextual catalog filters. Bare subtree replacement, custom elements and shadow DOM are absent; the player retains its explicit keyed ignore/destroy lifecycle.
+- Application `wire:stream`/`$this->stream()` inventory is zero: no component consumes bounded progressive text. Laravel streamed sitemap/feed/download responses, active-run polling and the media player remain distinct transport/lifecycle boundaries; Livewire DOM streaming also remains excluded from any Octane-compatible runtime plan.
+- Application `#[Async]`/`.async` inventory is zero. Current actions mutate visible component/domain state, require ordered validation/authorization responses or only trigger established queue/post-commit work; none is a pure fire-and-forget side effect safe from parallel snapshot races.
 
 ## Реестр выводов
 
@@ -33,7 +36,7 @@ Global event producers/consumers must be listed in `docs/frontend.md` when intro
 
 Добавлены class-based directory/dashboard/editor/page/profile/membership/admin components; Volt отсутствует. Stable public UUID/title IDs и content version locked, URL properties normalized, draft membership bounded UUID list, Eloquent models/query/services не сериализуются. Web/API paginator keys разделены явно; query/filter/sort state uses browser history, locale is restored at mount/hydration.
 
-Membership Apply/Cancel/create-and-add, report dialog, cover, delete/restore/permanent delete, up/down ordering and share have localized pending/success/error/confirmation states. `collections.js` owns named `collection-selector-opened/closed` dialog focus lifecycle and native share/clipboard progressive enhancement. No polling or nested component graph was introduced; title membership is an isolated child so collection actions do not rebuild the player.
+Membership Apply/Cancel/create-and-add, report dialog, cover, delete/restore/permanent delete, ordering and share have localized pending/success/error/confirmation states. Manual ordering has one handle-scoped `wire:sort` within the current page plus retained up/down keyboard/touch controls; persistence stays in the authorized bounded service. `collections.js` owns named `collection-selector-opened/closed` dialog focus lifecycle and native share/clipboard progressive enhancement. No polling or nested component graph was introduced; title membership is an isolated child so collection actions do not rebuild the player.
 
 Disposable SQLite + Chromium acceptance confirmed stable-ID hydration, create/edit/delete/restore, staged multi-membership Apply/Cancel, create-and-add, idempotent repeat Apply, up/down ordering, report deduplication and URL Back/Forward state. At 390×844 the modal measured 352×664 inside a 390×844 viewport, produced no horizontal overflow, focused an internal control, returned focus to its trigger and discarded an unapplied checkbox change. Automated Livewire tests were intentionally neither added nor run because Task 10 explicitly forbids them.
 

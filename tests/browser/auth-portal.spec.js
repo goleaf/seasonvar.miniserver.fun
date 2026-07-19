@@ -94,10 +94,14 @@ test('guest authentication and private library navigation are responsive', async
 
     await expect(page).toHaveURL(/\/library(?:\?|$)/);
     await expect(page.getByRole('heading', { level: 1, name: 'Моя библиотека' })).toBeVisible();
-    await expect(page.getByRole('link', { name: /В списке/ })).toContainText('1');
+    await expect(page.getByRole('link', { name: /Закладки/ })).toContainText('1');
     await expect(page.getByRole('link', { name: /Продолжить/ })).toContainText('1');
     await assertResponsivePage(page);
     await assertReadableHeaderBrand(page);
+
+    if (page.viewportSize().width < 640) {
+        await page.locator('[data-mobile-navigation] > summary').click();
+    }
 
     await page.getByRole('link', { name: 'Профиль' }).click();
     await expect(page).toHaveURL(/\/profile$/);

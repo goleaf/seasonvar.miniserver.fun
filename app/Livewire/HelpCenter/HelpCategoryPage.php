@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\HelpCenter;
 
+use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Models\HelpCategory;
 use App\Models\HelpCategoryTranslation;
 use App\Models\User;
@@ -24,6 +25,7 @@ use Throwable;
 
 final class HelpCategoryPage extends Component
 {
+    use InteractsWithPaginationIslands;
     use WithPagination;
 
     #[Locked]

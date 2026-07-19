@@ -148,7 +148,7 @@ const auditRenderedPage = async (page, testInfo, label, path, { listPoster = fal
     });
 };
 
-test('catalog keeps URL state, unified filters and responsive geometry', async ({ page, baseURL }) => {
+test('catalog keeps URL state, unified filters and responsive geometry', async ({ page, baseURL }, testInfo) => {
     const browserErrors = await installNetworkGuard(page, baseURL);
 
     await page.goto('/titles?q=Browser%20Smoke&sort=title_asc');
@@ -163,7 +163,13 @@ test('catalog keeps URL state, unified filters and responsive geometry', async (
 
     const filters = page.locator('#catalog-filters');
 
-    await expect(filters).toHaveAttribute('open', '');
+    if (testInfo.project.name === 'Desktop Chromium') {
+        await expect(filters).toHaveAttribute('open', '');
+    } else {
+        await expect(filters).not.toHaveAttribute('open', '');
+        await filters.locator('summary').click();
+        await expect(filters).toHaveAttribute('open', '');
+    }
     await expect(page.locator('[data-catalog-filter-groups]')).toBeVisible();
     await expect(page.getByText('Актёры', { exact: true }).first()).toBeVisible();
 
@@ -313,7 +319,9 @@ test('header autocomplete works by keyboard and keeps two responsive rows', asyn
             const box = dropdown.getBoundingClientRect();
             const style = window.getComputedStyle(dropdown);
             const primary = document.querySelector('[data-site-header-primary]')?.getBoundingClientRect();
-            const navigation = document.querySelector('[data-site-header-navigation]')?.getBoundingClientRect();
+            const navigation = [...document.querySelectorAll('[data-site-header-navigation]')]
+                .find((element) => element.getClientRects().length > 0)
+                ?.getBoundingClientRect();
             const inputFrame = document.querySelector('[data-header-search-input-frame]')?.getBoundingClientRect();
             const submit = document.querySelector('[data-header-search-autocomplete] button[type="submit"]')?.getBoundingClientRect();
 
@@ -393,22 +401,67 @@ test('route country and publication type can be removed independently', async ({
     expect(browserErrors.pageErrors).toEqual([]);
 });
 
-test('country pagination changes results, scrolls to them and keeps alphabet scripts separate', async ({ page, baseURL }) => {
+test('country pagination changes results, scrolls to them and keeps alphabet scripts separate', async ({ page, baseURL }, testInfo) => {
     const browserErrors = await installNetworkGuard(page, baseURL);
 
     await page.goto('/titles/country/turciia?country%5B0%5D=turciia');
     const results = page.locator('[data-catalog-results]');
+    const loading = results.locator('[data-pagination-loading]');
     const firstTitle = await page.locator('[data-catalog-card]').first().innerText();
 
+    await page.route(/\/livewire(?:-[^/]+)?\/update(?:\?.*)?$/, async (route) => {
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        await route.continue();
+    });
+
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-    await page.getByRole('link', { name: 'Страница 2' }).click();
+    await page.evaluate(() => {
+        window.__paginationScrollSamples = [];
+        window.__paginationScrollStartY = window.scrollY;
+        window.addEventListener('scroll', () => {
+            window.__paginationScrollSamples.push({ at: performance.now(), y: window.scrollY });
+        }, { passive: true });
+    });
+    await Promise.all([
+        expect(results).toHaveAttribute('aria-busy', 'true'),
+        expect(loading).toBeVisible(),
+        page.getByRole('link', { name: 'Страница 2' }).click(),
+    ]);
     await expect(page).toHaveURL(/page=2/);
     await expect(page.locator('[data-catalog-pagination] [aria-current="page"]')).toHaveText('2');
     await expect(page.locator('[data-catalog-card]').first()).not.toHaveText(firstTitle);
+    await expect(results).toHaveAttribute('aria-busy', 'false');
+    await expect(loading).toBeHidden();
     const resultTop = () => results.evaluate((element) => Math.round(element.getBoundingClientRect().top));
 
     await expect.poll(resultTop).toBeGreaterThanOrEqual(0);
     await expect.poll(resultTop).toBeLessThan(320);
+    await page.waitForTimeout(900);
+
+    const scrollContract = await results.evaluate((element) => {
+        const header = document.querySelector('[data-site-header]');
+        const headerPosition = header ? window.getComputedStyle(header).position : 'static';
+        const headerBottom = header && ['sticky', 'fixed'].includes(headerPosition)
+            ? Math.max(0, header.getBoundingClientRect().bottom)
+            : 0;
+        const samples = window.__paginationScrollSamples || [];
+        const startY = window.__paginationScrollStartY ?? window.scrollY;
+        const finalY = window.scrollY;
+
+        return {
+            duration: samples.length > 1 ? samples.at(-1).at - samples[0].at : 0,
+            expectedTop: headerBottom + 16,
+            hasIntermediatePosition: samples.some(({ y }) => (
+                Math.abs(y - startY) > 1 && Math.abs(y - finalY) > 1
+            )),
+            top: element.getBoundingClientRect().top,
+        };
+    });
+
+    expect(scrollContract.hasIntermediatePosition).toBe(true);
+    expect(scrollContract.duration).toBeGreaterThanOrEqual(500);
+    expect(Math.abs(scrollContract.top - scrollContract.expectedTop)).toBeLessThanOrEqual(4);
+    await page.screenshot({ path: testInfo.outputPath('pagination-result.png') });
 
     await page.getByRole('link', { name: 'Назад' }).click();
     await expect(page).not.toHaveURL(/page=2/);
@@ -434,6 +487,57 @@ test('country pagination changes results, scrolls to them and keeps alphabet scr
     expect(browserErrors.localAssetFailures).toEqual([]);
     expect(browserErrors.consoleErrors).toEqual([]);
     expect(browserErrors.pageErrors).toEqual([]);
+});
+
+test('country pagination respects reduced motion', async ({ browser, baseURL }, testInfo) => {
+    test.skip(testInfo.project.name !== 'Desktop Chromium', 'Reduced motion needs one representative runtime check.');
+
+    const context = await browser.newContext({
+        baseURL,
+        reducedMotion: 'reduce',
+        viewport: { width: 1440, height: 1200 },
+    });
+    const page = await context.newPage();
+    const browserErrors = await installNetworkGuard(page, baseURL);
+
+    await page.goto('/titles/country/turciia?country%5B0%5D=turciia');
+    const results = page.locator('[data-catalog-results]');
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await page.evaluate(() => {
+        window.__paginationReducedMotionSamples = [];
+        window.addEventListener('scroll', () => {
+            window.__paginationReducedMotionSamples.push({ at: performance.now(), y: window.scrollY });
+        }, { passive: true });
+    });
+
+    await page.getByRole('link', { name: 'Страница 2' }).click();
+    await expect(page).toHaveURL(/page=2/);
+    await expect(results).toHaveAttribute('aria-busy', 'false');
+    await page.waitForTimeout(150);
+
+    const motionContract = await results.evaluate((element) => {
+        const header = document.querySelector('[data-site-header]');
+        const headerPosition = header ? window.getComputedStyle(header).position : 'static';
+        const headerBottom = header && ['sticky', 'fixed'].includes(headerPosition)
+            ? Math.max(0, header.getBoundingClientRect().bottom)
+            : 0;
+
+        return {
+            reduced: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+            sampleCount: (window.__paginationReducedMotionSamples || []).length,
+            top: element.getBoundingClientRect().top,
+            expectedTop: headerBottom + 16,
+        };
+    });
+
+    expect(motionContract.reduced).toBe(true);
+    expect(motionContract.sampleCount).toBeLessThanOrEqual(3);
+    expect(Math.abs(motionContract.top - motionContract.expectedTop)).toBeLessThanOrEqual(24);
+    expect(browserErrors.localAssetFailures).toEqual([]);
+    expect(browserErrors.consoleErrors).toEqual([]);
+    expect(browserErrors.pageErrors).toEqual([]);
+
+    await context.close();
 });
 
 test('title page renders the player shell without local asset failures', async ({ page, baseURL }) => {

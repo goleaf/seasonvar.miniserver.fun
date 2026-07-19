@@ -4,15 +4,14 @@ declare(strict_types=1);
 
 namespace App\Services\Seasonvar;
 
+use App\Enums\SeasonvarImportStatus;
 use App\Models\SeasonvarImportRun;
 
 final class SeasonvarImportActivity
 {
     private const ACTIVE_STATUSES = [
-        'queued',
-        'discovering',
-        'running',
-        'finalizing',
+        SeasonvarImportStatus::Queued->value,
+        SeasonvarImportStatus::Running->value,
     ];
 
     public function active(): bool

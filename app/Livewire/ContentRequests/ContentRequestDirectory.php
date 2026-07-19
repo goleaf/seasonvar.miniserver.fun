@@ -7,6 +7,7 @@ namespace App\Livewire\ContentRequests;
 use App\Enums\ContentRequestSort;
 use App\Enums\ContentRequestStatus;
 use App\Enums\ContentRequestType;
+use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Services\ContentRequests\ContentRequestQuery;
 use App\Services\ContentRequests\ContentRequestSchema;
 use App\Services\ContentRequests\ContentRequestSeoPresenter;
@@ -22,6 +23,7 @@ use Throwable;
 
 final class ContentRequestDirectory extends Component
 {
+    use InteractsWithPaginationIslands;
     use WithPagination;
 
     #[Url(as: 'q', history: true, except: '')]

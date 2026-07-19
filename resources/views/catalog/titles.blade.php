@@ -241,15 +241,20 @@
 
             </x-ui.panel>
 
-            @island(name: 'catalog-live', defer: true)
+            @island(name: 'catalog-live', lazy: true)
                 @placeholder
-                    <x-catalog.unified-title-filters
-                        :filter-view="$this->catalogPage['filterView']"
-                        :route-year="$routeYear"
-                        :route-filter-type="$routeFilterType"
-                        :route-taxonomy="$routeTaxonomy"
-                        loading
-                    />
+                    <div
+                        id="catalog-filters"
+                        data-catalog-advanced-filters
+                        data-catalog-unified-filters
+                        aria-busy="true"
+                        class="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3"
+                    >
+                        <div data-catalog-facets-loading role="status" aria-live="polite" class="flex min-h-24 items-center justify-center gap-2 rounded-control bg-white px-4 py-5 text-sm font-bold text-slate-600">
+                            <x-ui.icon name="fa-solid fa-spinner fa-spin text-emerald-700" />
+                            <span>{{ __('catalog.catalog.filters.loading') }}</span>
+                        </div>
+                    </div>
                 @endplaceholder
 
                 <x-catalog.unified-title-filters
@@ -279,14 +284,16 @@
                 </section>
             @endif
 
-            <div data-catalog-results class="relative scroll-mt-40 sm:scroll-mt-44 lg:scroll-mt-48">
-                <div wire:loading.delay wire:target="filters.search,applySearch,applyFilters,sortBy,setPerPage,setLetter,resetGroup,resetAdvanced,resetAdvancedFilters,clearSearch,resetAll,previousPage,nextPage,gotoPage" class="hidden absolute inset-x-0 top-0 z-20 rounded-panel bg-white text-sm font-bold text-emerald-700" role="status" aria-live="polite">
+            <div class="relative">
+                <div wire:loading.delay wire:target="filters.search,applySearch,applyFilters,sortBy,setPerPage,setLetter,resetGroup,resetAdvanced,resetAdvancedFilters,clearSearch,resetAll" class="hidden absolute inset-x-0 top-0 z-20 rounded-panel bg-white text-sm font-bold text-emerald-700" role="status" aria-live="polite">
                     <div class="flex min-h-24 items-center justify-center">
                         <x-ui.icon name="fa-solid fa-spinner fa-spin" />
                         <span class="ml-2">{{ __('catalog.catalog.updating') }}</span>
                     </div>
                 </div>
-                <div data-catalog-results-list wire:loading.class="opacity-50" wire:target="filters.search,applySearch,applyFilters,sortBy,setPerPage,setLetter,resetGroup,resetAdvanced,resetAdvancedFilters,clearSearch,resetAll,previousPage,nextPage,gotoPage" class="divide-y divide-slate-200 overflow-hidden rounded-panel border border-slate-200 bg-white">
+                @island(name: 'catalog-pagination', always: true, with: $this->catalogPage)
+                <x-ui.pagination-region name="catalog-results" data-catalog-results>
+                <div data-catalog-results-list wire:loading.class="opacity-50" wire:target="filters.search,applySearch,applyFilters,sortBy,setPerPage,setLetter,resetGroup,resetAdvanced,resetAdvancedFilters,clearSearch,resetAll" class="divide-y divide-slate-200 overflow-hidden rounded-panel border border-slate-200 bg-white">
                 @forelse ($titles as $catalogTitle)
                     <x-catalog.title-card wire:key="catalog-title-{{ $catalogTitle->id }}" :title="$catalogTitle" layout="list" readable />
                 @empty
@@ -370,10 +377,12 @@
                     </x-ui.panel>
                 @endforelse
                 </div>
-            </div>
 
-            <div>
-                {{ $titles->links(data: ['scrollTo' => '[data-catalog-results]']) }}
+                <div>
+                    {{ $titles->links(data: ['region' => 'catalog-results']) }}
+                </div>
+                </x-ui.pagination-region>
+                @endisland
             </div>
             @endisland
         </div>

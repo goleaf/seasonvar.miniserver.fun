@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Web;
 
+use App\DTOs\UserLibraryFilters;
 use App\Livewire\Library\UserLibraryPage;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleUserState;
@@ -12,7 +13,10 @@ use App\Models\EpisodeViewProgress;
 use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Models\User;
+use App\Services\Catalog\UserLibraryQuery;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -144,6 +148,31 @@ final class UserLibraryPageTest extends TestCase
             ->test(UserLibraryPage::class, ['section' => 'ratings'])
             ->call('setPage', 2, 'ratingsPage')
             ->assertSet('paginators.ratingsPage', 2);
+    }
+
+    public function test_watchlist_hydrates_card_counts_with_bounded_grouped_queries(): void
+    {
+        $user = User::factory()->create();
+        [$title] = $this->watchableTitle('library-card-counts', 'Счётчики библиотеки');
+        $this->state($user, $title, true, null);
+        $queries = [];
+        DB::listen(function (QueryExecuted $query) use (&$queries): void {
+            $queries[] = str($query->sql)
+                ->replace(['`', '"'], '')
+                ->lower()
+                ->squish()
+                ->toString();
+        });
+
+        $items = app(UserLibraryQuery::class)->watchlist($user, new UserLibraryFilters);
+        $card = $items->first()?->catalogTitle;
+        $sql = implode("\n", $queries);
+
+        $this->assertSame(1, $card?->getAttribute('seasons_count'));
+        $this->assertSame(1, $card?->getAttribute('episodes_count'));
+        $this->assertSame(1, $card?->getAttribute('published_media_count'));
+        $this->assertStringContainsString('select season_id, count(*) as aggregate_count from episodes', $sql);
+        $this->assertStringNotContainsString('select count(*) from seasons where catalog_titles.id = seasons.catalog_title_id', $sql);
     }
 
     public function test_continue_watching_and_history_are_owner_scoped_and_history_actions_are_safe(): void

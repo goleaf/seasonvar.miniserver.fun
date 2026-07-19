@@ -32,6 +32,7 @@ use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Mockery;
@@ -199,6 +200,30 @@ class SeasonvarParallelImportTest extends TestCase
             ->where('mode', 'sitemap')
             ->whereIn('status', ['queued', 'running'])
             ->count());
+    }
+
+    public function test_global_start_preserves_a_stale_heartbeat_run_with_a_live_claim(): void
+    {
+        config([
+            'seasonvar.queue.lock_store' => 'array',
+            'seasonvar.queue.stale_after_minutes' => 60,
+        ]);
+        $run = SeasonvarImportRun::query()->create([
+            'mode' => 'sitemap',
+            'execution_mode' => 'queue',
+            'status' => 'running',
+            'started_at' => now()->subHours(3),
+            'last_heartbeat_at' => now()->subHours(3),
+        ]);
+        $page = SourcePage::factory()->create();
+
+        $this->assertNotNull(app(SeasonvarPageClaimManager::class)->claim($page, $run->id, 3600));
+
+        $result = app(SeasonvarGlobalImportRunCoordinator::class)->acquireSync(false, false);
+
+        $this->assertFalse($result->created);
+        $this->assertTrue($result->run->is($run));
+        $this->assertSame('running', $run->fresh()->status);
     }
 
     public function test_targeted_run_does_not_block_a_sync_global_reservation(): void
@@ -995,6 +1020,127 @@ class SeasonvarParallelImportTest extends TestCase
         ])
             ->expectsOutputToContain('поставлено в очередь: 2')
             ->assertExitCode(0);
+    }
+
+    public function test_queued_command_accepts_a_bounded_forced_sitemap_tail(): void
+    {
+        config(['seasonvar.queue.lock_store' => 'array']);
+        $run = $this->queuedRun();
+        $run->selected = 1000;
+        $run->save();
+        $dispatcher = Mockery::mock(SeasonvarQueuedImportDispatcher::class);
+        $dispatcher->shouldReceive('dispatch')
+            ->once()
+            ->with(true, true, null, 1000)
+            ->andReturn(new SeasonvarImportStartResultData($run, true));
+        $this->app->instance(SeasonvarQueuedImportDispatcher::class, $dispatcher);
+
+        $this->artisan('seasonvar:import', [
+            '--queued' => true,
+            '--force' => true,
+            '--sitemap-tail' => 1000,
+        ])
+            ->expectsOutputToContain('поставлено в очередь: 1000')
+            ->assertExitCode(0);
+    }
+
+    public function test_sitemap_tail_dispatches_only_the_last_distinct_serial_urls_in_xml_order(): void
+    {
+        $storageDirectory = 'seasonvar/tests/parallel-tail-'.getmypid();
+        config([
+            'seasonvar.crawl_delay_seconds' => 0,
+            'seasonvar.queue.lock_store' => 'array',
+            'seasonvar.sitemap_storage_directory' => $storageDirectory,
+            'seasonvar.sitemap_url' => 'https://seasonvar.ru/sitemap_index.xml',
+        ]);
+        Queue::fake();
+        Http::preventStrayRequests();
+        File::deleteDirectory(storage_path('app/'.$storageDirectory));
+
+        $xml = <<<'XML'
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <url><loc>https://seasonvar.ru/serial-1-One.html</loc></url>
+    <url><loc>https://seasonvar.ru/actor/1001-Actor</loc></url>
+    <url><loc>https://seasonvar.ru/serial-2-Two.html</loc></url>
+    <url><loc>https://seasonvar.ru/serial-3-Three.html</loc></url>
+    <url><loc>https://seasonvar.ru/genre/drama</loc></url>
+    <url><loc>https://seasonvar.ru/serial-4-Four.html</loc></url>
+    <url><loc>https://seasonvar.ru/serial-3-Three.html</loc></url>
+</urlset>
+XML;
+
+        Http::fake([
+            'seasonvar.ru/robots.txt' => Http::response("User-agent: *\nAllow: /\n"),
+            'seasonvar.ru/sitemap_index.xml' => Http::response($xml),
+        ]);
+
+        try {
+            $run = app(SeasonvarQueuedImportDispatcher::class)->dispatch(
+                force: true,
+                discover: true,
+                pageTypes: ['serial'],
+                sitemapTailLimit: 3,
+            )->run;
+
+            $selectedUrls = $run->preparedPages()
+                ->with('sourcePage:id,url')
+                ->orderBy('id')
+                ->get()
+                ->pluck('sourcePage.url')
+                ->all();
+
+            $this->assertSame([
+                'https://seasonvar.ru/serial-2-Two.html',
+                'https://seasonvar.ru/serial-3-Three.html',
+                'https://seasonvar.ru/serial-4-Four.html',
+            ], $selectedUrls);
+            $this->assertSame(3, $run->fresh()->selected);
+            $this->assertSame(4, SourcePage::query()->where('page_type', 'serial')->count());
+            $this->assertSame(3, data_get($run->fresh()->summary, 'sitemap_tail_limit'));
+            $this->assertSame(3, data_get($run->fresh()->summary, 'sitemap_tail_selected'));
+            $this->assertArrayNotHasKey('sitemap_tail_urls', $run->fresh()->summary ?? []);
+            Queue::assertPushedTimes(PrepareSeasonvarImportTitlePage::class, 3);
+        } finally {
+            File::deleteDirectory(storage_path('app/'.$storageDirectory));
+        }
+    }
+
+    public function test_sitemap_tail_rejects_out_of_range_and_incompatible_modes(): void
+    {
+        config(['seasonvar.queue.lock_store' => 'array']);
+        $dispatcher = Mockery::mock(SeasonvarQueuedImportDispatcher::class);
+        $dispatcher->shouldNotReceive('dispatch');
+        $this->app->instance(SeasonvarQueuedImportDispatcher::class, $dispatcher);
+
+        foreach ([0, 1001, 'invalid'] as $limit) {
+            $this->artisan('seasonvar:import', [
+                '--queued' => true,
+                '--force' => true,
+                '--sitemap-tail' => $limit,
+            ])->assertExitCode(1);
+        }
+
+        $this->artisan('seasonvar:import', [
+            '--force' => true,
+            '--sitemap-tail' => 1000,
+        ])->assertExitCode(1);
+        $this->artisan('seasonvar:import', [
+            '--queued' => true,
+            '--sitemap-tail' => 1000,
+        ])->assertExitCode(1);
+        $this->artisan('seasonvar:import', [
+            '--queued' => true,
+            '--force' => true,
+            '--no-discovery' => true,
+            '--sitemap-tail' => 1000,
+        ])->assertExitCode(1);
+        $this->artisan('seasonvar:import', [
+            '--queued' => true,
+            '--force' => true,
+            '--page-type' => ['actor'],
+            '--sitemap-tail' => 1000,
+        ])->assertExitCode(1);
     }
 
     public function test_queued_command_explains_that_an_active_global_run_was_reused(): void

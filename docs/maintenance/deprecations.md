@@ -1,6 +1,6 @@
 # Реестр deprecated API и behavior
 
-Аудит: 18.07.2026. Запись появляется только при подтверждённом предупреждении или официальном version-specific guidance. Рекомендация использовать другой стиль сама по себе не объявляется deprecation.
+Аудит: 18.07.2026; повторно сверен 19.07.2026. Запись появляется только при подтверждённом предупреждении или официальном version-specific guidance. Рекомендация использовать другой стиль сама по себе не объявляется deprecation.
 
 ## DEP-001 — неподдерживаемый глобальный npm config key
 
@@ -16,14 +16,14 @@
 10. Migration phase: operator build-runtime maintenance, not repository package update.
 11. Compatibility adapter: none; npm currently ignores/accepts the key with a warning.
 12. Removal condition: `npm audit --json`, `npm outdated --json` and `npm run build` complete without the warning under the approved package-manager runtime.
-13. Status: open / external environment.
+13. Status: open / external environment; fresh `npm ls`, `npm audit`, `npm outdated` and `npm run build` on 19.07.2026 still emit the warning.
 14. Verification method: inspect effective npm configuration without recording credentials, remove only this exact key, repeat the three read/build checks.
 
 ## Confirmed clean version-specific searches
 
 | Boundary | Officially relevant deprecated/changed surface | Repository result |
 | --- | --- | --- |
-| Livewire 4 | `$wire.$js(...)`, unprefixed `$js(...)`, `commit`/`request` hooks, old `setUpdateRoute` signature, `wire:scroll`, transition modifiers | No deprecated JS actions/hooks/scroll/transition usage. `setUpdateRoute($handle, $path)` preserves hashed v4 endpoints. |
+| Livewire 4 | `$wire.$js(...)`, unprefixed `$js(...)`, `commit`/`request` hooks, old `setUpdateRoute` signature, `wire:scroll`, transition modifiers | No deprecated JS actions/hooks/scroll/transition usage. `setUpdateRoute($handle, $path)` preserves hashed v4 endpoints. Package default SFC generation was a project-architecture drift risk, not a deprecation; config now pins `type=class`. |
 | Livewire 4.1+ | `.blur`/`.change` synchronization semantics | Existing `.blur` inputs intentionally commit client/server state on blur before later submit/action; no code relies on per-keystroke `$wire` state. Retained, not deprecated. |
 | Livewire routes | `Route::livewire()` is preferred for full-page components | Existing `Route::get(..., Component::class)` is still supported and preserves a large public/localized route contract. It is not marked deprecated and is not mass-rewritten. |
 | Laravel 13 | bootstrap/middleware/exception/provider structure and named-argument risk | Project uses `Application::configure`, configuration callbacks, public service-provider APIs and current attributes. No old HTTP/console Kernel structure or confirmed deprecated framework call found. |

@@ -114,6 +114,8 @@
             @endif
         </section>
 
+        @island(name: 'comment-discussion-pagination', always: true, with: $this->paginationIslandPage)
+        <x-ui.pagination-region name="comment-discussion-results">
         <div class="flex flex-col gap-3 rounded-panel border border-slate-200 bg-white p-3 shadow-panel sm:flex-row sm:items-end sm:justify-between">
             <div class="min-w-0">
                 <h3 class="text-sm font-black text-slate-800">{{ trans_choice('comments.count', $publicCount, ['count' => $publicCount]) }}</h3>
@@ -159,10 +161,12 @@
 
             @if ($comments->hasPages())
                 <nav aria-label="{{ __('comments.accessibility.pagination') }}">
-                    {{ $comments->links(data: ['scrollTo' => '#discussion']) }}
+                    {{ $comments->links(data: ['region' => 'comment-discussion-results']) }}
                 </nav>
             @endif
         @endif
+        </x-ui.pagination-region>
+        @endisland
     @endif
 
     @if ($reportingCommentId !== null)

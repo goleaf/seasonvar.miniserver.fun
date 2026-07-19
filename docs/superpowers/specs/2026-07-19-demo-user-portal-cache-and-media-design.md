@@ -25,11 +25,11 @@
 - avatar 320×320 WebP и cover 1280×360 WebP по разрешённому profile path;
 - коллекционные WebP 960×540 по разрешённому collection path.
 
-Seed остаётся идемпотентным, deterministic и запрещённым вне `dev|testing`. Для уже существующего production demo-корпуса вводится отдельная bounded repair-команда: она работает только с точным allowlist demo email pattern, поддерживает dry-run, не затрагивает обычных пользователей и требует explicit `--force`; production write дополнительно требует `--backup-confirmed` и `--writers-paused`. Перед её применением обязательны SQLite backup/checkpoint, проверка свободного места и post-run audit.
+Seed остаётся идемпотентным, deterministic и запрещённым вне `dev|testing`. Для уже существующего production demo-корпуса вводится отдельная bounded repair-команда: она работает только с точным allowlist demo email pattern, поддерживает dry-run, не затрагивает обычных пользователей и требует explicit `--force`; production write дополнительно требует `--backup-confirmed` и `--writers-paused`. Repair сначала использует собственный аудит и запускает только stages с ненулевым дефектом; аудит считает дефектом owner без коллекций и любую коллекцию с отсутствующим или недоставляемым cover, включая `NULL` path. Полностью исправленный corpus является быстрым no-op без повторных bulk upsert и warm jobs. Перед её применением обязательны SQLite backup/checkpoint, проверка свободного места и post-run audit.
 
 ### Owner-scoped cache
 
-HTML, CSRF, sessions, tokens, signed URLs и Eloquent object graphs не кэшируются. Новый `user-portal` cache хранит только bounded compact arrays: ID pages, totals и агрегаты. Scope строится по стабильному `users.public_id`; email и внутренний ID не входят в data key. Dimensions включают locale, section, validated filters/sort/page и projection format.
+HTML, CSRF, sessions, tokens, signed URLs и Eloquent object graphs не кэшируются. Новый `user-portal` cache хранит только bounded compact arrays: ID pages, totals и агрегаты. Scope строится по стабильному `users.public_id`; email и внутренний ID не входят в data key. Dimensions включают locale, section, validated filters/sort/page и projection format. Модели выбранной ID-page гидратируются заново с текущей visibility; availability-счётчики карточек собираются bounded grouped-запросами по выбранным title/season IDs без коррелированного `withCount` на каждую карточку.
 
 При чтении:
 

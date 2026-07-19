@@ -38,6 +38,7 @@ final readonly class HelpLinkResolver
             ->publiclyDiscoverable()
             ->where('code', $code)
             ->with(['translations' => fn ($query) => $query
+                ->select(['id', 'help_article_id', 'locale', 'slug'])
                 ->whereIn('locale', array_values(array_unique([$locale, $fallback])))
                 ->where('is_published', true)])
             ->first();

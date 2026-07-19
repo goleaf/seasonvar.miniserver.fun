@@ -12,6 +12,7 @@ use App\Enums\TagSource;
 use App\Enums\TagSynonymRelationship;
 use App\Enums\TagType;
 use App\Enums\TagVisibility;
+use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Models\CatalogTitle;
 use App\Models\Tag;
 use App\Models\TagSynonym;
@@ -30,6 +31,7 @@ use Livewire\WithPagination;
 
 final class TagAdministrationManager extends Component
 {
+    use InteractsWithPaginationIslands;
     use WithPagination;
 
     public string $search = '';

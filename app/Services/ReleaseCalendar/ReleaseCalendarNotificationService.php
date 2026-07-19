@@ -83,7 +83,13 @@ final class ReleaseCalendarNotificationService
             }
 
             $subscriptions
-                ->with(['user:id,name', 'user.releaseCalendarNotificationPreference'])
+                ->with([
+                    'user:id,name',
+                    'user.releaseCalendarNotificationPreference' => fn ($query) => $query->select([
+                        'user_id',
+                        ...ReleaseCalendarNotificationPreference::FIELDS,
+                    ]),
+                ])
                 ->chunkById(200, function ($subscriptions) use ($entry, $kind, $subscriptionField, $previousDate, $newDate): void {
                     foreach ($subscriptions as $subscription) {
                         $recipient = $subscription->user;

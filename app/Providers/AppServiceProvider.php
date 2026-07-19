@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Http\Middleware\EnsureAccountAccess;
+use App\Http\Middleware\EnsureAdministrator;
 use App\Models\CatalogCollection;
 use App\Models\CatalogTitleReview;
 use App\Models\CatalogTitleUpdateState;
@@ -13,7 +15,6 @@ use App\Models\EpisodeViewProgress;
 use App\Models\HelpArticle;
 use App\Models\LicensedMedia;
 use App\Models\TechnicalIssue;
-use App\Models\User;
 use App\Models\UserAccountSetting;
 use App\Models\UserProfile;
 use App\Models\UserTag;
@@ -23,6 +24,10 @@ use App\Observers\UserPortalCacheObserver;
 use App\Policies\AccountSettingsPolicy;
 use App\Policies\HelpArticlePolicy;
 use App\Policies\TechnicalIssuePolicy;
+use App\Services\Admin\AdminAccessRegistry;
+use App\Services\Admin\AdminAccessResolver;
+use App\Services\Admin\AdminGateRegistrar;
+use App\Services\Auth\AccountAccessResolver;
 use App\Services\Auth\AccountSettingsSchema;
 use App\Services\Catalog\PersonalLibrarySchema;
 use App\Services\Collections\CatalogCollectionSchema;
@@ -55,7 +60,6 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\View as ViewFacade;
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
 use Livewire\Livewire;
@@ -68,6 +72,10 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->scopedIf(CatalogCollectionSchema::class);
+        $this->app->singletonIf(AdminAccessRegistry::class);
+        $this->app->scopedIf(AdminAccessResolver::class);
+        $this->app->scopedIf(AdminGateRegistrar::class);
+        $this->app->scopedIf(AccountAccessResolver::class);
         $this->app->scopedIf(AccountSettingsSchema::class);
         $this->app->scopedIf(CommentSchema::class);
         $this->app->scopedIf(ContentRequestSchema::class);
@@ -137,40 +145,20 @@ class AppServiceProvider extends ServiceProvider
             max(1, (int) config('premium.rate_limits.webhook_per_minute', 120)),
         )->by(hash('sha256', (string) $request->ip())));
 
+        RateLimiter::for('administration', function (Request $request): Limit {
+            $identity = (string) ($request->user()?->getAuthIdentifier() ?? 'guest');
+
+            return Limit::perMinute(120)
+                ->by('admin:'.$identity.'|'.hash('sha256', (string) $request->ip()));
+        });
+
         Event::listen(CacheHit::class, fn (CacheHit $event) => app(CacheEventReporter::class)->record($event, 'hit'));
         Event::listen(CacheMissed::class, fn (CacheMissed $event) => app(CacheEventReporter::class)->record($event, 'miss'));
         Event::listen(KeyWritten::class, fn (KeyWritten $event) => app(CacheEventReporter::class)->record($event, 'write'));
         Event::listen(KeyForgotten::class, fn (KeyForgotten $event) => app(CacheEventReporter::class)->record($event, 'forget'));
         Event::listen(CacheFailedOver::class, fn (CacheFailedOver $event) => app(CacheEventReporter::class)->failedOver($event));
 
-        $catalogAdministrator = function (User $user): bool {
-            return in_array(
-                Str::lower($user->email),
-                config('seasonvar.admin_emails', []),
-                true,
-            );
-        };
-
-        Gate::define('manage-seasonvar-imports', $catalogAdministrator);
-        Gate::define('manage-catalog', $catalogAdministrator);
-        Gate::define('manage-comments', $catalogAdministrator);
-        Gate::define('manage-reviews', $catalogAdministrator);
-        Gate::define('manage-content-requests', $catalogAdministrator);
-        Gate::define('manage-technical-issues', $catalogAdministrator);
-        Gate::define('manage-release-calendar', $catalogAdministrator);
-        Gate::define('manage-help-center', $catalogAdministrator);
-        Gate::define('view-premium-administration', $catalogAdministrator);
-        $premiumAdministrator = static fn (string $capability): callable => static function (User $user) use ($catalogAdministrator, $capability): bool {
-            return $catalogAdministrator($user) && in_array(
-                Str::lower($user->email),
-                (array) config("premium.administration.{$capability}_emails", []),
-                true,
-            );
-        };
-        Gate::define('manage-premium-grants', $premiumAdministrator('grant'));
-        Gate::define('manage-premium-promotions', $premiumAdministrator('promotion'));
-        Gate::define('view-premium-billing-audit', $premiumAdministrator('billing_audit'));
-        Gate::define('reconcile-premium', $premiumAdministrator('reconciliation'));
+        app(AdminGateRegistrar::class)->register();
         Gate::policy(TechnicalIssue::class, TechnicalIssuePolicy::class);
         Gate::policy(HelpArticle::class, HelpArticlePolicy::class);
         Gate::define('view-account-settings', [AccountSettingsPolicy::class, 'view']);
@@ -181,6 +169,8 @@ class AppServiceProvider extends ServiceProvider
                 ->middleware('web');
         });
         Livewire::addPersistentMiddleware(AuthenticateSession::class);
+        Livewire::addPersistentMiddleware(EnsureAccountAccess::class);
+        Livewire::addPersistentMiddleware(EnsureAdministrator::class);
 
         Episode::observe(EpisodeReleaseScheduleObserver::class);
         LicensedMedia::observe(LicensedMediaReleaseScheduleObserver::class);

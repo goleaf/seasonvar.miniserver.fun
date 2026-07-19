@@ -54,12 +54,21 @@ final class WarmCatalogTitlePageTest extends TestCase
 
     public function test_job_contract_is_unique_and_overlap_protected(): void
     {
+        $this->travelTo('2026-07-19 12:00:00');
+        config([
+            'cache-architecture.warming.visible_titles.retry_window_seconds' => 86_400,
+            'cache-architecture.warming.visible_titles.unique_seconds' => 600,
+        ]);
         $job = new WarmCatalogTitlePage(73);
         $this->assertInstanceOf(ShouldQueue::class, $job);
         $this->assertInstanceOf(ShouldBeUnique::class, $job);
         $this->assertTrue($job->afterCommit);
+        $this->assertSame(0, $job->tries);
+        $this->assertSame(now()->addDay()->getTimestamp(), $job->retryUntil()->getTimestamp());
+        $this->assertSame(86_700, $job->uniqueFor);
         $this->assertSame('catalog-title-page:73', $job->uniqueId());
-        $this->assertContainsOnlyInstancesOf(WithoutOverlapping::class, $job->middleware());
+        $this->assertCount(1, $job->middleware());
+        $this->assertSame(WithoutOverlapping::class, get_class($job->middleware()[0]));
     }
 
     public function test_missing_and_stale_warm_one_url_while_fresh_does_not(): void
@@ -83,6 +92,30 @@ final class WarmCatalogTitlePageTest extends TestCase
         Http::assertSentCount(1);
     }
 
+    public function test_missing_warm_populates_the_canonical_cache_for_the_next_request(): void
+    {
+        $title = CatalogTitle::factory()->create(['slug' => 'canonical-warmed-title']);
+        $url = 'https://seasonvar.test/titles/canonical-warmed-title';
+        Http::fake(function () use ($url) {
+            $response = $this->get($url)
+                ->assertOk()
+                ->assertHeader('X-Seasonvar-Page-Cache', 'MISS');
+
+            return Http::response(
+                $response->getContent(),
+                $response->getStatusCode(),
+                ['Content-Type' => 'text/html; charset=UTF-8'],
+            );
+        });
+
+        $this->handle(new WarmCatalogTitlePage($title->id));
+
+        Http::assertSentCount(1);
+        $this->get($url)
+            ->assertOk()
+            ->assertHeader('X-Seasonvar-Page-Cache', 'HIT');
+    }
+
     public function test_hidden_title_import_and_cache_outage_never_send_http(): void
     {
         $hidden = CatalogTitle::factory()->create(['is_published' => false]);
@@ -104,6 +137,23 @@ final class WarmCatalogTitlePageTest extends TestCase
         $outageJob = (new WarmCatalogTitlePage($title->id))->withFakeQueueInteractions();
         $this->handle($outageJob);
         $outageJob->assertReleased(60);
+        Http::assertNothingSent();
+    }
+
+    public function test_version_registry_outage_releases_without_sending_http(): void
+    {
+        $title = CatalogTitle::factory()->create();
+        config([
+            'cache.stores.unavailable-title-version-test' => ['driver' => 'unsupported-title-version-test'],
+            'cache-architecture.stores.versions' => 'unavailable-title-version-test',
+        ]);
+        app()->forgetInstance('cache.__memoized:unavailable-title-version-test');
+        Http::fake();
+
+        $job = (new WarmCatalogTitlePage($title->id))->withFakeQueueInteractions();
+        $this->handle($job);
+
+        $job->assertReleased(60);
         Http::assertNothingSent();
     }
 

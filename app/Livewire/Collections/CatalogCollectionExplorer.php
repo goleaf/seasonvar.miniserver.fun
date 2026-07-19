@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Collections;
 
+use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Services\Collections\CatalogCollectionQuery;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
@@ -14,6 +15,7 @@ use Livewire\WithPagination;
 
 final class CatalogCollectionExplorer extends Component
 {
+    use InteractsWithPaginationIslands;
     use WithPagination;
 
     #[Url(as: 'collections_q', history: true, except: '')]

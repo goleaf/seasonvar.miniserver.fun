@@ -47,6 +47,10 @@ final readonly class DemoUserPortalRepairer
                 UserTag::query()->whereIn('user_id', $userIds)->distinct()->pluck('user_id'),
                 $userIds,
             ),
+            'users_without_collections' => $this->missingOwners(
+                CatalogCollection::query()->whereIn('owner_id', $userIds)->distinct()->pluck('owner_id'),
+                $userIds,
+            ),
             'users_without_requests' => $this->missingOwners(
                 ContentRequest::query()->whereIn('requester_id', $userIds)->distinct()->pluck('requester_id'),
                 $userIds,
@@ -54,7 +58,6 @@ final readonly class DemoUserPortalRepairer
             'invalid_profile_images' => $users->filter(fn (User $user): bool => ! $this->validProfileImages($user))->count(),
             'invalid_collection_images' => CatalogCollection::query()
                 ->whereIn('owner_id', $userIds)
-                ->whereNotNull('cover_path')
                 ->get(['public_id', 'cover_disk', 'cover_path', 'cover_mime_type'])
                 ->filter(fn (CatalogCollection $collection): bool => ! $this->validCollectionImage($collection))
                 ->count(),
@@ -67,23 +70,49 @@ final readonly class DemoUserPortalRepairer
         $options = DemoDataOptions::fromConfig();
         $users = $this->users($options);
         $before = $this->inspect();
-        $this->repairProfileImages($users, $options);
-        $organization = $this->organization->repairKnownDemoUsers($options);
-        $activity = $this->catalogActivity->repairKnownDemoUsers($options);
-        $requests = $this->contentRequests->repairKnownDemoUsers($options);
+        $needsProfileImages = $before['invalid_profile_images'] > 0;
+        $needsOrganization = $before['users_without_personal_tags'] > 0
+            || $before['users_without_collections'] > 0
+            || $before['invalid_collection_images'] > 0;
+        $needsCatalogActivity = $before['users_without_library'] > 0;
+        $needsContentRequests = $before['users_without_requests'] > 0;
+        $stageCounters = [];
 
-        foreach ($users as $user) {
-            $this->userPortalCache->changed($user);
+        if ($needsProfileImages) {
+            $this->repairProfileImages($users, $options);
+        }
+
+        if ($needsOrganization) {
+            $stageCounters = [
+                ...$stageCounters,
+                ...$this->organization->repairKnownDemoUsers($options)->counters,
+            ];
+        }
+
+        if ($needsCatalogActivity) {
+            $stageCounters = [
+                ...$stageCounters,
+                ...$this->catalogActivity->repairKnownDemoUsers($options)->counters,
+            ];
+        }
+
+        if ($needsContentRequests) {
+            $stageCounters = [
+                ...$stageCounters,
+                ...$this->contentRequests->repairKnownDemoUsers($options)->counters,
+            ];
+        }
+
+        if ($needsProfileImages || $needsOrganization || $needsCatalogActivity || $needsContentRequests) {
+            foreach ($users as $user) {
+                $this->userPortalCache->changed($user);
+            }
         }
 
         return [
             'before' => $before,
             'after' => $this->inspect(),
-            'stage_counters' => [
-                ...$organization->counters,
-                ...$activity->counters,
-                ...$requests->counters,
-            ],
+            'stage_counters' => $stageCounters,
         ];
     }
 
@@ -93,7 +122,7 @@ final readonly class DemoUserPortalRepairer
         $emails = collect(range(1, $options->userCount))
             ->mapWithKeys(fn (int $index): array => ["user{$index}@example.com" => $index]);
         $users = User::query()
-            ->with('profile')
+            ->with('profile:user_id,avatar_disk,avatar_path,avatar_mime_type,cover_disk,cover_path,cover_mime_type')
             ->whereIn('email', $emails->keys())
             ->get()
             ->keyBy('email');

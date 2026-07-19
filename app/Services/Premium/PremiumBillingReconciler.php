@@ -669,7 +669,10 @@ final class PremiumBillingReconciler
         }
 
         $checkout = PremiumCheckoutSession::query()
-            ->with(['plan', 'user'])
+            ->with([
+                'plan:id,code,type,duration_days,entitlement_codes',
+                'user:id',
+            ])
             ->where('public_id', $event->checkoutPublicId)
             ->lockForUpdate()
             ->first();

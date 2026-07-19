@@ -17,9 +17,12 @@ use App\Enums\HelpArticleType;
 use App\Enums\HelpAudience;
 use App\Enums\HelpEscalationType;
 use App\Enums\HelpFeature;
+use App\Enums\HelpFeedbackValue;
 use App\Enums\HelpOwnerTeam;
 use App\Enums\HelpPublicationStatus;
+use App\Enums\HelpReportReason;
 use App\Enums\TechnicalIssueType;
+use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Models\HelpArticle;
 use App\Models\HelpArticleFeedback;
 use App\Models\HelpArticleReport;
@@ -39,6 +42,7 @@ use Livewire\WithPagination;
 
 final class HelpCenterAdministrationPage extends Component
 {
+    use InteractsWithPaginationIslands;
     use WithPagination;
 
     #[Url(history: true, except: 'articles')]
@@ -183,7 +187,11 @@ final class HelpCenterAdministrationPage extends Component
         $this->authorizeManager();
         $locale = $locales->normalize($locale);
         $article = HelpArticle::query()
-            ->with(['translations', 'aliases', 'replacement:id,code'])
+            ->with([
+                'translations:id,help_article_id,locale,slug,title,summary,body_markdown,keywords,seo_title,seo_description,callout_type,callout_text',
+                'aliases:id,help_article_id,locale,alias,priority',
+                'replacement:id,code',
+            ])
             ->findOrFail($articleId);
         $translation = $article->translations->firstWhere('locale', $locale);
         $this->articleId = $article->id;
@@ -325,7 +333,9 @@ final class HelpCenterAdministrationPage extends Component
     public function editCategory(int $categoryId): void
     {
         $this->authorizeManager();
-        $category = HelpCategory::query()->with('translations')->findOrFail($categoryId);
+        $category = HelpCategory::query()
+            ->with('translations:id,help_category_id,locale,slug,title,description')
+            ->findOrFail($categoryId);
         $ru = $category->translations->firstWhere('locale', 'ru');
         $en = $category->translations->firstWhere('locale', 'en');
         $this->categoryEditId = $category->id;
@@ -381,7 +391,9 @@ final class HelpCenterAdministrationPage extends Component
         $articles = HelpArticle::query()
             ->with([
                 'category:id,code',
-                'translations' => fn ($query) => $query->where('locale', $this->localeFilter),
+                'translations' => fn ($query) => $query
+                    ->select(['id', 'help_article_id', 'locale', 'title'])
+                    ->where('locale', $this->localeFilter),
             ])
             ->withCount(['revisions', 'feedback', 'reports as open_reports_count' => fn (Builder $query) => $query->where('status', 'open')])
             ->when($this->statusFilter !== '', fn (Builder $query): Builder => $query->where('status', $this->statusFilter))
@@ -390,7 +402,12 @@ final class HelpCenterAdministrationPage extends Component
             ->orderByDesc('updated_at')
             ->orderByDesc('id')
             ->paginate(30, pageName: 'helpArticlesPage');
-        $categories = HelpCategory::query()->with('translations')->withCount('articles')->orderBy('position')->orderBy('id')->get();
+        $categories = HelpCategory::query()
+            ->with('translations:id,help_category_id,locale,slug,title,description')
+            ->withCount('articles')
+            ->orderBy('position')
+            ->orderBy('id')
+            ->get();
         $revisions = $this->articleId > 0
             ? HelpArticleRevision::query()->where('help_article_id', $this->articleId)->where('locale', $this->locale)->latest('revision')->limit(20)->get()
             : collect();
@@ -407,7 +424,9 @@ final class HelpCenterAdministrationPage extends Component
             ->paginate(50, pageName: 'helpFeedbackPage');
 
         $selectedArticle = $this->articleId > 0
-            ? HelpArticle::query()->with(['translations' => fn ($query) => $query->where('locale', $this->locale)])->find($this->articleId)
+            ? HelpArticle::query()->with(['translations' => fn ($query) => $query
+                ->select(['id', 'help_article_id', 'locale', 'link_status', 'link_errors'])
+                ->where('locale', $this->locale)])->find($this->articleId)
             : null;
 
         return view('livewire.help-center.administration', [
@@ -433,6 +452,27 @@ final class HelpCenterAdministrationPage extends Component
             'calloutOptions' => (array) config('help-center.allowed_callouts', []),
             'selectedArticle' => $selectedArticle,
             'selectedTranslation' => $selectedArticle?->translations->first(),
+            'publicationStatusLabels' => collect(HelpPublicationStatus::cases())
+                ->mapWithKeys(fn (HelpPublicationStatus $status): array => [$status->value => $status->label()])
+                ->all(),
+            'transitionOptions' => $selectedArticle instanceof HelpArticle
+                ? $this->options($selectedArticle->status->allowedTransitions())
+                : [],
+            'selectedArticleIsArchived' => $selectedArticle?->status === HelpPublicationStatus::Archived,
+            'revisionDates' => $revisions
+                ->mapWithKeys(fn (HelpArticleRevision $revision): array => [
+                    $revision->id => $revision->created_at?->format('d.m.Y H:i') ?? '',
+                ])->all(),
+            'feedbackValueLabels' => collect(HelpFeedbackValue::cases())
+                ->mapWithKeys(fn (HelpFeedbackValue $value): array => [$value->value => $value->label()])
+                ->all(),
+            'reportReasonLabels' => collect(HelpReportReason::cases())
+                ->mapWithKeys(fn (HelpReportReason $reason): array => [$reason->value => $reason->label()])
+                ->all(),
+            'reportDates' => $reports->getCollection()
+                ->mapWithKeys(fn (HelpArticleReport $report): array => [
+                    $report->id => $report->created_at?->format('d.m.Y H:i') ?? '',
+                ])->all(),
             'previewUrl' => $selectedArticle instanceof HelpArticle ? route('admin.help.preview', ['helpArticle' => $selectedArticle, 'locale' => $this->locale]) : null,
         ])->extends('layouts.app', [
             'title' => __('help.admin.title'),

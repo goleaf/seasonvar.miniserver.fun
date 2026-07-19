@@ -63,6 +63,49 @@ class CatalogTitleLiveRefreshTest extends TestCase
         Queue::assertPushed(RefreshSeasonvarCatalogTitle::class, 1);
     }
 
+    public function test_an_active_refresh_polls_without_sending_a_redundant_initialization_request(): void
+    {
+        $title = $this->refreshableTitle();
+        app(CatalogTitleRefreshStateStore::class)->queued($title->id);
+
+        $this->get(route('titles.show', $title))
+            ->assertOk()
+            ->assertDontSee('wire:init="startRefresh"', false)
+            ->assertSee('wire:poll.3s.visible="refreshCatalog"', false)
+            ->assertSee('Обновляем данные');
+
+        Queue::assertNothingPushed();
+    }
+
+    public function test_a_fresh_title_does_not_send_an_initialization_or_polling_request(): void
+    {
+        $title = $this->refreshableTitle();
+        app(CatalogTitleRefreshStateStore::class)->completed($title->id, 73);
+
+        $this->get(route('titles.show', $title))
+            ->assertOk()
+            ->assertDontSee('wire:init="startRefresh"', false)
+            ->assertDontSee('wire:poll.3s.visible="refreshCatalog"', false)
+            ->assertSee('Данные обновлены');
+
+        Queue::assertNothingPushed();
+    }
+
+    public function test_a_title_without_a_source_url_does_not_send_an_initialization_or_polling_request(): void
+    {
+        $title = $this->refreshableTitle([
+            'source_url' => '',
+            'source_url_hash' => hash('sha256', ''),
+        ]);
+
+        $this->get(route('titles.show', $title))
+            ->assertOk()
+            ->assertDontSee('wire:init="startRefresh"', false)
+            ->assertDontSee('wire:poll.3s.visible="refreshCatalog"', false);
+
+        Queue::assertNothingPushed();
+    }
+
     public function test_livewire_poll_reloads_all_title_data_notifies_the_player_and_stops_after_completion(): void
     {
         $title = $this->refreshableTitle(['title' => 'Старое название']);

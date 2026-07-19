@@ -81,6 +81,36 @@ final class UserPortalCacheTest extends TestCase
         Queue::assertPushed(WarmUserPortalCache::class, 2);
     }
 
+    public function test_all_demo_queues_only_the_exact_configured_allowlist(): void
+    {
+        Queue::fake();
+        config(['demo-data.user_count' => 2]);
+
+        $allowed = User::factory()->createMany([
+            ['email' => 'user1@example.com'],
+            ['email' => 'user2@example.com'],
+        ]);
+        User::factory()->create(['email' => 'user3@example.com']);
+        User::factory()->create(['email' => 'user999@example.com']);
+
+        $this->artisan('cache:warm-user-portal', ['--all-demo' => true])
+            ->expectsOutputToContain('Поставлено в очередь пользователей: 2')
+            ->assertSuccessful();
+
+        Queue::assertPushed(
+            WarmUserPortalCache::class,
+            2,
+        );
+        $this->assertSame(
+            $allowed->pluck('public_id')->sort()->values()->all(),
+            Queue::pushed(WarmUserPortalCache::class)
+                ->map(fn (WarmUserPortalCache $job): string => $job->userPublicId)
+                ->sort()
+                ->values()
+                ->all(),
+        );
+    }
+
     public function test_missing_ttl_config_fails_open_to_the_authoritative_rebuild(): void
     {
         $user = User::factory()->create();

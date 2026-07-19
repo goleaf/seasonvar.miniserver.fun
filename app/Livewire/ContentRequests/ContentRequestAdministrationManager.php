@@ -16,6 +16,7 @@ use App\Enums\ContentRequestSort;
 use App\Enums\ContentRequestStatus;
 use App\Enums\ContentRequestType;
 use App\Exceptions\ContentRequests\ContentRequestActionException;
+use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Models\ContentRequest;
 use App\Models\User;
 use App\Services\ContentRequests\ContentRequestQuery;
@@ -33,6 +34,7 @@ use Throwable;
 
 final class ContentRequestAdministrationManager extends Component
 {
+    use InteractsWithPaginationIslands;
     use WithPagination;
 
     #[Url(as: 'q', history: true, except: '')]

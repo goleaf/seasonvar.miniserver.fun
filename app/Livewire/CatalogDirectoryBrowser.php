@@ -8,6 +8,7 @@ use App\Services\Catalog\CatalogDirectoryPageBuilder;
 use App\Services\Catalog\CatalogDirectoryRegistry;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -105,17 +106,8 @@ class CatalogDirectoryBrowser extends Component
 
     public function render(): View
     {
-        $definition = $this->directories->find($this->directory);
-        abort_if($definition === null, 404);
-        $this->normalizeState();
-        $data = $this->pages->data(
-            $definition,
-            (string) $this->search,
-            (string) $this->letter,
-            (string) $this->sort,
-            is_int($this->decade) ? $this->decade : null,
-        );
-        $data['searchMaxLength'] = $this->searchMaxLength();
+        $data = $this->paginationPage;
+        $definition = $data['definition'];
         $items = $data['items'];
 
         if ($items->currentPage() > $items->lastPage()) {
@@ -130,6 +122,28 @@ class CatalogDirectoryBrowser extends Component
                 'seo' => $data['seo'] ?? [],
             ])
             ->section('content');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    #[Computed]
+    public function paginationPage(): array
+    {
+        $definition = $this->directories->find($this->directory);
+        abort_if($definition === null, 404);
+        $this->normalizeState();
+        $data = $this->pages->data(
+            $definition,
+            (string) $this->search,
+            (string) $this->letter,
+            (string) $this->sort,
+            is_int($this->decade) ? $this->decade : null,
+        );
+        $data['definition'] = $definition;
+        $data['searchMaxLength'] = $this->searchMaxLength();
+
+        return $data;
     }
 
     private function normalizeState(): void

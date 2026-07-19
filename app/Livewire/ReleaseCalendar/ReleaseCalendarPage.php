@@ -9,6 +9,7 @@ use App\Enums\ReleaseCalendarSort;
 use App\Enums\ReleaseCalendarView;
 use App\Enums\ReleaseScheduleEntryType;
 use App\Enums\ReleaseScheduleStatus;
+use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Models\CatalogTitle;
 use App\Services\Auth\AccountSettingsService;
 use App\Services\ReleaseCalendar\ReleaseCalendarPeriod;
@@ -31,6 +32,7 @@ use Throwable;
 
 final class ReleaseCalendarPage extends Component
 {
+    use InteractsWithPaginationIslands;
     use WithPagination;
 
     #[Locked]

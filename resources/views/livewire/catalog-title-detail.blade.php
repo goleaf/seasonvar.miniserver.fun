@@ -1,5 +1,7 @@
 <div
-    wire:init="startRefresh"
+    @if ($refreshShouldInitialize)
+        wire:init="startRefresh"
+    @endif
     @if ($refreshIsActive)
         wire:poll.3s.visible="refreshCatalog"
     @endif
@@ -172,6 +174,7 @@
 
             <livewire:catalog-title-player
                 :catalog-title-id="$title->id"
+                wire:ref="player"
                 :wire:key="'catalog-title-player-'.$title->id"
             />
 

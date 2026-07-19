@@ -1,12 +1,12 @@
 # Security audit
 
-Проверено: 15.07.2026. Review охватывает routes/middleware/Requests/Resources/Policies, Livewire mutations, Blade/JS sinks, authentication/session/token flows, importer/media URL boundaries, uploads, logs/config and dependency advisories. Это evidence snapshot; устойчивые правила находятся в [`docs/security.md`](../security.md) и [`docs/authorization.md`](../authorization.md).
+Проверено: 15.07.2026; `SEC-01` и dependency tooling повторно сверены 19.07.2026. Review охватывает routes/middleware/Requests/Resources/Policies, Livewire mutations, Blade/JS sinks, authentication/session/token flows, importer/media URL boundaries, uploads, logs/config and dependency advisories. Это evidence snapshot; устойчивые правила находятся в [`docs/security.md`](../security.md) и [`docs/authorization.md`](../authorization.md).
 
 ## Реестр выводов
 
 | ID | Класс | Наблюдение | Изменение | Статус | Verification / remaining risk |
 | --- | --- | --- | --- | --- | --- |
-| SEC-01 | Confirmed critical runtime problem | Production debug mode enabled | Environment owner sets `APP_DEBUG=false`; preflight must fail while true; rebuild config and graceful reload | External action pending | `artisan about`; disclosure risk remains until changed |
+| SEC-01 | Confirmed critical runtime problem, resolved | Production debug mode had been enabled | Set `APP_DEBUG=false`; rebuild config/routes; graceful PHP-FPM reload and queue restart; preserve fail-closed preflight | Resolved 19.07.2026 | Effective runtime is production + debug disabled + config cached; Debugbar routes `0`, PHP-FPM active, `/` and `/up` return `200` |
 | SEC-02 | Confirmed control | Admin/import writes use gates/policies; personalized API uses Sanctum abilities and owner scoping | Preserve and add mutation inventory contract | Verified by route and feature tests | New mutations must enter inventory |
 | SEC-03 | Confirmed control | Form Requests/Livewire Forms normalize validation; API errors use safe envelope/request ID | Preserve | 22 Requests, API contract tests | Full static typing still incomplete |
 | SEC-04 | Confirmed control | Playback grant is signed/viewer-bound and redirects only to guarded HTTPS provider; no byte proxy/raw URL API | Preserve | Playback/source guard tests | Provider/CDN is external boundary |

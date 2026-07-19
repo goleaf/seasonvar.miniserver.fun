@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Policies;
 
+use App\Enums\AdminPermission;
 use App\Models\User;
 use App\Models\UserBlock;
 use App\Models\UserProfile;
@@ -14,7 +15,7 @@ final class UserProfilePolicy
 {
     public function view(?User $viewer, UserProfile $profile): Response
     {
-        if ($viewer !== null && ((int) $viewer->id === (int) $profile->user_id || Gate::forUser($viewer)->allows('manage-catalog'))) {
+        if ($viewer !== null && ((int) $viewer->id === (int) $profile->user_id || Gate::forUser($viewer)->allows(AdminPermission::ProfilesModerate->value))) {
             return Response::allow();
         }
 
@@ -55,6 +56,6 @@ final class UserProfilePolicy
 
     public function moderate(User $user): bool
     {
-        return Gate::forUser($user)->allows('manage-catalog');
+        return Gate::forUser($user)->allows(AdminPermission::ProfilesModerate->value);
     }
 }

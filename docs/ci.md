@@ -1,18 +1,26 @@
 # CI
 
-Обновлено: 16.07.2026
+Обновлено: 19.07.2026
 
 ## Workflow
 
 GitHub Actions workflow находится в `.github/workflows/ci.yml` и запускается для `push`, `pull_request` в `main`, а также вручную через `workflow_dispatch`.
 
-Workflow закрепляет официальные major-версии `actions/checkout@v6`, `actions/cache@v5`, `actions/setup-node@v6` и `actions/upload-artifact@v7`. PHP устанавливается существующим `shivammathur/setup-php@v2`.
+Все три задания используют явный GA-образ `ubuntu-24.04`, чтобы постепенная миграция `ubuntu-latest` не меняла OS между запусками. Существующие major-версии `actions/checkout v6`, `actions/cache v5`, `actions/setup-node v6`, `actions/upload-artifact v7` и `shivammathur/setup-php v2` не обновлены: workflow закрепляет проверенные release commits полными SHA, а комментарий рядом с SHA сохраняет читаемую major-версию. Checkout выполняется с `persist-credentials: false`, потому что CI имеет только `contents: read` и не отправляет Git-изменения.
+
+Полный SHA защищает от перемещения tag, но не превращает GitHub, npm или Composer registry в безотказные сервисы. Внешний outage и новая реальная ошибка должны честно завершать job ненулевым кодом; `continue-on-error`, отключение audits/tests и фиктивный success не используются.
 
 ## Единый исполняемый сценарий
 
-`scripts/ci-check.sh` является единственным владельцем порядка и аргументов проверок. Доступны профили `backend`, `frontend`, `browser`, `pre-push` и `full`; `composer ci:check` запускает `full`. GitHub Actions сохраняет отдельные jobs и отвечает за установку toolchain и dependencies, после чего вызывает соответствующий профиль.
+`scripts/ci-check.sh` является единственным владельцем порядка и аргументов проверок. Доступны профили `docs`, `backend`, `frontend`, `browser`, `pre-push` и `full`; `composer ci:check` запускает `full`. Профиль `docs` до Laravel boot задаёт SQLite `:memory:` и только читает состояние через `project:docs-refresh --check`. Публичная база управляемых ссылок фиксируется через `PROJECT_DOCS_PUBLIC_BASE_URL=https://seasonvar.miniserver.fun` независимо от временного `APP_URL`, поэтому локальный сервер браузерных тестов и GitHub не переписывают sitemap-ссылки на `localhost`. GitHub Actions сохраняет отдельные jobs и отвечает за установку toolchain и dependencies, после чего вызывает соответствующий профиль.
+
+Все профили также задают process-scoped maintenance driver `cache` с временным store `array`. Поэтому локальный файл `storage/framework/down`, принадлежащий реальному обслуживанию или параллельному deployment-процессу, не превращает тестовые запросы в ложные `503`; сам production marker не читается, не изменяется и не снимается. Это окружение ограничено дочерним процессом quality gate и не является способом вывода сайта из режима обслуживания.
+
+`pre-commit` запускает тот же профиль `docs` после проверок чистоты дерева и до политик README/CHANGELOG. Поэтому stale managed blocks блокируются до создания commit. Исправление выполняется явно командой `php artisan project:docs-refresh`, после review изменённых managed документов проверка повторяется; hook ничего не исправляет и не добавляет в индекс автоматически.
 
 Laravel config, routes, events, packages, services и compiled views проверяются только через process-scoped ignored `output/ci/<run-id>` с отдельными `APP_CONFIG_CACHE`, `APP_ROUTES_CACHE`, `APP_EVENTS_CACHE`, `APP_PACKAGES_CACHE`, `APP_SERVICES_CACHE` и `VIEW_COMPILED_PATH`. `pint.json` исключает весь generated-каталог `output` из форматирования. Очистка выполняется перед началом проверок, повторно перед Pint и через exit-safe trap после backend, browser и cache-validation, поэтому generated artifacts удаляются даже после промежуточной ошибки. Параллельные локальные gate-процессы по умолчанию не разделяют Laravel manifests; воспроизводимый идентификатор можно передать через `SEASONVAR_CI_RUN_ID`, а полный путь — через `SEASONVAR_CI_OUTPUT_ROOT`. Store-wide `cache:clear` не выполняется.
+
+PHP syntax lint проверяет исходники в `app`, `bootstrap`, `config`, `database`, `routes` и `tests`, но явно исключает только generated-каталог `bootstrap/cache`. Его manifests создаются Composer/Laravel и могут атомарно заменяться другим process-scoped cache check; они не являются исходным кодом, а их содержимое повторно проверяется фактическими командами `config:cache`, `route:cache` и `view:cache`.
 
 ## Backend
 
@@ -29,6 +37,8 @@ Frontend job использует Node 26, выполняет `npm ci` и выз
 ## Browser
 
 Browser job после backend/frontend gates вызывает `bash scripts/ci-check.sh browser`: профиль собирает frontend, устанавливает managed Chromium, создаёт process-scoped временную SQLite-базу `output/playwright/<run-id>/browser.sqlite` с database sessions и запускает Playwright suite на process-scoped локальном порту. `APP_URL` всегда собирается из того же порта, а все пять cache-architecture stores принудительно используют process-local `array`, поэтому browser-проверка не получает HTML, assets или подсказки с origin соседнего запуска. Playwright проверяет mobile `390×844`, tablet `768×1024` и desktop `1440×1200`; сценарий шапки дополнительно меняет ширину на 375, 768, 1280 и 1920 пикселей. Матрица покрывает URL state каталога, автодополнение и клавиатуру, двухполосную геометрию шапки, title/player shell, Livewire login/profile/library/logout, verified progress/Continue Watching, отсутствие horizontal overflow и failed local assets. Внешние media requests блокируются. Axe допускает запуск только при отсутствии critical/serious WCAG 2 A/AA violations. Trace, screenshot, video и HTML-report сохраняются в отдельном runtime namespace внутри ignored `output/playwright/` и загружаются как CI artifact только для диагностики; явные `BROWSER_TEST_DATABASE`, `PLAYWRIGHT_RUNTIME_NAME` и `PLAYWRIGHT_PORT` сохраняют приоритет над безопасными defaults.
+
+Сценарии, которым нужен управляемый сетевой delay, сопоставляют оба официальных варианта Livewire update URL: обычный `/livewire/update` и CSP-safe `/livewire-<hash>/update`. Это сохраняет наблюдаемое промежуточное loading-состояние и не превращает проверку `aria-busy` в зависимость от случайной скорости локального ответа. Runtime пагинации дополнительно связывает завершение Livewire message с `component.id`, поэтому параллельная загрузка другого island не снимает spinner ожидающего paginator.
 
 Общий лимит browser-сценария составляет 60 секунд, ожидания отдельного состояния — 15 секунд: это покрывает холодную сборку и однопоточный PHP-сервер, но не заменяет точные assertions. Player-сценарии перед teardown отправляют `pagehide` и снимают route handlers, чтобы завершающийся media range не оставался за границей теста.
 

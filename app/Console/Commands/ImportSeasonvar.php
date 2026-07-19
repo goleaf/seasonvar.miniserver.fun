@@ -31,7 +31,7 @@ use Illuminate\Support\Facades\Cache;
 use LogicException;
 use Throwable;
 
-#[Signature('seasonvar:import {url? : Ссылка страницы seasonvar.ru для обновления одной страницы} {--force : Обновить данные даже если страница не изменилась} {--forever : Работать циклами без остановки} {--sleep= : Пауза между циклами в секундах} {--no-discovery : Не обновлять карту сайта в этом запуске} {--queued : Поставить подходящие страницы в Redis-очередь для параллельной обработки} {--status : Показать состояние Redis-очереди и последнего запуска без импорта} {--inventory-only : Инвентаризировать типы URL из карты сайта без разбора и изменения каталога} {--page-type=* : Обрабатывать только явно включённые типы страниц, например serial или rss} {--refresh-media-sizes : Проверить размеры подходящих существующих прямых видеофайлов} {--force-media-sizes : Повторно проверить размеры независимо от срока свежести} {--media-size-limit= : Ограничить число проверок размера в этом запуске} {--media-size-time-budget= : Остановить size-only цикл перед следующим файлом после заданного числа секунд}')]
+#[Signature('seasonvar:import {url? : Ссылка страницы seasonvar.ru для обновления одной страницы} {--force : Обновить данные даже если страница не изменилась} {--forever : Работать циклами без остановки} {--sleep= : Пауза между циклами в секундах} {--no-discovery : Не обновлять карту сайта в этом запуске} {--queued : Поставить подходящие страницы в Redis-очередь для параллельной обработки} {--sitemap-tail= : Принудительно обработать последние 1–1000 serial URL из актуального XML в queued-режиме} {--status : Показать состояние Redis-очереди и последнего запуска без импорта} {--inventory-only : Инвентаризировать типы URL из карты сайта без разбора и изменения каталога} {--page-type=* : Обрабатывать только явно включённые типы страниц, например serial или rss} {--refresh-media-sizes : Проверить размеры подходящих существующих прямых видеофайлов} {--force-media-sizes : Повторно проверить размеры независимо от срока свежести} {--media-size-limit= : Ограничить число проверок размера в этом запуске} {--media-size-time-budget= : Остановить size-only цикл перед следующим файлом после заданного числа секунд}')]
 #[Description('Инвентаризирует страницы seasonvar.ru или обновляет каталог, сезоны, серии и видео одной командой')]
 class ImportSeasonvar extends Command
 {
@@ -64,6 +64,12 @@ class ImportSeasonvar extends Command
             return self::FAILURE;
         }
 
+        $sitemapTailLimit = $this->validatedSitemapTailLimit($pageTypes);
+
+        if ($sitemapTailLimit === false) {
+            return self::FAILURE;
+        }
+
         if (! $this->mediaSizeOptionsAreValid()) {
             return self::FAILURE;
         }
@@ -77,7 +83,7 @@ class ImportSeasonvar extends Command
         }
 
         if ((bool) $this->option('queued')) {
-            return $this->handleQueued($queuedDispatcher, $pageTypes);
+            return $this->handleQueued($queuedDispatcher, $pageTypes, $sitemapTailLimit);
         }
 
         $inventoryOnly = (bool) $this->option('inventory-only');
@@ -293,8 +299,11 @@ class ImportSeasonvar extends Command
     }
 
     /** @param list<string>|null $pageTypes */
-    private function handleQueued(SeasonvarQueuedImportDispatcher $dispatcher, ?array $pageTypes): int
-    {
+    private function handleQueued(
+        SeasonvarQueuedImportDispatcher $dispatcher,
+        ?array $pageTypes,
+        ?int $sitemapTailLimit,
+    ): int {
         if ($this->argument('url')) {
             $this->error('Опция --queued предназначена только для полного импорта без URL.');
 
@@ -323,16 +332,25 @@ class ImportSeasonvar extends Command
         }
 
         try {
-            $result = $pageTypes === null
-                ? $dispatcher->dispatch(
-                    force: (bool) $this->option('force'),
-                    discover: ! (bool) $this->option('no-discovery'),
-                )
-                : $dispatcher->dispatch(
-                    force: (bool) $this->option('force'),
-                    discover: ! (bool) $this->option('no-discovery'),
+            if ($sitemapTailLimit !== null) {
+                $result = $dispatcher->dispatch(
+                    force: true,
+                    discover: true,
                     pageTypes: $pageTypes,
+                    sitemapTailLimit: $sitemapTailLimit,
                 );
+            } else {
+                $result = $pageTypes === null
+                    ? $dispatcher->dispatch(
+                        force: (bool) $this->option('force'),
+                        discover: ! (bool) $this->option('no-discovery'),
+                    )
+                    : $dispatcher->dispatch(
+                        force: (bool) $this->option('force'),
+                        discover: ! (bool) $this->option('no-discovery'),
+                        pageTypes: $pageTypes,
+                    );
+            }
 
             $run = $result->run;
 
@@ -559,6 +577,70 @@ class ImportSeasonvar extends Command
         $value = $this->option('media-size-limit');
 
         return $value === null || $value === '' ? null : (int) $value;
+    }
+
+    /** @param list<string>|null $pageTypes */
+    private function validatedSitemapTailLimit(?array $pageTypes): int|false|null
+    {
+        $value = $this->option('sitemap-tail');
+
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (! ctype_digit((string) $value) || (int) $value < 1 || (int) $value > 1000) {
+            $this->error('Опция --sitemap-tail должна быть целым числом от 1 до 1000.');
+
+            return false;
+        }
+
+        $conflicts = [];
+
+        if (! (bool) $this->option('queued')) {
+            $conflicts[] = 'без --queued';
+        }
+
+        if (! (bool) $this->option('force')) {
+            $conflicts[] = 'без --force';
+        }
+
+        if ((bool) $this->option('no-discovery')) {
+            $conflicts[] = '--no-discovery';
+        }
+
+        if ($this->argument('url')) {
+            $conflicts[] = 'URL';
+        }
+
+        foreach (['forever', 'status', 'inventory-only', 'refresh-media-sizes', 'force-media-sizes'] as $option) {
+            if ((bool) $this->option($option)) {
+                $conflicts[] = '--'.$option;
+            }
+        }
+
+        if ($this->option('sleep') !== null && $this->option('sleep') !== '') {
+            $conflicts[] = '--sleep';
+        }
+
+        if ($this->option('media-size-limit') !== null && $this->option('media-size-limit') !== '') {
+            $conflicts[] = '--media-size-limit';
+        }
+
+        if ($this->option('media-size-time-budget') !== null && $this->option('media-size-time-budget') !== '') {
+            $conflicts[] = '--media-size-time-budget';
+        }
+
+        if ($pageTypes !== null && $pageTypes !== [SeasonvarPageType::Serial->value]) {
+            $conflicts[] = '--page-type';
+        }
+
+        if ($conflicts !== []) {
+            $this->error('Опцию --sitemap-tail нельзя использовать: '.implode(', ', $conflicts).'.');
+
+            return false;
+        }
+
+        return (int) $value;
     }
 
     private function mediaSizeTimeBudgetSeconds(): ?int

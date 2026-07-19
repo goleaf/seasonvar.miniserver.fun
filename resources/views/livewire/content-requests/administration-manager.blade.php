@@ -48,6 +48,8 @@
         {{ __('requests.states.loading') }}
     </div>
 
+    @island(name: 'content-request-administration-pagination', always: true, with: $this->paginationIslandPage)
+    <x-ui.pagination-region name="content-request-administration-results">
     @if (! $schemaReady)
         <x-ui.panel><p>{{ __('requests.states.unavailable') }}</p></x-ui.panel>
     @elseif ($requests->isEmpty())
@@ -152,6 +154,8 @@
             @endforeach
         </section>
 
-        <nav aria-label="{{ __('requests.fields.pagination') }}">{{ $requests->links() }}</nav>
+        <nav aria-label="{{ __('requests.fields.pagination') }}">{{ $requests->links(data: ['region' => 'content-request-administration-results']) }}</nav>
     @endif
+    </x-ui.pagination-region>
+    @endisland
 </div>

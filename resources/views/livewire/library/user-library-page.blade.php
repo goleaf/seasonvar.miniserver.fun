@@ -124,8 +124,10 @@
         </x-ui.panel>
     @endif
 
+    @island(name: 'user-library-pagination', always: true, with: $this->paginationIslandPage)
     <x-ui.panel :title="$sectionTitle" :subtitle="$sectionDescription" icon="fa-solid fa-list" :pad="false">
         @if ($stateItems !== null)
+            <x-ui.pagination-region name="library-state-results">
             @if ($stateItems->isEmpty())
                 <div class="px-4 py-10 text-center">
                     <x-ui.icon name="fa-regular fa-folder-open text-3xl text-slate-400" />
@@ -197,10 +199,12 @@
                     @endforeach
                 </div>
                 @if ($stateItems->hasPages())
-                    <div class="border-t border-slate-200 bg-slate-50 p-4">{{ $stateItems->links() }}</div>
+                    <div class="border-t border-slate-200 bg-slate-50 p-4">{{ $stateItems->links(data: ['region' => 'library-state-results']) }}</div>
                 @endif
             @endif
+            </x-ui.pagination-region>
         @elseif ($feedbackItems !== null)
+            <x-ui.pagination-region name="library-feedback-results">
             @if ($feedbackItems->isEmpty())
                 <div class="px-4 py-10 text-center">
                     <x-ui.icon name="fa-regular fa-eye text-3xl text-slate-400" />
@@ -223,10 +227,12 @@
                     @endforeach
                 </div>
                 @if ($feedbackItems->hasPages())
-                    <div class="border-t border-slate-200 bg-slate-50 p-4">{{ $feedbackItems->links() }}</div>
+                    <div class="border-t border-slate-200 bg-slate-50 p-4">{{ $feedbackItems->links(data: ['region' => 'library-feedback-results']) }}</div>
                 @endif
             @endif
+            </x-ui.pagination-region>
         @elseif ($markers !== null)
+            <x-ui.pagination-region name="library-marker-results">
             @if ($markers->isEmpty())
                 <div class="px-4 py-10 text-center">
                     <x-ui.icon name="fa-solid fa-location-dot text-3xl text-slate-400" />
@@ -258,9 +264,10 @@
                     @endforeach
                 </div>
                 @if ($markers->hasPages())
-                    <div class="border-t border-slate-200 bg-slate-50 p-4">{{ $markers->links() }}</div>
+                    <div class="border-t border-slate-200 bg-slate-50 p-4">{{ $markers->links(data: ['region' => 'library-marker-results']) }}</div>
                 @endif
             @endif
+            </x-ui.pagination-region>
         @elseif ($continueWatching !== null)
             @if ($continueWatching->isEmpty())
                 <div class="px-4 py-10 text-center">
@@ -285,6 +292,7 @@
                 </div>
             @endif
         @elseif ($history !== null)
+            <x-ui.pagination-region name="library-history-results">
             @if ($history->isEmpty())
                 <div class="px-4 py-10 text-center">
                     <x-ui.icon name="fa-regular fa-clock text-3xl text-slate-400" />
@@ -323,9 +331,10 @@
                     @endforeach
                 </div>
                 @if ($history->hasPages())
-                    <div class="border-t border-slate-200 bg-slate-50 p-4">{{ $history->links() }}</div>
+                    <div class="border-t border-slate-200 bg-slate-50 p-4">{{ $history->links(data: ['region' => 'library-history-results']) }}</div>
                 @endif
             @endif
+            </x-ui.pagination-region>
         @else
             <div class="px-4 py-10 text-center" role="status">
                 <x-ui.icon name="fa-solid fa-triangle-exclamation text-3xl text-amber-600" />
@@ -333,4 +342,5 @@
             </div>
         @endif
     </x-ui.panel>
+    @endisland
 </div>

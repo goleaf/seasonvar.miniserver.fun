@@ -152,7 +152,7 @@
 
                 <div class="flex flex-wrap items-center justify-between gap-3 rounded-panel border border-slate-200 bg-white p-5 shadow-panel">
                     <p class="max-w-2xl text-sm leading-6 text-slate-600">{{ __('issues.create.boundary_notice') }}</p>
-                    <button type="submit" wire:loading.attr="disabled" wire:target="submit,screenshots" class="min-h-11 rounded-control bg-emerald-700 px-5 py-2.5 font-bold text-white disabled:opacity-50">
+                    <button type="submit" wire:offline.attr="disabled" wire:loading.attr="disabled" wire:target="submit,screenshots" class="min-h-11 rounded-control bg-emerald-700 px-5 py-2.5 font-bold text-white disabled:opacity-50">
                         <span wire:loading.remove wire:target="submit">{{ __('issues.actions.submit') }}</span>
                         <span wire:loading wire:target="submit">{{ __('issues.actions.submitting') }}</span>
                     </button>

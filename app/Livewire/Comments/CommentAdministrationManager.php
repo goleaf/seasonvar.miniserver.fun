@@ -15,6 +15,7 @@ use App\Enums\CommentRestrictionType;
 use App\Enums\CommentStatus;
 use App\Enums\CommentTargetType;
 use App\Exceptions\Comments\CommentActionException;
+use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Models\Comment;
 use App\Models\CommentReport;
 use App\Models\CommentRestriction;
@@ -34,6 +35,7 @@ use Throwable;
 
 final class CommentAdministrationManager extends Component
 {
+    use InteractsWithPaginationIslands;
     use WithPagination;
 
     #[Url(history: true, except: 'attention')]

@@ -60,6 +60,26 @@ final class PublicPageCachePolicyTitleContextTest extends TestCase
         $this->assertSame($requestKey, $canonicalKey);
     }
 
+    public function test_canonical_context_uses_the_configured_default_locale_in_a_contaminated_worker(): void
+    {
+        config(['cache-architecture.page_cache.canonical_locale' => 'ru']);
+        app()->setLocale('en');
+        $title = new CatalogTitle;
+        $title->forceFill(['id' => 85, 'slug' => 'default-locale-cache-title']);
+        $policy = app(PublicPageCachePolicy::class);
+
+        $requestContext = $policy->context($this->request(
+            '/titles/default-locale-cache-title',
+            $title,
+        ), 'title');
+        $canonicalContext = $policy->canonicalTitleContext($title);
+
+        $this->assertNotNull($requestContext);
+        $this->assertNotNull($canonicalContext);
+        $this->assertSame('en', $requestContext->dimensions['locale']);
+        $this->assertSame('ru', $canonicalContext->dimensions['locale']);
+    }
+
     private function request(string $uri, CatalogTitle $title): Request
     {
         $request = Request::create($uri);

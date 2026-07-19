@@ -14,6 +14,7 @@ use App\Enums\ReviewRestrictionReason;
 use App\Enums\ReviewRestrictionType;
 use App\Enums\ReviewStatus;
 use App\Exceptions\Reviews\ReviewActionException;
+use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Models\User;
 use App\Services\Reviews\CatalogTitleReviewQuery;
 use App\Services\Reviews\ReviewSchema;
@@ -31,6 +32,7 @@ use Throwable;
 
 final class ReviewModerationManager extends Component
 {
+    use InteractsWithPaginationIslands;
     use WithPagination;
 
     #[Locked]

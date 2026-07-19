@@ -52,6 +52,30 @@
 12. Verification: TDD RED/GREEN, exact three-package lock diff, installed metadata, MIT licences, zero locked advisories, local/false/production route boot, HTML injection/non-injection, platform checks, production `--no-dev` dry-run, documentation policies and repository-wide legacy/override search passed. The complete repository run executed 1 268 tests: 1 214 passed, while 37 failures and 6 errors came from pre-existing Blade contract violations and the unrelated missing `CacheDomain::UserPortal`; the 3 Debugbar tests passed with 9 assertions.
 13. Decision: `add` is accepted because all bounded package and environment gates pass. The independent full-suite baseline remains explicitly unresolved and is not expanded into this dependency task; final Git delivery is recorded separately.
 
+### UD-LW-CFG-001 — закрепить class-based generator Livewire
+
+1. Dependency or runtime: direct dependency `livewire/livewire`.
+2. Current version: locked `4.3.3` with constraint `^4.3`.
+3. Proposed version: unchanged `4.3.3`; no Composer resolution or lock rewrite.
+4. Direct or transitive: direct production dependency; only development-time generator configuration changes.
+5. Current purpose: canonical class-based full-page and nested interactive UI state boundary.
+6. Reason for change: permanent project rules prohibit Volt and require class-based Livewire, while the installed package default for `make:livewire` is `sfc`; an explicit project override prevents future architectural drift.
+7. Security relevance: no authorization, CSRF, hydration, public state, route or production collector behavior changes.
+8. Maintenance relevance: future generated components start in the already canonical `app/Livewire` plus Blade-view structure instead of introducing a competing component format.
+9. Compatibility requirements: use the documented Livewire 4 `make_command.type=class` public config; preserve current JS/CSS/test generation defaults as `false` and do not introduce Volt.
+10. Affected files: `config/livewire.php`, development/maintenance documentation, current task plan and changelog.
+11. Affected feature modules: generator workflow only; all 28 runtime compatibility domains are unchanged.
+12. Configuration changes: add the complete `make_command` array with `type=class`, `emoji=false` and `with.js|css|test=false` so package config merging cannot supply the SFC default.
+13. Database changes: none.
+14. Asset changes: none; existing Vite/Tailwind/Livewire runtime assets remain unchanged.
+15. Production changes: none after normal config build; the setting is consumed only by component generation commands.
+16. Deprecated APIs: none; SFC is supported package behavior but conflicts with this project's permanent architecture.
+17. Replacement APIs: documented class generator mode, not an application runtime replacement.
+18. Backward-compatibility strategy: existing class components, routes, public URLs, state, translations and generated files remain untouched.
+19. Rollback strategy: remove only the project `make_command` block to restore package defaults; no data, cache, session, queue, service-worker or asset rollback.
+20. Verification strategy: inspect effective config in an isolated process, confirm package/version metadata, scan for Volt/SFC/MFC usage and run allowed PHP syntax/Pint/static/documentation checks without invoking the generator or automated tests.
+21. Decision: `retain and configure`; package update/removal/replacement is not justified. Final commit remains `unresolved` until the shared worktree is safe.
+
 ## Все прямые npm decisions
 
 | Record | Dependency | Current / evaluated | Decision | Reason | Affected modules / production considerations | Limitation |
@@ -119,3 +143,17 @@ Package version changes: none. `composer.lock`, `package.json` and `package-lock
 11. Decision: remove stale configuration permission.
 
 Final commit: Task 29 commit on `main` (exact hash reported after commit).
+
+## CI-R-001 — воспроизводимый GitHub Actions без обновления major-версий
+
+1. Scope: GitHub-hosted runner и пять уже используемых actions; Composer/npm/PHP/Node/application dependencies не меняются.
+2. Current/proposed: `ubuntu-latest` заменяется на GA `ubuntu-24.04`; floating tags `checkout@v6`, `cache@v5`, `setup-node@v6`, `upload-artifact@v7`, `setup-php@v2` заменяются полными SHA соответствующих текущих release commits с читаемым major-комментарием.
+3. Reason: последний remote failure вызван stale repository documentation, а не новой dependency; отдельный pre-commit docs gate закрывает root cause. Exact runner/action refs дополнительно устраняют OS migration и mutable-tag drift.
+4. Security: GitHub указывает полный commit SHA как единственную immutable форму action release. Checkout credentials не сохраняются; существующее разрешение `contents: read` не расширяется.
+5. Compatibility: PHP `8.5`, Node `26`, Redis `7`, Memcached `1.6`, action majors, inputs, cache keys, services и quality-gate команды сохранены. Каждый SHA проверен как commit канонического upstream repository.
+6. Affected modules: только `.github/workflows/ci.yml`, central CI/hook contract, CI tests и development/maintenance documentation; public application/runtime domains не меняются.
+7. Production/data: нет migration, schema/storage/cache/session/queue/provider/service-worker/deployment runtime change; backup не требуется.
+8. Rollout: focused contract, shell syntax, stale/fresh docs rehearsal, backend/frontend/browser gates, затем push `main` и проверка нового remote run.
+9. Rollback: Git revert CI/hook/docs commit; data restore, store-wide cache flush и worker restart не требуются.
+10. Limitation: pinning не гарантирует доступность GitHub/registries и не должно скрывать новые advisories или реальные regressions. Такие отказы остаются честно `failed` и требуют отдельного разбора.
+11. Decision: `retain majors; pin commits and runner` — достаточная reliability/security причина существует, unrelated upgrade не выполняется.

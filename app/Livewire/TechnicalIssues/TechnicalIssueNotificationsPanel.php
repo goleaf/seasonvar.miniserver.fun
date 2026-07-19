@@ -7,6 +7,7 @@ namespace App\Livewire\TechnicalIssues;
 use App\Actions\TechnicalIssues\MarkTechnicalIssueNotificationRead;
 use App\Actions\TechnicalIssues\UpdateTechnicalIssueNotificationPreferences;
 use App\Exceptions\TechnicalIssues\TechnicalIssueActionException;
+use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Models\TechnicalIssueNotificationPreference;
 use App\Models\User;
 use App\Services\TechnicalIssues\TechnicalIssueNotificationQuery;
@@ -21,6 +22,7 @@ use Throwable;
 
 final class TechnicalIssueNotificationsPanel extends Component
 {
+    use InteractsWithPaginationIslands;
     use WithPagination;
 
     #[Locked]

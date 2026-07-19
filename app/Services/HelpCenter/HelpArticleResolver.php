@@ -60,11 +60,20 @@ final readonly class HelpArticleResolver
 
         $article = HelpArticle::query()
             ->with([
-                'category.translations' => fn ($query) => $query->whereIn('locale', [$requestedLocale, $fallback]),
+                'category:id,code',
+                'category.translations' => fn ($query) => $query
+                    ->select(['id', 'help_category_id', 'locale', 'slug', 'title', 'description'])
+                    ->whereIn('locale', [$requestedLocale, $fallback]),
                 'translations' => fn ($query) => $query
+                    ->select([
+                        'id', 'help_article_id', 'locale', 'slug', 'title', 'summary', 'body_markdown',
+                        'keywords', 'seo_title', 'seo_description', 'callout_text', 'callout_type',
+                        'is_published', 'published_at', 'updated_at',
+                    ])
                     ->whereIn('locale', $this->locales->supported())
                     ->where('is_published', true),
                 'replacement.translations' => fn ($query) => $query
+                    ->select(['id', 'help_article_id', 'locale', 'slug', 'is_published'])
                     ->whereIn('locale', array_values(array_unique([$requestedLocale, $fallback])))
                     ->where('is_published', true),
             ])
@@ -119,9 +128,15 @@ final readonly class HelpArticleResolver
             ->whereKey($translation->help_article_id)
             ->where('status', 'archived')
             ->whereNotNull('replacement_article_id')
-            ->with(['replacement' => fn ($query) => $query->published(), 'replacement.translations' => fn ($query) => $query
-                ->whereIn('locale', array_values(array_unique([$requestedLocale, $fallback])))
-                ->where('is_published', true)])
+            ->with([
+                'replacement' => fn ($query) => $query
+                    ->select(['id', 'status', 'published_at'])
+                    ->published(),
+                'replacement.translations' => fn ($query) => $query
+                    ->select(['id', 'help_article_id', 'locale', 'slug', 'is_published'])
+                    ->whereIn('locale', array_values(array_unique([$requestedLocale, $fallback])))
+                    ->where('is_published', true),
+            ])
             ->first();
         $replacement = $article?->replacement?->translations?->firstWhere('locale', $requestedLocale)
             ?? $article?->replacement?->translations?->firstWhere('locale', $fallback);

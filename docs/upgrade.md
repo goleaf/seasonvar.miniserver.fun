@@ -10,6 +10,7 @@
 - Node `26.4.0` и npm `12.0.1` наблюдались локально. Node 26 находится в Current, не LTS; переход на проверенную LTS-линию отделён в `UD-R-001` и `TD-001`.
 - Composer `2.10.2`; self-update public keys на текущем host отсутствуют и зарегистрированы как `TD-002`.
 - Flux/Volt, payment/OAuth/search provider SDK и service worker не установлены.
+- Livewire остаётся на `4.3.3`; package default SFC generator не является основанием менять архитектуру и переопределён project config как `type=class` по `UD-LW-CFG-001`.
 
 ## Решение Task 29
 

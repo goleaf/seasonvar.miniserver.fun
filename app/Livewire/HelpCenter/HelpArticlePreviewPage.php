@@ -33,7 +33,14 @@ final class HelpArticlePreviewPage extends Component
 
     public function render(HelpArticleRenderer $renderer): View
     {
-        $article = HelpArticle::query()->where('public_id', $this->articlePublicId)->with(['translations', 'category.translations'])->firstOrFail();
+        $article = HelpArticle::query()
+            ->where('public_id', $this->articlePublicId)
+            ->with([
+                'translations:id,help_article_id,locale,title,summary,body_markdown',
+                'category:id',
+                'category.translations:id,help_category_id,locale,slug,title',
+            ])
+            ->firstOrFail();
         Gate::authorize('update', $article);
         $translation = $article->translations->firstWhere('locale', $this->locale);
         abort_unless($translation instanceof HelpArticleTranslation, 404);
@@ -42,6 +49,9 @@ final class HelpArticlePreviewPage extends Component
             'article' => $article,
             'translation' => $translation,
             'content' => $renderer->render($translation->body_markdown, $translation->locale),
+            'articleStatusLabel' => $article->status->label(),
+            'articleTypeLabel' => $article->type->label(),
+            'localeLabel' => strtoupper($translation->locale),
         ])->extends('layouts.app', [
             'title' => __('help.admin.preview'),
             'seo' => ['robots' => 'noindex, nofollow', 'social' => false, 'alternates' => []],

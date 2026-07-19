@@ -525,7 +525,7 @@ Run parser/importer/pruner tests. On a database copy, compare row counts and `db
 
 **Interfaces:**
 - Tracker exposes `mark(int $titleId, string $reason): void`, `ids(int $limit): array`, `forget(array $ids): void`.
-- Builder exposes internal `rebuildDirty(?callable $progress = null, bool $allowFullRebuild = true): array`; no new Artisan command. Collection-sync passes `false`, while the full import keeps the default full fallback.
+- Builder exposes internal `rebuildDirty(?callable $progress = null, bool $allowFullRebuild = true): array`; no new Artisan command. Collection-sync and the 900-second queued Seasonvar finalizer pass `false`, preserving dirty rows when a full fallback is required; the controlled synchronous import/maintenance path keeps the default full fallback.
 
 - [x] **Step 1: Add failing dirty/scoped tests**
 

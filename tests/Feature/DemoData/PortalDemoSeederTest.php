@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature\DemoData;
 
+use App\DTOs\DemoData\DemoDataOptions;
 use App\Enums\ReviewOrigin;
+use App\Models\CatalogCollection;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleReview;
 use App\Models\Episode;
@@ -13,6 +15,7 @@ use App\Models\Season;
 use App\Models\Translation;
 use App\Models\User;
 use App\Models\UserProfile;
+use App\Services\DemoData\DemoDataAuditor;
 use App\Services\DemoData\DemoDataOrchestrator;
 use Database\Seeders\PortalDemoSeeder;
 use Illuminate\Database\Eloquent\Collection;
@@ -28,13 +31,14 @@ final class PortalDemoSeederTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const string TEST_DISK = 'portal-demo-seeder-uploads';
+    private string $uploadDisk;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        Storage::fake(self::TEST_DISK);
+        $this->uploadDisk = 'portal-demo-seeder-uploads-'.getmypid();
+        Storage::fake($this->uploadDisk);
         Mail::fake();
         Http::preventStrayRequests();
         config([
@@ -43,7 +47,7 @@ final class PortalDemoSeederTest extends TestCase
             'demo-data.coverage_denominator' => 2,
             'demo-data.chunk_size' => 100,
             'demo-data.minimum_free_bytes' => 0,
-            'demo-data.asset_disk' => self::TEST_DISK,
+            'demo-data.asset_disk' => $this->uploadDisk,
             'demo-data.asset_prefix' => 'demo-tests',
             'demo-data.personal_tags.minimum' => 12,
             'demo-data.personal_tags.maximum' => 12,
@@ -114,8 +118,20 @@ final class PortalDemoSeederTest extends TestCase
         $profile = UserProfile::query()->firstOrFail();
         $this->assertSame('image/webp', $profile->avatar_mime_type);
         $this->assertSame('image/webp', $profile->cover_mime_type);
-        Storage::disk(self::TEST_DISK)->assertExists((string) $profile->avatar_path);
-        Storage::disk(self::TEST_DISK)->assertExists((string) $profile->cover_path);
+        Storage::disk($this->uploadDisk)->assertExists((string) $profile->avatar_path);
+        Storage::disk($this->uploadDisk)->assertExists((string) $profile->cover_path);
+
+        CatalogCollection::query()->firstOrFail()->forceFill([
+            'cover_disk' => null,
+            'cover_path' => null,
+            'cover_mime_type' => null,
+            'cover_size' => null,
+        ])->save();
+        $brokenAssets = app(DemoDataAuditor::class)->audit(DemoDataOptions::fromConfig());
+        $this->assertContains(
+            'Демонстрационная коллекция содержит недоставляемую обложку.',
+            $brokenAssets->violations,
+        );
         Mail::assertNothingSent();
     }
 

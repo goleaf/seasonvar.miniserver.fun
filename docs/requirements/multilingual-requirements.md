@@ -1,8 +1,20 @@
 # Постоянные multilingual-требования
 
-Обновлено: 18.07.2026
+Обновлено: 19.07.2026
 
 Этот документ дополняет владельцев [`architecture.md`](../architecture.md), [`frontend.md`](../frontend.md), [`administration.md`](../administration.md) и [`caching.md`](../caching.md) только требованиями сопровождения переводов.
+
+Каждый будущий Codex prompt обязан считать multilingual integration обязательной, даже когда пользователь не повторяет это требование.
+
+- Всегда проверяется и переиспользуется текущая translation architecture; второй translation system не создаётся.
+- Каждый поддерживаемый locale сохраняется. User-facing strings не hardcode-ятся, а каждый новый interface key одновременно добавляется во все supported locale.
+- Сохраняются текущий PHP/JSON format, UTF-8, placeholders, pluralization и translation-key stability. Active/fallback locale выбираются безопасно и предсказуемо.
+- Переведённые labels никогда не хранятся как database status/identity, route identity или cache identity.
+- Interface locale отделён от metadata language, original audio language, preferred audio language, subtitle language, translation studio, region и country.
+- Dates, times, numbers, currencies, plural forms, SEO metadata и accessibility labels локализуются через канонические formatters/translations.
+- Locale сохраняется при Livewire hydration. Locale switch сохраняет текущий совместимый route и только безопасный state; translated joins не дублируют database rows.
+- Read/query boundary загружает только active и fallback translations, если feature owner не доказывает другой bounded workflow.
+- User-generated content, advertiser content и legal submissions автоматически не переводятся. Editorial translations требуют документированного human review/publication workflow и не называются проверенными без него.
 
 - Обновления dependencies не сокращают набор поддерживаемых locale.
 - Locale-файлы остаются синтаксически валидными после package/framework changes.

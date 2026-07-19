@@ -314,7 +314,7 @@ class CatalogPageTest extends TestCase
 
             $this->assertSame(
                 1,
-                preg_match_all('~/vendor/livewire/livewire(?:\.min|\.csp)?\.js\?id=~', $content),
+                preg_match_all('~/vendor/livewire/livewire(?:\.csp)?(?:\.min)?\.js\?id=~', $content),
             );
             $this->assertSame(1, substr_count($content, 'data-csrf='));
         }
@@ -1327,7 +1327,7 @@ class CatalogPageTest extends TestCase
         $response = $this->get(route('stats'));
 
         $this->assertMatchesRegularExpression(
-            '~/vendor/livewire/livewire(?:\.min|\.csp)?\.js\?id=~',
+            '~/vendor/livewire/livewire(?:\.csp)?(?:\.min)?\.js\?id=~',
             $response->getContent(),
         );
 

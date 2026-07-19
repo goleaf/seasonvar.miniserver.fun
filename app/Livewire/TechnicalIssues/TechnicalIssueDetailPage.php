@@ -7,13 +7,16 @@ namespace App\Livewire\TechnicalIssues;
 use App\Actions\TechnicalIssues\AddTechnicalIssueMessage;
 use App\Actions\TechnicalIssues\SetTechnicalIssueEngagement;
 use App\Actions\TechnicalIssues\TechnicalIssueWorkflow;
+use App\Enums\AdminPermission;
 use App\Enums\TechnicalIssuePriority;
 use App\Enums\TechnicalIssueResolutionType;
 use App\Enums\TechnicalIssueSeverity;
 use App\Enums\TechnicalIssueStatus;
 use App\Exceptions\TechnicalIssues\TechnicalIssueActionException;
+use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Models\TechnicalIssue;
 use App\Models\User;
+use App\Services\Admin\AdminEligibleUserQuery;
 use App\Services\TechnicalIssues\TechnicalIssueQuery;
 use App\Services\TechnicalIssues\TechnicalIssueSchema;
 use App\Services\TechnicalIssues\TechnicalIssueSourceHealthService;
@@ -33,6 +36,7 @@ use Throwable;
 
 final class TechnicalIssueDetailPage extends Component
 {
+    use InteractsWithPaginationIslands;
     use WithFileUploads;
 
     #[Locked]
@@ -291,6 +295,7 @@ final class TechnicalIssueDetailPage extends Component
         TechnicalIssueQuery $query,
         TechnicalIssueTypeRegistry $types,
         TechnicalIssueSchema $schema,
+        AdminEligibleUserQuery $eligibleAdministrators,
     ): View {
         $user = auth()->user();
         abort_unless($user instanceof User, 403);
@@ -353,7 +358,7 @@ final class TechnicalIssueDetailPage extends Component
         }
 
         $assignees = $staff
-            ? User::query()->whereIn('email', (array) config('seasonvar.admin_emails', []))->orderBy('name')->get(['id', 'name'])->map(fn (User $agent): array => ['value' => $agent->id, 'label' => $agent->name])->all()
+            ? $eligibleAdministrators->forPermission(AdminPermission::TicketsSupport)->orderBy('name')->get(['id', 'name'])->map(fn (User $agent): array => ['value' => $agent->id, 'label' => $agent->name])->all()
             : [];
 
         return view('livewire.technical-issues.detail-page', [

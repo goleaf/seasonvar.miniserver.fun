@@ -116,6 +116,8 @@
         <div class="rounded-control border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">{{ __('reviews.empty.email_verification') }}</div>
     @endif
 
+    @island(name: 'catalog-title-reviews-pagination', always: true, with: $this->paginationIslandPage)
+    <x-ui.pagination-region name="catalog-title-reviews-results">
     @if ($communityAvailable)
     <div class="rounded-panel border border-slate-200 bg-white p-4 shadow-panel sm:p-5">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -170,6 +172,8 @@
     </div>
 
     @if ($reviews->hasPages())
-        <div class="pt-1">{{ $reviews->links(data: ['scrollTo' => '#reviews']) }}</div>
+        <div class="pt-1">{{ $reviews->links(data: ['region' => 'catalog-title-reviews-results']) }}</div>
     @endif
+    </x-ui.pagination-region>
+    @endisland
 </section>

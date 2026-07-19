@@ -7,6 +7,7 @@ namespace App\Livewire\Premium;
 use App\Enums\PremiumEntitlementSource;
 use App\Enums\PremiumFeature;
 use App\Enums\PremiumGrantReason;
+use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Models\PremiumAuditEvent;
 use App\Models\PremiumEntitlement;
 use App\Models\PremiumPromotion;
@@ -29,6 +30,7 @@ use Livewire\WithPagination;
 
 final class PremiumAdministrationManager extends Component
 {
+    use InteractsWithPaginationIslands;
     use WithPagination;
 
     public string $userSearch = '';

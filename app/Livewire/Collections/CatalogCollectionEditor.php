@@ -9,6 +9,7 @@ use App\DTOs\CatalogCollectionItemCriteria;
 use App\Enums\CatalogCollectionSort;
 use App\Enums\CatalogCollectionVisibility;
 use App\Livewire\Concerns\InteractsWithCollectionLocale;
+use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Models\CatalogCollection;
 use App\Models\CatalogCollectionTranslation;
 use App\Models\User;
@@ -32,7 +33,10 @@ final class CatalogCollectionEditor extends Component
 {
     private const AUTHORING_LOCALE = 'ru';
 
+    private const ITEMS_PER_PAGE = 24;
+
     use InteractsWithCollectionLocale;
+    use InteractsWithPaginationIslands;
     use WithFileUploads;
     use WithPagination;
 
@@ -154,6 +158,33 @@ final class CatalogCollectionEditor extends Component
         $this->status = __('collections.status.order_updated');
     }
 
+    public function sortItem(
+        int $itemId,
+        int $position,
+        CatalogCollectionResolver $resolver,
+        CatalogCollectionItemService $items,
+    ): void {
+        $collection = $resolver->byPublicId($this->collectionPublicId);
+        $windowStart = (max(1, $this->getPage('collectionPage')) - 1) * self::ITEMS_PER_PAGE;
+        $changed = $items->moveWithinWindow(
+            $this->user(),
+            $collection,
+            $itemId,
+            targetIndex: $windowStart + $position,
+            windowStart: $windowStart,
+            windowSize: self::ITEMS_PER_PAGE,
+        );
+
+        if (! $changed) {
+            $this->status = __('collections.status.order_unchanged');
+
+            return;
+        }
+
+        $this->contentVersion = $collection->refresh()->content_version;
+        $this->status = __('collections.status.order_updated');
+    }
+
     public function delete(CatalogCollectionResolver $resolver, CatalogCollectionService $service): void
     {
         $service->delete($this->user(), $resolver->byPublicId($this->collectionPublicId, true));
@@ -171,7 +202,7 @@ final class CatalogCollectionEditor extends Component
         $user = $this->user();
         $items = $query->items($collection, $user, new CatalogCollectionItemCriteria(
             sort: CatalogCollectionSort::Manual,
-            perPage: 24,
+            perPage: self::ITEMS_PER_PAGE,
         ));
         $totalItems = (int) ($collection->total_items_count ?? 0);
 

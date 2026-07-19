@@ -38,7 +38,7 @@ All future Tailwind class variants must remain statically detectable. Dynamic pa
 
 ## Task 10 collection UI audit
 
-Collection directory/dashboard/editor/page/profile/title selector/admin queue reuse the existing light panels, form/status components, full-poster frame, list title cards and pagination. Names/descriptions wrap without truncating user content, forms collapse to one column, controls retain 44px targets, cover is 16:9 with fallback, and destructive actions are separated/confirmed. Up/down is the keyboard/touch ordering baseline; no hover-only or fake drag control exists.
+Collection directory/dashboard/editor/page/profile/title selector/admin queue reuse the existing light panels, form/status components, full-poster frame, list title cards and pagination. Names/descriptions wrap without truncating user content, forms collapse to one column, controls retain 44px targets, cover is 16:9 with fallback, and destructive actions are separated/confirmed. The manual editor adds a real Livewire drag handle within one page; up/down remains the keyboard/touch/no-drag ordering baseline, and no hover-only control exists.
 
 Native dialog/share progressive enhancement is isolated in the Vite module, restores focus and handles Escape/clipboard failure. Livewire renders localized loading/status/error/empty/no-result/unavailable/moderation/restore-expiry states, while policy remains server-side. Disposable Chromium smoke covered desktop and 390×844 mobile geometry, keyboard focus return, Cancel semantics, canonical sharing feedback, responsive owner/public/profile screens and zero console/page/request failures; no automated browser test was created or run under the explicit Task 10 constraint.
 

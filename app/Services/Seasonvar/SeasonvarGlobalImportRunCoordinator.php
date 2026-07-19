@@ -26,6 +26,7 @@ final class SeasonvarGlobalImportRunCoordinator
         ?array $pageTypes = null,
         ?int $requestedByUserId = null,
         ?int $retryOfRunId = null,
+        ?int $sitemapTailLimit = null,
     ): SeasonvarImportStartResultData {
         $lock = $this->startLock();
 
@@ -35,7 +36,9 @@ final class SeasonvarGlobalImportRunCoordinator
             $pageTypes,
             $requestedByUserId,
             $retryOfRunId,
+            $sitemapTailLimit,
         ): SeasonvarImportStartResultData {
+            $this->recoverStale();
             $active = $this->activeRun();
 
             if ($active !== null) {
@@ -55,6 +58,7 @@ final class SeasonvarGlobalImportRunCoordinator
                     'discover' => $discover,
                     'provider' => 'seasonvar',
                     'page_types' => $pageTypes,
+                    'sitemap_tail_limit' => $sitemapTailLimit,
                 ],
             ]));
 
@@ -78,6 +82,7 @@ final class SeasonvarGlobalImportRunCoordinator
             $processHost,
             $processCommand,
         ): SeasonvarImportStartResultData {
+            $this->recoverStale();
             $active = $this->activeRun();
 
             if ($active !== null) {
@@ -111,6 +116,21 @@ final class SeasonvarGlobalImportRunCoordinator
         return $this->activeRuns()->exists();
     }
 
+    public function recoverStale(): int
+    {
+        return $this->staleRuns()->update([
+            'status' => SeasonvarImportStatus::Failed->value,
+            'last_error' => 'Запуск остановлен автоматически: heartbeat давно не обновлялся и активных задач не осталось.',
+            'finished_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    public function staleCount(): int
+    {
+        return $this->staleRuns()->count();
+    }
+
     private function startLock(): Lock
     {
         $repository = Cache::store((string) config('seasonvar.queue.lock_store', 'redis-locks'));
@@ -137,5 +157,25 @@ final class SeasonvarGlobalImportRunCoordinator
                 SeasonvarImportStatus::Queued->value,
                 SeasonvarImportStatus::Running->value,
             ]);
+    }
+
+    /** @return Builder<SeasonvarImportRun> */
+    private function staleRuns(): Builder
+    {
+        $cutoff = now()->subMinutes(max(5, (int) config('seasonvar.queue.stale_after_minutes', 120)));
+
+        return SeasonvarImportRun::query()
+            ->where('execution_mode', 'queue')
+            ->where('status', SeasonvarImportStatus::Running->value)
+            ->where(function (Builder $query) use ($cutoff): void {
+                $query->where('last_heartbeat_at', '<=', $cutoff)
+                    ->orWhere(function (Builder $query) use ($cutoff): void {
+                        $query->whereNull('last_heartbeat_at')->where('updated_at', '<=', $cutoff);
+                    });
+            })
+            ->whereDoesntHave('claimedSourcePages', function (Builder $query): void {
+                $query->whereNotNull('import_claim_token')
+                    ->where('import_claim_expires_at', '>', now());
+            });
     }
 }

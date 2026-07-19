@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\HelpCenter;
 
 use App\DTOs\Help\HelpSearchCriteria;
+use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Models\User;
 use App\Services\Catalog\Search\CatalogSearchNormalizer;
 use App\Services\HelpCenter\HelpCenterQuery;
@@ -24,6 +25,7 @@ use Throwable;
 
 final class HelpSearchPage extends Component
 {
+    use InteractsWithPaginationIslands;
     use WithPagination;
 
     #[Url(as: 'q', history: true, except: '')]

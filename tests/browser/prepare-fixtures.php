@@ -2,7 +2,11 @@
 
 declare(strict_types=1);
 
+use App\Enums\AdminMembershipStatus;
+use App\Enums\AdminRoleCode;
 use App\Models\Actor;
+use App\Models\AdminRole;
+use App\Models\AdminUserRole;
 use App\Models\CatalogRecommendationBuild;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRating;
@@ -126,7 +130,7 @@ $media = LicensedMedia::factory()->create([
     'format' => 'm3u8',
     'quality' => '1080p',
     'variant_type' => 'original',
-    'variant_key' => 'browser-hls',
+    'variant_key' => 'browser-original',
     'duration_seconds' => 600,
     'status' => 'published',
     'check_status' => 'available',
@@ -153,7 +157,7 @@ LicensedMedia::factory()->create([
     'format' => 'mp4',
     'quality' => '720p',
     'variant_type' => 'original',
-    'variant_key' => 'browser-mp4',
+    'variant_key' => 'browser-original',
     'duration_seconds' => 600,
     'status' => 'published',
     'check_status' => 'available',
@@ -213,6 +217,20 @@ $englishUser = User::factory()->create([
     'email' => 'browser-en@example.com',
     'email_verified_at' => now()->subDay(),
     'password' => Hash::make('Browser-Strong-Password-42!'),
+]);
+
+$administrator = User::factory()->create([
+    'name' => 'Browser Administrator',
+    'email' => 'browser-admin@example.com',
+    'email_verified_at' => now()->subDay(),
+    'password' => Hash::make('Browser-Strong-Password-42!'),
+]);
+AdminUserRole::query()->create([
+    'user_id' => $administrator->id,
+    'admin_role_id' => AdminRole::query()->where('code', AdminRoleCode::Superadministrator)->valueOrFail('id'),
+    'status' => AdminMembershipStatus::Active,
+    'reason_code' => 'browser_fixture',
+    'assigned_at' => now()->subMinute(),
 ]);
 
 UserAccountSetting::query()->create([

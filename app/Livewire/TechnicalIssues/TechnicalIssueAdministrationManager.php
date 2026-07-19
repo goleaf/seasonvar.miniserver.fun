@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\TechnicalIssues;
 
 use App\Actions\TechnicalIssues\TechnicalIssueWorkflow;
+use App\Enums\AdminPermission;
 use App\Enums\TechnicalIssuePriority;
 use App\Enums\TechnicalIssueSeverity;
 use App\Enums\TechnicalIssueSort;
@@ -12,8 +13,10 @@ use App\Enums\TechnicalIssueStatus;
 use App\Enums\TechnicalIssueTargetType;
 use App\Enums\TechnicalIssueType;
 use App\Exceptions\TechnicalIssues\TechnicalIssueActionException;
+use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Models\TechnicalIssue;
 use App\Models\User;
+use App\Services\Admin\AdminEligibleUserQuery;
 use App\Services\TechnicalIssues\TechnicalIssueQuery;
 use App\Services\TechnicalIssues\TechnicalIssueSchema;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -30,6 +33,7 @@ use Throwable;
 
 final class TechnicalIssueAdministrationManager extends Component
 {
+    use InteractsWithPaginationIslands;
     use WithPagination;
 
     #[Url(as: 'q', history: true, except: '')]
@@ -138,7 +142,7 @@ final class TechnicalIssueAdministrationManager extends Component
         });
     }
 
-    public function render(TechnicalIssueQuery $query, TechnicalIssueSchema $schema): View
+    public function render(TechnicalIssueQuery $query, TechnicalIssueSchema $schema, AdminEligibleUserQuery $eligibleAdministrators): View
     {
         Gate::authorize('manage-technical-issues');
         $this->normalize();
@@ -172,7 +176,7 @@ final class TechnicalIssueAdministrationManager extends Component
         $visibleIds = collect($issues->items())->map(fn ($issue): int => $issue->id)->all();
         $this->visibleIssueIds = $visibleIds;
         $this->selectedIssues = array_values(array_intersect($this->selectedIssues, $visibleIds));
-        $assignees = User::query()->whereIn('email', (array) config('seasonvar.admin_emails', []))->orderBy('name')->get(['id', 'name']);
+        $assignees = $eligibleAdministrators->forPermission(AdminPermission::TicketsSupport)->orderBy('name')->get(['id', 'name']);
 
         return view('livewire.technical-issues.administration-manager', [
             'issues' => $issues,

@@ -154,6 +154,7 @@ final class PublicPageCachePolicy
             'titles.show',
             ['catalogTitle' => $slug],
             [],
+            (string) config('cache-architecture.page_cache.canonical_locale', 'ru'),
         ));
     }
 
@@ -162,13 +163,18 @@ final class PublicPageCachePolicy
      * @param  array<string, mixed>  $query
      * @return array<string, mixed>
      */
-    private function dimensions(string $origin, string $route, array $parameters, array $query): array
-    {
+    private function dimensions(
+        string $origin,
+        string $route,
+        array $parameters,
+        array $query,
+        ?string $locale = null,
+    ): array {
         return [
             'audience' => 'public',
             'assets' => $this->assetBuildFingerprint(),
             'origin' => $origin,
-            'locale' => app()->getLocale(),
+            'locale' => $locale ?? app()->getLocale(),
             'route' => $route,
             'parameters' => $parameters,
             'query' => hash('sha256', json_encode($query, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE)),

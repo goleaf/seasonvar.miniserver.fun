@@ -25,7 +25,7 @@
     <x-form.input-error for="collection" />
 
     @if ($showCreate && $canCreate)
-        <x-ui.panel :title="__('collections.actions.create')" icon="fa-solid fa-folder-plus">
+        <x-ui.panel wire:transition :title="__('collections.actions.create')" icon="fa-solid fa-folder-plus">
             <form wire:submit="create" class="grid gap-5" novalidate>
                 <x-form.field :label="__('collections.form.name')" for="new-collection-name" :placeholder="__('collections.form.name_placeholder')" wire:model="name" required />
                 <div>
@@ -70,6 +70,8 @@
         </x-ui.panel>
     @endif
 
+    @island(name: 'active-collections-pagination', always: true, with: $this->paginationIslandPage)
+    <x-ui.pagination-region name="active-collections-results">
     <section aria-labelledby="active-collections-title">
         <div class="mb-3 flex items-center justify-between gap-3">
             <h2 id="active-collections-title" class="text-lg font-black text-slate-800">{{ __('collections.dashboard.active') }}</h2>
@@ -91,10 +93,14 @@
                     </div>
                 @endforeach
             </div>
-            <nav class="mt-4" aria-label="{{ __('collections.page.pagination') }}">{{ $collections->links() }}</nav>
+            <nav class="mt-4" aria-label="{{ __('collections.page.pagination') }}">{{ $collections->links(data: ['region' => 'active-collections-results']) }}</nav>
         @endif
     </section>
+    </x-ui.pagination-region>
+    @endisland
 
+    @island(name: 'deleted-collections-pagination', always: true, with: $this->paginationIslandPage)
+    <x-ui.pagination-region name="deleted-collections-results">
     <x-ui.panel :title="__('collections.dashboard.deleted')" :subtitle="__('collections.dashboard.deleted_hint', ['days' => $restorationDays])" icon="fa-solid fa-clock-rotate-left">
         @if ($deletedCollections->isEmpty())
             <p class="text-sm font-semibold text-slate-500">{{ __('collections.dashboard.empty_deleted') }}</p>
@@ -127,7 +133,9 @@
                     </article>
                 @endforeach
             </div>
-            <nav class="mt-4" aria-label="{{ __('collections.page.pagination') }}">{{ $deletedCollections->links() }}</nav>
+            <nav class="mt-4" aria-label="{{ __('collections.page.pagination') }}">{{ $deletedCollections->links(data: ['region' => 'deleted-collections-results']) }}</nav>
         @endif
     </x-ui.panel>
+    </x-ui.pagination-region>
+    @endisland
 </div>

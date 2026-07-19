@@ -314,6 +314,7 @@ final class OfflineUserSyncTest extends TestCase
         $this->assertModelExists($foreign);
         $this->assertSame([
             ['progress', "offline-activity:{$episode->id}", ApiSyncChange::OPERATION_UPSERT],
+            ['title_state', 'offline-activity', ApiSyncChange::OPERATION_UPSERT],
             ['history', (string) $progress->id, ApiSyncChange::OPERATION_DELETE],
             ['history', null, ApiSyncChange::OPERATION_CLEAR],
         ], ApiSyncChange::query()

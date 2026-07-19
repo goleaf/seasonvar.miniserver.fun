@@ -6,9 +6,12 @@ namespace Tests\Feature;
 
 use App\DTOs\Seasonvar\SeasonvarCatalogData;
 use App\DTOs\Seasonvar\SeasonvarPreparedCatalogPage;
+use App\Enums\ReleaseScheduleEntryType;
+use App\Enums\ReleaseScheduleSource;
 use App\Models\ApiSyncChange;
 use App\Models\CatalogTitle;
 use App\Models\Episode;
+use App\Models\ReleaseScheduleEntry;
 use App\Models\Source;
 use App\Models\SourcePage;
 use App\Services\Seasonvar\SeasonvarCatalogImporter;
@@ -128,9 +131,46 @@ class SeasonvarCatalogPreparedApplyTest extends TestCase
         $this->assertSame('АЛЬФА', $alias->name);
     }
 
-    /** @return array{SourcePage, SeasonvarPreparedCatalogPage} */
-    private function preparedSeason(Source $source, int $seasonNumber, int $episodeCount, array $aliases = []): array
+    public function test_prepared_current_season_release_observation_creates_a_calendar_event(): void
     {
+        Http::preventStrayRequests();
+        $source = $this->seasonvarSource();
+        [$page, $prepared] = $this->preparedSeason($source, 1, 3, releaseStatus: [
+            'latest_episode_released_at' => '2026-07-19',
+            'episodes_released' => 3,
+            'episodes_total' => 8,
+            'translation_name' => 'Coldfilm',
+            'release_status_text' => '19.07.2026 3 серия (Coldfilm) из 8',
+        ]);
+        $canonical = CatalogTitle::factory()->for($source)->create([
+            'source_page_id' => $page->id,
+            'external_id' => '24212',
+            'slug' => 'ryzaia-8',
+            'title' => 'Рыжая',
+            'source_url' => $page->url,
+            'source_url_hash' => hash('sha256', $page->url),
+        ]);
+
+        app(SeasonvarCatalogImporter::class)->applyPreparedPage($page, $prepared, $canonical);
+
+        $episode = $canonical->episodes()->where('episodes.number', 3)->firstOrFail();
+        $entry = ReleaseScheduleEntry::query()->sole();
+        $this->assertSame(ReleaseScheduleEntryType::TranslationRelease, $entry->entry_type);
+        $this->assertSame(ReleaseScheduleSource::Provider, $entry->source);
+        $this->assertSame($episode->id, $entry->episode_id);
+        $this->assertSame('2026-07-19', $entry->date_value?->toDateString());
+        $this->assertSame('Coldfilm', $entry->translation_name);
+        $this->assertNull($episode->released_at);
+    }
+
+    /** @return array{SourcePage, SeasonvarPreparedCatalogPage} */
+    private function preparedSeason(
+        Source $source,
+        int $seasonNumber,
+        int $episodeCount,
+        array $aliases = [],
+        array $releaseStatus = [],
+    ): array {
         $url = sprintf(
             'https://seasonvar.ru/serial-24212-Ryzhaya_psbdtie-%d-season.html',
             $seasonNumber,
@@ -168,6 +208,7 @@ class SeasonvarCatalogPreparedApplyTest extends TestCase
                 'episodes_total' => $episodeCount,
                 'translation_name' => null,
                 'release_status_text' => null,
+                ...$releaseStatus,
             ]],
             'episodes' => $episodes,
             'media' => [],

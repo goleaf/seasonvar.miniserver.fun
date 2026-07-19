@@ -1,6 +1,6 @@
 # Работа с dependency security advisories
 
-Аудит registry: 18.07.2026. Этот документ хранит workflow и проверенные результаты, но не публикует exploit details и не заменяет provider/security incident process.
+Аудит registry: 18.07.2026; exact-lock tooling повторено 19.07.2026. Этот документ хранит workflow и проверенные результаты, но не публикует exploit details и не заменяет provider/security incident process.
 
 ## Обязательный workflow
 
@@ -27,6 +27,8 @@
 | SA-2026-07-18-C | Composer `audit` по exact lock, включая dev review | Composer lock | 0 advisories; 0 abandoned packages reported | Это dated tooling result, не гарантия отсутствия неизвестных проблем | Версии retained; uncontrolled update не выполнялся |
 | SA-2026-07-18-N | npm `audit --json` по `package-lock.json` | 113 locked npm dependencies | 0 low/moderate/high/critical vulnerabilities | npm не предоставляет Composer-equivalent abandonment conclusion | Версии retained; `audit fix`/`--force` не применялись |
 | SA-2026-07-18-P | Composer plugin policy inspection | `composer.json`, lock and installed package list | Два plugin names были pre-authorized, но не installed/locked | Лишнее permission surface, не vulnerability claim | Unused permissions удалены; lock untouched; rollback documented in UD-CFG-001 |
+| SA-2026-07-19-C | Fresh Composer `audit --locked` | 125 exact locked Composer packages including dev | 0 advisories; 0 abandoned packages reported | Dated authoritative package-tool result only | Retain decisions; no broad update |
+| SA-2026-07-19-N | Fresh npm `audit --json` | 113 exact locked npm dependencies | 0 low/moderate/high/critical vulnerabilities | npm provides no equivalent abandoned-package conclusion | Retain decisions; no `audit fix` or `--force` |
 
 ## Operational limitations
 
