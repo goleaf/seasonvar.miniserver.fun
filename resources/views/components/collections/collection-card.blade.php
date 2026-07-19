@@ -30,13 +30,13 @@
         </div>
 
         @if ($compact)
-            <h3 class="mt-3 line-clamp-2 break-words text-base font-black leading-snug text-slate-800"><a href="{{ $card->url }}" class="hover:text-emerald-700">{{ $card->name }}</a></h3>
+            <h3 class="mt-3 break-words text-base font-black leading-snug text-slate-800"><a href="{{ $card->url }}" class="hover:text-emerald-700">{{ $card->name }}</a></h3>
         @else
             <h2 class="mt-3 break-words text-lg font-black leading-snug text-slate-800"><a href="{{ $card->url }}" class="hover:text-emerald-700">{{ $card->name }}</a></h2>
         @endif
 
         @if ($card->description !== '')
-            <p @class(['mt-2 break-words text-sm text-slate-600', 'line-clamp-2 leading-5' => $compact, 'leading-6' => ! $compact])>{{ $card->description }}</p>
+            <p @class(['mt-2 break-words text-sm text-slate-600', 'leading-5' => $compact, 'leading-6' => ! $compact])>{{ $card->description }}</p>
         @endif
 
         <div class="mt-auto flex flex-wrap items-center justify-between gap-2 pt-4 text-xs font-semibold text-slate-500">

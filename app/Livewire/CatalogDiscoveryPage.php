@@ -298,6 +298,7 @@ final class CatalogDiscoveryPage extends Component
             'hasFilters' => $hasFilters,
             'isAuthenticated' => $this->user() !== null,
             'popularUrl' => $this->discoveryUrl(CatalogRecommendationType::Popular),
+            'collectionExplorerKey' => 'discovery-collections-'.app()->currentLocale(),
             'seo' => $seo,
         ])->extends('layouts.app', [
             'title' => $seo['title'],

@@ -265,6 +265,6 @@
     </section>
 
     @if ($type === 'popular')
-        <livewire:collections.catalog-collection-explorer :key="'discovery-collections-'.app()->currentLocale()" />
+        <livewire:collections.catalog-collection-explorer :key="$collectionExplorerKey" />
     @endif
 </div>
