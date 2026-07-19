@@ -2,7 +2,7 @@
 
 Дата: 19.07.2026
 
-Статус: `completed_locally`; финальная отправка в Git проверяется отдельно
+Статус: `completed_locally`; настроенная HTTPS-отправка заблокирована отсутствующей GitHub-аутентификацией
 
 Владелец требований: `docs/requirements/system-wide-integration.md`
 
@@ -61,7 +61,7 @@
 | Imports / notifications / search | `already_compliant` | Import source-sync, direct collection detail and notification targets сохранены; portal/header/title search ведут в `#collections` единой страницы |
 | Production dependencies / runtime / database | `not_applicable` | Зависимости, `.env`, schema и persistent rows этой задачей не менялись |
 | Full repository suite | `unresolved` | Финальный прогон после task fixes: 1 304 tests, 1 280 passed, 119 587 assertions, 11 skipped и 13 failures только в параллельно изменяемых help/player/OpenAPI/infrastructure/user-portal contracts; unified discovery, collection, fallback, cache, sitemap и demo проверки в этом же состоянии проходят |
-| Commit / push | `unresolved` | Scoped task commits существуют в `main`; фактический результат настроенной отправки фиксируется только после финальной попытки |
+| Commit / push | `unresolved` | Scoped task commits существуют в `main`; `git push origin main` выполнен и отклонён внешним remote: `could not read Username for 'https://github.com'`; remote URL, credentials и секреты не менялись |
 
 ## Verification evidence
 
