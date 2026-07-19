@@ -41,6 +41,6 @@ return [
         'home', 'titles.index', 'search.index', 'calendar.upcoming', 'requests.index',
         'requests.create', 'issues.create', 'library.index', 'viewing-activity',
         'login', 'register', 'password.request', 'verification.notice', 'settings.index',
-        'profile.security', 'collections.index', 'notifications.index', 'premium.index',
+        'profile.security', 'discover.index', 'notifications.index', 'premium.index',
     ],
 ];

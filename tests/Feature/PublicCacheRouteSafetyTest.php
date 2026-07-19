@@ -59,8 +59,6 @@ final class PublicCacheRouteSafetyTest extends TestCase
             'titles.year',
             'titles.taxonomy',
             'titles.show',
-            'collections.index',
-            'localized.collections.index',
             'requests.index',
             'requests.show',
             'localized.requests.index',

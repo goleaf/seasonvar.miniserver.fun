@@ -99,6 +99,7 @@ final class CatalogCollectionCacheInvalidator
         $collectionIds = array_values(array_unique($collectionIds));
         $invalidate = function () use ($collectionIds, $includeTitleDetail, $recommendationsChanged): void {
             $this->versions->bump(CacheDomain::Collections);
+            $this->versions->bump(CacheDomain::CatalogPages);
             $this->versions->bump(CacheDomain::Homepage);
             $this->versions->bump(CacheDomain::Sitemap);
             $this->versions->bump(CacheDomain::Api);

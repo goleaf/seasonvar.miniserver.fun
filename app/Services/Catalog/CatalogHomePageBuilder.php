@@ -196,7 +196,7 @@ class CatalogHomePageBuilder
             'featuredCollections' => $this->collections->featured(),
             'homeRecommendationItems' => $homeRecommendationItems,
             'homeRecommendationPresentation' => $homeRecommendationPresentation,
-            'collectionsUrl' => $this->localeRoute('collections.index'),
+            'collectionsUrl' => $this->discoveryUrl(CatalogRecommendationType::Popular).'#collections',
             'discoveryUrl' => $this->discoveryUrl($recommendationResult->displayType),
             'topRatedUrl' => $this->discoveryUrl(CatalogRecommendationType::TopRated),
             'recentlyAddedUrl' => $this->discoveryUrl(CatalogRecommendationType::RecentlyAdded),

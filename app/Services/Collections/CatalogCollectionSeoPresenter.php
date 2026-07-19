@@ -16,35 +16,6 @@ final class CatalogCollectionSeoPresenter
     public function __construct(private readonly CatalogCollectionCoverService $covers) {}
 
     /** @return array<string, mixed> */
-    public function directory(bool $localizedAlias = false, bool $statefulVariant = false): array
-    {
-        $canonical = route('collections.index');
-
-        return [
-            'title' => __('collections.seo.directory_title'),
-            'description' => __('collections.seo.directory_description'),
-            'canonical' => $canonical,
-            'robots' => $localizedAlias || $statefulVariant
-                ? 'noindex,follow'
-                : 'index,follow,max-image-preview:large,max-snippet:-1',
-            'section' => __('collections.navigation.collections'),
-            'breadcrumbs' => [
-                ['name' => __('catalog.navigation.home'), 'url' => route('home')],
-                ['name' => __('collections.navigation.collections'), 'url' => $canonical],
-            ],
-            'alternates' => $localizedAlias || $statefulVariant ? [] : null,
-            'jsonLd' => [[
-                '@context' => 'https://schema.org',
-                '@type' => 'CollectionPage',
-                'name' => __('collections.seo.directory_title'),
-                'description' => __('collections.seo.directory_description'),
-                'url' => $canonical,
-                'inLanguage' => app()->currentLocale(),
-            ]],
-        ];
-    }
-
-    /** @return array<string, mixed> */
     public function collection(
         CatalogCollection $collection,
         ?User $viewer,
@@ -146,7 +117,7 @@ final class CatalogCollectionSeoPresenter
             'section' => __('collections.navigation.collections'),
             'breadcrumbs' => [
                 ['name' => __('catalog.navigation.home'), 'url' => route('home')],
-                ['name' => __('collections.navigation.collections'), 'url' => route('collections.index')],
+                ['name' => __('collections.navigation.collections'), 'url' => $this->directoryUrl()],
                 ['name' => $name, 'url' => $canonical],
             ],
             'alternates' => $statefulVariant ? [] : $alternates,
@@ -169,10 +140,15 @@ final class CatalogCollectionSeoPresenter
             'robots' => $localizedAlias || $statefulVariant || $legacyAlias ? 'noindex,follow' : 'index,follow',
             'breadcrumbs' => [
                 ['name' => __('catalog.navigation.home'), 'url' => route('home')],
-                ['name' => __('collections.navigation.collections'), 'url' => route('collections.index')],
+                ['name' => __('collections.navigation.collections'), 'url' => $this->directoryUrl()],
                 ['name' => $owner->name, 'url' => $canonical],
             ],
             'alternates' => [],
         ];
+    }
+
+    private function directoryUrl(): string
+    {
+        return route('discover.index', ['type' => 'popular']).'#collections';
     }
 }

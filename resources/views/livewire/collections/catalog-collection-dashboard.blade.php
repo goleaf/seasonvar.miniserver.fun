@@ -73,7 +73,7 @@
     <section aria-labelledby="active-collections-title">
         <div class="mb-3 flex items-center justify-between gap-3">
             <h2 id="active-collections-title" class="text-lg font-black text-slate-800">{{ __('collections.dashboard.active') }}</h2>
-            <a href="{{ route('collections.index') }}" class="text-sm font-bold text-emerald-700 hover:text-emerald-600">{{ __('collections.navigation.public_collections') }}</a>
+            <a href="{{ route('discover.index', ['type' => 'popular']).'#collections' }}" class="text-sm font-bold text-emerald-700 hover:text-emerald-600">{{ __('collections.navigation.public_collections') }}</a>
         </div>
         @if ($collections->isEmpty())
             <div class="rounded-panel border border-dashed border-slate-300 bg-white p-8 text-center text-sm font-semibold text-slate-600">{{ __('collections.dashboard.empty') }}</div>

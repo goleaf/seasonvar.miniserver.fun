@@ -8,21 +8,12 @@ use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Services\Catalog\CatalogHomeSnapshotCache;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class CatalogHomeContentAdditionTest extends TestCase
 {
     use RefreshDatabase;
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        Route::get('/__tests/collections', fn (): string => '')->name('collections.index');
-        Route::getRoutes()->refreshNameLookups();
-    }
 
     public function test_latest_updates_use_created_content_instead_of_metadata_index_time(): void
     {

@@ -40,8 +40,6 @@ final class LivewireWebBoundaryTest extends TestCase
             'comments.show',
             'localized.comments.show',
             'reviews.show',
-            'legacy.collections.show',
-            'legacy.selections.show',
             ...app(CatalogDirectoryRegistry::class)->all()->pluck('detailRouteName')->all(),
         ];
 

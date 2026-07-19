@@ -269,7 +269,7 @@
                             <x-ui.icon name="fa-solid fa-layer-group text-emerald-700" />
                             <span>{{ __('collections.directory.search_results') }}</span>
                         </h2>
-                        <a href="{{ route('collections.index', ['q' => $search]) }}" class="text-sm font-bold text-emerald-700 hover:text-emerald-600">{{ __('collections.navigation.public_collections') }}</a>
+                        <a href="{{ route('discover.index', ['type' => 'popular', 'collections_q' => $search]).'#collections' }}" class="text-sm font-bold text-emerald-700 hover:text-emerald-600">{{ __('collections.navigation.public_collections') }}</a>
                     </div>
                     <div class="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                         @foreach ($collectionSuggestions as $collectionSuggestion)

@@ -615,10 +615,10 @@ final class PublicCatalogWarmTargetSource
     private function collectionTargets(array $position, int $limit): array
     {
         $variants = [
-            ['route' => 'collections.index', 'parameters' => []],
+            ['route' => 'discover.index', 'parameters' => ['type' => 'popular']],
             ...array_map(fn (string $locale): array => [
-                'route' => 'localized.collections.index',
-                'parameters' => ['locale' => $locale],
+                'route' => 'localized.discover.index',
+                'parameters' => ['locale' => $locale, 'type' => 'popular'],
             ], $this->locales('catalog-collections.supported_locales')),
         ];
         $variantIndex = max(0, (int) ($position['variant_index'] ?? 0));
@@ -626,7 +626,7 @@ final class PublicCatalogWarmTargetSource
         $count = $this->collectionSchema->available()
             ? CatalogCollection::query()->publiclyListed()->count()
             : 0;
-        $pages = $this->pages($count, 18);
+        $pages = $this->pages($count, 12);
         $targets = [];
 
         while (isset($variants[$variantIndex])) {

@@ -16,7 +16,7 @@
     @if ($collections->isEmpty())
         <section class="rounded-panel border border-dashed border-slate-300 bg-white p-8 text-center shadow-panel">
             <p class="text-sm font-semibold text-slate-600">{{ __('collections.profile.empty') }}</p>
-            <a href="{{ route('collections.index') }}" class="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-slate-100 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-200"><x-ui.icon name="fa-solid fa-layer-group" />{{ __('collections.navigation.public_collections') }}</a>
+            <a href="{{ route('discover.index', ['type' => 'popular']).'#collections' }}" class="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-slate-100 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-200"><x-ui.icon name="fa-solid fa-layer-group" />{{ __('collections.navigation.public_collections') }}</a>
         </section>
     @else
         <section class="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-label="{{ __('collections.navigation.public_collections') }}">

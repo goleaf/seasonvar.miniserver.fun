@@ -70,7 +70,7 @@ final class HdRezkaCollectionPresentationTest extends TestCase
             'version' => $collection->cover_version,
         ]);
 
-        $response = $this->get(route('collections.index'));
+        $response = $this->get(route('discover.index', ['type' => 'popular']));
 
         $response
             ->assertOk()
@@ -79,7 +79,7 @@ final class HdRezkaCollectionPresentationTest extends TestCase
             ->assertSeeText('Обновляется автоматически')
             ->assertSeeText('1 сериал')
             ->assertSee('src="'.$coverUrl.'"', false)
-            ->assertSee('sm:grid-cols-2 xl:grid-cols-3', false)
+            ->assertSee('sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4', false)
             ->assertDontSee('https://hdrezka.my', false)
             ->assertDontSee('/xfsearch/collections/secret-source/', false);
 
@@ -112,7 +112,7 @@ final class HdRezkaCollectionPresentationTest extends TestCase
         DB::flushQueryLog();
         DB::enableQueryLog();
 
-        $response = $this->actingAs($admin)->get(route('admin.collections'));
+        $response = $this->actingAs($admin)->get(route('admin.catalog', ['section' => 'collections']));
         $syncQueries = collect(DB::getQueryLog())
             ->filter(fn (array $query): bool => str_contains(
                 $query['query'],
