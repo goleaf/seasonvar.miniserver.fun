@@ -208,6 +208,11 @@ return [
         ],
     ],
     'admin' => [
+        'catalog_and_collections' => 'Управление каталогом и подборками',
+        'catalog_and_collections_description' => 'Единое управление сериалами, сезонами, источниками и публичными подборками.',
+        'sections' => 'Раздел управления',
+        'catalog_section' => 'Каталог',
+        'collections_section' => 'Подборки',
         'title' => 'Модерация подборок',
         'description' => 'Публичность, редакционный статус, жалобы и безопасные решения.',
         'empty' => 'Очередь модерации пуста.',
@@ -292,8 +297,6 @@ return [
         'unauthorized' => 'У вас нет доступа к этому действию.',
     ],
     'seo' => [
-        'directory_title' => 'Подборки сериалов',
-        'directory_description' => 'Публичные пользовательские и редакционные подборки сериалов.',
         'page_title' => ':name — подборка сериалов',
         'page_description' => ':name: :count сериалов в подборке.',
         'owner_suffix' => 'Автор: :owner.',

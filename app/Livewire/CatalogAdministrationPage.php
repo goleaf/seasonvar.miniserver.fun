@@ -34,9 +34,9 @@ final class CatalogAdministrationPage extends Component
     public function render(): View
     {
         return view('livewire.catalog-administration-page')->extends('layouts.app', [
-            'title' => 'Управление каталогом',
+            'title' => __('collections.admin.catalog_and_collections'),
             'seo' => [
-                'title' => 'Управление каталогом', 'description' => 'Служебное управление каталогом и подборками.',
+                'title' => __('collections.admin.catalog_and_collections'), 'description' => __('collections.admin.catalog_and_collections_description'),
                 'robots' => 'noindex,nofollow', 'canonical' => route('admin.catalog'), 'alternates' => [],
             ],
         ])->section('content');
