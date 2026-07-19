@@ -316,7 +316,7 @@
 <!-- project-docs:start -->
 ## Автоматически обновляемое состояние документации
 
-- Последнее автоматическое обновление блоков документации: 18.07.2026.
+- Последнее автоматическое обновление блоков документации: 19.07.2026.
 - Команда обновления: `php artisan project:docs-refresh`.
 - Хук автокоммита: `.githooks/post-commit` через `scripts/docs-autocommit-push.sh`; отправка в Git включается только через `SEASONVAR_DOCS_AUTO_PUSH=1`.
 - Основной sitemap для robots и поисковых систем: `https://seasonvar.miniserver.fun/sitemap-index.xml`.
