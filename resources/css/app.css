@@ -393,6 +393,11 @@ dialog {
     box-shadow: 0 0 0 4px var(--color-emerald-100);
 }
 
+.app-shell-main:focus-visible {
+    outline: none;
+    box-shadow: none;
+}
+
 [data-header-search-input]:focus-visible {
     outline: none;
     box-shadow: none;

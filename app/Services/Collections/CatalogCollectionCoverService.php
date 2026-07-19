@@ -146,7 +146,15 @@ final class CatalogCollectionCoverService
 
     public function url(CatalogCollection $collection): ?string
     {
-        if ($collection->cover_path === null || $collection->cover_version < 1) {
+        $path = $collection->cover_path;
+
+        if (! is_string($path)
+            || $collection->cover_version < 1
+            || $collection->cover_disk !== config('uploads.disk')
+            || ! in_array($collection->cover_mime_type, ['image/jpeg', 'image/png', 'image/webp'], true)
+            || ! str_starts_with($path, 'catalog-collections/'.$collection->public_id.'/')
+            || str_contains($path, '..')
+            || str_contains($path, '\\')) {
             return null;
         }
 

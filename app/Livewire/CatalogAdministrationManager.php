@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -33,6 +34,7 @@ final class CatalogAdministrationManager extends Component
 {
     use WithPagination;
 
+    #[Url(as: 'catalog_q', history: true, except: '')]
     public string $search = '';
 
     public string $recommendationRelationSearch = '';
@@ -605,16 +607,7 @@ final class CatalogAdministrationManager extends Component
             'maxCatalogYear' => now()->year + 5,
             'supportedQualities' => config('playback.supported_qualities'),
             'allowedFormats' => config('playback.allowed_formats'),
-        ])
-            ->extends('layouts.app', [
-                'title' => 'Управление каталогом',
-                'seo' => [
-                    'title' => 'Управление каталогом',
-                    'description' => 'Служебное управление каталогом.',
-                    'robots' => 'noindex, nofollow',
-                    'canonical' => route('admin.catalog'),
-                ],
-            ])->section('content');
+        ]);
     }
 
     private function selectedTitle(): CatalogTitle

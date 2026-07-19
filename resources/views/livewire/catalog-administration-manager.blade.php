@@ -1,20 +1,4 @@
 <div class="space-y-5" data-livewire-catalog-administration-manager>
-    <header class="rounded-panel border border-slate-200 bg-white p-4 shadow-panel sm:p-5">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div class="min-w-0">
-                <h1 class="flex items-center gap-3 text-2xl font-black tracking-tight text-slate-800 sm:text-3xl">
-                    <x-ui.icon name="fa-solid fa-screwdriver-wrench text-emerald-700" />
-                    <span>Управление каталогом</span>
-                </h1>
-                <p class="mt-2 text-sm leading-6 text-slate-600">Редакционные поля, публикация, связи, сезоны, серии и разрешённые видеоисточники.</p>
-            </div>
-            <a href="{{ route('admin.imports') }}" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-slate-50 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700">
-                <x-ui.icon name="fa-solid fa-cloud-arrow-down" />
-                <span>Запуски импорта</span>
-            </a>
-        </div>
-    </header>
-
     @if ($notice)
         <div role="status" class="rounded-control bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">{{ $notice }}</div>
     @endif

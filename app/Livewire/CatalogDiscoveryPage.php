@@ -278,7 +278,8 @@ final class CatalogDiscoveryPage extends Component
             canDismiss: $this->user() !== null,
         ));
         $hasFilters = $this->hasFilters();
-        $seo = $this->seo->discovery($type, $result, $result->items, $hasFilters);
+        $collectionStatefulVariant = request()->hasAny(['collections_q', 'collections_sort', 'collectionsPage']);
+        $seo = $this->seo->discovery($type, $result, $result->items, $hasFilters || $collectionStatefulVariant);
 
         return view('livewire.catalog-discovery-page', [
             'result' => $result,

@@ -12,16 +12,14 @@ use App\Livewire\Auth\LoginPage;
 use App\Livewire\Auth\RegisterPage;
 use App\Livewire\Auth\ResetPasswordPage;
 use App\Livewire\Auth\VerifyEmailPage;
-use App\Livewire\CatalogAdministrationManager;
+use App\Livewire\CatalogAdministrationPage;
 use App\Livewire\CatalogDirectoryBrowser;
 use App\Livewire\CatalogDiscoveryPage;
 use App\Livewire\CatalogHomePage;
 use App\Livewire\CatalogSeries;
 use App\Livewire\CatalogTitleDetail;
 use App\Livewire\CatalogTopListPage;
-use App\Livewire\Collections\CatalogCollectionAdministrationManager;
 use App\Livewire\Collections\CatalogCollectionDashboard;
-use App\Livewire\Collections\CatalogCollectionDirectory;
 use App\Livewire\Collections\CatalogCollectionEditor;
 use App\Livewire\Collections\CatalogCollectionPage;
 use App\Livewire\Collections\CatalogCollectionProfile;
@@ -71,7 +69,6 @@ use App\Services\Catalog\CatalogPlaybackSourceResponder;
 use App\Services\Catalog\CatalogSitemapResponder;
 use App\Services\Catalog\CatalogStatsPosterResponder;
 use App\Services\Collections\CatalogCollectionCoverResponder;
-use App\Services\Collections\CatalogCollectionLegacyRedirectResponder;
 use App\Services\Comments\CommentDirectLinkResponder;
 use App\Services\Media\LicensedMediaDownloadResponder;
 use App\Services\Operations\InfrastructureHealthResponder;
@@ -108,6 +105,10 @@ Route::post('/billing/webhooks/{provider}', fn (Request $request, string $provid
     ->middleware('throttle:premium-webhooks')
     ->name('premium.webhook');
 Route::get('/calendar', ReleaseCalendarPage::class)
+    ->defaults('view', 'recent')
+    ->middleware('public.page:calendar')
+    ->name('calendar.index');
+Route::get('/calendar/upcoming', ReleaseCalendarPage::class)
     ->defaults('view', 'upcoming')
     ->middleware('public.page:calendar')
     ->name('calendar.upcoming');
@@ -126,20 +127,18 @@ Route::get('/calendar/month/{period}', ReleaseCalendarPage::class)
     ->where('period', '\\d{4}-\\d{2}')
     ->middleware('public.page:calendar')
     ->name('calendar.month');
-Route::get('/calendar/recent', ReleaseCalendarPage::class)
-    ->defaults('view', 'recent')
-    ->middleware('public.page:calendar')
-    ->name('calendar.recent');
+Route::permanentRedirect('/calendar/recent', '/calendar')->name('calendar.recent');
 Route::prefix('{locale}')
     ->whereIn('locale', config('release-calendar.supported_locales', ['ru']))
     ->middleware('collection.locale')
     ->name('localized.calendar.')
     ->group(function (): void {
-        Route::get('/calendar', ReleaseCalendarPage::class)->defaults('view', 'upcoming')->middleware('public.page:calendar')->name('upcoming');
+        Route::get('/calendar', ReleaseCalendarPage::class)->defaults('view', 'recent')->middleware('public.page:calendar')->name('index');
+        Route::get('/calendar/upcoming', ReleaseCalendarPage::class)->defaults('view', 'upcoming')->middleware('public.page:calendar')->name('upcoming');
         Route::get('/calendar/day/{period}', ReleaseCalendarPage::class)->defaults('view', 'day')->where('period', '\\d{4}-\\d{2}-\\d{2}')->middleware('public.page:calendar')->name('day');
         Route::get('/calendar/week/{period}', ReleaseCalendarPage::class)->defaults('view', 'week')->where('period', '\\d{4}-W\\d{2}')->middleware('public.page:calendar')->name('week');
         Route::get('/calendar/month/{period}', ReleaseCalendarPage::class)->defaults('view', 'month')->where('period', '\\d{4}-\\d{2}')->middleware('public.page:calendar')->name('month');
-        Route::get('/calendar/recent', ReleaseCalendarPage::class)->defaults('view', 'recent')->middleware('public.page:calendar')->name('recent');
+        Route::permanentRedirect('/calendar/recent', '/{locale}/calendar')->name('recent');
     });
 Route::redirect('/schedule', '/calendar', 301)->name('legacy.calendar.schedule');
 Route::redirect('/release-calendar', '/calendar', 301)->name('legacy.calendar.index');
@@ -271,7 +270,6 @@ Route::middleware(['auth', 'auth.session', 'account.private'])->group(function (
     Route::get('/my/collections/{collectionPublicId}/edit', CatalogCollectionEditor::class)
         ->whereUuid('collectionPublicId')
         ->name('collections.edit');
-    Route::redirect('/my/lists', '/my/collections', 301)->name('legacy.collections.mine');
     Route::get('/library', UserLibraryPage::class)
         ->defaults('section', 'watchlist')
         ->name('library.index');
@@ -352,12 +350,10 @@ Route::get('/playback/{licensedMedia}', fn (Request $request, LicensedMedia $lic
     ->whereNumber('licensedMedia')
     ->name('playback.source');
 
-Route::redirect('/discover', '/discover/popular', 302)->name('discover.default');
 Route::get('/discover/{type}', CatalogDiscoveryPage::class)
     ->whereIn('type', $discoveryRouteTypes)
     ->middleware('public.page:discovery')
     ->name('discover.index');
-Route::redirect('/recommendations', '/discover/popular', 301)->name('legacy.recommendations.index');
 Route::redirect('/top', '/top/movies', 302)->name('top.default');
 Route::get('/top/{category}', CatalogTopListPage::class)
     ->whereIn('category', CatalogTopListCategory::values())
@@ -379,9 +375,6 @@ Route::get('/requests/{contentRequest}', ContentRequestDetailPage::class)
     ->middleware('public.page:requests')
     ->name('requests.show');
 
-Route::get('/collections', CatalogCollectionDirectory::class)
-    ->middleware('public.page:collections')
-    ->name('collections.index');
 Route::get('/collections/covers/{publicId}/{version}', fn (Request $request, string $publicId, int $version, CatalogCollectionCoverResponder $covers) => $covers->response($request, $publicId, $version))
     ->whereUuid('publicId')
     ->whereNumber('version')
@@ -438,14 +431,6 @@ Route::middleware('collection.locale')->group(function () use ($discoveryRouteTy
         ->whereUuid('contentRequest')
         ->middleware('public.page:requests')
         ->name('localized.requests.show');
-    Route::get('/{locale}/discover', function (string $locale) {
-        return redirect()->route('localized.discover.index', [
-            'locale' => $locale,
-            'type' => CatalogRecommendationType::Popular->value,
-        ], 302);
-    })
-        ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
-        ->name('localized.discover.default');
     Route::get('/{locale}/discover/{type}', CatalogDiscoveryPage::class)
         ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
         ->whereIn('type', $discoveryRouteTypes)
@@ -464,14 +449,6 @@ Route::middleware('collection.locale')->group(function () use ($discoveryRouteTy
         ->whereIn('category', CatalogTopListCategory::values())
         ->middleware('public.page:catalog')
         ->name('localized.top.show');
-    Route::get('/{locale}/recommendations', function (string $locale) {
-        return redirect()->route('localized.discover.index', [
-            'locale' => $locale,
-            'type' => CatalogRecommendationType::Popular->value,
-        ], 301);
-    })
-        ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
-        ->name('localized.legacy.recommendations.index');
     Route::get('/{locale}/comments/{comment}', fn (Request $request, string $locale, string $comment, CommentDirectLinkResponder $comments) => $comments->response($request, $comment))
         ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
         ->whereNumber('comment')
@@ -480,10 +457,6 @@ Route::middleware('collection.locale')->group(function () use ($discoveryRouteTy
         ->whereIn('locale', config('reviews.supported_locales', ['ru']))
         ->whereNumber('review')
         ->name('localized.reviews.show');
-    Route::get('/{locale}/collections', CatalogCollectionDirectory::class)
-        ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
-        ->middleware('public.page:collections')
-        ->name('localized.collections.index');
     Route::get('/{locale}/collections/{collectionSlug}', CatalogCollectionPage::class)
         ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
         ->where('collectionSlug', '[^/]+')
@@ -498,14 +471,6 @@ Route::middleware('collection.locale')->group(function () use ($discoveryRouteTy
         ->where('username', '[A-Za-z0-9_]{3,32}')
         ->name('localized.users.show');
 });
-
-Route::redirect('/lists', '/collections', 301)->name('legacy.collections.index');
-Route::get('/lists/{collectionSlug}', fn (string $collectionSlug, CatalogCollectionLegacyRedirectResponder $collections) => $collections->response($collectionSlug))
-    ->where('collectionSlug', '[^/]+')
-    ->name('legacy.collections.show');
-Route::get('/selections/{collectionSlug}', fn (string $collectionSlug, CatalogCollectionLegacyRedirectResponder $collections) => $collections->response($collectionSlug))
-    ->where('collectionSlug', '[^/]+')
-    ->name('legacy.selections.show');
 
 foreach (CatalogDirectoryRegistry::routeMap() as $directory => $config) {
     Route::get('/'.$config['path'], CatalogDirectoryBrowser::class)
@@ -523,12 +488,9 @@ Route::get('/titles', CatalogSeries::class)
 Route::get('/admin/imports', SeasonvarImportManager::class)
     ->middleware(['auth', 'auth.session', 'account.private', 'can:manage-seasonvar-imports'])
     ->name('admin.imports');
-Route::get('/admin/catalog', CatalogAdministrationManager::class)
+Route::get('/admin/catalog', CatalogAdministrationPage::class)
     ->middleware(['auth', 'auth.session', 'account.private', 'can:manage-catalog'])
     ->name('admin.catalog');
-Route::get('/admin/collections', CatalogCollectionAdministrationManager::class)
-    ->middleware(['auth', 'auth.session', 'account.private', 'can:manage-catalog'])
-    ->name('admin.collections');
 Route::get('/admin/comments', CommentAdministrationManager::class)
     ->middleware(['auth', 'auth.session', 'account.private', 'can:manage-comments'])
     ->name('admin.comments');
@@ -579,10 +541,4 @@ Route::get('/titles/{catalogTitle:slug}', CatalogTitleDetail::class)
     ->middleware('public.page:title')
     ->name('titles.show');
 
-Route::fallback(function (Request $request) {
-    if ($request->is('api/*')) {
-        abort(404);
-    }
-
-    return redirect()->route('home');
-});
+Route::fallback(static fn () => abort(404));

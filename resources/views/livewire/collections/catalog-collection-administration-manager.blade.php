@@ -1,9 +1,4 @@
-<div class="mx-auto max-w-7xl space-y-5">
-    <header class="rounded-panel border border-slate-200 bg-white p-5 shadow-panel sm:p-6">
-        <h1 class="text-2xl font-black tracking-tight text-slate-800 sm:text-3xl">{{ __('collections.admin.title') }}</h1>
-        <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">{{ __('collections.admin.description') }}</p>
-    </header>
-
+<div class="mx-auto max-w-7xl space-y-5" data-livewire-catalog-collection-administration-manager>
     @if ($sourceSyncSummary !== null)
         <section data-collection-source-sync-summary class="rounded-panel border border-slate-200 bg-white p-5 shadow-panel sm:p-6" aria-labelledby="collection-source-sync-title">
             <div class="flex flex-wrap items-start justify-between gap-3">

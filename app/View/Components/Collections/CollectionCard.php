@@ -15,13 +15,17 @@ final class CollectionCard extends Component
 {
     public CatalogCollectionCardViewModel $card;
 
+    public bool $compact;
+
     public function __construct(
         CatalogCollection $collection,
         CatalogCollectionCoverService $covers,
         AccountDateTimeFormatter $dates,
         bool $management = false,
+        bool $compact = false,
         ?string $timezone = null,
     ) {
+        $this->compact = $compact;
         $this->card = new CatalogCollectionCardViewModel(
             $collection,
             $covers,

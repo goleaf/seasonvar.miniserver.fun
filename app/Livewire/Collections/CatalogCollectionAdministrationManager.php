@@ -23,7 +23,7 @@ final class CatalogCollectionAdministrationManager extends Component
 {
     use WithPagination;
 
-    #[Url(as: 'q', history: true, except: '')]
+    #[Url(as: 'collection_admin_q', history: true, except: '')]
     public string $search = '';
 
     public ?string $notice = null;
@@ -143,16 +143,7 @@ final class CatalogCollectionAdministrationManager extends Component
         return view('livewire.collections.catalog-collection-administration-manager', [
             'collections' => $paginator,
             'sourceSyncSummary' => $sourceSyncSummary,
-        ])->extends('layouts.app', [
-            'title' => __('collections.admin.title'),
-            'seo' => [
-                'title' => __('collections.admin.title'),
-                'description' => __('collections.admin.description'),
-                'robots' => 'noindex,nofollow',
-                'canonical' => route('admin.collections'),
-                'alternates' => [],
-            ],
-        ])->section('content');
+        ]);
     }
 
     private function user(): User

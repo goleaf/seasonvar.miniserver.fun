@@ -263,4 +263,8 @@
             </nav>
         @endif
     </section>
+
+    @if ($type === 'popular')
+        <livewire:collections.catalog-collection-explorer :key="'discovery-collections-'.app()->currentLocale()" />
+    @endif
 </div>
