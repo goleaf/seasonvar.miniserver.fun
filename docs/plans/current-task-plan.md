@@ -742,7 +742,7 @@ The user explicitly prohibits creating or running automated tests for Task 15. E
 | Security/least privilege | completed | Сохранены `contents: read`; planned immutable action SHA и `persist-credentials: false`; secrets/config environment не меняются |
 | Canonical docs/README/CHANGELOG | completed | CI/development/runtime/update-decision/frontend/search/performance owners, русские README/CHANGELOG и task evidence обновлены; `ci-check.sh docs` проходил после штатной синхронизации |
 | Full backend/frontend/browser | completed | Backend: 1 419 tests / 1 408 passed / 11 skipped / 122 920 assertions и все static/docs/cache gates; frontend: audit 0 и Vite 23 modules; browser: 41 passed, 4 expected skipped |
-| Git push/new Actions run | unresolved | После зелёных профилей в shared `main` снова появились многочисленные несвязанные staged/unstaged и untracked изменения; их нельзя поглощать task-only commit-ом. Без фактического push новый remote run отсутствует; внешняя доступность никогда не гарантируется |
+| Git push/new Actions run | unresolved | CI-реализация вошла в общий commit `eb4e7f9e`; `main` опережает `origin/main` на 36 unpublished commits. Отдельный task-only push технически невозможен без публикации всех его предков, поэтому до согласованной общей доставки последним остаётся remote run №212 (`29567874996`); внешняя доступность никогда не гарантируется |
 
 ## Production impact и rollback
 
