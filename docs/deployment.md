@@ -27,6 +27,14 @@ Repository templates use deployment-neutral `/srv/seasonvar/current`. Перед
 - High-risk package migration требует подтверждённого backup. Каждый dependency change явно указан в release/rollback runbook; service-worker rollback и stale clients учитываются.
 - Перед выпуском dependency/runtime group заполняется [`maintenance/production-compatibility-checklist.md`](maintenance/production-compatibility-checklist.md); package/framework/frontend-specific gates находятся в соседних checklists и ссылаются на один [`update-decisions.md`](maintenance/update-decisions.md).
 
+### Laravel Debugbar rollout от 19.07.2026
+
+`fruitcake/laravel-debugbar 4.4.0` добавлен только в `require-dev`; lock дополнительно содержит `php-debugbar/php-debugbar 3.8.0` и `php-debugbar/symfony-bridge 1.1.0`, без обновлений или удалений других packages. Production artifact обязан выполнять `composer install --no-dev --classmap-authoritative --no-interaction`, поэтому Debugbar classes, routes и assets туда не устанавливаются. `APP_ENV=production`, `APP_DEBUG=false` остаются обязательными независимо от отсутствия package.
+
+Deployment не добавляет migration, database/storage write, Vite asset или worker. После обновления lock/autoload пересобрать Laravel config и route caches уже после production `--no-dev` install, затем выполнить штатный graceful PHP-FPM reload; глобальный cache flush не нужен. Pre-activation проверяет production `--no-dev` dry-run, boot/config cache и отсутствие `_debugbar` routes. Ошибка install/autoload/config boot блокирует activation и не требует database restore.
+
+Rollback возвращает прежние `composer.json`/`composer.lock`, удаляет `config/debugbar.php`, выполняет locked Composer install/autoload и повторно собирает config/route caches перед reload. Sessions, queues, cache data, пользовательские записи и public assets не откатываются. Включение через отдельный environment override или runtime middleware запрещено.
+
 ## Eloquent AutoCache rollout от 17.07.2026
 
 Интеграция не добавляет миграций, очередей, scheduler или нового backend. После установки locked Composer dependencies и пересборки config cache выполнить:

@@ -91,6 +91,10 @@ composer dev
 
 `composer dev` запускает Laravel server, `queue:listen --tries=3 --timeout=900`, Pail logs и Vite. Если нужен только фронтенд, используйте `npm run dev`.
 
+Laravel Debugbar установлен только через `require-dev`. В доверенной локальной среде панель автоматически отображается при `APP_DEBUG=true`; при `APP_DEBUG=false`, а также в `production` и `testing`, package guard не регистрирует диагностические routes/listeners. Отдельные `DEBUGBAR_ENABLED` и `DEBUGBAR_FORCE_ALLOW_ENABLE` проектом не поддерживаются: единственный переключатель — `APP_DEBUG`, а `force_allow_enable` зафиксирован как `false` в `config/debugbar.php`.
+
+После изменения `APP_DEBUG` пересоберите config cache и локальный route cache в том же окружении либо удалите локальный route cache перед запуском, затем перезапустите длительно работающий PHP process. Route cache, созданный при выключенном Debugbar, намеренно не содержит его служебных маршрутов. Реальный `.env` не перезаписывается приложением. Debugbar может показывать SQL bindings, request/session context и замедлять ответы, поэтому его нельзя открывать на публичном endpoint или использовать как production monitoring.
+
 ### Полное демонстрационное наполнение
 
 В среде `dev` обычная команда `php artisan db:seed` после локальных `admin@example.com` и `user@example.com` запускает `PortalDemoSeeder`. Он создаёт или обновляет ровно 100 подтверждённых пользователей `user1@example.com`–`user100@example.com` с паролем `password` и детерминированно заполняет пользовательские состояния ровно для половины опубликованного каталога на каждого пользователя.

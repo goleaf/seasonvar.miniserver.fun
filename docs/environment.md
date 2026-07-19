@@ -76,6 +76,12 @@ Standalone default DBs: cache 1, queues 2, sessions 3, locks 5, broadcasting 6. 
 
 `RUN_CACHE_INFRASTRUCTURE_TESTS=false` — только test/CI switch. Его включают в изолированном тестовом окружении с run-specific Redis/Memcached prefixes; это не runtime feature flag production-приложения.
 
+## Laravel Debugbar
+
+`fruitcake/laravel-debugbar 4.4.0` является только development dependency. `config/debugbar.php` напрямую связывает `enabled` с уже существующим `APP_DEBUG` и запрещает `force_allow_enable`; отдельные `DEBUGBAR_*` variables отсутствуют в canonical inventory. В `local` при `APP_DEBUG=true` package регистрирует diagnostic routes/listeners и внедряет панель в подходящие HTML responses. При `APP_DEBUG=false`, а также в `production` и `testing`, package guard завершает boot до routes/listeners.
+
+Production baseline остаётся `APP_ENV=production`, `APP_DEBUG=false` и locked `composer install --no-dev`, поэтому Debugbar не входит в runtime artifact. Database, Redis/Memcached, sessions, queues, storage, scheduler, service worker и Vite manifest этой dependency не меняются. После config change нужен обычный `config:cache`, согласованный `route:cache` и graceful process refresh; store-wide cache flush не применяется. В local среде route cache, созданный при выключенном Debugbar, нужно удалить или пересобрать после включения, иначе условно регистрируемые `_debugbar/*` routes в нём отсутствуют.
+
 ## Eloquent AutoCache
 
 AutoCache обслуживает только явно кэшируемые публичные списки стран и жанров в фильтрах Top 100. Defaults принадлежат `config/autocache.php`:

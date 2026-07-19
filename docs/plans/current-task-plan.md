@@ -154,3 +154,27 @@ The user explicitly prohibits creating or running automated tests for Task 15. E
 - Inspect Livewire/Blade/translation/email/a11y/responsive/loading/error/unavailable states and auth page noindex/sitemap exclusion.
 - Inspect repository-wide duplicate/legacy/dead/auth control, custom hash, raw token, public cache and unfinished/debug patterns before delivery.
 - Run only allowed fresh verification, update compliance/docs, commit on clean `main` and attempt configured push.
+
+---
+
+# Laravel Debugbar по `APP_DEBUG`
+
+Обновлено: 19.07.2026
+
+Статус: ограниченная реализация и package-specific verification завершены; полный repository suite сохраняет независимые baseline failures, Git delivery выполняется отдельно.
+
+Исполняемый план и полная evidence matrix: [`../superpowers/plans/2026-07-19-laravel-debugbar-app-debug.md`](../superpowers/plans/2026-07-19-laravel-debugbar-app-debug.md).
+
+## Compliance matrix
+
+| Требование | Статус | Evidence / ограничение |
+| --- | --- | --- |
+| Requirements, maintenance и production owners | completed | Канонический порядок прочитан до реализации и повторно сверен перед delivery |
+| Dependency и compatibility | completed | `fruitcake/laravel-debugbar 4.4.0` только в `require-dev`; PHP/Laravel/Livewire metadata и exact lock проверены |
+| Configuration/security | completed | Только `APP_DEBUG`; `force_allow_enable=false`; local true показывает панель, local false и production/testing блокируют её |
+| Production/rollback | completed | `--no-dev`, `APP_DEBUG=false`, config/route cache rebuild; migration/data/storage/queue/Vite changes отсутствуют |
+| Cross-feature domains | already_compliant | Auth, privacy, translations, cache data, search, SEO, notifications, admin, premium, region/legal и public routes не меняются |
+| Tests/package/docs policies | completed | Focused 3/3 и 9 assertions, Pint, Composer validation/platform/audit/dry-run, environment gates, docs policies и legacy scan прошли |
+| Full repository suite | unresolved | 1 268 tests выполнены: 1 214 passed; 37 failures и 6 errors принадлежат существующим Blade/`CacheDomain::UserPortal` проблемам вне Debugbar |
+| README/CHANGELOG/canonical docs | completed | Отдельные русские записи и реестры обновлены; managed project-docs block проверен штатной командой и не требовал изменения |
+| Commit/push | unresolved | Завершается на `main`; remote success не заявляется без фактического результата |

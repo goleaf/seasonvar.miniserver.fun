@@ -1,6 +1,6 @@
 # Реестр решений об обновлениях
 
-Аудит: 18.07.2026. Решение относится к точным lock-файлам Task 29. `retain` не означает бессрочную заморозку: оно означает отсутствие достаточной причины менять dependency в этом change set.
+Аудит: 18.07.2026. Решение относится к точным lock-файлам Task 29. `retain` не означает бессрочную заморозку: оно означает отсутствие достаточной причины менять dependency в этом change set. Отдельная запись `UD-C-017` от 19.07.2026 фиксирует последующую ограниченную установку Laravel Debugbar и не изменяет исторические выводы Task 29.
 
 ## Общий contract записей
 
@@ -34,6 +34,23 @@
 | UD-C-014 | `nunomaduro/collision` | `8.9.5` / current metadata | retain | Existing CLI error presentation | Development console | No production dependency reason |
 | UD-C-015 | `phpunit/phpunit` | `12.5.31` / `13.2.4` | retain; defer major | New major alone is not benefit; tests may not be run in Task 29 | Complete test suite/config/CI and Pao/Collision compatibility | PHPUnit 13 compatibility is unknown until a dedicated verified migration |
 | UD-C-016 | `rector/rector` | `2.5.7` / current metadata | retain | Owns required and maximum modernization inventory | Development/static analysis | Suggested refactors are not proof of deprecation or correctness |
+| UD-C-017 | `fruitcake/laravel-debugbar` | absent / `^4.4` (locked `4.4.0`) | add; package gates verified | Requested Laravel-native local request/SQL/Livewire diagnostics without a custom profiler | Development only; auto-discovery/config boot and local HTML responses; production uses `--no-dev` and remains fail-closed | Debugbar gates pass; full repository suite retains unrelated baseline failures and final Git delivery remains unresolved |
+
+### UD-C-017 — добавить Laravel Debugbar только для разработки
+
+1. Dependency/runtime: direct `fruitcake/laravel-debugbar 4.4.0`; exact material transitive packages are `php-debugbar/php-debugbar 3.8.0` and `php-debugbar/symfony-bridge 1.1.0`.
+2. Current/proposed version: package was absent; direct constraint `^4.4` resolved to locked official stable `4.4.0` without updating or removing another package.
+3. Scope/purpose: `require-dev` diagnostics for trusted local HTTP, database, views, requests and Livewire behavior; no production product capability.
+4. Reason: explicit user request and maintenance value from supported Laravel-native observability; a custom profiler/provider would duplicate package lifecycle and increase disclosure risk.
+5. Security/maintenance relevance: Debugbar can expose request, SQL binding, session and application context. It is allowed only when application debug mode is on outside `production|testing`; force enable and public runtime middleware are prohibited.
+6. Compatibility requirements: PHP `^8.2`, Illuminate `^11|^12|^13`, current Laravel `13.20`, PHP `8.5` and Livewire 4 support are confirmed by official package metadata, installed Composer resolution and passing dev/non-dev platform checks.
+7. Affected files/modules: `composer.json`, `composer.lock`, `config/debugbar.php`, package discovery, development HTML response pipeline, regression test and maintenance/development/deployment documentation.
+8. Configuration/database/assets/production: minimal config binds `enabled` to `APP_DEBUG` and sets `force_allow_enable=false`; no `.env` edit/variable, migration, Vite entry, domain cache key, session/queue/job/provider change. Production installs `--no-dev` and keeps `APP_DEBUG=false`.
+9. Deprecated/replacement APIs: old package name `barryvdh/laravel-debugbar` is replaced upstream and must not be introduced; no existing application API is replaced.
+10. Backward compatibility: public/application routes, APIs, persisted data, translations, cache identities and production responses remain unchanged. Local debug responses gain package assets/routes only while the approved gate is true.
+11. Rollback: remove direct dev package and minimal config, restore reviewed lock, rebuild Composer autoload and Laravel config/route caches; no database, asset, session, queue, cache-data or provider rollback.
+12. Verification: TDD RED/GREEN, exact three-package lock diff, installed metadata, MIT licences, zero locked advisories, local/false/production route boot, HTML injection/non-injection, platform checks, production `--no-dev` dry-run, documentation policies and repository-wide legacy/override search passed. The complete repository run executed 1 268 tests: 1 214 passed, while 37 failures and 6 errors came from pre-existing Blade contract violations and the unrelated missing `CacheDomain::UserPortal`; the 3 Debugbar tests passed with 9 assertions.
+13. Decision: `add` is accepted because all bounded package and environment gates pass. The independent full-suite baseline remains explicitly unresolved and is not expanded into this dependency task; final Git delivery is recorded separately.
 
 ## Все прямые npm decisions
 

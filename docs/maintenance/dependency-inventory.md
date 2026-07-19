@@ -1,6 +1,6 @@
 # Канонический реестр прямых зависимостей
 
-Аудит: 18.07.2026. Источники: `composer.json`, `composer.lock`, `composer show --direct --format=json`, `composer licenses --format=json`, `package.json`, `package-lock.json`, `npm ls --depth=0`, package manifest и полный repository usage search. Основные таблицы содержат только direct dependencies; transitive packages упоминаются лишь там, где они образуют production boundary. Версия означает состояние lock-файла, а не рекомендацию обновиться.
+Аудит: 18.07.2026; дополнено 19.07.2026 после установки Laravel Debugbar. Источники: `composer.json`, `composer.lock`, `composer show --direct --format=json`, `composer licenses --format=json`, `package.json`, `package-lock.json`, `npm ls --depth=0`, package manifest и полный repository usage search. Основные таблицы содержат только direct dependencies; transitive packages упоминаются лишь там, где они образуют production boundary. Версия означает состояние lock-файла, а не рекомендацию обновиться.
 
 ## Composer: назначение и решение
 
@@ -13,6 +13,7 @@
 | `wddyousuf/eloquent-autocache` | `0.2.4` / `^0.2.3` | production | Opt-in cache for the bounded public Country/Genre Top lists only | `config/autocache.php`, `CachesCatalogFilterOptions` | retain; isolated and disableable fallback |
 | `driftingly/rector-laravel` | `2.5.0` / `^2.5` | development | Laravel-aware Rector rules | `rector.php`, `rector-max.php` | retain; static upgrade audit |
 | `fakerphp/faker` | `1.24.1` / `^1.23` | development | Factories and existing fixture/test data only | `database/factories`, tests | retain; no runtime bundle |
+| `fruitcake/laravel-debugbar` | `4.4.0` / `^4.4` | development | Trusted local HTTP, SQL, view, request and Livewire diagnostics | auto-discovery, minimal `config/debugbar.php`; enabled only by `APP_DEBUG` outside `production|testing` | add; optional development diagnostics, excluded by production `--no-dev` |
 | `larastan/larastan` | `3.10.0` / `^3.10` | development | Laravel-aware PHPStan analysis | `phpstan.neon.dist`, `composer analyse` | retain; bounded static gate |
 | `laravel/boost` | `2.4.13` / `^2.4` | development | Laravel/Codex development context and diagnostics | auto-discovered development provider and commands | retain; development only |
 | `laravel/pail` | `1.2.7` / `^1.2.5` | development | Local log tailing in `composer dev` | auto-discovered `pail` command | retain; development only |
@@ -51,6 +52,7 @@
 | `wddyousuf/eloquent-autocache` | `autocache:clear|flush|stats|warm`; no routes/migrations | server cache only; no bundle | optional with fallback / medium | disable, rebuild config, reload processes, prove Country/Genre query fallback, then remove trait/config/cache namespace | audit clean, not abandoned; MIT; catalog/cache |
 | `driftingly/rector-laravel` | `rector` rules via vendor binary; no runtime effects | development PHP memory/process | optional gate / low | replace rules/config and prove required profile parity | audit clean; MIT; development |
 | `fakerphp/faker` | none | development only | required by existing factories / low | usage-free factories/tests or compatible generator migration | audit clean; MIT; testing |
+| `fruitcake/laravel-debugbar` | `_debugbar/*` routes and four local diagnostic commands only while the package guard can boot; no migrations | development HTTP collectors and package-served assets; no Vite entry | optional / low | remove direct package/config, rebuild autoload/config and prove local app boots; production already installs `--no-dev` | audit clean on 19.07.2026; MIT; development diagnostics |
 | `larastan/larastan` | `phpstan` integration; no runtime effects | development analysis memory | required by static gate / medium | replace only with equivalent Laravel type coverage | audit clean; MIT; development |
 | `laravel/boost` | Boost/MCP development commands; no intended production route | auto-discovered development tooling | optional / low | remove project/Codex integrations and docs together | audit clean; MIT; development |
 | `laravel/pail` | `pail`; no route/migration | development log reader | optional / low | remove from `composer dev` and operator docs | audit clean; MIT; development |
@@ -74,6 +76,7 @@
 ## Transitive boundaries that matter
 
 - Laravel resolves Symfony 8.1 components, Guzzle 7.15, Flysystem 3.35, CommonMark 2.8, Monolog 3.10 and Carbon 3.13. They are not independent direct decisions; a framework update must inspect their relevant mail, HTTP, storage, Markdown, logging and date contracts.
+- `fruitcake/laravel-debugbar` 4.4.0 adds development-only `php-debugbar/php-debugbar` 3.8.0 and `php-debugbar/symfony-bridge` 1.1.0. Both are MIT and share the same local-debug/no-production purpose; they are not separate application integration decisions.
 - No direct payment, OAuth, external search, image-processing, Redis-client or Memcached-client Composer package is installed. Payment providers are unconfigured, search uses application/Eloquent/SQLite FTS boundaries, images use installed PHP Imagick/GD extensions, and cache clients are PHP extensions/runtime services.
 - Composer plugin policy has no installed or locked plugin. Task 29 removed stale permissions for `pestphp/pest-plugin` and `php-http/discovery`; any future plugin needs its own purpose/security/scripts decision before permission is granted.
 - Composer auto-discovery registers framework/dev providers plus Sanctum, Tinker, Livewire and AutoCache. Application providers remain exactly `AppServiceProvider`, `ApiServiceProvider` and `SeasonvarQueueServiceProvider`; no duplicate registration was found.
@@ -93,7 +96,7 @@ Seven scheduler entries remain bounded and named; no cron, queue, provider call 
 
 ## Lock and licensing policy
 
-- The four dependency files were hashed before maintenance work and are protected from unrelated rewrite. Task 29 changes no package version or lock entry.
+- The four dependency files were hashed before maintenance work and are protected from unrelated rewrite. Task 29 changed no package version or lock entry; the separate 19.07.2026 Debugbar decision adds exactly three Composer lock entries with no update or removal.
 - `composer audit --locked` reports no advisory, malware-policy or abandoned-package record. `npm audit` reports zero known vulnerabilities across the 113 locked npm dependencies. These are dated tooling results, not a permanent safety claim.
 - Direct Composer licenses are MIT except Mockery/PHPUnit (BSD-3-Clause). Direct npm licenses are documented above; FontAwesome attribution/license obligations and axe-core MPL-2.0 must remain in any distribution/legal review.
 - A successful install or clean advisory command never replaces feature, production, privacy, accessibility or rollback verification.
