@@ -24,3 +24,10 @@
 - [x] Run Pint, related tests, full suite, managed docs, diff and legacy scans.
 - [x] Update current compliance, CHANGELOG and README assessment.
 - [ ] Commit/push only when the shared Git guard permits a clean scoped delivery.
+
+### Verification evidence
+
+- RED contract failed on the missing process token before the base-test guard; ordinary and `TEST_TOKEN=runner-7` GREEN runs then passed with 1 test and 2 assertions each.
+- Two independent `DemoCatalogCorpusStageTest` processes passed concurrently with 4 tests and 5,575 assertions each; the full `Storage::fake()` inventory passed 56 tests and 7,937 assertions.
+- The final combined cache/storage/CI focused run passed 80 tests and 5,991 assertions with 9 expected infrastructure skips.
+- The full repository suite passed 1,427 tests: 1,416 passed, 11 expected skips, 122,945 assertions.
