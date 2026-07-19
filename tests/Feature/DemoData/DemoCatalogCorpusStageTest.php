@@ -126,7 +126,14 @@ final class DemoCatalogCorpusStageTest extends TestCase
 
         CatalogCollection::query()->each(function (CatalogCollection $collection): void {
             $this->assertNotNull($collection->cover_path);
+            $this->assertSame('image/webp', $collection->cover_mime_type);
+            $this->assertStringStartsWith('catalog-collections/'.$collection->public_id.'/', (string) $collection->cover_path);
+            $this->assertStringEndsWith('.webp', (string) $collection->cover_path);
             Storage::disk('uploads')->assertExists($collection->cover_path);
+            $this->assertSame(
+                [960, 540],
+                array_slice(getimagesize(Storage::disk('uploads')->path($collection->cover_path)) ?: [], 0, 2),
+            );
         });
 
         $duplicatePersonalPivot = DB::table('catalog_title_user_tag')

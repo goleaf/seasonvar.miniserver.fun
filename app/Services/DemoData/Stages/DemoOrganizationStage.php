@@ -231,7 +231,14 @@ final readonly class DemoOrganizationStage implements DemoDataStage
         for ($ordinal = 0; $ordinal < $count; $ordinal++) {
             $copy = $this->text->collection($persona, $ordinal);
             $publicId = $this->stable->uuid("organization:user:{$userIndex}:collection:{$ordinal}");
-            $cover = $assets->store('collection-covers', $publicId, 960, 540);
+            $cover = $assets->store(
+                'collection-covers',
+                $publicId,
+                960,
+                540,
+                'catalog-collections/'.$publicId.'/demo',
+                'webp',
+            );
             $visibility = $visibilityCases[($userIndex + $ordinal - 1) % count($visibilityCases)];
             $rows[] = [
                 'public_id' => $publicId,

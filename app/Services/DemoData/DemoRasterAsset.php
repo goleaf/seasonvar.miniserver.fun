@@ -19,17 +19,35 @@ final readonly class DemoRasterAsset
     /**
      * @return array{disk: string, path: string, mime_type: string, size: int, width: int, height: int, hash: string}
      */
-    public function store(string $kind, string $identity, int $width, int $height): array
-    {
-        if ($kind === '' || $identity === '' || $width < 32 || $height < 32 || $width > 2_000 || $height > 2_000) {
+    public function store(
+        string $kind,
+        string $identity,
+        int $width,
+        int $height,
+        ?string $directory = null,
+        string $format = 'png',
+    ): array {
+        if ($kind === ''
+            || $identity === ''
+            || $width < 32
+            || $height < 32
+            || $width > 2_000
+            || $height > 2_000
+            || ! in_array($format, ['png', 'webp'], true)) {
             throw new InvalidArgumentException('Demo raster asset parameters are invalid.');
         }
 
         $scope = 'asset:'.$kind.':'.$identity.':'.$width.'x'.$height;
-        $path = trim($this->options->assetPrefix, '/')
-            .'/'.trim($kind, '/')
-            .'/'.$this->stable->uuid($scope).'.png';
-        $bytes = $this->png($scope, $kind, $width, $height);
+        $directory = $directory === null
+            ? trim($this->options->assetPrefix, '/').'/'.trim($kind, '/')
+            : trim($directory, '/');
+
+        if ($directory === '' || str_contains($directory, '..') || str_contains($directory, '\\')) {
+            throw new InvalidArgumentException('Demo raster asset directory is invalid.');
+        }
+
+        $path = $directory.'/'.$this->stable->uuid($scope).'.'.$format;
+        $bytes = $this->raster($scope, $kind, $width, $height, $format);
         $disk = Storage::disk($this->options->assetDisk);
 
         if (! $disk->put($path, $bytes)) {
@@ -41,7 +59,7 @@ final readonly class DemoRasterAsset
         return [
             'disk' => $this->options->assetDisk,
             'path' => $path,
-            'mime_type' => 'image/png',
+            'mime_type' => 'image/'.$format,
             'size' => strlen($bytes),
             'width' => $width,
             'height' => $height,
@@ -49,7 +67,7 @@ final readonly class DemoRasterAsset
         ];
     }
 
-    private function png(string $scope, string $kind, int $width, int $height): string
+    private function raster(string $scope, string $kind, int $width, int $height, string $format): string
     {
         $image = imagecreatetruecolor($width, $height);
 
@@ -91,13 +109,24 @@ final readonly class DemoRasterAsset
             $foreground,
         );
 
+        $bufferLevel = ob_get_level();
         ob_start();
-        $written = imagepng($image, null, 9);
-        $bytes = ob_get_clean();
-        imagedestroy($image);
+
+        try {
+            $written = $format === 'webp'
+                ? imagewebp($image, null, 82)
+                : imagepng($image, null, 9);
+            $bytes = ob_get_clean();
+        } finally {
+            while (ob_get_level() > $bufferLevel) {
+                ob_end_clean();
+            }
+
+            imagedestroy($image);
+        }
 
         if (! $written || ! is_string($bytes)) {
-            throw new RuntimeException('Unable to encode GD image.');
+            throw new RuntimeException('Unable to encode deterministic demo raster asset.');
         }
 
         return $bytes;
