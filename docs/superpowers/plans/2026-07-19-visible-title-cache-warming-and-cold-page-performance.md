@@ -33,6 +33,7 @@
 - [x] `CacheEntryState` missing/fresh/stale/unavailable regression.
 - [x] Canonical title context parity regression.
 - [x] Long-slug regression: значение длиннее общего dimension limit использует bounded title ID, не release-ит job как cache outage и выполняет один exact-origin warm.
+- [x] Long-slug production convergence: три прежних retry IDs естественно перешли `missing→fresh` после штатного worker recycle, дали HTTPS `HIT`, а очередь дошла до нуля без restart/retry/clear/rewrite.
 - [x] Import activity status regression и существующие consumer jobs.
 - [x] Job contract: unique, overlap, fresh skip, stale/missing warm, hidden/import/outage skip/release.
 - [x] Job retry contract: новые payload используют `$tries=0`, absolute `retryUntil()`, deadline-covering unique lock, domain/version-store outage release и default-locale canonical key; старые Laravel payload честно остаются на записанном attempt-bound контракте и заменяются только следующим demand-driven fan-out без queue rewrite/clear.
