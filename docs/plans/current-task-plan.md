@@ -1,7 +1,7 @@
 # Текущая задача — даты серий Seasonvar в календаре и XML-tail backfill
 
 Дата: 20.07.2026
-Статус: implementation, production backfill, финальная техническая сверка и Git delivery завершены; продуктовый snapshot `07d577425f5dab179830f66582462a85a78bb55a` и post-delivery documentation sync `118429fa338a9aa4a2b59a233c380a68a23eca64` опубликованы в `origin/main`.
+Статус: календарный mapping и production backfill завершены; штатный cron run `#964` выявил отдельную dispatcher/global-finalizer race, для которой root cause и design завершены, а TDD implementation, безопасное recovery и delivery выполняются.
 
 ## Цель и план
 
@@ -42,6 +42,33 @@ Fresh XML evidence: карта содержит 47 835 distinct serial URL. `ser
 Production evidence: targeted run `#953` обновил три sibling-season страницы «Интервью с вампиром». XML-tail run `#954` сохранил `sitemap_tail_limit=1000` и `sitemap_tail_selected=1000`, затем штатно добавил sibling seasons до итоговых `1592/1592`; статус `completed`, page failures `0`, active/problem groups `0/0`, live claims `0`, checkpoint удалён, recommendation handoff `deferred` с сохранением dirty rows. Пять claims, созданных base dispatcher для уже terminal sibling staging rows, выявили отдельную гонку fan-in: finalizer теперь освобождает только exact `(source_page_id, run_id, token)` terminal claim, не затрагивая nonterminal work. Production recovery прошёл через обычный `queue:restart` и canonical watchdog signal без queue/cache clear или state rewrite. Финальный `app:deployment-check --json` вернул `ready=true`: SQLite quick/FK, migrations, indexes, FTS и transports прошли; только исторические failed jobs и отсутствие отдельного постоянного importer process остались ожидаемыми operational warnings.
 
 Calendar evidence: «Интервью с вампиром» хранит одну logical translation row для сезона 3, серии 7, `RuDub`; «Вестис» — одну logical translation row для сезона 1, серии 3, `RuDub`. В обоих случаях provider correction повышена существующим portal observer до `exact_datetime`, `Episode::released_at` остаётся `null`, а filtered HTTPS `/calendar?title=...` показывает название, дату 19 июля 2026 года, сезон/серию и перевод.
+
+## Follow-up — durable dispatch-completion barrier
+
+- [x] Дождаться штатного cron и подтвердить реальный queued lifecycle без ручного запуска.
+- [x] Зафиксировать точную race: run `#964` получил terminal state раньше последних claims и staging groups.
+- [x] Сравнить durable summary marker, schema column и ephemeral Redis lock; выбрать summary marker без migration.
+- [x] Записать design spec и проверить его на placeholders, противоречия, scope и rollback.
+- [ ] Добавить RED regression для global finalizer при `dispatch_completed=false`.
+- [ ] Реализовать atomic transition `false → true` после полного dispatch и сохранить legacy missing-marker compatibility.
+- [ ] Выполнить безопасное recovery `#964` только через application services, без queue/cache clear и direct state rewrite.
+- [ ] Перепроверить claims/groups/run/calendar, focused/full tests, docs, README/CHANGELOG и legacy paths.
+- [ ] Commit/push только из существующей `main` после чистой финальной сверки.
+
+### Compliance matrix
+
+| Требование | Статус | Evidence / ограничение |
+| --- | --- | --- |
+| Root cause | `completed` | `#964` завершён в `02:01:33 UTC`, но новые claims создавались до `02:01:38`; после terminal остались 137 live claims, 147 queued staging rows и 91 running group. |
+| Architecture/data safety | `completed` | Выбран durable marker в existing run summary; schema, queue payload, public command и Redis key format не меняются. |
+| TDD implementation | `unresolved` | Production code запрещён до наблюдаемого RED regression. |
+| Production recovery | `unresolved` | Claims/staging не очищаются вручную; сначала выбирается существующая service boundary и проверяется отсутствие другого active global run. |
+| Auth/privacy/translations/search/SEO/mobile/admin/premium/region/legal | `not_applicable` | Изменяется только internal importer lifecycle; public/user access contracts и source privacy не расширяются. |
+| Cache/notifications/recommendations | `unresolved` | Finalizer handoff должен остаться после terminal claims/groups и не запускаться во время dispatch. |
+| Documentation/README/CHANGELOG | `unresolved` | Design и current evidence записаны; owners и visitor history обновляются только после фактического результата. |
+| Verification/Git delivery | `unresolved` | Требуются focused/full gates, production read-only smoke и delivery из `main`. |
+
+Design: [`2026-07-20-seasonvar-dispatch-completion-barrier-design.md`](../superpowers/specs/2026-07-20-seasonvar-dispatch-completion-barrier-design.md).
 
 ---
 
