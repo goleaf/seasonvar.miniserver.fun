@@ -747,9 +747,9 @@ The user explicitly prohibits creating or running automated tests for Task 15. E
 
 # Текущая задача: надёжность GitHub Actions
 
-Обновлено: 19.07.2026
+Обновлено: 20.07.2026
 
-Статус: первоначальный и remote-only root causes воспроизведены и исправлены; локальные профили, направленные regressions, commit/push и последующий успешный GitHub Actions run завершены.
+Статус: первоначальный и remote-only root causes воспроизведены и исправлены; локальные профили, направленные regressions и последующие успешные GitHub Actions runs завершены. Repository-level Actions policy, dependency alerts и защита истории `main` применены, прочитаны обратно и проверены отдельным полным run.
 
 ## Решение и evidence
 
@@ -760,6 +760,9 @@ The user explicitly prohibits creating or running automated tests for Task 15. E
 - Локальный для CI maintenance driver `cache` со store `array` исключает ложные `503` от общего `storage/framework/down`, не изменяет marker и не выводит production из режима обслуживания.
 - Полный Playwright gate после исправления component-scoped pagination cleanup завершён без ошибок: `41 passed`, `4 skipped` на desktop/mobile/tablet. Свежий backend-профиль прошёл Composer audit, Pint, Rector, PHP syntax, Larastan, docs/cache gates и PHPUnit: `1 419` tests, `1 408` passed, `11` skipped, `122 920` assertions. Свежий frontend-профиль подтвердил `npm audit` без уязвимостей и Vite build из `23` modules.
 - Pre-push commit `3bd5e56` повторно прошёл `1 424` tests / `122 939` assertions, frontend audit/build и был опубликован. Remote run №213 на его родительском snapshot выявил два пропуска локального окружения: stale readiness assertion и production default Unix-группу внутри fake uploads; job log извлечён через настроенную read-only Git-аутентификацию. Оба сценария получили GREEN, а workflow дополнительно закрепил явный `gd` в PHP jobs.
+- Read-only repository audit обнаружил остававшиеся remote gaps: `allowed_actions=all`, отсутствие server-side SHA enforcement, отсутствие ruleset для `main` и выключенные vulnerability alerts. Secret scanning, push protection и read-only default workflow permissions уже соответствовали требованиям.
+- Repository settings обновлены без изменения application runtime: `allowed_actions=selected`, `sha_pinning_required=true`, GitHub-owned actions и exact external `setup-php` SHA; создан ruleset `Protect main history` (`19185964`) только с deletion/non-fast-forward protection; passive Dependabot alerts включены и показали `0` открытых alerts.
+- Ручной run [№223](https://github.com/goleaf/seasonvar.miniserver.fun/actions/runs/29712616978) под новой политикой завершил `Backend`, `Frontend` и `Browser` со статусом `success` на exact SHA `c19504e3183f011ebb14aaf15cf24b330c95bd92`.
 
 ## Compliance matrix
 
@@ -769,18 +772,22 @@ The user explicitly prohibits creating or running automated tests for Task 15. E
 | Remote diagnosis/root cause | completed | Публичные runs/jobs проверены; последний remote SHA воспроизведён exact backend profile; failure локализован после прошедших Composer/Pint/Rector/syntax/Larastan gates |
 | TDD regression | completed | Первые RED/GREEN дали 24 tests / 469 assertions; remote №213 добавил RED public readiness contract и Unix-group drift, а explicit `gd` contract прошёл отдельный RED/GREEN. Три новых направленных теста завершились 35 assertions |
 | Dependencies/runtime compatibility | already_compliant | Composer/npm/PHP/Node/action majors не обновляются; фиксируются используемые action commits, GA Ubuntu 24.04 label и уже обязательное для raster flows расширение `gd` |
-| Production/data/rollback | not_applicable | Нет migration, database/storage/cache/session/queue/provider/service-worker изменения; rollback — revert CI/hook/docs commit |
+| Production/data/rollback | not_applicable | Нет migration, database/storage/cache/session/queue/provider/service-worker изменения; local rollback — revert CI/hook/docs commit, remote settings rollback описан в `CI-R-002` |
 | Auth/authorization/translations/search/SEO/notifications/admin/imports/premium/region/legal/mobile | already_compliant | Application/public contracts и данные не меняются; затронут только development/CI boundary |
-| Security/least privilege | completed | Сохранены `contents: read`; planned immutable action SHA и `persist-credentials: false`; secrets/config environment не меняются |
+| Security/least privilege | completed | Сохранены `contents: read`; immutable action SHA и `persist-credentials: false` проверены; secrets/config environment не меняются |
+| Repository Actions policy | completed | Read-back подтвердил selected allowlist, обязательный full SHA, GitHub-owned refs и единственный exact external `setup-php` pin; default token read-only без PR approval |
+| Main history/dependency alerts | completed | Active ruleset `19185964` запрещает deletion/non-fast-forward; secret scanning/push protection сохранены; passive vulnerability alerts включены и вернули 0 open alerts на дату проверки |
+| Required checks/automatic update PRs | not_applicable | Server-side pre-merge checks и Dependabot update PRs требуют PR branches, запрещённых каноническим direct-to-`main` workflow; предварительный gate остаётся локальным `pre-push`, а remote CI — fail-closed после push |
 | Canonical docs/README/CHANGELOG | completed | CI/development/runtime/update-decision/frontend/search/performance owners, русские README/CHANGELOG и task evidence обновлены; `ci-check.sh docs` проходил после штатной синхронизации |
 | Full backend/frontend/browser | completed | Последний pre-push backend: 1 424 tests / 1 413 passed / 11 skipped / 122 939 assertions и все static/docs/cache gates; frontend: audit 0 и Vite 23 modules; browser: 41 passed, 4 expected skipped |
-| Git push/new Actions run | completed | Исправления вошли в `096c66f573df6ae914e2aa0061d928c3ee9c2909` и опубликованные containing snapshots. GitHub Actions runs [`29709075412`](https://github.com/goleaf/seasonvar.miniserver.fun/actions/runs/29709075412) для `7ae3ae8` и [`29710632600`](https://github.com/goleaf/seasonvar.miniserver.fun/actions/runs/29710632600) для более свежего `118429f` фактически завершены `success` во всех заданиях `Backend`, `Frontend` и `Browser`; промежуточные отмены вызваны только новыми push через `concurrency.cancel-in-progress`. |
+| Git push/new Actions run | completed | Исправления вошли в `096c66f573df6ae914e2aa0061d928c3ee9c2909` и опубликованные containing snapshots. GitHub Actions runs [`29709075412`](https://github.com/goleaf/seasonvar.miniserver.fun/actions/runs/29709075412), [`29710632600`](https://github.com/goleaf/seasonvar.miniserver.fun/actions/runs/29710632600) и новый policy-validation run [`29712616978`](https://github.com/goleaf/seasonvar.miniserver.fun/actions/runs/29712616978) фактически завершены `success` во всех заданиях `Backend`, `Frontend` и `Browser`; промежуточные отмены вызваны только новыми push через `concurrency.cancel-in-progress`. |
 
 ## Production impact и rollback
 
 - Deployment/runtime сервиса не меняются; backup, migration, cache flush и worker restart не требуются.
 - При внешнем outage GitHub/npm/Composer job остаётся честно красным и повторяется после восстановления; ошибки не маскируются.
 - Rollback возвращает предыдущие workflow refs/runner и удаляет локальный docs gate одним Git revert без восстановления данных.
+- Remote settings rollback при подтверждённой несовместимости отдельно возвращает Actions policy к `allowed_actions=all`/`sha_pinning_required=false` и удаляет ruleset `19185964`; vulnerability alerts отключаются только по отдельному security-решению. Application code/data rollback для repository settings не требуется.
 
 ---
 

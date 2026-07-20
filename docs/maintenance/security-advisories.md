@@ -1,6 +1,6 @@
 # Работа с dependency security advisories
 
-Аудит registry: 18.07.2026; exact-lock tooling повторено 19.07.2026. Этот документ хранит workflow и проверенные результаты, но не публикует exploit details и не заменяет provider/security incident process.
+Аудит registry: 18.07.2026; exact-lock tooling повторено 19.07.2026; repository alert signal проверен 20.07.2026. Этот документ хранит workflow и проверенные результаты, но не публикует exploit details и не заменяет provider/security incident process.
 
 ## Обязательный workflow
 
@@ -29,6 +29,7 @@
 | SA-2026-07-18-P | Composer plugin policy inspection | `composer.json`, lock and installed package list | Два plugin names были pre-authorized, но не installed/locked | Лишнее permission surface, не vulnerability claim | Unused permissions удалены; lock untouched; rollback documented in UD-CFG-001 |
 | SA-2026-07-19-C | Fresh Composer `audit --locked` | 125 exact locked Composer packages including dev | 0 advisories; 0 abandoned packages reported | Dated authoritative package-tool result only | Retain decisions; no broad update |
 | SA-2026-07-19-N | Fresh npm `audit --json` | 113 exact locked npm dependencies | 0 low/moderate/high/critical vulnerabilities | npm provides no equivalent abandoned-package conclusion | Retain decisions; no `audit fix` or `--force` |
+| SA-2026-07-20-GH | GitHub Dependabot repository alerts API | Dependency graph репозитория | Passive alerts enabled; `0` open alerts на момент read-back | Dated GitHub signal, не гарантия отсутствия неизвестной проблемы и не замена Composer/npm audits | Сохранить alerts; каждое обновление review вручную, automatic security-update PRs выключены из-за `main`-only contract |
 
 ## Operational limitations
 

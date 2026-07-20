@@ -10,6 +10,18 @@ GitHub Actions workflow находится в `.github/workflows/ci.yml` и за
 
 Полный SHA защищает от перемещения tag, но не превращает GitHub, npm или Composer registry в безотказные сервисы. Внешний outage и новая реальная ошибка должны честно завершать job ненулевым кодом; `continue-on-error`, отключение audits/tests и фиктивный success не используются.
 
+## Политика репозитория GitHub
+
+Проверенная 20.07.2026 repository-level политика дополняет workflow:
+
+- GitHub Actions разрешены в режиме `selected`; remote setting `sha_pinning_required=true` отклоняет action без полного commit SHA. Разрешены GitHub-owned actions и единственный внешний ref `shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240`; произвольные и просто verified actions не разрешены.
+- Default `GITHUB_TOKEN` имеет read-only permissions и не может одобрять pull request. Сам workflow дополнительно объявляет только `contents: read`, а checkout не сохраняет credentials.
+- Активный repository ruleset `Protect main history` (`19185964`) для `refs/heads/main` запрещает удаление ветки и non-fast-forward update. Обычный fast-forward push в единственную рабочую ветку `main` сохранён; обязательный pull request и server-side required status checks не заявляются, потому что они противоречат каноническому direct-to-`main` workflow проекта.
+- GitHub secret scanning и push protection уже включены. Passive Dependabot vulnerability alerts включены отдельно; read-back на дату проверки показал `0` открытых alerts. Автоматические Dependabot security updates намеренно не включены: они создают отдельные pull-request branches, запрещённые текущим Git workflow.
+- Ручной run [№223](https://github.com/goleaf/seasonvar.miniserver.fun/actions/runs/29712616978) после применения этой политики завершил `Backend`, `Frontend` и `Browser` со статусом `success` на exact SHA `c19504e3183f011ebb14aaf15cf24b330c95bd92`.
+
+Эти настройки уменьшают configuration drift, supply-chain и history-rewrite risks, но не обещают отсутствие всех будущих ошибок. Реальная регрессия, новый advisory или недоступность GitHub/registry должны оставаться видимым отказом. Direct-to-`main` правило также означает, что последний server-side run происходит после push; локальный `pre-push` остаётся обязательным предварительным gate.
+
 ## Единый исполняемый сценарий
 
 `scripts/ci-check.sh` является единственным владельцем порядка и аргументов проверок. Доступны профили `docs`, `backend`, `frontend`, `browser`, `pre-push` и `full`; `composer ci:check` запускает `full`. Профиль `docs` до Laravel boot задаёт SQLite `:memory:` и только читает состояние через `project:docs-refresh --check`. Публичная база управляемых ссылок фиксируется через `PROJECT_DOCS_PUBLIC_BASE_URL=https://seasonvar.miniserver.fun` независимо от временного `APP_URL`, поэтому локальный сервер браузерных тестов и GitHub не переписывают sitemap-ссылки на `localhost`. GitHub Actions сохраняет отдельные jobs и отвечает за установку toolchain и dependencies, после чего вызывает соответствующий профиль.

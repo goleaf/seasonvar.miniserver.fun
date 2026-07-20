@@ -157,3 +157,17 @@ Final commit: canonical Task 29 implementation `fa4d09f503d717fc737955902585737f
 9. Rollback: Git revert CI/hook/docs commit; data restore, store-wide cache flush и worker restart не требуются.
 10. Limitation: pinning не гарантирует доступность GitHub/registries и не должно скрывать новые advisories или реальные regressions. Такие отказы остаются честно `failed` и требуют отдельного разбора.
 11. Decision: `retain majors; pin commits and runner` — достаточная reliability/security причина существует, unrelated upgrade не выполняется.
+
+## CI-R-002 — repository-level GitHub hardening
+
+1. Scope: GitHub Actions repository policy, dependency alerting и защита истории единственной ветки `main`; application code, package/runtime versions и workflow commands не меняются.
+2. Current/proposed: разрешение всех actions без server-side SHA enforcement заменено на `allowed_actions=selected`, `sha_pinning_required=true`, GitHub-owned actions и exact external `shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240`; passive vulnerability alerts включаются, а ruleset запрещает deletion/non-fast-forward для `main`.
+3. Reason: локальные immutable refs уже существовали, но repository settings не блокировали будущий mutable или произвольный action ref, history rewrite и отсутствие dependency alert signal.
+4. Security: default workflow token остаётся read-only без права approval; checkout credentials не сохраняются; secret scanning/push protection уже включены. Passive alerts добавляют dated signal, но не объявляют dependency graph безусловно безопасным.
+5. Compatibility: exact allowlist покрывает все текущие refs workflow. `setup-php` pin соответствует подписанному выпуску `2.37.2`; GitHub-owned refs также используют full SHA. Direct fast-forward push в `main`, `workflow_dispatch` и три существующих jobs сохранены.
+6. Affected feature map: authentication, authorization, translations, caching, search, notifications, SEO, privacy, mobile, administration, audit, imports, premium, regional/legal access и public routes не меняются. Затронуты только repository governance, CI supply chain и dependency notification boundary.
+7. Production/data: schema, database, storage, cache/session/queue, provider configuration, service worker, assets и deployment runtime не меняются; backup, migration, cache flush и worker restart не нужны.
+8. Rollout/verification: применить настройки через authenticated GitHub API без сохранения credentials, выполнить read-back каждого значения, проверить active rules, получить список alerts и запустить workflow вручную. Run №223 для `c19504e3183f011ebb14aaf15cf24b330c95bd92` завершил `Backend`, `Frontend` и `Browser` со статусом `success`.
+9. Rollback: при подтверждённой несовместимости вернуть Actions policy к `allowed_actions=all` и `sha_pinning_required=false`; удалить ruleset `19185964`; vulnerability alerts отключать только по отдельной явной security-причине. Откат не требует изменения кода или восстановления данных.
+10. Limitation: required status checks и Dependabot security updates не включены, потому что обязательные PR branches противоречат каноническому direct-to-`main` workflow. Локальный pre-push проверяет изменение до отправки, remote run — после неё. Внешние outages и новые реальные regressions невозможно и нельзя маскировать.
+11. Decision: `apply repository hardening without dependency upgrade` — уменьшить контролируемые configuration/supply-chain/history risks, сохраняя fail-closed проверки и существующий Git contract.
