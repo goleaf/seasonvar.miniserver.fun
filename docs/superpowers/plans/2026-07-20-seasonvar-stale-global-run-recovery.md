@@ -221,6 +221,8 @@ After tests, invoke the existing recovery boundary for the confirmed stale row o
 
 Evidence 20.07.2026: run `#944` завершился `completed`, checkpoint удалён, recommendation mode=`deferred`, live claims отсутствуют. Новый bounded XML-tail run `#954` после этого был принят canonical single-flight boundary и также завершился `completed`, что подтверждает отсутствие повторной ложной блокировки.
 
-- [ ] **Step 4: Commit and push if repository state permits**
+- [x] **Step 4: Commit and push if repository state permits**
 
 Before commit, run `git status --short --branch`. Stage only task-owned changes. If the pre-existing mixed staged/unstaged snapshot prevents an isolated commit without altering other work, leave commit/push `unresolved` and report the blocker instead of rewriting the index.
+
+Evidence: после завершения остальных совместимых owners общий snapshot прошёл полный review и configured hooks, был зафиксирован commit `07d577425f5dab179830f66582462a85a78bb55a` и опубликован из существующей `main` без force; local/origin HEAD равны.

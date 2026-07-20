@@ -56,6 +56,7 @@
 - Expanded PHP tests containing the delivered directive contracts: 22 files, 196 tests, 1,875 assertions.
 - Production build: 23 Vite modules; managed documentation and both diff checks passed.
 - Runtime code, Blade, JavaScript, routes, schema, configuration, dependencies, cache, queues, data, and visitor behavior were not changed.
+- Documentation closure was published in verified snapshot `07d577425f5dab179830f66582462a85a78bb55a`; local and `origin/main` HEAD were equal after the non-force push.
 
 Exact expanded-suite command:
 

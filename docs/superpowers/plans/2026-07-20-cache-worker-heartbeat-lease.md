@@ -93,4 +93,6 @@ Evidence: graceful reload allowed the active job to finish in 6 minutes 42 secon
 
 Mark every matrix row from actual evidence, update Russian `CHANGELOG.md`, confirm `README.md` remains accurate, commit on `main`, push without force and verify local/origin HEAD equality.
 
+Evidence: verified snapshot `07d577425f5dab179830f66582462a85a78bb55a` was committed and pushed from the existing `main` through the configured hooks without force; local and `origin/main` HEAD were equal and the worktree was clean after delivery.
+
 Evidence: финальный объединённый snapshot доставлен только через существующую `main` и настроенный pre-push gate; после push local/origin equality проверена без force push.

@@ -299,7 +299,7 @@ Read-only assertions must show current source observations for `serial-41165` an
 
 Evidence 20.07.2026: targeted run `#953` обновил контрольный тайтл за пределами хвоста. XML-tail run `#954` сохранил exact limit/selection `1000/1000`, расширил группы sibling seasons до `1592/1592` и завершился `completed` с `0` page failures, `0` active/problem groups и `0` live claims. Provider → portal corrections дали по одной logical translation row `RuDub` для «Вестис» (серия 3) и «Интервью с вампиром» (серия 7), не заполняя `episodes.released_at`; filtered HTTPS calendar output показал дату, сезон, серию и перевод. Финальная focused матрица прошла 96 тестов/503 assertions, полный suite текущего снимка — 1 420 passed, 11 skipped и 122 979 assertions.
 
-- [ ] **Step 7: Final compliance and delivery**
+- [x] **Step 7: Final compliance and delivery**
 
 Re-read applicable requirements and task plan, scan all repository references for duplicate/stale paths, then inspect:
 
@@ -310,3 +310,5 @@ git diff --check
 ```
 
 If and only if the task files can be isolated without altering the shared index, commit them on `main` with a Russian/technical scoped message and push the configured remote. Otherwise leave delivery `unresolved` and report the shared-worktree blocker honestly.
+
+Evidence: после полного review совместимые изменения общего snapshot зафиксированы commit `07d577425f5dab179830f66582462a85a78bb55a`, опубликованы из существующей `main` без force; local/origin HEAD равны, worktree после push чист.
