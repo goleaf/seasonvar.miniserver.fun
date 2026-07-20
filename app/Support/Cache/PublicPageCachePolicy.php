@@ -208,6 +208,7 @@ final class PublicPageCachePolicy
     /** @param array<string, mixed> $dimensions */
     private function titleContextFor(CatalogTitle $title, array $dimensions): PublicPageCacheContext
     {
+        $dimensions['parameters']['catalogTitle'] = $title->getKey();
         $dimensions['global_title_version'] = $this->versions->version(CacheDomain::TitleDetail);
 
         return new PublicPageCacheContext(

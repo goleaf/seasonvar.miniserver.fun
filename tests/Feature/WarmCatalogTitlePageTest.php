@@ -116,6 +116,21 @@ final class WarmCatalogTitlePageTest extends TestCase
             ->assertHeader('X-Seasonvar-Page-Cache', 'HIT');
     }
 
+    public function test_long_canonical_slug_uses_a_bounded_title_identity_and_warms_once(): void
+    {
+        $slug = str_repeat('long-cache-title-', 12).'tail';
+        $this->assertGreaterThan((int) config('cache-architecture.max_dimension_length'), mb_strlen($slug));
+        $title = CatalogTitle::factory()->create(['slug' => $slug]);
+        Http::fake(fn () => Http::response('<html></html>'));
+        $job = (new WarmCatalogTitlePage($title->id))->withFakeQueueInteractions();
+
+        $this->handle($job);
+
+        $job->assertNotReleased();
+        Http::assertSentCount(1);
+        Http::assertSent(fn ($request): bool => $request->url() === 'https://seasonvar.test/titles/'.$slug);
+    }
+
     public function test_hidden_title_import_and_cache_outage_never_send_http(): void
     {
         $hidden = CatalogTitle::factory()->create(['is_published' => false]);

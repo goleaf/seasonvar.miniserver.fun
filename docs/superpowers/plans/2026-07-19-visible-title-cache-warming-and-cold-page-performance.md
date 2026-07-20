@@ -13,7 +13,7 @@
 ## Реализуемый контракт
 
 1. `TieredCache::state()` читает только authoritative domain store и возвращает `fresh`, `stale`, `missing` или fail-safe `unavailable`, ничего не перестраивая.
-2. `PublicPageCachePolicy::canonicalTitleContext()` строит canonical dimensions для queryless guest `/titles/{slug}` с default `APP_LOCALE`, не наследуя mutable locale долгоживущего worker, и использует тот же version scope, что HTTP middleware.
+2. `PublicPageCachePolicy::canonicalTitleContext()` строит canonical dimensions для queryless guest `/titles/{slug}` с default `APP_LOCALE`, не наследуя mutable locale долгоживущего worker, использует тот же version scope, что HTTP middleware, и нормализует route identity до bounded integer `CatalogTitle.id`, чтобы длинный `slug` не превращал точную проверку кеша в ложный outage.
 3. `CatalogSeries` фиксирует не более 96 уникальных положительных ID показанных тайтлов. На обычном GET middleware сохраняет их в guest cache payload; на Livewire update scheduler запускается после успешного ответа.
 4. `CachePublicPage` передаёт ID scheduler и на `MISS`, и на `HIT`/`STALE`. `response_contract=2` делает прежние catalog payload без metadata недостижимыми без scan/flush.
 5. На каждый ID создаётся отдельный `WarmCatalogTitlePage` в существующей `cache-warm-v2`. Job использует `ShouldBeUnique`, `WithoutOverlapping`, guest visibility, shared import detector и exact state check. Fresh/hidden ничего не делают; stale/missing выполняют один same-origin HTTP warm; import/cache/version-store outage дают bounded release внутри абсолютного 24-часового retry window, а unique lock живёт дольше deadline.
@@ -32,6 +32,7 @@
 
 - [x] `CacheEntryState` missing/fresh/stale/unavailable regression.
 - [x] Canonical title context parity regression.
+- [x] Long-slug regression: значение длиннее общего dimension limit использует bounded title ID, не release-ит job как cache outage и выполняет один exact-origin warm.
 - [x] Import activity status regression и существующие consumer jobs.
 - [x] Job contract: unique, overlap, fresh skip, stale/missing warm, hidden/import/outage skip/release.
 - [x] Job retry contract: новые payload используют `$tries=0`, absolute `retryUntil()`, deadline-covering unique lock, domain/version-store outage release и default-locale canonical key; старые Laravel payload честно остаются на записанном attempt-bound контракте и заменяются только следующим demand-driven fan-out без queue rewrite/clear.

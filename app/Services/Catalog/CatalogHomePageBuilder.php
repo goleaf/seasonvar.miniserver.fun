@@ -9,9 +9,7 @@ use App\DTOs\CatalogRecommendationItem;
 use App\DTOs\CatalogRecommendationListItem;
 use App\Enums\CatalogRecommendationType;
 use App\Models\CatalogTitle;
-use App\Models\Episode;
 use App\Models\LicensedMedia;
-use App\Models\Season;
 use App\Models\Tag;
 use App\Models\User;
 use App\Services\Auth\AccountDateTimeFormatter;
@@ -33,6 +31,7 @@ class CatalogHomePageBuilder
         private readonly CatalogHomeContentAdditionQuery $contentAdditions,
         private readonly CatalogHomeMetricsCache $metrics,
         private readonly CatalogHomeSnapshotCache $snapshot,
+        private readonly CatalogTitleCardCountLoader $cardCounts,
         private readonly CatalogUserCardStateLoader $cardStates,
         private readonly CatalogCollectionQuery $collections,
         private readonly CatalogRecommendationService $recommendations,
@@ -78,10 +77,6 @@ class CatalogHomePageBuilder
                 $latestUpdateTimes->get((int) $catalogTitle->id),
             );
         });
-        $latestReleaseGroups = $this->contentAdditions->latestReleaseGroups(
-            $latestTitles,
-            $latestTitleUpdates->all(),
-        );
         $featuredTitles = $this->orderedTitles(
             $snapshot['featured_title_ids'],
             $this->titleSummaryQuery($user)->with($this->taxonomies->cardSummaryLoads()),
@@ -97,24 +92,25 @@ class CatalogHomePageBuilder
             ->with([
                 'catalogTitle' => fn ($query) => $query
                     ->availableTo(null)
-                    ->select(['id', 'slug', 'title', 'original_title', 'type', 'year', 'poster_url', 'indexed_at'])
-                    ->withCount([
-                        'seasons' => fn (Builder $query): Builder => $query->whereIn(
-                            'seasons.id',
-                            Season::query()->published()->select('seasons.id'),
-                        ),
-                        'episodes' => fn (Builder $query): Builder => $query
-                            ->whereIn(
-                                'episodes.id',
-                                Episode::query()
-                                    ->published()
-                                    ->whereIn('season_id', Season::query()->published()->select('seasons.id'))
-                                    ->select('episodes.id'),
-                            ),
-                    ]),
+                    ->select(['id', 'slug', 'title', 'original_title', 'type', 'year', 'poster_url', 'indexed_at']),
                 'season:id,catalog_title_id,number,kind,sort_order,title',
                 'episode:id,season_id,number,kind,sort_order,title,released_at',
             ]), $snapshot['latest_media_ids']);
+        $latestMediaTitles = $latestMedia
+            ->map(fn (LicensedMedia $media): ?CatalogTitle => $media->catalogTitle)
+            ->filter(fn (?CatalogTitle $title): bool => $title instanceof CatalogTitle)
+            ->values();
+        $this->cardCounts->load(
+            $latestTitles
+                ->concat($featuredTitles)
+                ->concat($videoTitles)
+                ->concat($latestMediaTitles),
+            $user,
+        );
+        $latestReleaseGroups = $this->contentAdditions->latestReleaseGroups(
+            $latestTitles,
+            $latestTitleUpdates->all(),
+        );
         $excludedRecommendationIds = $latestTitles
             ->concat($featuredTitles)
             ->concat($videoTitles)
@@ -216,8 +212,7 @@ class CatalogHomePageBuilder
     private function titleSummaryQuery(?User $user): Builder
     {
         return $this->titles->visibleTo($user)
-            ->select(['id', 'slug', 'title', 'original_title', 'type', 'year', 'description', 'poster_url', 'indexed_at'])
-            ->withCount($this->titles->publicCardCounts($user));
+            ->select(['id', 'slug', 'title', 'original_title', 'type', 'year', 'description', 'poster_url', 'indexed_at']);
     }
 
     private function discoveryUrl(CatalogRecommendationType $type): string

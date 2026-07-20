@@ -36,6 +36,8 @@ Actual Task 28 result after the bounded worker refresh: database and critical Re
 
 Контракт внедрён 20.07.2026. Focused queue/health regression прошёл 25 тестов и 145 утверждений. После graceful recycle production worker продолжал `WarmCatalogCaches` дольше прежних 120 секунд: heartbeat оставался доступен с TTL 525 секунд, `app:health --json` показывал `ready=true`, а pool — `degraded` по реальному backlog вместо ложного `failed`. Следующая job получила 660-секундный lease, read-only TTL составлял 643 секунды. Проверка остановленного worker выполнена unit-контрактом без остановки production service.
 
+Follow-up `TD-011` 20.07.2026 сохранил честное различие health и latency: после graceful PHP-FPM reload `app:health --json` вернул `ready=true`, database/Redis/workers `ok`, Memcached `failed`, а cache warming — `running` с `0` failed и backlog `28` pending/`43` delayed/`1` reserved. В этот момент scheduled media-size importer и critical warm конкурировали за текущую SQLite; первый isolated browser `/` превысил 30 секунд, тогда как после заполнения page cache `curl` получил `200`/`X-Seasonvar-Page-Cache: HIT` менее чем за секунду. Очередь и cache не очищались, job не прерывались, а скорость не маскировалась статусом ready.
+
 ## Observability and alerts
 
 Available evidence: HTTP status, Laravel/system logs, queue/import heartbeat/backlog, cache metrics, disk usage, migration status and panel/system service state. External APM, distributed tracing and automatic alert transport were not found. Operational review is manual; no uptime, RTO/RPO or delivery guarantee is claimed.

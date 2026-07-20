@@ -66,7 +66,7 @@ final class PublicPageCachePolicyTest extends TestCase
         $this->assertSame(CacheDomain::TitleDetail, $context->domain);
         $this->assertSame('title:73', $context->versionScope);
         $this->assertSame($globalVersion, $context->dimensions['global_title_version']);
-        $this->assertSame(['catalogTitle' => 'cache-title'], $context->dimensions['parameters']);
+        $this->assertSame(['catalogTitle' => 73], $context->dimensions['parameters']);
     }
 
     public function test_top_list_filter_queries_have_stable_and_distinct_cache_dimensions(): void

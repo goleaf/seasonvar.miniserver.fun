@@ -99,5 +99,5 @@
 - [x] Re-read applicable requirements/design/current plan and finalize every compliance row honestly.
 - [x] Inspect remote runs `#213` and `#214`; reproduce the two backend failures from their authenticated job logs without weakening the public readiness or filesystem-permission contracts.
 - [x] Add RED/GREEN regressions for the minimal readiness payload, fake-upload Unix group isolation, and explicit `gd` provisioning in both PHP jobs.
-- [ ] Confirm `git status --short --branch` is clean on `main`, commit the coherent task, and push `origin main`.
-- [ ] Monitor a new GitHub Actions run containing the remote-only fixes through completion; if authentication or an external service blocks delivery, preserve it as `unresolved` with exact evidence.
+- [x] Confirm `git status --short --branch` is clean on `main`, commit the coherent task, and push `origin main`.
+- [x] Monitor new GitHub Actions runs containing the remote-only fixes through completion: runs `#218` (`7ae3ae8`) and `#220` (`118429f`) completed Backend, Frontend, and Browser with `success`; intermediate cancellation-only runs were caused by newer pushes through `concurrency.cancel-in-progress`, not quality-gate failures.
