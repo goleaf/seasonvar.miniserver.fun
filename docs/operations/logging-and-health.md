@@ -1,6 +1,6 @@
 # Logging and health
 
-Проверено: 18.07.2026.
+Проверено: 20.07.2026.
 
 ## Actual logging
 
@@ -29,6 +29,8 @@ It returns 503 when unavailable, `Cache-Control: no-store, private` and `X-Robot
 - `php artisan seasonvar:import --status`, `queue:monitor` and `app:failed-job-audit` provide bounded importer/queue state.
 
 Actual Task 28 result after the bounded worker refresh: database and critical Redis roles were reachable; the import, title-refresh and cache-warm pools reported current heartbeats; full warming was idle. The latest bounded critical warming pass completed with 74 public-target failures and therefore reported `degraded`; Memcached was configured but unavailable. The application remained ready while detailed health honestly remained degraded. Queue history and failed work were preserved for normal review; they were not flushed, retried in bulk or presented as healthy.
+
+Task 29 final read-only evidence found an observability limitation: the `cache-warm-v2` heartbeat lease is 120 seconds while `WarmCatalogCaches` may legally run for 600 seconds. During a confirmed active long job, the key expired and CLI health reported the pool as `failed` although the systemd unit and worker process remained active. This false-negative is tracked as `TD-012`; operators must correlate CLI output with unit/process/journal evidence until a separately verified heartbeat change is deployed. The queue was not cleared, rewritten, bulk-retried or interrupted during the audit.
 
 ## Observability and alerts
 

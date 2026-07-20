@@ -802,8 +802,8 @@ The user explicitly prohibits creating or running automated tests for Task 15. E
 
 ## Phase zero evidence
 
-- Ветка: существующая `main`; Task 29 integration `eb4e7f9e7dcf300328b35c527f65a39a743c2ebe`, CI-doc `3bd5e5637f89a46a56e714d0e9987a7e8e10b40a` и последующие совместимые follow-up commits опубликованы до `51ba31363e9eefdb7a617484dcd92d05a28aedcc` в `origin/main`.
-- Git status: согласованный накопленный snapshot доставлен без branch/worktree, stash/reset, force push или потери чужих изменений; текущая changelog-нормализация является последним docs-only follow-up.
+- Ветка: существующая `main`; Task 29 integration `eb4e7f9e7dcf300328b35c527f65a39a743c2ebe` и последующие совместимые follow-up commits опубликованы до cache census `307b291434f7052dafc179441b1bfa304061f968` в `origin/main`.
+- Git status: согласованный накопленный snapshot доставлен без branch/worktree, stash/reset, force push или потери чужих изменений; текущая health-нормализация является последним docs-only follow-up.
 - Прочитаны `AGENTS.md`, `docs/requirements/index.md`, все указанные им canonical owners, все maintenance registries/checklists, production runbooks, architecture/implementation maps, `README.md`, `CHANGELOG.md` и current plan.
 - 189 project Markdown files прочитаны byte-for-byte; SHA-256 manifest проверен агрегированным digest `ddb10e27b30ce2afa27116228a3174e15e4411c9515d421ac492d0459102d19d`. Все 104 локальные ссылки requirement index существуют.
 - `docs/requirements/maintenance-and-upgrades.md`, conflict precedence и permanent root rules уже соответствуют Task 29. Финальная сверка нормализовала literal 15-step read order в requirement index и собрала распределённые production runtime/package checks в явный enforcement block без создания duplicate owner.
@@ -816,7 +816,7 @@ The user explicitly prohibits creating or running automated tests for Task 15. E
 | 1 | Task title | Повторный аудит постоянной maintenance architecture Task 29. |
 | 2 | Task date | 19.07.2026. |
 | 3 | Current branch | `main`; новая ветка/worktree запрещены. |
-| 4 | Git status | `main` implementation published through `eb4e7f9e`; containing integrated HEAD `51ba31363e9eefdb7a617484dcd92d05a28aedcc` confirmed in `origin/main`; final docs-only follow-up in progress. |
+| 4 | Git status | `main` implementation published through `eb4e7f9e`; containing cache-census HEAD `307b291434f7052dafc179441b1bfa304061f968` confirmed in `origin/main`; final health docs-only follow-up in progress. |
 | 5 | Requirement files read | `completed`: полный index read order и все 189 Markdown files. |
 | 6 | Requirement files updated | `completed`: maintenance owner и остальные domain rules уже каноничны; index read order и production upgrade enforcement уточнены, current plan reread/updated. |
 | 7 | Maintenance documentation found | `completed`: canonical requirement, 7 registries/inventories и 5 checklists найдены без дублей. |
@@ -879,8 +879,8 @@ The user explicitly prohibits creating or running automated tests for Task 15. E
 | 64 | Files expected to remain compatible | All application code, public routes, schema/data, manifests/locks, assets and production contracts by default. |
 | 65 | Compliance matrix | Initial matrix below; every row must be reclassified from actual evidence before closure. |
 | 66 | Manual acceptance checklist | Affected-flow browser/static journeys only; unsupported/unavailable device/provider/production flows remain unresolved, never simulated as verified. |
-| 67 | Unresolved limitations | Non-Chromium devices; authenticated/external-provider journeys; Memcached runtime; backup evidence for external batches 31–33; prohibited Task29 automated tests; loaded-browser latency tracked as `TD-011` (`/` `39.5 s`, first mobile `/titles` `52.0 s`). |
-| 68 | Final commit reference | `completed`: canonical implementation `fa4d09f503d717fc737955902585737f34cf713a`; repeat audit/unified integration `eb4e7f9e7dcf300328b35c527f65a39a743c2ebe`; verified containing published HEAD `51ba31363e9eefdb7a617484dcd92d05a28aedcc`. |
+| 67 | Unresolved limitations | Non-Chromium devices; authenticated/external-provider journeys; Memcached runtime; backup evidence for external batches 31–33; prohibited Task29 automated tests; loaded-browser latency `TD-011`; cache-worker heartbeat false-negative `TD-012`. |
+| 68 | Final commit reference | `completed`: canonical implementation `fa4d09f503d717fc737955902585737f34cf713a`; repeat audit/unified integration `eb4e7f9e7dcf300328b35c527f65a39a743c2ebe`; verified containing published HEAD `307b291434f7052dafc179441b1bfa304061f968`. |
 
 ## Cross-feature impact matrix
 
@@ -908,7 +908,7 @@ The user explicitly prohibits creating or running automated tests for Task 15. E
 | Dependency inventory and purpose registry | `completed` | Все 27 direct dependencies, exact locks, purpose, environment, licensing metadata, usage and package effects reconciled; package secrets отсутствуют. |
 | Runtime compatibility matrix | `completed` | Matrix refreshed from exact local/tooling evidence; непроверенные MySQL/Redis/provider/browser states остались `unknown`/`requires review`. |
 | Advisory, abandoned and outdated review | `completed` | Fresh exact-lock `composer audit` и `npm audit` дали zero advisories; Composer abandoned list empty; outdated candidates evaluated without updates. |
-| Deprecations, adapters and technical debt | `completed` | Registries reread and refreshed; `DEP-001`, removal conditions и `TD-001..011` remain visible. `OP-001/003` закрыты; schema outcome `OP-002` закрыт внешними batches 31–33, но отсутствие доступного pre-migration backup evidence осталось честно отмечено. |
+| Deprecations, adapters and technical debt | `completed` | Registries reread and refreshed; `DEP-001`, removal conditions и `TD-001..012` remain visible. `OP-001/003` закрыты; schema outcome `OP-002` закрыт внешними batches 31–33, но отсутствие доступного pre-migration backup evidence осталось честно отмечено. |
 | Architecture drift | `completed` | Volt, `@php`, Blade DB/service/facade calls, inline styles, legacy Laravel structure, deprecated Livewire/Tailwind APIs, debug dumps and fake controls searched. Livewire generator drift fixed through `UD-LW-CFG-001`. |
 | Package/runtime changes | `not_applicable` | No dependency/runtime update was justified; versions and locks preserved. Configuration-only class generator decision is `completed`. |
 | Database/cache/session/queue/service-worker compatibility | `completed` | No Task29 format/key/job/service-worker change; 110 migrations inspected and all now `Ran`. External batches 31–33 passed available tombstone/index/FK and administration-schema read-only checks; PWA/service worker absent by design. |
@@ -917,7 +917,7 @@ The user explicitly prohibits creating or running automated tests for Task 15. E
 | README and Russian changelog | `completed` | README reread: visitor capability/state did not change, so no fake visitor entry was added. Technical Russian changelog entry records the real audit and limitation. |
 | Automated tests | `not_applicable` | Explicitly prohibited for Task 29; infrastructure remains untouched. |
 | Static/build/browser verification | `completed` | PHP syntax, Pint, required Rector, Larastan, config/dependency/translation checks, repeat Vite build/manifest, managed docs check, production preflight и отдельный desktop/mobile managed-Chromium smoke прошли. Maximum Rector advisory coordinator не завершился и остаётся historical `TD-005`; required Rector прошёл и файлы не менял. |
-| Commit and push on `main` | `completed` | Unified snapshot committed as `eb4e7f9e7dcf300328b35c527f65a39a743c2ebe` and delivered by non-force push; compatible follow-ups are present through verified `origin/main` HEAD `51ba31363e9eefdb7a617484dcd92d05a28aedcc`. |
+| Commit and push on `main` | `completed` | Unified snapshot committed as `eb4e7f9e7dcf300328b35c527f65a39a743c2ebe` and delivered by non-force push; compatible follow-ups are present through verified `origin/main` HEAD `307b291434f7052dafc179441b1bfa304061f968`. |
 
 
 ## 233-позиционная final acceptance matrix
@@ -1154,9 +1154,9 @@ The user explicitly prohibits creating or running automated tests for Task 15. E
 | 228 | Relevant Markdown updated | `completed` | Canonical maintenance/production/audit/plan docs refreshed. |
 | 229 | Canonical requirements updated | `completed` | Index and production owner normalized; others verified. |
 | 230 | Current task plan honest | `completed` | Performed/unavailable/external evidence separated. |
-| 231 | Unresolved limitations documented | `completed` | Backup evidence, degraded health, browser/provider coverage and loaded latency `TD-011` remain explicit. |
+| 231 | Unresolved limitations documented | `completed` | Backup evidence, degraded health, browser/provider coverage, loaded latency `TD-011` and cache-worker heartbeat false-negative `TD-012` remain explicit. |
 | 232 | Main changelog updated | `completed` | Russian entry added per higher-priority root contract. |
-| 233 | Commit and push on main | `completed` | Task 29 implementation `eb4e7f9e7dcf300328b35c527f65a39a743c2ebe` and compatible follow-ups through `51ba31363e9eefdb7a617484dcd92d05a28aedcc` were pushed to `origin/main` without force. |
+| 233 | Commit and push on main | `completed` | Task 29 implementation `eb4e7f9e7dcf300328b35c527f65a39a743c2ebe` and compatible follow-ups through `307b291434f7052dafc179441b1bfa304061f968` were pushed to `origin/main` without force. |
 
 
 ## Итоговая evidence выполненного аудита
@@ -1171,7 +1171,7 @@ The user explicitly prohibits creating or running automated tests for Task 15. E
 - Config/environment: все 404 literal configuration environment keys присутствуют active/commented в `.env.example`; 14 example-only/dynamic/tooling keys документированы. Direct `env()` outside config, unexpected package telemetry, production Debugbar routes and Composer plugin permissions отсутствуют.
 - Architecture drift: не найдены Volt/SFC/MFC components, `@php`, direct Blade DB/service/facade/container calls, inline `style`, debug dumps/console logging, removed Tailwind utilities, deprecated Livewire commit/request hooks или old Laravel Kernel/Handler structure. Один доказанный preventive defect — package default `make:livewire` SFC — исправлен явным `make_command.type=class` с выключенной генерацией JS/CSS/test.
 - Frontend security scan: production JS/Blade не содержит `innerHTML`/`outerHTML` assignment, `insertAdjacentHTML`, `document.write`, string-to-code execution, inline event attributes, wildcard `postMessage`, browser-storage auth/token keys или remote script/link tags. Navigation sinks используют same-origin/protocol checks; `style-src 'unsafe-inline'` остаётся существующей явно ограниченной style policy, а `script-src` не получает `unsafe-inline`/`unsafe-eval`.
-- Technical limits: legacy Russian-only operator/admin literals остаются tracked `TD-009`; broad modernization остаётся staged `TD-004/TD-005`; loaded public-page latency остаётся tracked `TD-011`; external production database/cache/provider and non-Chromium device evidence remains unavailable.
+- Technical limits: legacy Russian-only operator/admin literals остаются tracked `TD-009`; broad modernization остаётся staged `TD-004/TD-005`; loaded public-page latency остаётся tracked `TD-011`; 120-second cache-worker heartbeat against a permitted 600-second job остаётся tracked `TD-012`; external production database/cache/provider and non-Chromium device evidence remains unavailable.
 
 ## Verification и manual acceptance
 
@@ -1195,10 +1195,10 @@ Manual acceptance завершён для доступных guest journeys: hom
 - `OP-001` закрыт: environment-owned `.env` безопасно приведён к `APP_ENV=production`/`APP_DEBUG=false`, config/routes rebuilt, подтверждённый `php-fpm-85.service` и queue workers gracefully refreshed; production Debugbar routes `0`.
 - `OP-002`: внешний rollout применил три additive migrations в batch 31 и пять administration migrations в batches 32–33; Task 29 их не запускала. Итоговые доступные data/index/FK/schema invariants чисты, но Task 29 не наблюдала pre-migration backup evidence этих batches и не заявляет его.
 - `OP-003` закрыт после завершения владельца maintenance window: marker отсутствует, PHP-FPM active, home и `/up` возвращают `200`. Task 29 не открывала portal во время активной чужой записи.
-- Финальный `app:health --json` остаётся честно `ready=true`/`degraded`: database и Redis roles доступны; import/title-refresh/cache-warm pools имеют status `ok`, cache warming — `running` с `failed=0`; Memcached недоступен и остаётся причиной degraded state. На момент снимка queues содержали 2103 pending и три reserved jobs; store-wide clear, queue deletion/retry или неподтверждённое масштабирование не выполнялись.
+- Финальный `app:health --json` остаётся честно `ready=true`/`degraded`: database и Redis roles доступны, import/title-refresh pools имеют status `ok`, cache warming — `running` с `failed=0`, Memcached недоступен. `cache-warm-v2` показал `failed` при 1 112 pending и одной reserved job, хотя systemd unit/process активны и journal подтверждает выполняемую `WarmCatalogCaches`: 120-секундный heartbeat истёк внутри разрешённого timeout 600 секунд. False-negative сохранён как `TD-012`; store-wide clear, queue deletion/retry/rewrite, принудительное прерывание job или неподтверждённое масштабирование не выполнялись.
 - Финальный `app:deployment-check --json` после внешних batches 32–33 завершился exit `0`/`ready`: environment, debug, logging, все 110 migrations, SQLite quick/FK, required indexes, FTS `32929/32929/32929` и cache transports прошли. SQLite integrity заняла `136028 ms` под нагрузкой; warnings по `32771` historical failed jobs и отсутствию отдельного подтверждённого forever-importer process сохранены для ручной operational disposition.
 - Post-reload HTTPS probe: `/up` `200`/`0.70 s`, `/titles` `200`/`9.15 s`, guest `/admin` завершился на login `200`/`0.62 s`; `/` превысил 20-секундный timeout без тела. Это сохраняет performance-риск `TD-011` открытым, но не означает maintenance mode или failed readiness.
-- Shared writers завершились. Финальная интеграция сохранила весь согласованный snapshot на `main`, не удаляла и не снимала со staging чужие изменения. Canonical Task 29 delivery — `fa4d09f503d717fc737955902585737f34cf713a`; repeat audit/config integration — `eb4e7f9e7dcf300328b35c527f65a39a743c2ebe`; содержащий все совместимые follow-ups HEAD `51ba31363e9eefdb7a617484dcd92d05a28aedcc` подтверждён в `origin/main`.
+- Финальная интеграция сохранила согласованный snapshot на `main`, не удаляла и не снимала со staging чужие изменения. Canonical Task 29 delivery — `fa4d09f503d717fc737955902585737f34cf713a`; repeat audit/config integration — `eb4e7f9e7dcf300328b35c527f65a39a743c2ebe`; cache-census closure `307b291434f7052dafc179441b1bfa304061f968` подтверждён в `origin/main`. Последняя read-only health-сверка не меняла runtime и входит в отдельный docs-only evidence follow-up.
 
 ---
 

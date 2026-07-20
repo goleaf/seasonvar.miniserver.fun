@@ -2,7 +2,7 @@
 
 Дата: 19.07.2026
 
-Статус: implementation, production index rollout, rolling runtime activation и task-focused verification завершены. Post-delivery TDD follow-up исправляет обход `ShouldBeUniqueUntilProcessing` у общего `WarmCatalogCaches`, обнаруженный по production backlog во время run `#954`. Fresh full repository verification и Git delivery остаются `unresolved` до завершения параллельных изменений общего рабочего дерева.
+Статус: implementation, production index rollout, rolling runtime activation, task-focused/full-suite verification и Git delivery завершены; post-delivery fix обхода `ShouldBeUniqueUntilProcessing` опубликован в `096c66f`, а read-only census подтвердил отсутствие новых общих дублей. Финальный health дополнительно выявил tracked observability limitation `TD-012`, при котором 120-секундный heartbeat истекает внутри разрешённой 600-секундной `WarmCatalogCaches`.
 
 ## Наблюдаемая проблема
 
@@ -69,4 +69,4 @@
 | SQLite cold-path и index | completed | SQL-shape tests, covering-index rehearsal; повторный median HTTP 1 394,4 ms, SQL 1 075,0 ms и 56,8% improvement от 2 490 ms baseline выполняют только предусмотренный fallback >=50%, не абсолютные SQL ceilings |
 | Production database safety | completed | verified owner-only backup с `quick_check` и `foreign_key_check`, maintenance/write pause, target-only batch 30 migration, exact index columns и covering `EXPLAIN` |
 | Full repository delivery | completed | Актуальный snapshot прошёл 1 427 tests / 1 416 passed / 11 expected skipped / 122 945 assertions; реализация зафиксирована в `096c66f`, а содержащий её documentation HEAD `51ba313` подтверждён в `origin/main` без force push. |
-| Production rollout | completed | Import workers естественно переработались в 02:58 без ручного restart. Два read-only census за 91 секунду при продвижении active run на 42 страницы показали недельный unique lock и неизменные 614 legacy общих jobs; новые общие дубли не появились, legacy backlog оставлен для естественного drain без queue clear/rewrite. |
+| Production rollout | completed | Import workers естественно переработались в 02:58 без ручного restart. Два read-only census за 91 секунду при продвижении active run на 42 страницы показали недельный unique lock и неизменные 614 legacy общих jobs; новые общие дубли не появились, legacy backlog оставлен для естественного drain без queue clear/rewrite. Во время активной долгой `WarmCatalogCaches` CLI health дал ложный `failed`, потому что heartbeat TTL 120 секунд короче job timeout 600 секунд; unit/process/job подтверждены живыми, отдельная корректировка отложена как `TD-012` без прерывания очереди. |

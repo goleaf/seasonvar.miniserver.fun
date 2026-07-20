@@ -1,6 +1,6 @@
 # Матрица runtime-совместимости
 
-Аудит: 18.07.2026; повторная maintenance-сверка 19.07.2026. Матрица разделяет локально установленное, проверенное инструментами, требуемое проектом и внешнее production-состояние. Статус `verified` относится только к перечисленной проверке и не означает поддержку любого будущего patch release.
+Аудит: 18.07.2026; повторная maintenance-сверка 20.07.2026. Матрица разделяет локально установленное, проверенное инструментами, требуемое проектом и внешнее production-состояние. Статус `verified` относится только к перечисленной проверке и не означает поддержку любого будущего patch release.
 
 ## Значения статусов
 
@@ -43,7 +43,7 @@
 | Memcached server | binary `1.6.39` present; local service/unit/port unavailable during Task 29 health inspection | requires review; local runtime unavailable | Application readiness remains available through the documented recomputable-cache fallback, but this is degraded operation rather than a verified hot-cache tier. Production Memcached service/config/metrics still require redacted host evidence. |
 | Cache format | application `CACHE_SCHEMA_VERSION`/`CACHE_FORMAT_VERSION`; Redis domain + Memcached hot + failover | project-required | No Task 29 key, serializer, TTL or payload format change. Global `Cache::flush()` remains prohibited. |
 | Session | production Redis connection `sessions`, encrypted/signed cookie framework contract | project-required | No driver, cookie, serialization or `APP_KEY` change. Any future change must preserve OAuth/payment returns and account switching. |
-| Queue | production Redis, `after_commit=true`; synchronous fallbacks exist where documented | project-required | Thirteen application job classes and ten notification classes were inventoried. Class/constructor changes require pending-job compatibility and worker restart. |
+| Queue | production Redis, `after_commit=true`; synchronous fallbacks exist where documented | project-required | Thirteen application job classes and ten notification classes were inventoried. Class/constructor changes require pending-job compatibility and worker restart. Current `cache-warm-v2` heartbeat lease can expire during a permitted long job and produce a false CLI-health failure; correction is staged as `TD-012`, without queue clear/rewrite. |
 | Scheduler | seven named bounded schedules using lock store | verified source configuration | No new cron/queue infrastructure. Scheduler availability in production remains operational evidence. |
 
 ## Web, browser, provider и storage compatibility
@@ -67,7 +67,7 @@
 
 ## Production compatibility conclusion
 
-Task 29 does not change PHP, Node, Composer/npm, framework/package constraints, database, Redis/Memcached, cache/session/job serialization, provider state or service worker. Therefore deployment uses the existing locked-install/build/cache/reload runbook. Final `app:health` remained ready but degraded because Memcached was unavailable; database, all critical Redis roles and the cache-warm/import/title-refresh pools were `ok`, while cache warming was running with zero recorded failures. Task 29 neither concealed the degraded hot tier nor reconfigured it. Outstanding production evidence is explicit: Node 26 LTS policy, Composer self-update pubkeys, Redis/Memcached server/failover state, actual FPM/nginx config, non-Chromium devices and external provider delivery.
+Task 29 does not change PHP, Node, Composer/npm, framework/package constraints, database, Redis/Memcached, cache/session/job serialization, provider state or service worker. Therefore deployment uses the existing locked-install/build/cache/reload runbook. The final `app:health` remained `ready=true`/`degraded`: database and critical Redis roles were reachable, import/title-refresh pools were `ok`, Memcached was unavailable, and `cache-warm-v2` reported a false `failed` after its 120-second heartbeat lease expired during a confirmed active `WarmCatalogCaches` job whose allowed timeout is 600 seconds. Task 29 neither concealed nor reconfigured these runtime states; `TD-012` owns the heartbeat correction. Outstanding production evidence is explicit: Node 26 LTS policy, Composer self-update pubkeys, Redis/Memcached server/failover state, actual FPM/nginx config, non-Chromium devices and external provider delivery.
 
 ## Повторная operational-сверка 19.07.2026
 
@@ -77,7 +77,7 @@ Task 29 does not change PHP, Node, Composer/npm, framework/package constraints, 
 - Task 29 не наблюдала и не подтверждает pre-migration backup evidence для внешних batches 31–33. Любой следующий SQLite DDL всё равно требует verified backup, writer pause и recorded checksum/integrity evidence до migration.
 - Cache/session/queue serializers, prefixes, drivers, job constructors, database data, service worker и provider state этим repeat audit не менялись.
 - Финальный `app:deployment-check --json` после внешних batches 32–33 завершился `ready`: production environment/debug/logging, все 110 migrations, SQLite quick/FK, required indexes, FTS `32929/32929/32929` и cache transports прошли. Integrity check занял `136028 ms` под активной нагрузкой; warnings по `32771` historical failed jobs и неподтверждённому отдельному forever-importer process требуют ручной disposition, но не скрыты как successful automation.
-- Финальный `app:health --json` отдельно остаётся `ready=true`/`degraded`: database и все критические Redis roles доступны, `cache-warm-v2`, import и title-refresh pools имеют status `ok`, cache warming — `running` с `failed=0`; Memcached недоступен и остаётся причиной degraded state. На момент снимка queues содержали 493 cache-warm и 1610 import pending jobs с тремя reserved; это transient operational evidence, не SLA. Queue deletion/retry или масштабирование наугад не выполнялись. Readiness и health не подменяют друг друга.
+- Более ранний `app:health --json` показал `cache-warm-v2`, import и title-refresh pools как `ok`. Последний снимок после graceful worker refresh остаётся `ready=true`/`degraded`: database и все критические Redis roles доступны, import/title-refresh — `ok`, cache warming — `running` с `failed=0`, но `cache-warm-v2` имеет 1 112 pending и одну reserved job и показывает `failed`, потому что 120-секундный heartbeat истёк внутри подтверждённой активной `WarmCatalogCaches` с timeout 600 секунд. Systemd unit активен, процесс потребляет CPU, журнал фиксирует начало job; это tracked false-negative `TD-012`, а не доказательство здорового pool или остановленного worker. Memcached также недоступен. Queue deletion/retry/rewrite, случайное масштабирование или принудительное прерывание job не выполнялись.
 - Post-reload HTTP probe: `/up` вернул `200` за `0.70 s`, `/titles` — `200` за `9.15 s`, guest `/admin` штатно завершился на login за `0.62 s`; `/` превысил 20-секундный timeout без тела. Последнее сохраняет `TD-011` открытым и не отменяется успешным health/preflight.
 
 ## Laravel Debugbar compatibility от 19.07.2026
