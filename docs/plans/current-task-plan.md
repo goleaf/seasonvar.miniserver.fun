@@ -757,7 +757,7 @@ The user explicitly prohibits creating or running automated tests for Task 15. E
 
 Обновлено: 19.07.2026
 
-Статус: implementation, production index rollout, rolling runtime activation, full-suite verification и Git delivery основного product snapshot завершены; после final review закрыты retry/version-store/locale defects, повторно измерен cold-path и зафиксирован live fan-out после восстановления importer lifecycle. Post-delivery исправление coalescing общего `WarmCatalogCaches` находится в TDD: production census показал, что прямой `Bus::dispatch()` обходил `ShouldBeUniqueUntilProcessing` и создавал тяжёлый backlog перед отдельными title jobs. Отдельный evidence follow-up остаётся в общем параллельно изменяемом docs snapshot.
+Статус: implementation, production index rollout, rolling runtime activation, full-suite verification и Git delivery завершены; после final review закрыты retry/version-store/locale defects, повторно измерен cold-path и зафиксирован live fan-out после восстановления importer lifecycle. Post-delivery coalescing общего `WarmCatalogCaches` и recommendation rebuild завершено в `096c66f573df6ae914e2aa0061d928c3ee9c2909`, а содержащий его documentation HEAD `51ba31363e9eefdb7a617484dcd92d05a28aedcc` опубликован в `origin/main`.
 
 ## Решение и evidence
 
@@ -784,8 +784,8 @@ The user explicitly prohibits creating or running automated tests for Task 15. E
 | Focused verification | completed | После retry/version/locale исправлений и end-to-end warm→HIT regression расширенный cache/route/query snapshot прошёл 115 tests / 1 040 assertions. Coalescing follow-up прошёл RED `2→1` general jobs и `3→1` recommendation jobs; итоговые cache/import и collection-sync наборы прошли 49/49 / 319 assertions |
 | Full repository suite | completed | Актуальный общий snapshot после обоих coalescing fixes прошёл 1 427 tests: 1 416 passed, 11 expected skipped, 122 945 assertions. Targeted Pint, PHP syntax, Catalog invalidator PHPStan, managed docs и staged/unstaged diff checks зелёные; расширенный прямой PHPStan старого HDRezka service/test сохранил 6 ранее существующих findings вне изменённых dispatch/assertion строк |
 | README/CHANGELOG/canonical docs | completed | Русские visitor/technical entries, cache/performance/environment/deployment owners и rollback дополнены; managed blocks проверены штатной командой |
-| Production rollout | unresolved | Owner-only backup, migration batch 30, covering query plan и title payload rollout завершены. Run `#954` корректно включает import-pause, но live census выявил отдельный источник общего backlog: ready `WarmCatalogCaches` выросли 121→186 из-за bypass unique dispatch. Исправление должно быть опубликовано и подтверждено повторным census; queue rewrite/clear не выполняются |
-| Commit/push | unresolved | Основной product snapshot с cache-реализацией уже опубликован в `main` как `eb4e7f9`. Новый live-evidence follow-up нельзя отделить на уровне path: тот же `current-task-plan.md` снова содержит параллельные admin/Livewire closure edits; отдельный commit захватил бы чужой scope |
+| Production rollout | unresolved | Owner-only backup, migration batch 30, covering query plan и title payload rollout завершены. Run `#954` корректно включает import-pause; import workers естественно переработались в 02:58 и подхватили coalescing fix без ручного restart. Redis подтвердил новый недельный unique lock; требуется повторный census после следующего интервала и terminal-run drain, queue rewrite/clear не выполняются |
+| Commit/push | completed | Проверенный snapshot зафиксирован как `096c66f573df6ae914e2aa0061d928c3ee9c2909`; последующая доступная HTTPS-аутентификация успешно опубликовала содержащий documentation HEAD `51ba31363e9eefdb7a617484dcd92d05a28aedcc` в `origin/main` без force push. |
 
 ## Production impact и rollback
 
@@ -802,8 +802,8 @@ The user explicitly prohibits creating or running automated tests for Task 15. E
 
 ## Phase zero evidence
 
-- Ветка: существующая `main`; implementation commit `eb4e7f9e7dcf300328b35c527f65a39a743c2ebe` и последующий CI-doc commit `3bd5e5637f89a46a56e714d0e9987a7e8e10b40a` опубликованы в `origin/main`.
-- Git status: согласованный накопленный snapshot доставлен без branch/worktree, stash/reset, force push или потери чужих изменений; оставшиеся документационные уточнения входят в завершающий follow-up commit этой задачи.
+- Ветка: существующая `main`; Task 29 integration `eb4e7f9e7dcf300328b35c527f65a39a743c2ebe`, CI-doc `3bd5e5637f89a46a56e714d0e9987a7e8e10b40a` и последующие совместимые follow-up commits опубликованы до `51ba31363e9eefdb7a617484dcd92d05a28aedcc` в `origin/main`.
+- Git status: согласованный накопленный snapshot доставлен без branch/worktree, stash/reset, force push или потери чужих изменений; текущая changelog-нормализация является последним docs-only follow-up.
 - Прочитаны `AGENTS.md`, `docs/requirements/index.md`, все указанные им canonical owners, все maintenance registries/checklists, production runbooks, architecture/implementation maps, `README.md`, `CHANGELOG.md` и current plan.
 - 189 project Markdown files прочитаны byte-for-byte; SHA-256 manifest проверен агрегированным digest `ddb10e27b30ce2afa27116228a3174e15e4411c9515d421ac492d0459102d19d`. Все 104 локальные ссылки requirement index существуют.
 - `docs/requirements/maintenance-and-upgrades.md`, conflict precedence и permanent root rules уже соответствуют Task 29. Финальная сверка нормализовала literal 15-step read order в requirement index и собрала распределённые production runtime/package checks в явный enforcement block без создания duplicate owner.
@@ -816,7 +816,7 @@ The user explicitly prohibits creating or running automated tests for Task 15. E
 | 1 | Task title | Повторный аудит постоянной maintenance architecture Task 29. |
 | 2 | Task date | 19.07.2026. |
 | 3 | Current branch | `main`; новая ветка/worktree запрещены. |
-| 4 | Git status | `main` implementation snapshot published through `eb4e7f9e`; `origin/main` confirmed, documentation follow-up in progress. |
+| 4 | Git status | `main` implementation published through `eb4e7f9e`; containing integrated HEAD `51ba31363e9eefdb7a617484dcd92d05a28aedcc` confirmed in `origin/main`; final docs-only follow-up in progress. |
 | 5 | Requirement files read | `completed`: полный index read order и все 189 Markdown files. |
 | 6 | Requirement files updated | `completed`: maintenance owner и остальные domain rules уже каноничны; index read order и production upgrade enforcement уточнены, current plan reread/updated. |
 | 7 | Maintenance documentation found | `completed`: canonical requirement, 7 registries/inventories и 5 checklists найдены без дублей. |
@@ -880,7 +880,7 @@ The user explicitly prohibits creating or running automated tests for Task 15. E
 | 65 | Compliance matrix | Initial matrix below; every row must be reclassified from actual evidence before closure. |
 | 66 | Manual acceptance checklist | Affected-flow browser/static journeys only; unsupported/unavailable device/provider/production flows remain unresolved, never simulated as verified. |
 | 67 | Unresolved limitations | Non-Chromium devices; authenticated/external-provider journeys; Memcached runtime; backup evidence for external batches 31–33; prohibited Task29 automated tests; loaded-browser latency tracked as `TD-011` (`/` `39.5 s`, first mobile `/titles` `52.0 s`). |
-| 68 | Final commit reference | `completed`: canonical implementation `fa4d09f503d717fc737955902585737f34cf713a`; repeat audit/unified integration `eb4e7f9e7dcf300328b35c527f65a39a743c2ebe`, published to `origin/main`. |
+| 68 | Final commit reference | `completed`: canonical implementation `fa4d09f503d717fc737955902585737f34cf713a`; repeat audit/unified integration `eb4e7f9e7dcf300328b35c527f65a39a743c2ebe`; verified containing published HEAD `51ba31363e9eefdb7a617484dcd92d05a28aedcc`. |
 
 ## Cross-feature impact matrix
 
@@ -917,7 +917,7 @@ The user explicitly prohibits creating or running automated tests for Task 15. E
 | README and Russian changelog | `completed` | README reread: visitor capability/state did not change, so no fake visitor entry was added. Technical Russian changelog entry records the real audit and limitation. |
 | Automated tests | `not_applicable` | Explicitly prohibited for Task 29; infrastructure remains untouched. |
 | Static/build/browser verification | `completed` | PHP syntax, Pint, required Rector, Larastan, config/dependency/translation checks, repeat Vite build/manifest, managed docs check, production preflight и отдельный desktop/mobile managed-Chromium smoke прошли. Maximum Rector advisory coordinator не завершился и остаётся historical `TD-005`; required Rector прошёл и файлы не менял. |
-| Commit and push on `main` | `completed` | Unified snapshot committed as `eb4e7f9e7dcf300328b35c527f65a39a743c2ebe` and delivered by non-force push; CI documentation follow-up `3bd5e5637f89a46a56e714d0e9987a7e8e10b40a` is also present on `origin/main`. |
+| Commit and push on `main` | `completed` | Unified snapshot committed as `eb4e7f9e7dcf300328b35c527f65a39a743c2ebe` and delivered by non-force push; compatible follow-ups are present through verified `origin/main` HEAD `51ba31363e9eefdb7a617484dcd92d05a28aedcc`. |
 
 
 ## 233-позиционная final acceptance matrix
@@ -1156,7 +1156,7 @@ The user explicitly prohibits creating or running automated tests for Task 15. E
 | 230 | Current task plan honest | `completed` | Performed/unavailable/external evidence separated. |
 | 231 | Unresolved limitations documented | `completed` | Backup evidence, degraded health, browser/provider coverage and loaded latency `TD-011` remain explicit. |
 | 232 | Main changelog updated | `completed` | Russian entry added per higher-priority root contract. |
-| 233 | Commit and push on main | `completed` | Implementation snapshot `eb4e7f9e7dcf300328b35c527f65a39a743c2ebe` and CI documentation follow-up `3bd5e5637f89a46a56e714d0e9987a7e8e10b40a` were pushed to `origin/main` without force. |
+| 233 | Commit and push on main | `completed` | Task 29 implementation `eb4e7f9e7dcf300328b35c527f65a39a743c2ebe` and compatible follow-ups through `51ba31363e9eefdb7a617484dcd92d05a28aedcc` were pushed to `origin/main` without force. |
 
 
 ## Итоговая evidence выполненного аудита
@@ -1198,7 +1198,7 @@ Manual acceptance завершён для доступных guest journeys: hom
 - Финальный `app:health --json` остаётся честно `ready=true`/`degraded`: database и Redis roles доступны; import/title-refresh/cache-warm pools имеют status `ok`, cache warming — `running` с `failed=0`; Memcached недоступен и остаётся причиной degraded state. На момент снимка queues содержали 2103 pending и три reserved jobs; store-wide clear, queue deletion/retry или неподтверждённое масштабирование не выполнялись.
 - Финальный `app:deployment-check --json` после внешних batches 32–33 завершился exit `0`/`ready`: environment, debug, logging, все 110 migrations, SQLite quick/FK, required indexes, FTS `32929/32929/32929` и cache transports прошли. SQLite integrity заняла `136028 ms` под нагрузкой; warnings по `32771` historical failed jobs и отсутствию отдельного подтверждённого forever-importer process сохранены для ручной operational disposition.
 - Post-reload HTTPS probe: `/up` `200`/`0.70 s`, `/titles` `200`/`9.15 s`, guest `/admin` завершился на login `200`/`0.62 s`; `/` превысил 20-секундный timeout без тела. Это сохраняет performance-риск `TD-011` открытым, но не означает maintenance mode или failed readiness.
-- Shared writers завершились. Финальная интеграция сохранила весь согласованный snapshot на `main`, не удаляла и не снимала со staging чужие изменения. Canonical Task 29 delivery — `fa4d09f503d717fc737955902585737f34cf713a`; repeat audit/config integration и единый согласованный snapshot опубликованы commit-ом `eb4e7f9e7dcf300328b35c527f65a39a743c2ebe`, CI evidence — follow-up commit-ом `3bd5e5637f89a46a56e714d0e9987a7e8e10b40a`.
+- Shared writers завершились. Финальная интеграция сохранила весь согласованный snapshot на `main`, не удаляла и не снимала со staging чужие изменения. Canonical Task 29 delivery — `fa4d09f503d717fc737955902585737f34cf713a`; repeat audit/config integration — `eb4e7f9e7dcf300328b35c527f65a39a743c2ebe`; содержащий все совместимые follow-ups HEAD `51ba31363e9eefdb7a617484dcd92d05a28aedcc` подтверждён в `origin/main`.
 
 ---
 
@@ -1206,7 +1206,7 @@ Manual acceptance завершён для доступных guest journeys: hom
 
 Обновлено: 20.07.2026
 
-Статус: завершено; все разрешённые изменения активных задач объединены в существующей ветке `main`, включая основной снимок `eb4e7f9e7dcf300328b35c527f65a39a743c2ebe`, документационную фиксацию `3bd5e5637f89a46a56e714d0e9987a7e8e10b40a` и follow-up `096c66f573df6ae914e2aa0061d928c3ee9c2909` для CI, test isolation и coalescing уникальных jobs.
+Статус: завершено; все разрешённые изменения активных задач объединены в существующей ветке `main`, включая основной снимок `eb4e7f9e7dcf300328b35c527f65a39a743c2ebe`, CI-doc `3bd5e5637f89a46a56e714d0e9987a7e8e10b40a`, code/test follow-up `096c66f573df6ae914e2aa0061d928c3ee9c2909` и подтверждённый опубликованный documentation HEAD `51ba31363e9eefdb7a617484dcd92d05a28aedcc`.
 
 ## Scope и стратегия доставки
 
@@ -1232,7 +1232,7 @@ Manual acceptance завершён для доступных guest journeys: hom
 | Imports | affected | Seasonvar import activity и catalog cache integration проверяются regression tests; публичная команда импорта и external URL boundary не меняются |
 | Premium, regional и legal access | affected | Billing reconciliation изменён без новых provider/payment contracts; entitlement, region и legal decisions остаются server-side |
 | Account lifecycle и demo repair | affected | Repair stages теперь идемпотентно пропускают уже compliant state; repeat-run regression проверяет отсутствие лишних jobs |
-| Dependencies/runtime/database/storage/service worker | affected | Packages/locks/runtime/service worker не менялись; пять additive administration migrations входят в основной снимок и уже имеют отдельные rollout/backup/recovery evidence выше, а текущая интеграция не выполняла schema/data/storage operations |
+| Dependencies/runtime/database/storage/service worker | affected | Packages/locks/runtime/service worker не менялись; пять additive administration migrations входят в основной снимок и уже имеют отдельные rollout/backup/recovery evidence выше. Дополнительный fresh disposable SQLite прогон применил все migrations и подтвердил пять новых таблиц/расширений, 14 ролей и 60 permissions; project guard штатно запрещает destructive rollback даже для disposable базы, поэтому он не обходился |
 
 ## Compliance matrix
 
@@ -1246,7 +1246,7 @@ Manual acceptance завершён для доступных guest journeys: hom
 | README, canonical docs и русский CHANGELOG | completed | Visitor-visible и technical изменения описаны; managed blocks обновлены штатной командой и проверяются read-only docs gate |
 | Legacy/duplicate/conflict/temporary scan | completed | Финальный staged snapshot прошёл diff check, tracked-path guard, documentation checks и repository cleanup review без конфликтов или временных tracked-файлов |
 | Focused/backend/frontend/browser verification | completed | Focused admin/cache/import/CI regressions, полный PHPUnit (1 427 tests, 1 416 passed, 11 expected skipped, 122 945 assertions), frontend/build, managed docs и browser checks завершились успешно; обязательный `scripts/ci-check.sh pre-push` остаётся финальным push-gate |
-| Commit и push из `main` | completed | Implementation, documentation и follow-up commits созданы только на существующей `main`; финальная configured push и равенство local/origin HEAD входят в обязательную delivery verification этой консолидации |
+| Commit и push из `main` | completed | Implementation, documentation и follow-up commits созданы только на существующей `main`; non-force push завершён, local/origin HEAD подтверждены равными на `51ba31363e9eefdb7a617484dcd92d05a28aedcc`. |
 
 ---
 
@@ -1759,7 +1759,7 @@ Rollback: удалить characterization contract и уточнение docs; r
 # PHPUnit `Storage::fake()` — process isolation
 
 Дата: 20.07.2026
-Статус: реализация и verification завершены; Git delivery оценивается отдельно на общем staged snapshot.
+Статус: реализация и verification завершены в follow-up `096c66f573df6ae914e2aa0061d928c3ee9c2909`; содержащий его documentation HEAD `51ba31363e9eefdb7a617484dcd92d05a28aedcc` опубликован, local/origin equality подтверждена.
 
 ## Scope и решение
 
@@ -1781,7 +1781,7 @@ Rollback: удалить test-only resolver и regression contract; schema/data/
 | Auth, translations, cache, search, SEO, notifications, mobile, admin, imports | `not_applicable` | Product behavior и domain state не меняются |
 | Documentation, README, CHANGELOG | `completed` | Permanent development rule, plan и русский CHANGELOG обновлены; `README.md` проверен без фиктивной visitor entry, поскольку product behavior не изменился |
 | Full repository suite | `completed` | 1 427 tests: 1 416 passed, 11 expected skipped, 122 945 assertions |
-| Git delivery | `unresolved` | Разрешён только безопасный commit/push из `main`; общий staged snapshot проверяется без захвата или отмены чужих changes |
+| Git delivery | `completed` | Test-only guard и regression contract вошли в `096c66f573df6ae914e2aa0061d928c3ee9c2909` на существующей `main`; containing HEAD `51ba31363e9eefdb7a617484dcd92d05a28aedcc` подтверждён в `origin/main`. |
 
 ## Verification evidence
 

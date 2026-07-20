@@ -23,7 +23,7 @@
 
 - [x] Run Pint, related tests, full suite, managed docs, diff and legacy scans.
 - [x] Update current compliance, CHANGELOG and README assessment.
-- [ ] Commit/push only when the shared Git guard permits a clean scoped delivery.
+- [x] Commit the implementation on the existing `main` as `096c66f573df6ae914e2aa0061d928c3ee9c2909`; deliver it together with this final evidence through the configured pre-push gate and verify local/origin HEAD equality.
 
 ### Verification evidence
 
