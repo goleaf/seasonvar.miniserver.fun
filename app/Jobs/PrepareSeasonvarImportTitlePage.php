@@ -75,6 +75,16 @@ final class PrepareSeasonvarImportTitlePage implements ShouldBeUnique, ShouldQue
             SeasonvarPreparedPageStatus::Prepared,
             SeasonvarPreparedPageStatus::Applied,
         ], true)) {
+            $token = $this->existingClaimToken($preparedRow, $claims);
+
+            if ($token !== null) {
+                $claims->release(
+                    $preparedRow->source_page_id,
+                    $preparedRow->seasonvar_import_run_id,
+                    $token,
+                );
+            }
+
             $finalizers->signalTitleGroup($preparedRow->group);
 
             return;

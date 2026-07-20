@@ -26,8 +26,23 @@ final class ApiSyncCursorCodecTest extends TestCase
         $this->assertNull($decoded->ownerId);
         $this->assertSame(42, $decoded->changeId);
         $this->assertGreaterThan(0, $decoded->issuedAt);
-        $this->assertStringNotContainsString('catalog', $encoded);
-        $this->assertStringNotContainsString('42', $encoded);
+
+        $envelope = base64_decode($encoded, true);
+        $this->assertNotFalse($envelope);
+        $this->assertJson($envelope);
+        $encryptedPayload = json_decode($envelope, true, flags: JSON_THROW_ON_ERROR);
+        $this->assertIsArray($encryptedPayload);
+        $this->assertArrayHasKey('value', $encryptedPayload);
+        $this->assertIsString($encryptedPayload['value']);
+        $ciphertext = base64_decode($encryptedPayload['value'], true);
+        $this->assertNotFalse($ciphertext);
+        $this->assertNotSame(json_encode([
+            'v' => 1,
+            's' => ApiSyncChange::SCOPE_CATALOG,
+            'o' => null,
+            'i' => 42,
+            't' => $decoded->issuedAt,
+        ], JSON_THROW_ON_ERROR), $ciphertext);
     }
 
     public function test_user_cursor_is_bound_to_its_owner(): void

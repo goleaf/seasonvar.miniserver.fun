@@ -153,7 +153,7 @@ final class QueueWorkerObservabilityTest extends TestCase
         $this->assertSame('idle', $status['queues']['seasonvar_title_refresh']['status']);
     }
 
-    public function test_expired_pool_heartbeat_does_not_hide_new_backlog(): void
+    public function test_expired_base_pool_heartbeat_does_not_hide_new_backlog(): void
     {
         config([
             'cache-architecture.operations.queue_worker_heartbeat_seconds' => 30,
@@ -170,19 +170,19 @@ final class QueueWorkerObservabilityTest extends TestCase
 
         $state = new class
         {
-            public int $cacheWarmPending = 0;
+            public int $seasonvarImportPending = 0;
         };
         $queue = $this->createMock(QueueContract::class);
         $queue->method('pendingSize')->willReturnCallback(
             static function (string $name) use ($state): int {
-                return $name === 'cache-warm' ? $state->cacheWarmPending : 0;
+                return $name === 'seasonvar-import' ? $state->seasonvarImportPending : 0;
             },
         );
         $queue->method('delayedSize')->willReturn(0);
         $queue->method('reservedSize')->willReturn(0);
         $queue->method('creationTimeOfOldestPendingJob')->willReturnCallback(
             static function (string $name) use ($state): ?int {
-                return $name === 'cache-warm' && $state->cacheWarmPending > 0
+                return $name === 'seasonvar-import' && $state->seasonvarImportPending > 0
                     ? now()->subMinute()->getTimestamp()
                     : null;
             },
@@ -193,16 +193,153 @@ final class QueueWorkerObservabilityTest extends TestCase
         $this->app->instance(QueueManager::class, $manager);
 
         $heartbeat = app(QueueWorkerHeartbeat::class);
-        $heartbeat->looping(new Looping('redis', 'cache-warm'));
+        $heartbeat->looping(new Looping('redis', 'seasonvar-import'));
 
-        $this->assertSame('ok', $heartbeat->status()['queues']['cache_warm']['status']);
+        $this->assertSame('ok', $heartbeat->status()['queues']['seasonvar_import']['status']);
 
         $this->travel(31)->seconds();
-        $state->cacheWarmPending = 3;
-        $status = $heartbeat->status()['queues']['cache_warm'];
+        $state->seasonvarImportPending = 3;
+        $status = $heartbeat->status()['queues']['seasonvar_import'];
 
         $this->assertSame('failed', $status['status']);
         $this->assertSame(3, $status['pending']);
         $this->assertNull($status['last_heartbeat_at']);
+    }
+
+    public function test_cache_warm_heartbeat_covers_a_long_job_and_expires_after_bounded_grace(): void
+    {
+        config([
+            'cache-architecture.operations.queue_worker_heartbeat_seconds' => 30,
+            'cache-architecture.stores.domain' => 'array',
+            'cache-architecture.stores.versions' => 'array',
+            'cache-architecture.warming.connection' => 'redis',
+            'cache-architecture.warming.queue' => 'cache-warm',
+            'cache-architecture.warming.timeout' => 120,
+            'queue.default' => 'redis',
+            'queue.connections.redis.queue' => 'default',
+            'seasonvar.queue.connection' => 'redis',
+            'seasonvar.queue.queue' => 'seasonvar-import',
+            'seasonvar.title_refresh.queue' => 'seasonvar-title-refresh',
+        ]);
+
+        $queue = $this->createMock(QueueContract::class);
+        $queue->method('pendingSize')->willReturnCallback(
+            static fn (string $name): int => $name === 'cache-warm' ? 3 : 0,
+        );
+        $queue->method('delayedSize')->willReturn(0);
+        $queue->method('reservedSize')->willReturn(0);
+        $queue->method('creationTimeOfOldestPendingJob')->willReturnCallback(
+            static fn (string $name): ?int => $name === 'cache-warm'
+                ? now()->subMinute()->getTimestamp()
+                : null,
+        );
+
+        $manager = $this->createMock(QueueManager::class);
+        $manager->method('connection')->with('redis')->willReturn($queue);
+        $this->app->instance(QueueManager::class, $manager);
+
+        $heartbeat = app(QueueWorkerHeartbeat::class);
+        $heartbeat->looping(new Looping('redis', 'cache-warm'));
+
+        $this->travel(31)->seconds();
+        $activeStatus = $heartbeat->status()['queues']['cache_warm'];
+
+        $this->assertSame('ok', $activeStatus['status']);
+        $this->assertNotNull($activeStatus['last_heartbeat_at']);
+
+        $this->travel(150)->seconds();
+        $stoppedStatus = $heartbeat->status()['queues']['cache_warm'];
+
+        $this->assertSame('failed', $stoppedStatus['status']);
+        $this->assertNull($stoppedStatus['last_heartbeat_at']);
+    }
+
+    public function test_same_queue_name_on_another_connection_keeps_the_base_heartbeat_lease(): void
+    {
+        config([
+            'cache-architecture.operations.queue_worker_heartbeat_seconds' => 30,
+            'cache-architecture.stores.domain' => 'array',
+            'cache-architecture.stores.versions' => 'array',
+            'cache-architecture.warming.connection' => 'redis',
+            'cache-architecture.warming.queue' => 'cache-warm',
+            'cache-architecture.warming.timeout' => 120,
+            'queue.default' => 'sync',
+            'queue.connections.redis.queue' => 'cache-warm',
+            'seasonvar.queue.connection' => 'redis',
+            'seasonvar.queue.queue' => 'seasonvar-import',
+            'seasonvar.title_refresh.queue' => 'seasonvar-title-refresh',
+        ]);
+
+        $state = new class
+        {
+            public int $pending = 0;
+        };
+        $queue = $this->createMock(QueueContract::class);
+        $queue->method('pendingSize')->willReturnCallback(
+            static fn (string $name): int => $name === 'cache-warm' ? $state->pending : 0,
+        );
+        $queue->method('delayedSize')->willReturn(0);
+        $queue->method('reservedSize')->willReturn(0);
+        $queue->method('creationTimeOfOldestPendingJob')->willReturnCallback(
+            static fn (string $name): ?int => $name === 'cache-warm' && $state->pending > 0
+                ? now()->subMinute()->getTimestamp()
+                : null,
+        );
+
+        $manager = $this->createMock(QueueManager::class);
+        $manager->method('connection')->willReturn($queue);
+        $this->app->instance(QueueManager::class, $manager);
+
+        $heartbeat = app(QueueWorkerHeartbeat::class);
+        $heartbeat->looping(new Looping('sync', 'cache-warm'));
+
+        $this->travel(31)->seconds();
+        $state->pending = 3;
+        $status = $heartbeat->status()['queues']['default'];
+
+        $this->assertSame('failed', $status['status']);
+        $this->assertNull($status['last_heartbeat_at']);
+    }
+
+    public function test_cache_warm_heartbeat_never_shortens_a_longer_base_lease(): void
+    {
+        config([
+            'cache-architecture.operations.queue_worker_heartbeat_seconds' => 300,
+            'cache-architecture.stores.domain' => 'array',
+            'cache-architecture.stores.versions' => 'array',
+            'cache-architecture.warming.connection' => 'redis',
+            'cache-architecture.warming.queue' => 'cache-warm',
+            'cache-architecture.warming.timeout' => 120,
+            'queue.default' => 'redis',
+            'queue.connections.redis.queue' => 'default',
+            'seasonvar.queue.connection' => 'redis',
+            'seasonvar.queue.queue' => 'seasonvar-import',
+            'seasonvar.title_refresh.queue' => 'seasonvar-title-refresh',
+        ]);
+
+        $queue = $this->createMock(QueueContract::class);
+        $queue->method('pendingSize')->willReturnCallback(
+            static fn (string $name): int => $name === 'cache-warm' ? 3 : 0,
+        );
+        $queue->method('delayedSize')->willReturn(0);
+        $queue->method('reservedSize')->willReturn(0);
+        $queue->method('creationTimeOfOldestPendingJob')->willReturnCallback(
+            static fn (string $name): ?int => $name === 'cache-warm'
+                ? now()->subMinute()->getTimestamp()
+                : null,
+        );
+
+        $manager = $this->createMock(QueueManager::class);
+        $manager->method('connection')->with('redis')->willReturn($queue);
+        $this->app->instance(QueueManager::class, $manager);
+
+        $heartbeat = app(QueueWorkerHeartbeat::class);
+        $heartbeat->looping(new Looping('redis', 'cache-warm'));
+
+        $this->travel(181)->seconds();
+        $this->assertSame('ok', $heartbeat->status()['queues']['cache_warm']['status']);
+
+        $this->travel(120)->seconds();
+        $this->assertSame('failed', $heartbeat->status()['queues']['cache_warm']['status']);
     }
 }

@@ -17,6 +17,8 @@ use Throwable;
 
 final class QueueWorkerHeartbeat
 {
+    private const int CACHE_WARM_HEARTBEAT_GRACE_SECONDS = 60;
+
     /** @var array<string, int> */
     private array $lastHeartbeatAt = [];
 
@@ -195,7 +197,7 @@ final class QueueWorkerHeartbeat
     {
         $now = now();
         $identity = $connection.':'.$queue;
-        $ttl = max(30, (int) config('cache-architecture.operations.queue_worker_heartbeat_seconds', 120));
+        $ttl = $this->heartbeatTtl($connection, $queue);
         $writeInterval = max(5, min(30, intdiv($ttl, 3)));
 
         if (! $processed && ($this->lastHeartbeatAt[$identity] ?? 0) > $now->getTimestamp() - $writeInterval) {
@@ -217,6 +219,22 @@ final class QueueWorkerHeartbeat
             $ttl,
         );
         $this->lastHeartbeatAt[$identity] = $now->getTimestamp();
+    }
+
+    private function heartbeatTtl(string $connection, string $queue): int
+    {
+        $baseTtl = max(30, (int) config('cache-architecture.operations.queue_worker_heartbeat_seconds', 120));
+
+        if (
+            $connection !== (string) config('cache-architecture.warming.connection', 'redis')
+            || $queue !== (string) config('cache-architecture.warming.queue', 'cache-warm-v2')
+        ) {
+            return $baseTtl;
+        }
+
+        $warmingTimeout = max(30, (int) config('cache-architecture.warming.timeout', 600));
+
+        return max($baseTtl, $warmingTimeout + self::CACHE_WARM_HEARTBEAT_GRACE_SECONDS);
     }
 
     private function key(string $connection, string $queue): string

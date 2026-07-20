@@ -61,7 +61,7 @@ class SeasonvarImportTitleGroupFinalizerTest extends TestCase
         $this->assertSame(0, $group->fresh()->applied_pages);
     }
 
-    public function test_finalizer_returns_without_polling_while_a_terminal_page_still_has_a_live_claim(): void
+    public function test_finalizer_releases_its_exact_live_claim_after_the_page_became_terminal(): void
     {
         $title = $this->titleWithSeasonUrls([1]);
         $group = app(SeasonvarImportTitleGroupDispatcher::class)
@@ -81,8 +81,10 @@ class SeasonvarImportTitleGroupFinalizerTest extends TestCase
         $this->app->call([$job, 'handle']);
 
         $job->assertNotReleased();
-        $this->assertSame('running', $group->fresh()->status->value);
-        $this->assertSame(0, $group->fresh()->applied_pages);
+        $this->assertSame('completed', $group->fresh()->status->value);
+        $this->assertSame(1, $group->fresh()->applied_pages);
+        $this->assertNull($row->sourcePage->fresh()->import_claim_token);
+        $this->assertNull($row->sourcePage->fresh()->import_claim_run_id);
     }
 
     public function test_finalizer_fails_a_stale_group_with_a_structurally_incomplete_page_set(): void

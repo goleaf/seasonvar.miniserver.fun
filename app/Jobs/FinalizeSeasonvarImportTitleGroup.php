@@ -25,6 +25,7 @@ use App\Services\Seasonvar\SeasonvarImportFinalizationDispatcher;
 use App\Services\Seasonvar\SeasonvarImportGroupKey;
 use App\Services\Seasonvar\SeasonvarImportRunRecorder;
 use App\Services\Seasonvar\SeasonvarImportTitleGroupReconciler;
+use App\Services\Seasonvar\SeasonvarPageClaimManager;
 use App\Services\Seasonvar\SeasonvarTitleManifestBuilder;
 use App\Services\Seasonvar\SeasonvarTitleMerger;
 use App\Services\Seasonvar\SeasonvarUrl;
@@ -87,6 +88,7 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
         SeasonvarUrl $urls,
         SeasonvarImportFinalizationDispatcher $finalizers,
         SeasonvarImportTitleGroupReconciler $reconciler,
+        SeasonvarPageClaimManager $claims,
     ): void {
         $group = $this->group();
 
@@ -97,6 +99,13 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
         if ($group->status->isTerminal()) {
             $finalizers->signalGlobalRun($group->run);
 
+            return;
+        }
+
+        $this->releaseTerminalPageClaims($group, $claims);
+        $group = $this->group();
+
+        if ($group === null) {
             return;
         }
 
@@ -351,6 +360,25 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
         return $group->expected_pages > 0
             && $terminal === $group->expected_pages
             && $group->preparedPages->count() === $group->expected_pages;
+    }
+
+    private function releaseTerminalPageClaims(
+        SeasonvarImportTitleGroup $group,
+        SeasonvarPageClaimManager $claims,
+    ): void {
+        foreach ($group->preparedPages as $row) {
+            $token = $row->sourcePage->import_claim_token;
+
+            if (! $row->status->isTerminal() || ! is_string($token) || $token === '') {
+                continue;
+            }
+
+            $claims->release(
+                (int) $row->source_page_id,
+                (int) $group->seasonvar_import_run_id,
+                $token,
+            );
+        }
     }
 
     /**

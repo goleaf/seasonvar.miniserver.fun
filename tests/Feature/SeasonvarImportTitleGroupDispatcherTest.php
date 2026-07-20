@@ -12,6 +12,7 @@ use App\Models\Season;
 use App\Models\SeasonvarImportPreparedPage;
 use App\Models\Source;
 use App\Services\Seasonvar\SeasonvarImportTitleGroupDispatcher;
+use App\Services\Seasonvar\SeasonvarPageClaimManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -203,6 +204,24 @@ class SeasonvarImportTitleGroupDispatcherTest extends TestCase
         $this->assertSame('failed', $prepared->sourcePage->fresh()->import_status);
         $this->assertSame(1, $prepared->sourcePage->fresh()->failure_count);
         $this->assertNull($prepared->sourcePage->fresh()->import_claim_token);
+    }
+
+    public function test_retry_of_prepared_page_releases_its_orphaned_claim_before_finalization(): void
+    {
+        Queue::fake();
+        $title = $this->titleWithSeasonUrls([1]);
+        $group = app(SeasonvarImportTitleGroupDispatcher::class)
+            ->start($title, 'seasonvar-title-refresh');
+        $prepared = $group->preparedPages()->with('sourcePage')->firstOrFail();
+        $claims = app(SeasonvarPageClaimManager::class);
+        $token = $claims->claim($prepared->sourcePage, $group->seasonvar_import_run_id, 3600);
+        $this->assertNotNull($token);
+        $prepared->markPrepared([], [], hash('sha256', 'prepared'), 1);
+
+        $this->app->call([new PrepareSeasonvarImportTitlePage($prepared->id), 'handle']);
+
+        $this->assertFalse($claims->owns($prepared->source_page_id, $group->seasonvar_import_run_id, $token));
+        Queue::assertPushed(FinalizeSeasonvarImportTitleGroup::class, 1);
     }
 
     /** @param list<int> $seasonNumbers */

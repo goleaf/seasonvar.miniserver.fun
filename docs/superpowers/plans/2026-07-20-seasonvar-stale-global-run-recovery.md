@@ -215,9 +215,11 @@ git diff --check
 
 Evidence: exact task matrix after the bounded recommendation handoff passed 128 tests / 701 assertions; maintenance/recommendation subset passed 60 / 340; full suite passed 1,407 tests with 11 expected skips and 122,916 assertions. Pint, managed-doc check and `git diff --check` passed.
 
-- [ ] **Step 3: Verify the real stale row no longer blocks**
+- [x] **Step 3: Verify the real stale row no longer blocks**
 
 After tests, invoke the existing recovery boundary for the confirmed stale row only through application code, then verify with a read-only query that run `#944` is terminal and no live claims were overwritten. Do not start provider HTTP merely to prove cleanup.
+
+Evidence 20.07.2026: run `#944` завершился `completed`, checkpoint удалён, recommendation mode=`deferred`, live claims отсутствуют. Новый bounded XML-tail run `#954` после этого был принят canonical single-flight boundary и также завершился `completed`, что подтверждает отсутствие повторной ложной блокировки.
 
 - [ ] **Step 4: Commit and push if repository state permits**
 
