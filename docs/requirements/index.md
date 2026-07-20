@@ -1,6 +1,6 @@
 # Канонический индекс требований
 
-Обновлено: 19.07.2026
+Обновлено: 20.07.2026
 
 Этот файл определяет обязательный порядок чтения постоянных требований. Он ссылается на существующие документы-владельцы и не копирует их доменные контракты.
 
@@ -20,7 +20,7 @@
 | 8 | [`docs/performance.md`](../performance.md), [`docs/caching.md`](../caching.md) | Query, payload, cache и invalidation contracts | Весь portal | Каждая data/UI задача | Performance and caching | 19.07.2026 |
 | 9 | [`docs/UI_STANDARDS.md`](../UI_STANDARDS.md), [`docs/frontend.md`](../frontend.md) | UI, UX, mobile и accessibility | User/admin interfaces | Каждая UI-задача | Frontend experience | 19.07.2026 |
 | 10 | [`docs/administration.md`](../administration.md), [`docs/authorization.md`](../authorization.md) | Administration, roles, permissions и moderation | Administration/private staff | Каждая admin-задача | Administration and authorization | 19.07.2026 |
-| 11 | [`docs/requirements/production-operations.md`](production-operations.md) | Production/data/deployment/runbook boundaries | Production-affecting work | При любом production impact | Operations | 19.07.2026 |
+| 11 | [`docs/requirements/production-operations.md`](production-operations.md) | Production/data/deployment/runbook boundaries | Production-affecting work | При любом production impact | Operations | 20.07.2026 |
 | 12 | [`docs/requirements/maintenance-and-upgrades.md`](maintenance-and-upgrades.md) | Dependency/runtime/architecture upgrades | Maintenance-affecting work | При любом maintenance impact | Maintenance | 18.07.2026 |
 | 13 | [`docs/requirements/system-wide-integration.md`](system-wide-integration.md), [`docs/README.md`](../README.md) и feature owners | Cross-feature и feature-specific requirements | Затронутые domains | По scope задачи | System integration и тематические владельцы | По каждому owner-файлу |
 | 14 | [`docs/plans/current-task-plan.md`](../plans/current-task-plan.md) | Task scope, discoveries, compliance и evidence | Текущая задача | Каждая задача | Task owner | Обновляется в каждой задаче |

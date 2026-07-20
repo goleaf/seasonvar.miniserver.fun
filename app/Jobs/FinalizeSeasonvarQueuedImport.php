@@ -67,6 +67,12 @@ class FinalizeSeasonvarQueuedImport implements ShouldBeUniqueUntilProcessing, Sh
             return;
         }
 
+        if ($this->dispatchIsIncomplete($run)) {
+            $runs->heartbeat($run->id);
+
+            return;
+        }
+
         if ($claims->outstandingForRun($run->id) > 0) {
             $runs->heartbeat($run->id);
 
@@ -95,6 +101,12 @@ class FinalizeSeasonvarQueuedImport implements ShouldBeUniqueUntilProcessing, Sh
                 || $run->status !== 'running'
                 || $run->execution_mode !== 'queue'
             ) {
+                return;
+            }
+
+            if ($this->dispatchIsIncomplete($run)) {
+                $runs->heartbeat($run->id);
+
                 return;
             }
 
@@ -160,6 +172,11 @@ class FinalizeSeasonvarQueuedImport implements ShouldBeUniqueUntilProcessing, Sh
             ->where('seasonvar_import_run_id', $runId)
             ->whereIn('status', ['discovering', 'running', 'finalizing'])
             ->exists();
+    }
+
+    private function dispatchIsIncomplete(SeasonvarImportRun $run): bool
+    {
+        return data_get($run->summary, 'dispatch_completed') === false;
     }
 
     private function lockStore(): Store&LockProvider

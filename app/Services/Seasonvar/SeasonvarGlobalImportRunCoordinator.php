@@ -6,6 +6,8 @@ namespace App\Services\Seasonvar;
 
 use App\DTOs\Seasonvar\SeasonvarImportStartResultData;
 use App\Enums\SeasonvarImportStatus;
+use App\Enums\SeasonvarImportTitleGroupStatus;
+use App\Enums\SeasonvarPreparedPageStatus;
 use App\Models\SeasonvarImportRun;
 use Illuminate\Cache\Repository as CacheRepository;
 use Illuminate\Contracts\Cache\Lock;
@@ -56,6 +58,7 @@ final class SeasonvarGlobalImportRunCoordinator
                 'last_heartbeat_at' => now(),
                 'summary' => [
                     'discover' => $discover,
+                    'dispatch_completed' => false,
                     'provider' => 'seasonvar',
                     'page_types' => $pageTypes,
                     'sitemap_tail_limit' => $sitemapTailLimit,
@@ -103,6 +106,59 @@ final class SeasonvarGlobalImportRunCoordinator
             ]));
 
             return new SeasonvarImportStartResultData($run, true);
+        });
+    }
+
+    public function resumePrematurelyFinalized(int $runId): ?SeasonvarImportRun
+    {
+        return $this->startLock()->block(5, function () use ($runId): ?SeasonvarImportRun {
+            return DB::transaction(function () use ($runId): ?SeasonvarImportRun {
+                $run = SeasonvarImportRun::query()->lockForUpdate()->find($runId);
+
+                if ($run === null
+                    || $run->mode !== 'sitemap'
+                    || $run->execution_mode !== 'queue'
+                    || $this->activeRuns()->whereKeyNot($run->id)->exists()
+                ) {
+                    return null;
+                }
+
+                if ($run->status === SeasonvarImportStatus::Running->value
+                    && data_get($run->summary, 'dispatch_completed') === false
+                    && is_array(data_get($run->summary, 'premature_finalization_recovery'))
+                ) {
+                    return $run;
+                }
+
+                if (! in_array($run->status, [
+                    SeasonvarImportStatus::Completed->value,
+                    SeasonvarImportStatus::Partial->value,
+                ], true)
+                    || ! array_key_exists('queued_pages', $run->summary ?? [])
+                    || ! $this->hasIncompleteDispatchedWork($run)
+                    || $this->hasUnsupportedLiveClaims($run)
+                ) {
+                    return null;
+                }
+
+                $storedRecovery = data_get($run->summary, 'premature_finalization_recovery');
+                $recovery = is_array($storedRecovery) ? $storedRecovery : [];
+                $run->summary = array_merge($run->summary ?? [], [
+                    'dispatch_completed' => false,
+                    'premature_finalization_recovery' => array_merge($recovery, [
+                        'started_at' => $recovery['started_at'] ?? now()->toIso8601String(),
+                        'previous_status' => (string) $run->status,
+                    ]),
+                ]);
+                $run->fill([
+                    'status' => SeasonvarImportStatus::Running->value,
+                    'finished_at' => null,
+                    'last_error' => null,
+                    'last_heartbeat_at' => now(),
+                ])->save();
+
+                return $run;
+            });
         });
     }
 
@@ -177,5 +233,37 @@ final class SeasonvarGlobalImportRunCoordinator
                 $query->whereNotNull('import_claim_token')
                     ->where('import_claim_expires_at', '>', now());
             });
+    }
+
+    private function hasIncompleteDispatchedWork(SeasonvarImportRun $run): bool
+    {
+        $hasPreparedWork = $run->preparedPages()
+            ->whereIn('status', [
+                SeasonvarPreparedPageStatus::Queued->value,
+                SeasonvarPreparedPageStatus::Preparing->value,
+                SeasonvarPreparedPageStatus::Prepared->value,
+            ])
+            ->exists();
+        $hasActiveGroups = $run->titleGroups()
+            ->whereIn('status', [
+                SeasonvarImportTitleGroupStatus::Discovering->value,
+                SeasonvarImportTitleGroupStatus::Running->value,
+                SeasonvarImportTitleGroupStatus::Finalizing->value,
+            ])
+            ->exists();
+
+        return $hasPreparedWork || $hasActiveGroups || $run->claimedSourcePages()
+            ->whereNotNull('import_claim_token')
+            ->where('import_claim_expires_at', '>', now())
+            ->exists();
+    }
+
+    private function hasUnsupportedLiveClaims(SeasonvarImportRun $run): bool
+    {
+        return $run->claimedSourcePages()
+            ->whereNotNull('import_claim_token')
+            ->where('import_claim_expires_at', '>', now())
+            ->whereNotIn('source_pages.id', $run->preparedPages()->select('source_page_id'))
+            ->exists();
     }
 }

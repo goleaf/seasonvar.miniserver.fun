@@ -30,11 +30,11 @@ class CatalogLivewireBudgetTest extends TestCase
 
     private const TITLE_UPDATE_MAX_BYTES = 95_000;
 
-    private const CATALOG_INITIAL_MAX_QUERIES = 8;
+    private const CATALOG_INITIAL_MAX_QUERIES = 10;
 
-    private const CATALOG_DEFERRED_MAX_QUERIES = 12;
+    private const CATALOG_DEFERRED_MAX_QUERIES = 14;
 
-    private const CATALOG_UPDATE_MAX_QUERIES = 8;
+    private const CATALOG_UPDATE_MAX_QUERIES = 10;
 
     private const TITLE_INITIAL_MAX_QUERIES = 29;
 

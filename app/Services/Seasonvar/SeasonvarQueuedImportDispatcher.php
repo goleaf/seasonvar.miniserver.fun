@@ -13,6 +13,7 @@ use App\Models\CatalogTitle;
 use App\Models\SeasonvarImportRun;
 use App\Models\SourcePage;
 use App\Services\Catalog\CatalogCacheInvalidator;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use LogicException;
 use Throwable;
@@ -144,32 +145,41 @@ class SeasonvarQueuedImportDispatcher
             'stored' => $stored,
         ]);
 
-        $run->refresh();
-        $run->summary = array_merge($run->summary ?? [], [
+        $dispatchSummary = [
+            'dispatch_completed' => true,
             'expired_claims_recovered' => $recovered,
             'queued_pages' => $selected,
             'sitemap_tail_selected' => $sitemapTailUrls !== null ? count($sitemapTailUrls) : null,
-        ]);
-
-        if ($run->status !== SeasonvarImportStatus::Running->value) {
-            $run->save();
-
-            return $run->refresh();
-        }
+        ];
 
         if ($selected === 0) {
-            $run->fill([
-                'status' => $run->completionStatus(),
-                'cycles' => 1,
-                'finished_at' => now(),
-                'last_heartbeat_at' => now(),
-            ])->save();
+            $run = DB::transaction(function () use ($dispatchSummary, $run): SeasonvarImportRun {
+                $lockedRun = SeasonvarImportRun::query()->lockForUpdate()->findOrFail($run->id);
+                $lockedRun->summary = array_merge($lockedRun->summary ?? [], $dispatchSummary);
+
+                if ($lockedRun->status === SeasonvarImportStatus::Running->value) {
+                    $lockedRun->fill([
+                        'status' => $lockedRun->completionStatus(),
+                        'cycles' => 1,
+                        'finished_at' => now(),
+                        'last_heartbeat_at' => now(),
+                    ]);
+                }
+
+                $lockedRun->save();
+
+                return $lockedRun;
+            }, 3);
             $this->cacheInvalidator->catalogChanged();
 
             return $run->refresh();
         }
 
-        $run->save();
+        $run = $this->runs->mergeSummary($run->id, $dispatchSummary) ?? $run->fresh();
+
+        if ($run->status !== SeasonvarImportStatus::Running->value) {
+            return $run->refresh();
+        }
 
         $this->finalizers->globalRun(
             $run,

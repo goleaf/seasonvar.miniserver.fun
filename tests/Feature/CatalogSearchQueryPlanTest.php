@@ -137,9 +137,9 @@ class CatalogSearchQueryPlanTest extends TestCase
         $this->assertStringNotContainsString('select count(*) from "seasons"', $rankedQueries->first());
 
         $cardQuery = $queries->first(fn (string $sql): bool => str_contains($sql, 'from "catalog_titles"')
-            && str_contains($sql, 'where "catalog_titles"."id" in')
-            && str_contains($sql, 'select count(*) from "seasons"'));
+            && str_contains($sql, 'where "catalog_titles"."id" in'));
         $this->assertIsString($cardQuery);
         $this->assertStringNotContainsString('bm25', $cardQuery);
+        $this->assertStringNotContainsString('select count(*) from "seasons"', $cardQuery);
     }
 }

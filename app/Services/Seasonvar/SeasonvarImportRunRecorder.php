@@ -64,4 +64,24 @@ class SeasonvarImportRunRecorder
                 'updated_at' => now(),
             ]);
     }
+
+    /**
+     * @param  array<string, mixed>  $values
+     */
+    public function mergeSummary(int $runId, array $values): ?SeasonvarImportRun
+    {
+        return DB::transaction(function () use ($runId, $values): ?SeasonvarImportRun {
+            $run = SeasonvarImportRun::query()->lockForUpdate()->find($runId);
+
+            if ($run === null) {
+                return null;
+            }
+
+            $run->summary = array_merge($run->summary ?? [], $values);
+            $run->last_heartbeat_at = now();
+            $run->save();
+
+            return $run->fresh();
+        }, 3);
+    }
 }

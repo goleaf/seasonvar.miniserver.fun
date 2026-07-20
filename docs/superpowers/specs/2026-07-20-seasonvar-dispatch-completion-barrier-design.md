@@ -41,7 +41,7 @@ Production cron создал run `#964`. Пока `SeasonvarQueuedImportDispatch
 2. `StartSeasonvarQueuedImport` переводит run в `running`; marker остаётся `false` при sitemap mirror, discovery, storage и page selection.
 3. Page/group jobs могут завершаться и сигналить global finalizer, но `FinalizeSeasonvarQueuedImport` обновляет heartbeat и возвращается, пока marker равен строго `false`.
 4. После полного `dispatchEligiblePages()` dispatcher под row lock перечитывает текущий summary, объединяет counters/evidence и записывает `dispatch_completed=true`, не стирая concurrent summary keys.
-5. При `selected=0` тот же marker сохраняется до terminal update, чтобы audit отличал корректный пустой цикл от незавершённого dispatch.
+5. При `selected=0` marker и terminal status сохраняются одной row-locked transaction, чтобы watchdog не наблюдал открытый barrier у ещё running пустого цикла и stale model-save не затёр concurrent summary.
 6. После `true` существующие gates claims/groups/global lock остаются authority для catalog-wide finalization.
 
 ## Ошибки и retry
@@ -53,15 +53,16 @@ Production cron создал run `#964`. Пока `SeasonvarQueuedImportDispatch
 
 ## Production recovery run `#964`
 
-Recovery выполняется только через существующие application services после deployment исправления. Сначала проверяются exact run ownership, terminal/nonterminal staging state, claims и отсутствие нового active global run. Нельзя очищать Redis queue/cache, удалять staging rows, обнулять claims массовым SQL или приписывать необработанные страницы к completed counters.
+Recovery выполняется только через internal `SeasonvarPrematurelyFinalizedRunRecovery` после verification исправления. `SeasonvarGlobalImportRunCoordinator` под canonical start-lock и row lock проверяет exact sitemap/queue run, historical `queued_pages`, orphan staging/groups, соответствие каждого live claim prepared row и отсутствие другого active global run. Затем service повторно закрывает barrier, requeue-ит только `queued/preparing` prepared rows существующими unique jobs, сигналит nonterminal title groups и открывает barrier атомарным summary merge перед обычным global signal.
 
-Безопасный путь должен вернуть `#964` в поддерживаемый retry/resume lifecycle либо создать новый canonical run, который сможет повторно принять эти страницы после точного освобождения claims через service boundary. Конкретный путь выбирается после чтения существующего `SeasonvarImportAdminService` и regression verification; ручная смена статуса без service contract запрещена.
+Исключение до финального merge оставляет `dispatch_completed=false`, поэтому повторный вызов продолжает тот же recovery безопасно. Нельзя очищать Redis queue/cache, удалять staging rows, обнулять claims массовым SQL, приписывать необработанные страницы к completed counters или создавать отдельную публичную recovery command. `#964` принят этой boundary с 147 nonterminal prepared rows и 91 active group при отсутствии другого global run; terminal invariants проверяются через bounded aggregate queries.
 
 ## Тестирование
 
 - RED regression воспроизводит global finalizer во время незавершённого dispatch: run с `dispatch_completed=false`, без текущих claims/groups, остаётся `running`, pipeline finalization не вызывается.
 - Legacy regression подтверждает, что run без marker сохраняет прежний finalizer contract.
 - Dispatcher test подтверждает `false` при acquire и `true` после полного dispatch, включая пустой selection.
+- Recovery tests подтверждают положительный resume, interrupted idempotent resume и fail-closed отказ для нормального terminal run, конкурирующего global run и неподдерживаемого claim ownership.
 - Existing claim/group/finalizer, command и calendar/importer tests должны остаться зелёными.
 
 ## Cross-feature impact

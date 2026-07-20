@@ -48,6 +48,7 @@ class CatalogTitlesPageBuilder
         private readonly CatalogSearchQueryParser $searchParser,
         private readonly CatalogTitleSearch $titleSearch,
         private readonly CatalogSearchSuggestion $searchSuggestions,
+        private readonly CatalogTitleCardCountLoader $cardCounts,
         private readonly CatalogUserCardStateLoader $cardStates,
         private readonly CatalogCollectionQuery $collections,
         private readonly TagPagePresenter $tagPages,
@@ -99,10 +100,17 @@ class CatalogTitlesPageBuilder
         $catalogTotal = $rankSearch
             ? $this->query->filteredTitles($criteria, $request->user())->count()
             : null;
-        $cardCounts = $this->query->publicCardCounts($request->user());
+        $cardCountQueries = $this->query->publicCardCounts($request->user());
         $cardRelations = array_merge([
             'latestSeason' => fn ($query) => $query->select(['seasons.id', 'seasons.catalog_title_id', 'seasons.number']),
         ], $cardLoads);
+        $sortCountKeys = match ($sortOption) {
+            CatalogSort::EpisodesDesc => ['episodes'],
+            CatalogSort::SeasonsDesc => ['seasons'],
+            CatalogSort::VideoDesc => ['licensedMedia as published_media_count'],
+            default => [],
+        };
+        $sortCardCountQueries = array_intersect_key($cardCountQueries, array_flip($sortCountKeys));
 
         if ($rankSearch) {
             $catalogTitleIds = $this->query->filteredTitles(
@@ -111,15 +119,8 @@ class CatalogTitlesPageBuilder
                 rankSearch: true,
             )->select('catalog_titles.id');
 
-            $sortCountKeys = match ($sortOption) {
-                CatalogSort::EpisodesDesc => ['episodes'],
-                CatalogSort::SeasonsDesc => ['seasons'],
-                CatalogSort::VideoDesc => ['licensedMedia as published_media_count'],
-                default => [],
-            };
-
-            if ($sortCountKeys !== []) {
-                $catalogTitleIds->withCount(array_intersect_key($cardCounts, array_flip($sortCountKeys)));
+            if ($sortCardCountQueries !== []) {
+                $catalogTitleIds->withCount($sortCardCountQueries);
             }
 
             if (in_array($sortOption, [CatalogSort::KinopoiskRating, CatalogSort::ImdbRating], true)) {
@@ -140,7 +141,6 @@ class CatalogTitlesPageBuilder
                     ->select($cardColumns)
                     ->whereKey($pageIds->all())
                     ->with($cardRelations)
-                    ->withCount($cardCounts)
                     ->when(
                         in_array($sortOption, [CatalogSort::KinopoiskRating, CatalogSort::ImdbRating], true),
                         fn ($query) => $query->withMax($this->query->ratingAggregates(), 'rating'),
@@ -156,8 +156,11 @@ class CatalogTitlesPageBuilder
         } else {
             $catalogTitleQuery = $this->query->filteredTitles($criteria, $request->user())
                 ->select($cardColumns)
-                ->with($cardRelations)
-                ->withCount($cardCounts);
+                ->with($cardRelations);
+
+            if ($sortCardCountQueries !== []) {
+                $catalogTitleQuery->withCount($sortCardCountQueries);
+            }
 
             if (in_array($sortOption, [CatalogSort::KinopoiskRating, CatalogSort::ImdbRating], true)) {
                 $catalogTitleQuery->withMax($this->query->ratingAggregates(), 'rating');
@@ -166,6 +169,9 @@ class CatalogTitlesPageBuilder
             $this->query->sorted($catalogTitleQuery, $sortOption);
             $catalogTitles = $catalogTitleQuery->paginate($perPage)->appends($paginationQuery);
         }
+        $catalogTitles->setCollection(
+            $this->cardCounts->load($catalogTitles->getCollection(), $request->user()),
+        );
         $catalogTitles->setCollection(
             $this->cardStates->load($catalogTitles->getCollection(), $request->user()),
         );

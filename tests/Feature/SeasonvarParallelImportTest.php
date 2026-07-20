@@ -26,6 +26,7 @@ use App\Services\Seasonvar\SeasonvarImportPipeline;
 use App\Services\Seasonvar\SeasonvarImportRunRecorder;
 use App\Services\Seasonvar\SeasonvarImportTitleGroupDispatcher;
 use App\Services\Seasonvar\SeasonvarPageClaimManager;
+use App\Services\Seasonvar\SeasonvarPrematurelyFinalizedRunRecovery;
 use App\Services\Seasonvar\SeasonvarQueuedImportDispatcher;
 use Illuminate\Contracts\Bus\Dispatcher as BusDispatcher;
 use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
@@ -140,6 +141,33 @@ class SeasonvarParallelImportTest extends TestCase
             ->count());
         Queue::assertPushedTimes(StartSeasonvarQueuedImport::class, 1);
         Queue::assertNotPushed(PrepareSeasonvarImportTitlePage::class);
+    }
+
+    public function test_new_queued_global_run_records_dispatch_as_incomplete(): void
+    {
+        config(['seasonvar.queue.lock_store' => 'array']);
+
+        $result = app(SeasonvarGlobalImportRunCoordinator::class)->acquire(
+            force: false,
+            discover: false,
+        );
+
+        $this->assertTrue($result->created);
+        $this->assertFalse(data_get($result->run->summary, 'dispatch_completed'));
+    }
+
+    public function test_import_run_summary_merge_preserves_existing_values(): void
+    {
+        $run = $this->queuedRun();
+        $run->update(['summary' => ['concurrent_key' => 'preserved']]);
+
+        $merged = app(SeasonvarImportRunRecorder::class)->mergeSummary($run->id, [
+            'dispatch_completed' => true,
+        ]);
+
+        $this->assertNotNull($merged);
+        $this->assertSame('preserved', data_get($merged->summary, 'concurrent_key'));
+        $this->assertTrue(data_get($merged->summary, 'dispatch_completed'));
     }
 
     public function test_queued_start_reuses_an_active_sync_global_run(): void
@@ -771,6 +799,7 @@ class SeasonvarParallelImportTest extends TestCase
         );
         Queue::assertPushedTimes(WakeSeasonvarImportFinalizers::class, 1);
         $this->assertSame(2, $run->fresh()->selected);
+        $this->assertTrue(data_get($run->fresh()->summary, 'dispatch_completed'));
         $this->assertSame(1, $run->titleGroups()->count());
         $this->assertSame(2, $run->preparedPages()->count());
         $this->assertSame(2, SourcePage::query()->where('import_claim_run_id', $run->id)->count());
@@ -786,6 +815,24 @@ class SeasonvarParallelImportTest extends TestCase
             $pages->pluck('id')->all(),
             SourcePage::query()->where('import_claim_run_id', $run->id)->pluck('id')->all(),
         );
+    }
+
+    public function test_empty_queued_dispatch_records_the_completed_barrier_before_finishing(): void
+    {
+        config(['seasonvar.queue.lock_store' => 'array']);
+        Queue::fake();
+        $result = app(SeasonvarGlobalImportRunCoordinator::class)->acquire(
+            force: false,
+            discover: false,
+        );
+
+        $this->assertFalse(data_get($result->run->summary, 'dispatch_completed'));
+
+        $run = app(SeasonvarQueuedImportDispatcher::class)->dispatchRun($result->run);
+
+        $this->assertSame('completed', $run->status);
+        $this->assertTrue(data_get($run->summary, 'dispatch_completed'));
+        $this->assertSame(0, $run->selected);
     }
 
     public function test_dispatcher_keeps_non_serial_handlers_on_the_legacy_page_job(): void
@@ -951,6 +998,217 @@ class SeasonvarParallelImportTest extends TestCase
         );
 
         $job->assertNotReleased();
+    }
+
+    public function test_global_finalizer_waits_until_page_dispatch_is_completed(): void
+    {
+        config(['seasonvar.queue.lock_store' => 'array']);
+        $run = $this->queuedRun();
+        $run->update([
+            'summary' => array_merge($run->summary ?? [], ['dispatch_completed' => false]),
+        ]);
+        $pipeline = Mockery::mock(SeasonvarImportPipeline::class);
+        $pipeline->shouldNotReceive('finalizeQueuedRun');
+        $job = (new FinalizeSeasonvarQueuedImport($run->id))->withFakeQueueInteractions();
+
+        $job->handle(
+            app(SeasonvarPageClaimManager::class),
+            $pipeline,
+            app(SeasonvarImportRunRecorder::class),
+            app(CatalogCacheInvalidator::class),
+        );
+
+        $job->assertNotReleased();
+        $this->assertSame('running', $run->fresh()->status);
+    }
+
+    public function test_dispatcher_rejects_premature_run_recovery_when_another_global_run_is_active(): void
+    {
+        config(['seasonvar.queue.lock_store' => 'array']);
+        Queue::fake();
+        $run = SeasonvarImportRun::query()->create([
+            'mode' => 'sitemap',
+            'execution_mode' => 'queue',
+            'status' => 'completed',
+            'summary' => ['queued_pages' => 1],
+            'finished_at' => now(),
+        ]);
+        $run->titleGroups()->create([
+            'group_key_hash' => hash('sha256', 'seasonvar-title:premature'),
+            'queue_name' => 'seasonvar-import',
+            'status' => 'running',
+        ]);
+        $activeRun = SeasonvarImportRun::query()->create([
+            'mode' => 'sitemap',
+            'execution_mode' => 'queue',
+            'status' => 'running',
+            'started_at' => now(),
+            'last_heartbeat_at' => now(),
+        ]);
+
+        $recovered = app(SeasonvarPrematurelyFinalizedRunRecovery::class)->recover($run->id);
+
+        $this->assertFalse($recovered);
+        $this->assertSame('completed', $run->fresh()->status);
+        $this->assertSame('running', $activeRun->fresh()->status);
+        Queue::assertNothingPushed();
+    }
+
+    public function test_prematurely_finalized_run_recovery_requeues_only_nonterminal_work(): void
+    {
+        config(['seasonvar.queue.lock_store' => 'array']);
+        Queue::fake();
+        $source = Source::factory()->create([
+            'code' => 'seasonvar',
+            'base_url' => 'https://seasonvar.ru',
+        ]);
+        $page = SourcePage::factory()->for($source)->create([
+            'url' => 'https://seasonvar.ru/serial-24212-Ryzhaya_psbdtie-1-season.html',
+            'url_hash' => hash('sha256', 'https://seasonvar.ru/serial-24212-Ryzhaya_psbdtie-1-season.html'),
+            'page_type' => 'serial',
+        ]);
+        $run = SeasonvarImportRun::query()->create([
+            'mode' => 'sitemap',
+            'execution_mode' => 'queue',
+            'status' => 'completed',
+            'last_error' => 'Предыдущее terminal-состояние.',
+            'summary' => ['existing_key' => 'kept', 'queued_pages' => 1],
+            'finished_at' => now(),
+        ]);
+        $group = $run->titleGroups()->create([
+            'group_key_hash' => hash('sha256', 'seasonvar-title:recoverable'),
+            'queue_name' => 'seasonvar-import',
+            'status' => 'running',
+            'expected_pages' => 1,
+        ]);
+        $prepared = $group->preparedPages()->create([
+            'seasonvar_import_run_id' => $run->id,
+            'source_page_id' => $page->id,
+            'status' => 'queued',
+        ]);
+        $this->assertNotNull(app(SeasonvarPageClaimManager::class)->claim($page, $run->id, 3600));
+
+        $recovered = app(SeasonvarPrematurelyFinalizedRunRecovery::class)->recover($run->id);
+        $fresh = $run->fresh();
+
+        $this->assertTrue($recovered);
+        $this->assertSame('running', $fresh->status);
+        $this->assertNull($fresh->finished_at);
+        $this->assertNull($fresh->last_error);
+        $this->assertTrue(data_get($fresh->summary, 'dispatch_completed'));
+        $this->assertSame('kept', data_get($fresh->summary, 'existing_key'));
+        $this->assertSame(1, data_get($fresh->summary, 'premature_finalization_recovery.prepared_pages_requeued'));
+        Queue::assertPushed(
+            PrepareSeasonvarImportTitlePage::class,
+            fn (PrepareSeasonvarImportTitlePage $job): bool => $job->preparedPageId === $prepared->id,
+        );
+        Queue::assertPushed(
+            FinalizeSeasonvarImportTitleGroup::class,
+            fn (FinalizeSeasonvarImportTitleGroup $job): bool => $job->groupId === $group->id,
+        );
+        Queue::assertPushed(
+            FinalizeSeasonvarQueuedImport::class,
+            fn (FinalizeSeasonvarQueuedImport $job): bool => $job->importRunId === $run->id,
+        );
+    }
+
+    public function test_prematurely_finalized_run_recovery_rejects_completed_work_without_orphans(): void
+    {
+        config(['seasonvar.queue.lock_store' => 'array']);
+        Queue::fake();
+        $run = SeasonvarImportRun::query()->create([
+            'mode' => 'sitemap',
+            'execution_mode' => 'queue',
+            'status' => 'completed',
+            'summary' => ['queued_pages' => 1],
+            'finished_at' => now(),
+        ]);
+
+        $this->assertFalse(
+            app(SeasonvarPrematurelyFinalizedRunRecovery::class)->recover($run->id),
+        );
+        $this->assertSame('completed', $run->fresh()->status);
+        Queue::assertNothingPushed();
+    }
+
+    public function test_prematurely_finalized_run_recovery_rejects_unowned_live_claims(): void
+    {
+        config(['seasonvar.queue.lock_store' => 'array']);
+        Queue::fake();
+        $run = SeasonvarImportRun::query()->create([
+            'mode' => 'sitemap',
+            'execution_mode' => 'queue',
+            'status' => 'completed',
+            'summary' => ['queued_pages' => 1],
+            'finished_at' => now(),
+        ]);
+        $run->titleGroups()->create([
+            'group_key_hash' => hash('sha256', 'seasonvar-title:unowned-claim'),
+            'queue_name' => 'seasonvar-import',
+            'status' => 'running',
+        ]);
+        $page = SourcePage::factory()->create();
+        $this->assertNotNull(app(SeasonvarPageClaimManager::class)->claim($page, $run->id, 3600));
+
+        $this->assertFalse(
+            app(SeasonvarPrematurelyFinalizedRunRecovery::class)->recover($run->id),
+        );
+        $this->assertSame('completed', $run->fresh()->status);
+        Queue::assertNothingPushed();
+    }
+
+    public function test_prematurely_finalized_run_recovery_resumes_an_interrupted_recovery_idempotently(): void
+    {
+        config(['seasonvar.queue.lock_store' => 'array']);
+        Queue::fake();
+        $run = $this->queuedRun();
+        $run->update(['summary' => [
+            'queued_pages' => 1,
+            'existing_key' => 'kept',
+            'dispatch_completed' => false,
+            'premature_finalization_recovery' => [
+                'started_at' => now()->subMinute()->toIso8601String(),
+                'previous_status' => 'completed',
+            ],
+        ]]);
+        $page = SourcePage::factory()->create(['page_type' => 'serial']);
+        $claims = app(SeasonvarPageClaimManager::class);
+        $this->assertNotNull($claims->claim($page, $run->id, 3600));
+        $group = $run->titleGroups()->create([
+            'group_key_hash' => hash('sha256', 'premature-finalization'),
+            'queue_name' => 'seasonvar-import',
+            'status' => 'running',
+            'expected_pages' => 1,
+            'started_at' => now(),
+        ]);
+        $prepared = $group->preparedPages()->create([
+            'seasonvar_import_run_id' => $run->id,
+            'source_page_id' => $page->id,
+            'status' => 'queued',
+            'warnings' => [],
+        ]);
+
+        $this->assertTrue(
+            app(SeasonvarPrematurelyFinalizedRunRecovery::class)->recover($run->id),
+        );
+        $recovered = $run->fresh();
+
+        $this->assertSame('running', $recovered->status);
+        $this->assertNull($recovered->finished_at);
+        $this->assertTrue(data_get($recovered->summary, 'dispatch_completed'));
+        $this->assertSame('kept', data_get($recovered->summary, 'existing_key'));
+        Queue::assertPushed(
+            PrepareSeasonvarImportTitlePage::class,
+            fn (PrepareSeasonvarImportTitlePage $job): bool => $job->preparedPageId === $prepared->id,
+        );
+        Queue::assertPushed(
+            FinalizeSeasonvarImportTitleGroup::class,
+            fn (FinalizeSeasonvarImportTitleGroup $job): bool => $job->groupId === $group->id,
+        );
+        Queue::assertPushed(
+            FinalizeSeasonvarQueuedImport::class,
+            fn (FinalizeSeasonvarQueuedImport $job): bool => $job->importRunId === $run->id,
+        );
     }
 
     public function test_finalizer_waits_while_another_catalog_finalization_holds_the_global_lock(): void

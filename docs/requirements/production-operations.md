@@ -1,6 +1,6 @@
 # Требования к production operations
 
-Обновлено: 19.07.2026
+Обновлено: 20.07.2026
 
 Этот документ — обязательный постоянный contract для deployment, environment, storage, database, cache, sessions, queues, scheduler, backups, restore, rollback, health и incidents. Фактические версии и состояния принадлежат [`../environment.md`](../environment.md), а последовательности deployment — [`../deployment.md`](../deployment.md) и связанным runbooks. Не копируйте туда secret values.
 
@@ -92,6 +92,7 @@
 - Queue/scheduler считаются существующими только при подтверждённых driver, workers/process manager и cron/timer. Fake health запрещён.
 - Jobs/commands bounded, idempotent, retry-safe, privacy-safe; queues не становятся mandatory без synchronous/request-driven correctness.
 - Для каждого scheduled workload фиксируются frequency, lock, timeout, failure, logging, safe manual invocation и required services.
+- Fan-out run не может стать terminal, пока durable dispatch marker явно показывает незавершённую постановку работы; моментальный ноль уже созданных jobs/claims не доказывает завершённый dispatch. Восстановление ошибочно terminal run допускается только через fail-closed application service под canonical single-flight lock после exact ownership/preflight, повторно ставит только persisted nonterminal work и не использует direct status rewrite, массовое освобождение claims, `queue:clear` или `cache:clear`.
 
 ## 14. Storage и file permissions
 
