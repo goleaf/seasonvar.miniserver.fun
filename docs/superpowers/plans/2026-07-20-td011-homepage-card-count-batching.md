@@ -105,7 +105,7 @@ git diff --check
 
 Не очищать fresh `/en`. После natural invalidation/missing state разрешён read-only MISS→HIT probe; иначе подтвердить текущие HIT и worker/health state и оставить cold HTTP activation evidence честно `not_performed`. Schema/data/cache/queue rollback отсутствует.
 
-- [ ] **Step 4: Документация, commit и push**
+- [x] **Step 4: Документация, commit и push**
 
 Обновить compliance matrix и русский `CHANGELOG.md`, проверить актуальность `README.md`, затем на чистой `main` выполнить configured hooks, commit, non-force push и сравнить local/origin/remote SHA.
 
@@ -114,3 +114,4 @@ Evidence 20.07.2026:
 - Pint, Larastan (`0` errors), managed-doc check и `git diff --check` прошли.
 - Same builder profile: `1 355,92 ms`, 57 queries/`1 119,23 ms` SQL, 0 correlated counts; full PHPUnit: 1 433 tests, 1 422 passed, 11 skipped, 122 992 assertions; Vite: 23 modules.
 - PHP-FPM graceful reload прошёл, service остался active. Cache/queue не очищались. Isolated desktop/mobile routes дали шесть `200` и один cold `/` timeout под одновременными critical warm/importer; последующие `/` HIT подтвердился отдельным `200`. Остаточный catalogue/contention риск остаётся в `TD-011`, а не скрыт успешным builder profile.
+- Application/documentation implementation опубликована из существующей `main` без force в `596eeb26da130857638d73d87f2a8d6b0035690b`; последующий опубликованный `a9d1ac09f95d216342e3cba4e2efd3358a90f477` содержит production evidence. Configured pre-push gate прошёл полностью; remote CI не заявляется без отдельного результата.
