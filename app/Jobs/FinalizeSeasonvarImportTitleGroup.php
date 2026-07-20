@@ -187,9 +187,13 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
             $localManifestBefore = $catalogTitle !== null
                 ? $manifests->fromCatalog($catalogTitle)
                 : new SeasonvarTitleManifest([], [], []);
-            $media = ['attached' => 0, 'updated' => 0, 'skipped' => 0, 'failed' => 0];
+            $media = $this->checkpointedMedia($validRows);
 
             foreach ($validRows as $item) {
+                if ($item['row']->status === SeasonvarPreparedPageStatus::Applied) {
+                    continue;
+                }
+
                 $result = $importer->applyPreparedPage(
                     $item['row']->sourcePage,
                     $item['prepared'],
@@ -206,10 +210,7 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
                 $media['updated'] += $result['media_updated'];
                 $media['skipped'] += $result['media_skipped'];
                 $media['failed'] += $result['media_failed'];
-
-                if ($group->catalog_title_id === null) {
-                    $group->update(['catalog_title_id' => $catalogTitle->id]);
-                }
+                $this->checkpointAppliedPage($group, $item['row'], $catalogTitle, $result);
             }
 
             $mergeResult = $titleMerger->mergeForCanonicalSlug($catalogTitle->slug);
@@ -243,7 +244,6 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
                 $invalidPages,
                 $comparison,
                 $warningCount,
-                $media,
             );
             $cacheInvalidator->importedTitleChanged((int) $catalogTitle->id);
 
@@ -453,8 +453,75 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
 
     /**
      * @param  Collection<int, array{row: SeasonvarImportPreparedPage, prepared: SeasonvarPreparedCatalogPage}>  $validRows
+     * @return array{attached: int, updated: int, skipped: int, failed: int}
+     */
+    private function checkpointedMedia(Collection $validRows): array
+    {
+        $media = ['attached' => 0, 'updated' => 0, 'skipped' => 0, 'failed' => 0];
+
+        foreach ($validRows as $item) {
+            if ($item['row']->status !== SeasonvarPreparedPageStatus::Applied) {
+                continue;
+            }
+
+            $result = $item['row']->applicationResult();
+            $media['attached'] += $result['media_attached'];
+            $media['updated'] += $result['media_updated'];
+            $media['skipped'] += $result['media_skipped'];
+            $media['failed'] += $result['media_failed'];
+        }
+
+        return $media;
+    }
+
+    /**
+     * @param  array{media_attached: int, media_updated: int, media_skipped: int, media_failed: int}  $result
+     */
+    private function checkpointAppliedPage(
+        SeasonvarImportTitleGroup $group,
+        SeasonvarImportPreparedPage $row,
+        CatalogTitle $catalogTitle,
+        array $result,
+    ): void {
+        DB::transaction(function () use ($group, $row, $catalogTitle, $result): void {
+            $lockedRow = SeasonvarImportPreparedPage::query()->lockForUpdate()->findOrFail($row->id);
+
+            if ($lockedRow->status === SeasonvarPreparedPageStatus::Applied) {
+                return;
+            }
+
+            if ($lockedRow->status !== SeasonvarPreparedPageStatus::Prepared) {
+                throw new LogicException('Staging row Seasonvar нельзя checkpoint-ить из текущего состояния.');
+            }
+
+            $lockedRow->markApplied($result);
+            $lockedGroup = SeasonvarImportTitleGroup::query()->lockForUpdate()->findOrFail($group->id);
+
+            if ($lockedGroup->catalog_title_id === null) {
+                $lockedGroup->catalog_title_id = $catalogTitle->id;
+            }
+
+            $lockedGroup->applied_pages = $lockedGroup->preparedPages()
+                ->where('status', SeasonvarPreparedPageStatus::Applied->value)
+                ->count();
+            $lockedGroup->save();
+
+            $run = SeasonvarImportRun::query()->lockForUpdate()->findOrFail($group->seasonvar_import_run_id);
+            $run->media_attached += max(0, $result['media_attached']);
+            $run->media_updated += max(0, $result['media_updated']);
+            $run->media_skipped += max(0, $result['media_skipped']);
+            $run->media_failed += max(0, $result['media_failed']);
+            $run->last_heartbeat_at = now();
+            $run->save();
+        }, 3);
+
+        $row->refresh();
+        $group->refresh();
+    }
+
+    /**
+     * @param  Collection<int, array{row: SeasonvarImportPreparedPage, prepared: SeasonvarPreparedCatalogPage}>  $validRows
      * @param  array<string, int>  $comparison
-     * @param  array{attached: int, updated: int, skipped: int, failed: int}  $media
      */
     private function persistSuccess(
         SeasonvarImportTitleGroup $group,
@@ -464,13 +531,8 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
         int $invalidPages,
         array $comparison,
         int $warningCount,
-        array $media,
     ): void {
-        DB::transaction(function () use ($group, $validRows, $status, $failedPages, $invalidPages, $comparison, $warningCount, $media): void {
-            foreach ($validRows as $item) {
-                $item['row']->markApplied();
-            }
-
+        DB::transaction(function () use ($group, $validRows, $status, $failedPages, $invalidPages, $comparison, $warningCount): void {
             $group->update([
                 'status' => $status,
                 'applied_pages' => $validRows->count(),
@@ -485,10 +547,6 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
                 'title_manifest' => $comparison,
                 'preparation_warnings' => $warningCount,
             ]);
-            $run->media_attached += $media['attached'];
-            $run->media_updated += $media['updated'];
-            $run->media_skipped += $media['skipped'];
-            $run->media_failed += $media['failed'];
             $run->failed += $invalidPages;
             $run->cycles = max(1, (int) $run->cycles);
             $run->last_heartbeat_at = now();

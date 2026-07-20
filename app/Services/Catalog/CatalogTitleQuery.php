@@ -18,6 +18,7 @@ use App\Services\Catalog\Search\CatalogSearchState;
 use App\Services\Catalog\Search\CatalogTitleSearch;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -208,6 +209,124 @@ class CatalogTitleQuery
                     ->select('licensed_media.id'),
             ),
         ];
+    }
+
+    /**
+     * @param  Builder<CatalogTitle>  $query
+     * @return Builder<CatalogTitle>
+     */
+    public function withCardCountSortAggregate(
+        Builder $query,
+        CatalogSort $sort,
+        ?User $user,
+    ): Builder {
+        return match ($sort) {
+            CatalogSort::EpisodesDesc => $this->joinCardCountSortAggregate(
+                $query,
+                $this->episodeCountSortAggregate($user),
+                'catalog_episode_sort_counts',
+                'episodes_count',
+            ),
+            CatalogSort::SeasonsDesc => $this->joinCardCountSortAggregate(
+                $query,
+                $this->seasonCountSortAggregate($user),
+                'catalog_season_sort_counts',
+                'seasons_count',
+            ),
+            CatalogSort::VideoDesc => $this->joinCardCountSortAggregate(
+                $query,
+                $this->mediaCountSortAggregate($user),
+                'catalog_media_sort_counts',
+                'published_media_count',
+            ),
+            default => $query,
+        };
+    }
+
+    /**
+     * @param  Builder<CatalogTitle>  $query
+     * @param  Builder<Model>  $aggregate
+     * @return Builder<CatalogTitle>
+     */
+    private function joinCardCountSortAggregate(
+        Builder $query,
+        Builder $aggregate,
+        string $alias,
+        string $column,
+    ): Builder {
+        return $query
+            ->leftJoinSub(
+                $aggregate,
+                $alias,
+                fn (JoinClause $join): JoinClause => $join->on(
+                    $alias.'.catalog_title_id',
+                    '=',
+                    'catalog_titles.id',
+                ),
+            )
+            ->addSelect(DB::raw("COALESCE({$alias}.aggregate_count, 0) AS {$column}"));
+    }
+
+    /** @return Builder<Season> */
+    private function seasonCountSortAggregate(?User $user): Builder
+    {
+        $table = (new Season)->getTable();
+
+        return Season::query()
+            ->availableTo($user)
+            ->select($table.'.catalog_title_id')
+            ->selectRaw('COUNT(*) AS aggregate_count')
+            ->whereNotNull($table.'.catalog_title_id')
+            ->groupBy($table.'.catalog_title_id');
+    }
+
+    /** @return Builder<Season> */
+    private function episodeCountSortAggregate(?User $user): Builder
+    {
+        $seasonTable = (new Season)->getTable();
+        $episodeCounts = $this->availableEpisodeCountsBySeason($user);
+
+        return Season::query()
+            ->availableTo($user)
+            ->joinSub(
+                $episodeCounts,
+                'catalog_episode_counts_by_season',
+                fn (JoinClause $join): JoinClause => $join->on(
+                    'catalog_episode_counts_by_season.season_id',
+                    '=',
+                    $seasonTable.'.id',
+                ),
+            )
+            ->select($seasonTable.'.catalog_title_id')
+            ->selectRaw('SUM(catalog_episode_counts_by_season.aggregate_count) AS aggregate_count')
+            ->whereNotNull($seasonTable.'.catalog_title_id')
+            ->groupBy($seasonTable.'.catalog_title_id');
+    }
+
+    /** @return Builder<Episode> */
+    private function availableEpisodeCountsBySeason(?User $user): Builder
+    {
+        $table = (new Episode)->getTable();
+
+        return Episode::query()
+            ->availableTo($user)
+            ->select($table.'.season_id')
+            ->selectRaw('COUNT(*) AS aggregate_count')
+            ->groupBy($table.'.season_id');
+    }
+
+    /** @return Builder<LicensedMedia> */
+    private function mediaCountSortAggregate(?User $user): Builder
+    {
+        $table = (new LicensedMedia)->getTable();
+
+        return LicensedMedia::query()
+            ->availableTo($user)
+            ->forAvailableReleases($user)
+            ->select($table.'.catalog_title_id')
+            ->selectRaw('COUNT(*) AS aggregate_count')
+            ->whereNotNull($table.'.catalog_title_id')
+            ->groupBy($table.'.catalog_title_id');
     }
 
     /**
@@ -687,13 +806,8 @@ class CatalogTitleQuery
     /** @return Builder<Season> */
     private function episodeTitleIdsByCount(string $operator, int $count, ?User $user): Builder
     {
-        $episodeTable = (new Episode)->getTable();
         $seasonTable = (new Season)->getTable();
-        $episodeCounts = Episode::query()
-            ->availableTo($user)
-            ->select($episodeTable.'.season_id')
-            ->selectRaw('count(*) as visible_episode_count')
-            ->groupBy($episodeTable.'.season_id');
+        $episodeCounts = $this->availableEpisodeCountsBySeason($user);
 
         return Season::query()
             ->availableTo($user)
@@ -703,7 +817,7 @@ class CatalogTitleQuery
             ->select($seasonTable.'.catalog_title_id')
             ->whereNotNull($seasonTable.'.catalog_title_id')
             ->groupBy($seasonTable.'.catalog_title_id')
-            ->havingRaw('sum(visible_episode_counts.visible_episode_count) '.$operator.' ?', [$count]);
+            ->havingRaw('sum(visible_episode_counts.aggregate_count) '.$operator.' ?', [$count]);
     }
 
     /**

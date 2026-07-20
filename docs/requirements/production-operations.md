@@ -93,6 +93,8 @@
 - Jobs/commands bounded, idempotent, retry-safe, privacy-safe; queues не становятся mandatory без synchronous/request-driven correctness.
 - Для каждого scheduled workload фиксируются frequency, lock, timeout, failure, logging, safe manual invocation и required services.
 - Fan-out run не может стать terminal, пока durable dispatch marker явно показывает незавершённую постановку работы; моментальный ноль уже созданных jobs/claims не доказывает завершённый dispatch. Восстановление ошибочно terminal run допускается только через fail-closed application service под canonical single-flight lock после exact ownership/preflight, повторно ставит только persisted nonterminal work и не использует direct status rewrite, массовое освобождение claims, `queue:clear` или `cache:clear`.
+- Если одна логическая queue group может содержать достаточно элементов для превышения job timeout, полезная работа checkpoint-ится после каждого ограниченного идемпотентного элемента. Retry не начинает уже подтверждённые элементы заново, а checkpoint атомарно связывает durable item state, aggregate progress и счётчики; увеличение timeout не заменяет эту конечную границу.
+- Multi-table merge большой доменной группы не должен удерживать одну транзакцию до queue timeout. Каждый целостный ограниченный дочерний ресурс фиксируется собственной транзакцией и сам служит durable progress marker; failure откатывает только текущий ресурс, а retry повторно обнаруживает оставшийся набор через канонический merger.
 
 ## 14. Storage и file permissions
 

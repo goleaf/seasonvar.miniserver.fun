@@ -27,6 +27,16 @@ Repository templates use deployment-neutral `/srv/seasonvar/current`. Перед
 - High-risk package migration требует подтверждённого backup. Каждый dependency change явно указан в release/rollback runbook; service-worker rollback и stale clients учитываются.
 - Перед выпуском dependency/runtime group заполняется [`maintenance/production-compatibility-checklist.md`](maintenance/production-compatibility-checklist.md); package/framework/frontend-specific gates находятся в соседних checklists и ссылаются на один [`update-decisions.md`](maintenance/update-decisions.md).
 
+### Seasonvar title-group checkpoint rollout от 20.07.2026
+
+Изменение возобновляемого apply не добавляет migration, dependency, asset, cache key, session format, queue name или serialized job field. В staged payload появляется только внутренний additive `_application_result`; прежний reader его игнорирует, а новый reader нормализует отсутствующее или некорректное значение в нулевые non-negative counters. Публичная команда остаётся единственной: `php artisan seasonvar:import`.
+
+Тот же выпуск делает merge большого сезонного семейства resumable без нового persisted contract: удаление каждого duplicate season, кроме последнего, является checkpoint существующей схемы, а последний season удаляется в одной транзакции с переносом title-level relations и удалением duplicate title. Это сохраняет family discovery после interrupted финализации; частичный merge остаётся representable старым кодом, но rollback во время nonterminal group запрещён.
+
+Перед активацией опубликовать clean commit в `main` и дождаться terminal boundary уже выполняющейся title group: hard-kill или ручной retry старого worker запрещён, очередь/кеш не очищаются. После безопасной границы пересобрать `php artisan config:cache`, выполнить graceful reload фактического PHP-FPM unit и `php artisan queue:restart`. Проверка фиксирует exact run/group без URL или payload: terminal run, `active groups=0`, `nonterminal prepared pages=0`, `live claims=0`, отсутствие нового `failed_jobs`, затем `/up`, `/titles` и affected calendar lookup. Повтор может двигать `applied_pages` порциями; увеличение счётчика при сохранении `failed=0` является ожидаемым recovery, а не основанием вмешиваться в transport.
+
+Application rollback возвращает прежнее group-at-once marking только после terminal active group. Additive JSON удалять или переписывать не нужно; schema/data restore отсутствует. Откат во время nonterminal group небезопасен, потому что старый reader снова применит все страницы. Если checkpointed retry не завершается, сохраняются staging rows и queue envelope, rollout блокируется для диагностики `TD-013`; повышение timeout, уменьшение worker pool, direct status rewrite и массовый retry не являются rollback.
+
 ### Laravel Debugbar rollout от 19.07.2026
 
 `fruitcake/laravel-debugbar 4.4.0` добавлен только в `require-dev`; lock дополнительно содержит `php-debugbar/php-debugbar 3.8.0` и `php-debugbar/symfony-bridge 1.1.0`, без обновлений или удалений других packages. Production artifact обязан выполнять `composer install --no-dev --classmap-authoritative --no-interaction`, поэтому Debugbar classes, routes и assets туда не устанавливаются. `APP_ENV=production`, `APP_DEBUG=false` остаются обязательными независимо от отсутствия package.

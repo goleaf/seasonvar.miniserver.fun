@@ -97,20 +97,10 @@ class CatalogTitlesPageBuilder
         }
 
         $rankSearch = $searchQuery->isReady();
-        $catalogTotal = $rankSearch
-            ? $this->query->filteredTitles($criteria, $request->user())->count()
-            : null;
-        $cardCountQueries = $this->query->publicCardCounts($request->user());
+        $catalogTotal = $this->query->filteredTitles($criteria, $request->user())->count();
         $cardRelations = array_merge([
             'latestSeason' => fn ($query) => $query->select(['seasons.id', 'seasons.catalog_title_id', 'seasons.number']),
         ], $cardLoads);
-        $sortCountKeys = match ($sortOption) {
-            CatalogSort::EpisodesDesc => ['episodes'],
-            CatalogSort::SeasonsDesc => ['seasons'],
-            CatalogSort::VideoDesc => ['licensedMedia as published_media_count'],
-            default => [],
-        };
-        $sortCardCountQueries = array_intersect_key($cardCountQueries, array_flip($sortCountKeys));
 
         if ($rankSearch) {
             $catalogTitleIds = $this->query->filteredTitles(
@@ -119,9 +109,7 @@ class CatalogTitlesPageBuilder
                 rankSearch: true,
             )->select('catalog_titles.id');
 
-            if ($sortCardCountQueries !== []) {
-                $catalogTitleIds->withCount($sortCardCountQueries);
-            }
+            $this->query->withCardCountSortAggregate($catalogTitleIds, $sortOption, $request->user());
 
             if (in_array($sortOption, [CatalogSort::KinopoiskRating, CatalogSort::ImdbRating], true)) {
                 $catalogTitleIds->withMax($this->query->ratingAggregates(), 'rating');
@@ -158,16 +146,16 @@ class CatalogTitlesPageBuilder
                 ->select($cardColumns)
                 ->with($cardRelations);
 
-            if ($sortCardCountQueries !== []) {
-                $catalogTitleQuery->withCount($sortCardCountQueries);
-            }
+            $this->query->withCardCountSortAggregate($catalogTitleQuery, $sortOption, $request->user());
 
             if (in_array($sortOption, [CatalogSort::KinopoiskRating, CatalogSort::ImdbRating], true)) {
                 $catalogTitleQuery->withMax($this->query->ratingAggregates(), 'rating');
             }
 
             $this->query->sorted($catalogTitleQuery, $sortOption);
-            $catalogTitles = $catalogTitleQuery->paginate($perPage)->appends($paginationQuery);
+            $catalogTitles = $catalogTitleQuery
+                ->paginate($perPage, total: $catalogTotal)
+                ->appends($paginationQuery);
         }
         $catalogTitles->setCollection(
             $this->cardCounts->load($catalogTitles->getCollection(), $request->user()),

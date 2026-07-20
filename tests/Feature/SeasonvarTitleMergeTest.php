@@ -12,7 +12,9 @@ use App\Models\Source;
 use App\Models\SourcePage;
 use App\Services\Seasonvar\SeasonvarTitleMerger;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
+use Throwable;
 
 class SeasonvarTitleMergeTest extends TestCase
 {
@@ -388,5 +390,191 @@ class SeasonvarTitleMergeTest extends TestCase
         $this->get('/titles/mamockamom')
             ->assertMovedPermanently()
             ->assertRedirect(route('titles.show', $canonical));
+    }
+
+    public function test_requested_family_merge_keeps_a_completed_season_when_the_next_season_fails(): void
+    {
+        $source = Source::factory()->create(['code' => 'seasonvar']);
+        $seasonUrls = [
+            1 => 'https://seasonvar.ru/serial-90001-Proverka_checkpointa-1-season.html',
+            2 => 'https://seasonvar.ru/serial-90002-Proverka_checkpointa-2-season.html',
+        ];
+        $pages = collect($seasonUrls)->mapWithKeys(fn (string $url, int $number): array => [
+            $number => SourcePage::factory()->create([
+                'source_id' => $source->id,
+                'url' => $url,
+                'url_hash' => hash('sha256', $url),
+            ]),
+        ]);
+        $canonical = CatalogTitle::factory()->create([
+            'source_id' => $source->id,
+            'source_page_id' => $pages[1]->id,
+            'external_id' => '90001',
+            'slug' => 'proverka-checkpointa',
+            'title' => 'Проверка checkpoint',
+            'source_url' => $seasonUrls[1],
+            'source_url_hash' => hash('sha256', $seasonUrls[1]),
+        ]);
+        $duplicate = CatalogTitle::factory()->create([
+            'source_id' => $source->id,
+            'source_page_id' => $pages[2]->id,
+            'external_id' => '90002',
+            'slug' => 'proverka-checkpointa-2',
+            'title' => 'Проверка checkpoint',
+            'source_url' => $seasonUrls[2],
+            'source_url_hash' => hash('sha256', $seasonUrls[2]),
+        ]);
+        $duplicateSeasons = collect();
+
+        foreach ($seasonUrls as $number => $url) {
+            $canonicalSeason = Season::factory()->create([
+                'catalog_title_id' => $canonical->id,
+                'source_page_id' => $pages[$number]->id,
+                'number' => $number,
+                'source_url' => $url,
+                'source_url_hash' => hash('sha256', $url),
+            ]);
+            Episode::factory()->create([
+                'season_id' => $canonicalSeason->id,
+                'source_page_id' => $pages[$number]->id,
+                'number' => 1,
+            ]);
+            $duplicateSeason = Season::factory()->create([
+                'catalog_title_id' => $duplicate->id,
+                'source_page_id' => $pages[$number]->id,
+                'number' => $number,
+                'source_url' => $url,
+                'source_url_hash' => hash('sha256', $url),
+            ]);
+            Episode::factory()->create([
+                'season_id' => $duplicateSeason->id,
+                'source_page_id' => $pages[$number]->id,
+                'number' => 1,
+            ]);
+            $duplicateSeasons->put($number, $duplicateSeason);
+        }
+
+        $failingSeasonId = (int) $duplicateSeasons[2]->id;
+        DB::unprepared(<<<SQL
+            CREATE TRIGGER fail_second_season_merge
+            BEFORE DELETE ON seasons
+            WHEN OLD.id = {$failingSeasonId}
+            BEGIN
+                SELECT RAISE(FAIL, 'forced second season failure');
+            END
+            SQL);
+
+        try {
+            app(SeasonvarTitleMerger::class)->mergeForCanonicalSlug($canonical->slug);
+            $this->fail('Season family merge accepted a failed second season.');
+        } catch (Throwable $exception) {
+            $this->assertStringContainsString('forced second season failure', $exception->getMessage());
+        } finally {
+            DB::unprepared('DROP TRIGGER IF EXISTS fail_second_season_merge');
+        }
+
+        $this->assertDatabaseMissing('seasons', ['id' => $duplicateSeasons[1]->id]);
+        $this->assertDatabaseHas('seasons', [
+            'id' => $duplicateSeasons[2]->id,
+            'catalog_title_id' => $duplicate->id,
+        ]);
+        $this->assertDatabaseHas('catalog_titles', ['id' => $duplicate->id]);
+
+        $result = app(SeasonvarTitleMerger::class)->mergeForCanonicalSlug($canonical->slug);
+
+        $this->assertSame(1, $result['titles']);
+        $this->assertDatabaseMissing('catalog_titles', ['id' => $duplicate->id]);
+        $this->assertSame(2, $canonical->fresh()->seasons()->count());
+        $this->assertSame(2, $canonical->fresh()->episodes()->count());
+    }
+
+    public function test_requested_family_merge_keeps_the_last_season_discoverable_until_duplicate_title_deletion_commits(): void
+    {
+        $source = Source::factory()->create(['code' => 'seasonvar']);
+        $seasonUrl = 'https://seasonvar.ru/serial-90003-Proverka_finalnogo_checkpointa-1-season.html';
+        $duplicateTitleUrl = 'https://seasonvar.ru/serial-90004-Proverka_finalnogo_checkpointa-2-season.html';
+        $page = SourcePage::factory()->create([
+            'source_id' => $source->id,
+            'url' => $seasonUrl,
+            'url_hash' => hash('sha256', $seasonUrl),
+        ]);
+        $duplicatePage = SourcePage::factory()->create([
+            'source_id' => $source->id,
+            'url' => $duplicateTitleUrl,
+            'url_hash' => hash('sha256', $duplicateTitleUrl),
+        ]);
+        $canonical = CatalogTitle::factory()->create([
+            'source_id' => $source->id,
+            'source_page_id' => $page->id,
+            'external_id' => '90003',
+            'slug' => 'proverka-finalnogo-checkpointa',
+            'title' => 'Проверка финального checkpoint',
+            'source_url' => $seasonUrl,
+            'source_url_hash' => hash('sha256', $seasonUrl),
+        ]);
+        $duplicate = CatalogTitle::factory()->create([
+            'source_id' => $source->id,
+            'source_page_id' => $duplicatePage->id,
+            'external_id' => '90004',
+            'slug' => 'proverka-finalnogo-checkpointa-2',
+            'title' => 'Проверка финального checkpoint',
+            'source_url' => $duplicateTitleUrl,
+            'source_url_hash' => hash('sha256', $duplicateTitleUrl),
+        ]);
+        $canonicalSeason = Season::factory()->create([
+            'catalog_title_id' => $canonical->id,
+            'source_page_id' => $page->id,
+            'number' => 1,
+            'source_url' => $seasonUrl,
+            'source_url_hash' => hash('sha256', $seasonUrl),
+        ]);
+        Episode::factory()->create([
+            'season_id' => $canonicalSeason->id,
+            'source_page_id' => $page->id,
+            'number' => 1,
+        ]);
+        $duplicateSeason = Season::factory()->create([
+            'catalog_title_id' => $duplicate->id,
+            'source_page_id' => $page->id,
+            'number' => 1,
+            'source_url' => $seasonUrl,
+            'source_url_hash' => hash('sha256', $seasonUrl),
+        ]);
+        Episode::factory()->create([
+            'season_id' => $duplicateSeason->id,
+            'source_page_id' => $page->id,
+            'number' => 1,
+        ]);
+        $duplicateId = (int) $duplicate->id;
+        DB::unprepared(<<<SQL
+            CREATE TRIGGER fail_duplicate_title_merge
+            BEFORE DELETE ON catalog_titles
+            WHEN OLD.id = {$duplicateId}
+            BEGIN
+                SELECT RAISE(FAIL, 'forced duplicate title failure');
+            END
+            SQL);
+
+        try {
+            app(SeasonvarTitleMerger::class)->mergeForCanonicalSlug($canonical->slug);
+            $this->fail('Season family merge accepted a failed duplicate title deletion.');
+        } catch (Throwable $exception) {
+            $this->assertStringContainsString('forced duplicate title failure', $exception->getMessage());
+        } finally {
+            DB::unprepared('DROP TRIGGER IF EXISTS fail_duplicate_title_merge');
+        }
+
+        $this->assertDatabaseHas('catalog_titles', ['id' => $duplicate->id]);
+        $this->assertDatabaseHas('seasons', [
+            'id' => $duplicateSeason->id,
+            'catalog_title_id' => $duplicate->id,
+        ]);
+
+        $result = app(SeasonvarTitleMerger::class)->mergeForCanonicalSlug($canonical->slug);
+
+        $this->assertSame(1, $result['titles']);
+        $this->assertDatabaseMissing('catalog_titles', ['id' => $duplicate->id]);
+        $this->assertSame(1, $canonical->fresh()->seasons()->count());
+        $this->assertSame(1, $canonical->fresh()->episodes()->count());
     }
 }

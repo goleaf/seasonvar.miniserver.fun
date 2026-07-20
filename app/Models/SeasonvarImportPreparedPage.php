@@ -86,12 +86,29 @@ class SeasonvarImportPreparedPage extends Model
         ]);
     }
 
-    public function markApplied(): void
+    /**
+     * @param  array<string, int>  $applicationResult
+     */
+    public function markApplied(array $applicationResult = []): void
     {
+        $payload = $this->payload ?? [];
+        $payload['_application_result'] = $this->normalizeApplicationResult($applicationResult);
+
         $this->update([
             'status' => SeasonvarPreparedPageStatus::Applied,
+            'payload' => $payload,
             'applied_at' => now(),
         ]);
+    }
+
+    /**
+     * @return array{media_attached: int, media_updated: int, media_skipped: int, media_failed: int}
+     */
+    public function applicationResult(): array
+    {
+        $result = data_get($this->payload, '_application_result');
+
+        return $this->normalizeApplicationResult(is_array($result) ? $result : []);
     }
 
     /** @return array<string, string> */
@@ -104,6 +121,20 @@ class SeasonvarImportPreparedPage extends Model
             'warnings' => 'array',
             'prepared_at' => 'datetime',
             'applied_at' => 'datetime',
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $result
+     * @return array{media_attached: int, media_updated: int, media_skipped: int, media_failed: int}
+     */
+    private function normalizeApplicationResult(array $result): array
+    {
+        return [
+            'media_attached' => max(0, (int) ($result['media_attached'] ?? 0)),
+            'media_updated' => max(0, (int) ($result['media_updated'] ?? 0)),
+            'media_skipped' => max(0, (int) ($result['media_skipped'] ?? 0)),
+            'media_failed' => max(0, (int) ($result['media_failed'] ?? 0)),
         ];
     }
 }

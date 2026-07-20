@@ -76,7 +76,7 @@ class SeasonvarTitleMerger
 
         foreach ($groups as $group) {
             $titles = CatalogTitle::query()
-                ->with([...self::CATALOG_RELATIONS, 'aliases', 'ratings', 'seasons.episodes'])
+                ->with([...self::CATALOG_RELATIONS, 'aliases', 'ratings', 'seasons'])
                 ->whereKey($group->pluck('id'))
                 ->orderBy('id')
                 ->get();
@@ -86,7 +86,7 @@ class SeasonvarTitleMerger
             }
 
             $duplicateSlugs = $titles->slice(1)->pluck('slug')->filter()->values();
-            $groupResult = DB::transaction(fn (): array => $this->mergeGroup($titles));
+            $groupResult = $this->mergeGroup($titles);
             $this->tagCache->publicChanged($titles->modelKeys());
             $this->recommendationCache->publicSignalsChanged('title-merge');
             $result['titles'] += $groupResult['titles'];
@@ -151,7 +151,7 @@ class SeasonvarTitleMerger
             ->merge($duplicates->modelKeys())
             ->values();
         $titlesById = CatalogTitle::query()
-            ->with([...self::CATALOG_RELATIONS, 'aliases', 'ratings', 'seasons.episodes'])
+            ->with([...self::CATALOG_RELATIONS, 'aliases', 'ratings', 'seasons'])
             ->whereKey($orderedIds)
             ->get()
             ->keyBy('id');
@@ -168,7 +168,7 @@ class SeasonvarTitleMerger
         }
 
         $duplicateSlugs = $titles->slice(1)->pluck('slug')->filter()->values();
-        $groupResult = DB::transaction(fn (): array => $this->mergeGroup($titles));
+        $groupResult = $this->mergeGroup($titles);
         $this->tagCache->publicChanged($titles->modelKeys());
         $this->recommendationCache->publicSignalsChanged('title-merge');
 
@@ -401,89 +401,119 @@ class SeasonvarTitleMerger
         $mergedTitles = 0;
         $mergedSeasons = 0;
         $movedEpisodes = 0;
-        $relationIds = $this->relationIds($canonical);
 
         foreach ($titles->slice(1) as $duplicate) {
-            $this->comments->moveTitle($duplicate, $canonical);
-            $this->contentRequests->moveTitle($duplicate->id, $canonical->id);
-            $this->technicalIssues->moveTitle($duplicate->id, $canonical->id);
-            $this->releaseCalendar->moveTitle($duplicate, $canonical);
+            $seasons = $duplicate->seasons->values();
 
-            foreach ($this->relationIds($duplicate) as $relation => $ids) {
-                $relationIds[$relation] = array_values(array_unique([
-                    ...$relationIds[$relation],
-                    ...$ids,
-                ]));
-            }
-
-            foreach ($duplicate->seasons as $season) {
-                $targetSeason = Season::query()->firstOrCreate(
-                    [
-                        'catalog_title_id' => $canonical->id,
-                        'kind' => $season->kind,
-                        'number' => $season->number,
-                    ],
-                    [
-                        'source_page_id' => $season->source_page_id,
-                        'title' => $season->title,
-                        'source_url' => $season->source_url,
-                        'source_url_hash' => $season->source_url_hash,
-                        'sort_order' => $season->sort_order,
-                        'publication_status' => $season->publication_status,
-                        'audience' => $season->audience,
-                        'available_from' => $season->available_from,
-                        'available_until' => $season->available_until,
-                    ],
+            foreach ($seasons->slice(0, -1) as $season) {
+                $movedEpisodes += DB::transaction(
+                    fn (): int => $this->mergeSeason($season, $canonical),
+                    attempts: 3,
                 );
-
-                $targetSeason->fill([
-                    'source_page_id' => $season->source_page_id ?? $targetSeason->source_page_id,
-                    'title' => $season->title ?? $targetSeason->title,
-                    'source_url' => $season->source_url ?? $targetSeason->source_url,
-                    'source_url_hash' => $season->source_url_hash ?? $targetSeason->source_url_hash,
-                    'latest_episode_released_at' => $season->latest_episode_released_at ?? $targetSeason->latest_episode_released_at,
-                    'episodes_released' => $season->episodes_released ?? $targetSeason->episodes_released,
-                    'episodes_total' => $season->episodes_total ?? $targetSeason->episodes_total,
-                    'translation_name' => $season->translation_name ?? $targetSeason->translation_name,
-                    'release_status_text' => $season->release_status_text ?? $targetSeason->release_status_text,
-                ])->save();
-
-                $movedEpisodes += $this->mergeEpisodes($season, $targetSeason, $canonical);
-                $this->moveMediaForSeason($season->id, $canonical, $targetSeason);
-                $this->comments->moveSeason($season, $targetSeason);
-                $this->contentRequests->moveSeason($season, $targetSeason);
-                $this->technicalIssues->moveSeason($season->id, $targetSeason->id);
-                $this->releaseCalendar->moveSeason($season, $targetSeason);
-
-                $season->forceDelete();
+                $season->unsetRelation('episodes');
                 $mergedSeasons++;
             }
 
-            $this->mergeAliases($canonical, $duplicate);
-            $this->mergeRatings($canonical, $duplicate);
-            $this->reviews->merge($canonical, $duplicate);
-            $this->userData->moveTitle($duplicate, $canonical);
-            $this->moveLooseMedia($duplicate, $canonical);
-            $this->preservePublicSlugs($canonical, $duplicate);
-            $this->collectionItems->mergeTitle($canonical, $duplicate);
-            $this->tagTitles->moveTitle($canonical, $duplicate);
-            $this->titleRelations->mergeTitle($canonical, $duplicate);
+            $lastSeason = $seasons->last();
+            $movedEpisodes += DB::transaction(function () use ($canonical, $duplicate, $lastSeason): int {
+                $moved = $lastSeason instanceof Season
+                    ? $this->mergeSeason($lastSeason, $canonical)
+                    : 0;
+                $canonical->load(self::CATALOG_RELATIONS);
+                $relationIds = $this->relationIds($canonical);
 
-            $duplicate->forceDelete();
+                foreach ($this->relationIds($duplicate) as $relation => $ids) {
+                    $relationIds[$relation] = array_values(array_unique([
+                        ...$relationIds[$relation],
+                        ...$ids,
+                    ]));
+                }
+
+                $this->comments->moveTitle($duplicate, $canonical);
+                $this->contentRequests->moveTitle($duplicate->id, $canonical->id);
+                $this->technicalIssues->moveTitle($duplicate->id, $canonical->id);
+                $this->releaseCalendar->moveTitle($duplicate, $canonical);
+                $this->mergeAliases($canonical, $duplicate);
+                $this->mergeRatings($canonical, $duplicate);
+                $this->reviews->merge($canonical, $duplicate);
+                $this->userData->moveTitle($duplicate, $canonical);
+                $this->moveLooseMedia($duplicate, $canonical);
+                $this->preservePublicSlugs($canonical, $duplicate);
+                $this->collectionItems->mergeTitle($canonical, $duplicate);
+                $this->tagTitles->moveTitle($canonical, $duplicate);
+                $this->titleRelations->mergeTitle($canonical, $duplicate);
+
+                foreach ($relationIds as $relation => $ids) {
+                    $canonical->{$relation}()->sync($ids);
+                }
+
+                $this->refreshCanonicalTitle(
+                    $canonical,
+                    new EloquentCollection([$canonical, $duplicate]),
+                );
+                $duplicate->forceDelete();
+
+                return $moved;
+            }, attempts: 3);
+
+            if ($lastSeason instanceof Season) {
+                $lastSeason->unsetRelation('episodes');
+                $mergedSeasons++;
+            }
+
             $mergedTitles++;
         }
-
-        foreach ($relationIds as $relation => $ids) {
-            $canonical->{$relation}()->sync($ids);
-        }
-
-        $this->refreshCanonicalTitle($canonical, $titles);
 
         return [
             'titles' => $mergedTitles,
             'seasons' => $mergedSeasons,
             'episodes' => $movedEpisodes,
         ];
+    }
+
+    private function mergeSeason(Season $season, CatalogTitle $canonical): int
+    {
+        $season->loadMissing('episodes');
+        $targetSeason = Season::query()->firstOrCreate(
+            [
+                'catalog_title_id' => $canonical->id,
+                'kind' => $season->kind,
+                'number' => $season->number,
+            ],
+            [
+                'source_page_id' => $season->source_page_id,
+                'title' => $season->title,
+                'source_url' => $season->source_url,
+                'source_url_hash' => $season->source_url_hash,
+                'sort_order' => $season->sort_order,
+                'publication_status' => $season->publication_status,
+                'audience' => $season->audience,
+                'available_from' => $season->available_from,
+                'available_until' => $season->available_until,
+            ],
+        );
+
+        $targetSeason->fill([
+            'source_page_id' => $season->source_page_id ?? $targetSeason->source_page_id,
+            'title' => $season->title ?? $targetSeason->title,
+            'source_url' => $season->source_url ?? $targetSeason->source_url,
+            'source_url_hash' => $season->source_url_hash ?? $targetSeason->source_url_hash,
+            'latest_episode_released_at' => $season->latest_episode_released_at ?? $targetSeason->latest_episode_released_at,
+            'episodes_released' => $season->episodes_released ?? $targetSeason->episodes_released,
+            'episodes_total' => $season->episodes_total ?? $targetSeason->episodes_total,
+            'translation_name' => $season->translation_name ?? $targetSeason->translation_name,
+            'release_status_text' => $season->release_status_text ?? $targetSeason->release_status_text,
+        ])->save();
+
+        $movedEpisodes = $this->mergeEpisodes($season, $targetSeason, $canonical);
+        $this->moveMediaForSeason($season->id, $canonical, $targetSeason);
+        $this->comments->moveSeason($season, $targetSeason);
+        $this->contentRequests->moveSeason($season, $targetSeason);
+        $this->technicalIssues->moveSeason($season->id, $targetSeason->id);
+        $this->releaseCalendar->moveSeason($season, $targetSeason);
+        $season->forceDelete();
+
+        return $movedEpisodes;
     }
 
     private function preservePublicSlugs(CatalogTitle $canonical, CatalogTitle $duplicate): void

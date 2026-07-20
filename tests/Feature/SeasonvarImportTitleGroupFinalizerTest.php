@@ -15,6 +15,7 @@ use App\Models\SeasonvarImportPreparedPage;
 use App\Models\Source;
 use App\Services\Catalog\CatalogCacheWarmRequestStore;
 use App\Services\Seasonvar\CatalogTitleRefreshStateStore;
+use App\Services\Seasonvar\SeasonvarCatalogImporter;
 use App\Services\Seasonvar\SeasonvarCatalogParser;
 use App\Services\Seasonvar\SeasonvarImportTitleGroupDispatcher;
 use App\Services\Seasonvar\SeasonvarPageClaimManager;
@@ -228,6 +229,58 @@ class SeasonvarImportTitleGroupFinalizerTest extends TestCase
         $this->assertNotNull($warmWork);
         $this->assertSame([$title->id], $warmWork->titleIds);
         Queue::assertPushed(WarmCatalogCaches::class, 1);
+    }
+
+    public function test_finalizer_resumes_after_an_applied_page_without_applying_or_counting_it_twice(): void
+    {
+        $title = $this->titleWithSeasonUrls([1, 2]);
+        $group = app(SeasonvarImportTitleGroupDispatcher::class)
+            ->start($title, 'seasonvar-title-refresh');
+        $rows = $group->preparedPages()->with('sourcePage')->orderBy('id')->get();
+        $this->prepareAllRows($rows, [1 => 2, 2 => 2]);
+        $applied = $rows->firstOrFail();
+        $pending = $rows->last();
+        $applied->markApplied([
+            'media_attached' => 3,
+            'media_updated' => 4,
+            'media_skipped' => 5,
+            'media_failed' => 1,
+        ]);
+        $group->update(['applied_pages' => 1]);
+        $group->run->update([
+            'media_attached' => 3,
+            'media_updated' => 4,
+            'media_skipped' => 5,
+            'media_failed' => 1,
+        ]);
+        $this->mock(SeasonvarCatalogImporter::class, function (MockInterface $mock) use ($pending, $title): void {
+            $mock->shouldReceive('applyPreparedPage')
+                ->once()
+                ->withArgs(fn ($page): bool => (int) $page->id === (int) $pending->source_page_id)
+                ->andReturn([
+                    'catalog_title' => $title,
+                    'media_attached' => 2,
+                    'media_updated' => 1,
+                    'media_skipped' => 0,
+                    'media_failed' => 0,
+                ]);
+        });
+
+        $this->app->call([
+            (new FinalizeSeasonvarImportTitleGroup($group->id))->withFakeQueueInteractions(),
+            'handle',
+        ]);
+
+        $freshRun = $group->run->fresh();
+        $this->assertSame('partial', $group->fresh()->status->value);
+        $this->assertSame(2, $group->fresh()->applied_pages);
+        $this->assertSame('applied', $applied->fresh()->status->value);
+        $this->assertSame('applied', $pending->fresh()->status->value);
+        $this->assertSame(5, $freshRun->media_attached);
+        $this->assertSame(5, $freshRun->media_updated);
+        $this->assertSame(5, $freshRun->media_skipped);
+        $this->assertSame(1, $freshRun->media_failed);
+        $this->assertSame('partial', $freshRun->status);
     }
 
     public function test_finalizer_publishes_one_invalidation_when_merge_fails_after_pages_commit(): void
