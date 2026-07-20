@@ -1983,7 +1983,7 @@ Rollback: вернуть raw `catalogTitle` route dimension в title context. Sc
 # `TD-011` — пакетные счётчики карточек каталога
 
 Дата: 20.07.2026
-Статус: requirements/root-cause/design, RED/GREEN implementation, affected/full verification и документация завершены; Git delivery выполняется.
+Статус: requirements/root-cause/design, RED/GREEN implementation, affected/full verification, документация и Git delivery завершены; остаточный count-sort/contention risk остаётся открытым в `TD-011`.
 
 ## Подтверждённая причина и scope
 
@@ -2007,4 +2007,4 @@ Rollback: code-only возврат `withCount($cardCounts)` и удаление 
 | Cache/queue/data/production safety | `already_compliant` | No clear/retry/restart; schema, payloads, serializers, prefixes и data не меняются. |
 | Mobile/UI/SEO/admin/premium/region/legal | `not_applicable` | HTML/controls/routes/canonical URLs/access decisions не меняются; оптимизируется server-side card hydration. |
 | Documentation/README/CHANGELOG | `completed` | Performance/cache/debt owners, русский CHANGELOG и visitor history фиксируют подтверждённое ускорение без SLA claim; current plan содержит rollback и остаточный count-sort/contention risk. |
-| Verification/Git delivery | `unresolved` | Pint scoped к затронутым PHP, Larastan 0 errors, Rector 0 diffs, Composer/npm audits 0 advisories/vulnerabilities, managed docs/diff, Vite 23 modules, affected 113/1 045 и full PHPUnit 1 444/1 433/11/123 046 прошли. Managed Chromium desktop/mobile catalog/search: 4×`200`, no overflow/console/page/request/first-party failures. Остаются clean scoped commit и non-force push после отделения параллельного importer scope. |
+| Verification/Git delivery | `completed` | Pint scoped к затронутым PHP, Larastan 0 errors, Rector 0 diffs, Composer/npm audits 0 advisories/vulnerabilities, managed docs/diff, Vite 23 modules, affected 113/1 045 и full PHPUnit 1 444/1 433/11/123 046 прошли. Managed Chromium desktop/mobile catalog/search: 4×`200`, no overflow/console/page/request/first-party failures. Реализация и документация вошли в `7005a244571bf19f8d967be9b262fef6f0c18243`, опубликованный fast-forward из существующей `main`; local/origin/GitHub SHA и remote commit read-back совпали, force push не применялся. |

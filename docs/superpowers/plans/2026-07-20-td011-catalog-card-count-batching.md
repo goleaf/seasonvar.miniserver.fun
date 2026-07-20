@@ -129,6 +129,6 @@ Evidence 20.07.2026: scoped Pint, Larastan 0 errors, Rector 0 diffs, Composer/np
 
 Зафиксировать before/after, remaining count-sort cost, cross-feature impact, rollback и честный статус `TD-011`. Проверить `README.md`; не добавлять фиктивную visitor запись без фактического улучшения.
 
-- [ ] **Step 4: Commit и push только своего scope**
+- [x] **Step 4: Commit и push только своего scope**
 
-Проверить `main`, staged diff и отсутствие чужих файлов в index. Commit/push выполнять без force только после завершения параллельных изменений, чтобы не включить importer scope.
+Проверить `main`, staged diff и отсутствие чужих файлов в index. Реализация и документация вошли в общий совместимый snapshot `7005a244571bf19f8d967be9b262fef6f0c18243`, опубликованный fast-forward из существующей `main`; local/origin/GitHub SHA и remote commit read-back совпали, force push не применялся.
