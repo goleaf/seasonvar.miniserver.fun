@@ -405,6 +405,79 @@ staged README/CHANGELOG policies и whitespace прошли. Commit `d781661` с
 - `bash scripts/check-readme-policy.sh README.md`, managed docs check, docs CI и full `git diff --check` прошли.
 - Task-owned CHANGELOG строка проходит русскоязычную policy-проверку; полная working copy отдельно останавливается на concurrent importer строке со словом `master`, которую system planning scope не переписывает.
 - PHP/Blade/JavaScript/CSS, routes, migrations, schema, DB rows, cache, queues, dependencies, lock files, assets, Git hooks и production services не изменялись; application tests/build для documentation-only diff не требуются.
+- Planning commit `ebbbc85` создан в существующей `main`. Обычный `git push --porcelain origin main` достиг configured remote и вернул `could not read Username for 'https://github.com': No such device or address`; force, history rewrite, alternate branch и хранение credentials не применялись.
+
+## Активная реализация — Task 34, standalone declared-path boundary
+
+Дата: 24.07.2026
+Статус: `standalone_preparation_committed_local_delivery_unresolved_remote`; пользователь поручил начать программирование без дополнительных вопросов. Реализованы и проверены только Tasks 34 Steps 1–3 в standalone lease script и isolated temporary repositories; live hooks, production runtime и shared repository index не меняются. Implementation files попали в concurrent player evidence commit `331b0c3`, когда другой owner завершил уже подготовленный общий index; история не переписывается.
+
+### Причина и dependency decision
+
+- Incident из Task 32 показал, что SHA-256 уже подготовленного index обнаруживает позднее изменение, но не запрещает владельцу случайно принять чужой путь, который попал в snapshot до approval.
+- Task 30 owner lease и Task 32 reviewed-index boundary локально подготовлены, но их live hook activation остаётся заблокирована до завершения активных importer/collection owners.
+- Безопасный независимый change set добавляет только `declare-paths`/`verify-paths`, manifest parsing и обязательную проверку declared set внутри standalone `approve-index`.
+- Hook integration, contributor workflow и activation выполняются только после exact handoff Tasks 30/32; эта подготовка не объявляет пути, не stage-ит файлы и не выдаёт approval в активном shared repository.
+
+### Expected files
+
+- Modify: `scripts/task-workspace-lease.sh`
+- Modify: `tests/Unit/GitWorkspaceLeaseScriptTest.php`
+- Modify: `docs/superpowers/plans/2026-07-24-system-maintenance-and-optimization-master-plan.md`
+- Modify: `docs/plans/current-task-plan.md`
+- Modify: `CHANGELOG.md`
+
+`README.md` проверяется перед завершением без изменения: поддерживаемая contributor sequence ещё не активирована. Сохраняются без изменений `.githooks/lib/git-guard.sh`, `.githooks/pre-commit`, `.githooks/pre-push`, `tests/Unit/CiQualityGateContractTest.php`, `docs/development.md`, application code, routes, migrations, config, translations, cache keys, permissions, dependencies, lock files, assets и production state.
+
+### Exact standalone contract
+
+- `declare-paths <task-id>` требует active exact lease, matching task ID и process-scoped `SEASONVAR_TASK_LEASE_TOKEN`; читает только NUL-delimited stdin с terminating NUL и хотя бы одной записью.
+- Input reject-ится до mutation при empty/duplicate byte-identical record, absolute path, любом `.`/`..` component и `.git` или descendant. Spaces, tabs и newlines остаются валидными filename bytes.
+- Canonical manifest — bytewise sorted NUL list внутри exact lease directory. `declared-paths` и `declared-paths.meta` являются regular non-symlink mode-`0600` files; metadata содержит только `task_id`, UTC `declared_at` и SHA-256 manifest.
+- Успешная новая declaration инвалидирует только exact `approved-index`; failed declaration сохраняет прежние manifest, metadata и approval.
+- `verify-paths <task-id>` сравнивает manifest с canonical `git diff --cached --name-only -z --no-renames --`; missing/additional path fail closed, rename требует старый и новый path, mode-only edit — один path.
+- `approve-index` сначала требует exact declared-path equality, затем создаёт Task 32 approval. `status` добавляет только `paths_declared=yes|no`, не раскрывая paths, hashes, token, arguments или private absolute paths.
+- `release`/`recover` принимают только exact allowlist `metadata`, optional `approved-index`, `declared-paths` и `declared-paths.meta` после полного parsing/preflight; symlink, malformed pair или unexpected entry сохраняют lease.
+- Declare/verify/approve/status не stage/unstage и не меняют working tree. Tests используют только отдельный temporary Git repository.
+
+### Compatibility, risks и rollback
+
+| Domain | Статус | Evidence / решение |
+| --- | --- | --- |
+| Shared Git ownership | `isolated_preparation` | Активные importer/collection paths и shared index не меняются; live hooks остаются прежними |
+| Existing lease/index contracts | `completed_for_preparation` | `acquire/status/release/recover` и Task 32 digest сохраняются; `approve-index` получает проверенный fail-closed prerequisite declaration |
+| Manifest security/privacy | `completed_for_preparation` | Exact repository-local files, mode `0600`, no symlinks, no path/hash output, raw token только process-scoped; malformed/symlink tests fail closed |
+| Hooks/contributor workflow | `blocked_until_handoff` | `.githooks/*`, `docs/development.md` и README не меняются до Tasks 30/32 activation |
+| Routes/schema/data/cache/queues | `not_applicable` | Standalone developer tool не исполняется приложением и не выполняет DDL/DML/service/provider actions |
+| Translations/UI/mobile/SEO/search | `not_applicable` | Public presentation и locale contracts не меняются |
+| Production/deployment | `not_applicable` | Нет runtime/environment/dependency/build mutation или deployment |
+| Rollback | `defined` | Удалить только новые commands/manifest parsing/tests; Tasks 30/32 и все существующие guards остаются |
+| Remote delivery | `unresolved_external` | Только normal push существующей `main`; credentials, force, rewrite, alternate branch/worktree запрещены |
+
+### Requirement-compliance matrix
+
+| Требование | Статус | Evidence / ограничение |
+| --- | --- | --- |
+| Root/canonical read order | `completed` | Повторно прочитаны root, requirement index и применимые code/architecture/development/multilingual/security/production/maintenance/system owners |
+| Versions/existing implementation | `completed` | Boost подтвердил PHP `8.5`, Laravel `13.21.1`, SQLite, Livewire `4.3.3`, Boost `2.4.13`, Pint `1.29.3`, PHPUnit `12.5.31`, Tailwind CSS `4.3.2`; lease script/tests/hooks проверены |
+| Written plan before code | `completed` | Exact files/contracts/compatibility/risks/rollback/verification записаны здесь до test или script edit |
+| Maintenance reason | `completed` | Изменение закрывает измеренный shared-index ownership gap, а не выполняется ради новой версии |
+| TDD | `completed_for_preparation` | RED: `41` test case, `19` passed / `22` expected failures; GREEN после fail-closed expansion: `44` tests / `256` assertions |
+| Cross-feature/production safety | `completed_for_scope` | Hook activation и application/runtime/data исключены; foreign workstreams сохраняются |
+| README/CHANGELOG/docs | `completed_with_foreign_working_copy_limitation` | README policy, managed docs и docs CI прошли; README не меняется до supported hook workflow; task-owned русский CHANGELOG entry проходит, full working copy останавливается на foreign importer строке `network-free` |
+| Verification | `completed_for_preparation` | Lease `44`/`256`, hook contract `17`/`95`, Unit `472`/`107410`, Pint, `bash -n`, README policy, managed docs, docs CI и `git diff --check` прошли |
+| Commit granularity | `unresolved_shared_index_race` | Script/test/master/CHANGELOG были уже staged этой задачей, но concurrent player owner добавил свои evidence hunks и создал `331b0c3` до отдельного Task 34 commit; safe history rewrite запрещён |
+| Commit/push | `partially_completed` | Task 34 implementation сохранена в существующей `main` как часть `331b0c3`; follow-up compliance evidence и normal push ещё выполняются |
+
+### TDD и verification checklist
+
+- [x] Добавить focused tests для lease/task/token/input validation, binary-safe paths, deterministic metadata, safe status, staged add/edit/delete/rename/mode equality, missing/additional rejection, approval invalidation, cleanup и no-mutation.
+- [x] Выполнить RED: `php artisan test --filter=GitWorkspaceLeaseScriptTest` — `41` test case, `19` passed / `22` expected failures.
+- [x] Реализовать минимальные standalone commands и fail-closed parsing без hook integration.
+- [x] Выполнить GREEN и regression: lease suite `44`/`256`, `CiQualityGateContractTest` `17`/`95`, `bash -n` и Pint.
+- [x] Выполнить Pint после PHP test changes, managed docs check, docs CI, README policy и task-owned/full diff checks; full working CHANGELOG limitation относится только к foreign строке `network-free`.
+- [x] Перечитать applicable requirements, обновить эту matrix/master status/CHANGELOG, проверить repository-wide legacy/duplicate/unfinished Task 34 paths.
+- [ ] Commit-ить отдельный follow-up compliance evidence в существующей `main`, не переписывая mixed `331b0c3`, затем выполнить обычный push.
 
 ## Активная реализация — Task 32, изолированная подготовка reviewed-index boundary
 
