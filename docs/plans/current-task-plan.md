@@ -1,7 +1,7 @@
 # Текущая задача — бесшовное переключение сезонов, серий и переводов в плеере
 
 Дата: 24.07.2026
-Статус: design согласован; canonical target, design spec и compliance preparation зафиксированы; runtime implementation ещё не начата.
+Статус: design согласован и сохранён в `ea8f7ad`; runtime implementation ещё не начата, push заблокирован отсутствующей HTTPS-аутентификацией GitHub, ожидается отдельный review спецификации пользователем.
 
 ## Цель и согласованное решение
 
@@ -13,7 +13,7 @@
 - [x] Согласовать desktop/mobile UX, клавиатуру, fallback перевода, ошибки, progress и verification.
 - [x] Зафиксировать platform limitation native iOS fullscreen без fake fullscreen.
 - [x] Сначала обновить canonical owner новым постоянным целевым правилом, не выдавая его за уже работающий runtime.
-- [x] Записать design spec [`2026-07-24-player-seamless-episode-switching-design.md`](../superpowers/specs/2026-07-24-player-seamless-episode-switching-design.md).
+- [x] Записать и закоммитить в `main` design spec [`2026-07-24-player-seamless-episode-switching-design.md`](../superpowers/specs/2026-07-24-player-seamless-episode-switching-design.md) как `ea8f7ad`.
 - [ ] Получить отдельное подтверждение пользователя после просмотра записанной спецификации.
 - [ ] После подтверждения записать подробный TDD implementation plan и перечитать его до application edits.
 - [ ] Выполнить RED → GREEN implementation, focused/full verification, runtime docs, README/CHANGELOG, commit и push только в существующей `main`.
@@ -119,7 +119,7 @@ Rollback будущей реализации: вернуть countdown/обыч�
 | Maintenance/production/rollback | `completed` | Причина browser behavior change зафиксирована; dependency update отсутствует; code/assets rollback и failure boundary описаны. |
 | README актуальность | `already_compliant` | На design-only стадии visitor/product runtime не изменился; фиктивная visitor history entry запрещена и не добавляется. |
 | CHANGELOG | `completed` | Добавлена отдельная русская design-only запись, явно подтверждающая отсутствие runtime/schema/route/cache/dependency changes. |
-| Git `main`, commit и push | `pending` | Текущая ветка `main`; design docs должны быть закоммичены без pre-existing `composer.lock`, затем push может снова остаться `unresolved` из-за HTTPS auth. |
+| Git `main`, commit и push | `unresolved` | Design docs закоммичены в существующей `main` как `ea8f7ad`; pre-existing `composer.lock` исключён. `git push origin main` вернул `could not read Username for 'https://github.com'`, поэтому remote delivery не заявляется. |
 
 ## Design verification checklist
 
@@ -129,9 +129,18 @@ Rollback будущей реализации: вернуть countdown/обыч�
 - [x] Проверить README и не добавлять visitor delivery до реальной реализации.
 - [x] Добавить русский design-only CHANGELOG.
 - [x] Перечитать applicable canonical requirements.
-- [ ] Commit task-owned design docs в существующей `main`, исключив `composer.lock`.
-- [ ] Попытаться отправить commit в configured remote; внешний auth failure зафиксировать как `unresolved`.
-- [ ] Передать пользователю spec на отдельный review.
+- [x] Commit task-owned design docs в существующей `main`, исключив `composer.lock`.
+- [x] Попытаться отправить commit в configured remote; внешний auth failure зафиксирован как `unresolved`.
+- [x] Передать пользователю spec на отдельный review.
+
+## Design evidence
+
+- Design spec, canonical target и preparation matrix сохранены в `ea8f7ad` на существующей `main`.
+- `bash scripts/ci-check.sh docs`, staged README/CHANGELOG policy checks, `project:docs-refresh --check`, Markdown target checks и `git diff --check` прошли.
+- README проверен без изменения: design-only commit не меняет фактическую visitor capability и не создаёт фиктивную запись истории.
+- Application PHP/Blade/JavaScript/CSS, routes, schema, data, cache, packages и built assets не менялись; runtime countdown остаётся фактическим до будущего implementation commit.
+- Project pre-commit guard обнаружил pre-existing unstaged `composer.lock`; task-owned diff прошёл его read-only checks вручную, после чего предусмотренный `SEASONVAR_SKIP_GIT_GUARD=1` применён только к commit. Пользовательский lock diff не добавлен и не изменён этой задачей.
+- `git push origin main` завершился внешним отказом HTTPS credential lookup; commit существует только локально и push остаётся `unresolved`.
 
 ---
 
