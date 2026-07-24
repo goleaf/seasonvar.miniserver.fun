@@ -26,6 +26,21 @@
 
 ---
 
+## Execution Ledger — 24.07.2026
+
+| Workstream | Status | Evidence / next gate |
+| --- | --- | --- |
+| Task 1 — operational baseline | `completed` | Dated read-only evidence is committed in `2227c08`; no production state was mutated. |
+| Task 2 — Redis persistence observability | `completed` | TDD implementation and documentation are committed in `2227c08`; `app:health --json` now reports `redis_persistence=failed` while preserving `ready=true`. |
+| Task 1–2 remote delivery | `unresolved` | The normal push reached configured `origin` but failed because HTTPS credentials were unavailable. Local `main` is currently 13 commits ahead of `origin/main`; no force push or history rewrite is allowed. |
+| Task 3 — controlled Redis recovery | `unresolved` | Blocked before any mutation: independent protected backup, exact Redis process-manager ownership, maintenance/session-impact approval and producer stop boundary are not verified. |
+| Tasks 4–28 | `not_started` | They remain ordered behind the Task 3 recoverability gate unless a task is explicitly marked cross-cutting and read-only. |
+| Importer child roadmap | `in_progress_preparation` | Importer Task 2 prepares bounded event admission in code, but production activation remains gated by Tasks 3–5 of this plan. |
+| Player child roadmap | `in_progress_separate` | Seamless-player runtime work reports focused verification complete and full verification/commit still pending; it must not be staged or deployed together with Redis, database, dependency or process-control work. |
+| Rolling extension Tasks 29+ | `planned` | Delivery recovery, shared-`main` ownership and child-roadmap reconciliation were added from observed evidence; later discoveries extend the plan without changing completed history. |
+
+Task 1 and Task 2 were delivered as one isolated Batch 1 commit because they shared operations owners while unrelated importer/player changes already occupied the worktree. This is a recorded commit-granularity deviation, not a reason to rewrite `main`. Every later implementation task returns to one independently reviewable commit.
+
 ## Baseline Evidence — 24.07.2026
 
 | Boundary | Verified state |
@@ -91,6 +106,8 @@ Documentation, security review, monitoring and compliance evidence run through e
 
 ### Task 1: Record a New Dated Operational Baseline
 
+**Status:** `completed` in `2227c08`; remote delivery remains `unresolved`.
+
 **Files:**
 - Modify: `docs/environment.md`
 - Modify: `docs/queues.md`
@@ -106,7 +123,7 @@ Documentation, security review, monitoring and compliance evidence run through e
 - Consumes: Current read-only evidence in this master plan.
 - Produces: Dated source of truth that later operational tasks use as their before-state.
 
-- [ ] **Step 1: Re-read requirements and capture a clean task boundary**
+- [x] **Step 1: Re-read requirements and capture a clean task boundary**
 
 Run:
 
@@ -120,7 +137,7 @@ php artisan schedule:list
 
 Expected: branch is `main`; unrelated dirty files are identified and excluded; no migration or scheduler mutation occurs.
 
-- [ ] **Step 2: Repeat only bounded read-only operational probes**
+- [x] **Step 2: Repeat only bounded read-only operational probes**
 
 Run:
 
@@ -135,11 +152,11 @@ redis-cli INFO stats
 
 Expected: JSON/status evidence is available without queue retry, forget, cache flush, migration or service restart.
 
-- [ ] **Step 3: Update canonical evidence**
+- [x] **Step 3: Update canonical evidence**
 
 Record exact dated states `verified`, `degraded`, `unknown`, `not_installed` or `unresolved`. Replace stale claims that import/title/cache workers are active; do not delete the historical Task 28 evidence.
 
-- [ ] **Step 4: Add stable technical-debt records**
+- [x] **Step 4: Add stable technical-debt records**
 
 Reconcile the existing registry without renumbering or overwriting concurrent importer debt:
 
@@ -155,7 +172,7 @@ TD-025 Full deployment integrity check is unbounded for the current 28 GB SQLite
 
 `TD-016` already owns failed-job/retention debt, while importer-specific work owns `TD-021`–`TD-024`; preserve those records. Each new or corrected row must use the existing registry columns and contain a measurable completion criterion.
 
-- [ ] **Step 5: Verify documentation**
+- [x] **Step 5: Verify documentation**
 
 Run:
 
@@ -167,7 +184,7 @@ git diff --check
 
 Expected: all commands pass; managed documentation blocks remain untouched.
 
-- [ ] **Step 6: Commit baseline evidence**
+- [x] **Step 6: Commit baseline evidence**
 
 ```bash
 git add docs/environment.md docs/queues.md docs/audits/current-state-audit.md docs/audits/environment-preflight.md docs/operations/logging-and-health.md docs/maintenance/runtime-compatibility.md docs/maintenance/technical-debt.md docs/plans/current-task-plan.md CHANGELOG.md
@@ -177,9 +194,13 @@ git push origin main
 
 Expected: only evidence files are committed; push succeeds or auth/network failure is recorded `unresolved`.
 
+Actual: Task 1 evidence and Task 2 implementation were committed together as `2227c08`; the push failed only at the external HTTPS credential boundary and is recorded `unresolved`.
+
 ---
 
 ### Task 2: Add Redis Persistence Observability
+
+**Status:** `completed` in `2227c08`; focused verification passed and remote delivery remains `unresolved`.
 
 **Files:**
 - Create: `app/Services/Operations/RedisPersistenceInspector.php`
@@ -196,7 +217,7 @@ Expected: only evidence files are committed; push succeeds or auth/network failu
 - Consumes: Laravel Redis connection `queues`; Redis `INFO persistence`.
 - Produces: `RedisPersistenceInspector::inspect(): array` and detailed health component `redis_persistence`.
 
-- [ ] **Step 1: Write the failing inspector tests**
+- [x] **Step 1: Write the failing inspector tests**
 
 Test contract:
 
@@ -217,7 +238,7 @@ $this->assertFalse($result['aof_enabled']);
 
 Also cover idle/healthy, recent active save, failed last save, missing fields and connection failure. Do not include Redis paths, endpoints or raw error messages.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```bash
 php artisan test --filter=RedisPersistenceInspectorTest
@@ -225,7 +246,7 @@ php artisan test --filter=RedisPersistenceInspectorTest
 
 Expected: FAIL because `RedisPersistenceInspector` does not exist.
 
-- [ ] **Step 3: Implement the typed inspector**
+- [x] **Step 3: Implement the typed inspector**
 
 Required public surface:
 
@@ -252,11 +273,11 @@ Use `Illuminate\Redis\RedisManager`, connection `queues`, `INFO persistence`, bo
 ],
 ```
 
-- [ ] **Step 4: Integrate detailed health without changing readiness**
+- [x] **Step 4: Integrate detailed health without changing readiness**
 
 Add `redis_persistence` to `InfrastructureHealthCheck::run()`. Status `degraded|failed` degrades detailed health but does not make `ready=false` while sessions/queues/locks still answer. `readiness()` remains a lightweight connectivity check.
 
-- [ ] **Step 5: Run GREEN and wider health tests**
+- [x] **Step 5: Run GREEN and wider health tests**
 
 ```bash
 php artisan test --filter=RedisPersistenceInspectorTest
@@ -267,7 +288,7 @@ vendor/bin/phpstan analyse app/Services/Operations/RedisPersistenceInspector.php
 
 Expected: tests pass; Pint changes no unrelated files; PHPStan returns zero diagnostics.
 
-- [ ] **Step 6: Document and commit**
+- [x] **Step 6: Document and commit**
 
 ```bash
 git add app/Services/Operations/RedisPersistenceInspector.php app/Services/Operations/InfrastructureHealthCheck.php config/cache-architecture.php .env.example tests/Unit/RedisPersistenceInspectorTest.php tests/Unit/InfrastructureHealthCheckTest.php docs/operations/logging-and-health.md docs/environment.md CHANGELOG.md
@@ -275,9 +296,13 @@ git commit -m "feat: report Redis persistence health"
 git push origin main
 ```
 
+Actual: inspector tests passed `8` tests / `27` assertions, infrastructure-health integration passed `5` / `21`, CLI health coverage passed `1` / `9`, targeted PHPStan returned zero diagnostics, and `app:health --json` reported the stuck save without changing readiness. Commit evidence is `2227c08`; push is `unresolved`.
+
 ---
 
 ### Task 3: Execute a Controlled Redis Persistence Recovery
+
+**Status:** `unresolved` before Step 1. No producer stop, signal, restart, backup overwrite, persistence command or Redis/data mutation is authorized by this plan update.
 
 **Files:**
 - Modify: `docs/operations/incident-response.md`
@@ -2098,7 +2123,7 @@ git push origin main
 - Modify: `CHANGELOG.md`
 
 **Interfaces:**
-- Consumes: All completed tasks and their commits.
+- Consumes: Tasks 1–27, every applicable non-deferred rolling task that exists at execution time, and their completed commits. With the current ledger this includes Tasks 29–31 before final closeout.
 - Produces: Final compliance matrix and honest remaining limitations.
 
 - [ ] **Step 1: Re-read all applicable canonical requirements**
@@ -2173,6 +2198,266 @@ Before staging `README.md`, confirm it contains a meaningful actual change; othe
 
 ---
 
+## Rolling Extension Protocol
+
+The numbered roadmap has no artificial ceiling. Tasks 1–28 remain stable historical identities; new evidence appends Task 29, Task 30 and later tasks without renumbering, rewriting completed evidence or silently broadening an active change set.
+
+A discovery becomes a numbered task only when all of the following are recorded:
+
+1. measured business, security, compatibility, performance or maintenance reason;
+2. exact owner files and public/internal contracts;
+3. dependencies and cross-feature impact;
+4. data-safety, production-impact and rollback boundary;
+5. RED/GREEN or bounded operational verification;
+6. documentation, `README.md`, Russian `CHANGELOG.md`, commit and push rules;
+7. honest state `planned`, `in_progress`, `completed`, `already_compliant`, `not_applicable` or `unresolved`.
+
+New tasks never grant authority to mutate production data, stop processes, overwrite backups, add production dependencies, change providers or expose secrets. Such authority must still come from the applicable canonical requirement and task-specific approval boundary.
+
+### Task 29: Restore Authenticated Fast-Forward Delivery of `main`
+
+**Status:** `unresolved_external`; may run independently of production recovery only after the shared worktree is clean.
+
+**Files:**
+- Modify: `docs/development.md` only if the verified credential mechanism changes the documented workflow
+- Modify: `docs/plans/current-task-plan.md`
+- Modify: `CHANGELOG.md` only after actual remote delivery is verified
+- Review only: `.git/config`, configured credential helper and remote refs; never track credential material
+
+**Interfaces:**
+- Consumes: existing local `main`, configured `origin`, all task-owned commits and a clean worktree.
+- Produces: a normal fast-forward remote `refs/heads/main` equal to local `HEAD`, or a precise external `unresolved` result.
+- Preserves: direct-to-`main`, no force push, no history rewrite, no alternate branch/worktree and no credential value in command output or tracked files.
+
+- [ ] **Step 1: Freeze the exact delivery set**
+
+Run:
+
+```bash
+git status --short --branch
+git rev-list --count origin/main..main
+git log --oneline --decorate origin/main..main
+git remote get-url origin
+git fsck --no-progress --connectivity-only
+```
+
+Expected: branch is `main`; every ahead commit is intentional; the tree is clean; Git object connectivity passes. Stop on unrelated dirty state, an unexpected remote or an unreviewed commit. Do not stash, reset, cherry-pick or rewrite history to manufacture a clean result.
+
+- [ ] **Step 2: Establish credentials outside the repository**
+
+An authorized operator configures an OS/user credential provider, SSH agent or approved short-lived GitHub credential outside tracked files. Never write a token to `.env`, `.env.example`, Git remote URLs, Markdown, shell history, logs or screenshots.
+
+Probe without an interactive prompt:
+
+```bash
+GIT_TERMINAL_PROMPT=0 git ls-remote --exit-code --heads origin main
+```
+
+Expected: the remote main ref is returned. Authentication or network failure remains `unresolved`; it must not trigger a fallback force push or credential disclosure.
+
+- [ ] **Step 3: Run the configured pre-push gate once**
+
+```bash
+git status --short --branch
+bash scripts/ci-check.sh pre-push
+git diff --check
+```
+
+Expected: the full configured backend/frontend gate passes against the exact clean `HEAD`. If concurrent work dirties the tree during verification, stop and repeat only after its owner finishes.
+
+- [ ] **Step 4: Push normally and verify the exact ref**
+
+```bash
+git push --porcelain origin main
+git rev-parse HEAD
+git ls-remote --exit-code --heads origin main
+```
+
+Expected: push is a normal fast-forward and the remote hash equals local `HEAD`. `--force`, `--force-with-lease`, ref deletion and alternate branches are forbidden.
+
+- [ ] **Step 5: Record delivery evidence**
+
+Update the current-plan delivery row with the exact local/remote hash and verification time. Update `docs/development.md` only if the real supported credential workflow changed. Add a Russian `CHANGELOG.md` item only for an actual workflow/documentation change, not merely to announce that Git authentication happened.
+
+- [ ] **Step 6: Commit and deliver any real documentation correction**
+
+If Step 5 changed tracked documentation:
+
+```bash
+bash scripts/ci-check.sh docs
+git diff --check
+git add docs/development.md docs/plans/current-task-plan.md CHANGELOG.md
+git commit -m "docs: record verified main delivery"
+git push --porcelain origin main
+```
+
+Stage only files that actually changed. Verify the final remote ref again. If no tracked documentation needed correction, do not create an empty evidence commit.
+
+---
+
+### Task 30: Serialize Shared-`main` Delivery Ownership
+
+**Status:** `planned`; blocked until current importer/player owners finish or commit their exact work, because this task may not overwrite their shared hook/docs/test files.
+
+**Reason:** Multiple independent tasks currently edit one checkout while project policy forbids branches and worktrees. The existing clean-tree guard prevents accidental partial commits but has no cooperative task-owner lease, leading to repeated guard bypass pressure and overlapping owner documents.
+
+**Files:**
+- Create: `scripts/task-workspace-lease.sh`
+- Modify: `.githooks/lib/git-guard.sh`
+- Modify: `.githooks/pre-commit`
+- Modify: `.githooks/pre-push`
+- Create: `tests/Unit/GitWorkspaceLeaseScriptTest.php`
+- Modify: `tests/Unit/CiQualityGateContractTest.php`
+- Modify: `docs/development.md`
+- Modify: `docs/plans/current-task-plan.md`
+- Modify: `README.md` only if the contributor quick-start actually changes
+- Modify: `CHANGELOG.md`
+
+**Interfaces:**
+- Produces cooperative commands `acquire <task-id>`, `status`, `release <task-id>` and an exact repository-local lease below `git rev-parse --git-path ...`.
+- Lease metadata may contain only task ID, process ID, timestamp and a one-way token digest; raw token, command arguments, environment values, file contents and credentials are forbidden.
+- Hooks validate an ephemeral `SEASONVAR_TASK_LEASE_TOKEN` against the digest and fail closed for a different active owner.
+- The lease never stages files, stashes work, switches branches, creates worktrees, kills processes, deletes changes or weakens existing main/conflict/path/clean-tree/documentation gates.
+
+- [ ] **Step 1: Write failing script tests**
+
+Cover:
+
+```text
+first acquire succeeds atomically;
+second acquire fails without changing the first lease;
+status exposes safe owner metadata only;
+wrong token cannot release or commit;
+matching token releases the exact lease;
+active PID cannot be recovered as stale;
+stale recovery requires an explicit command and exact repository validation;
+paths with spaces and concurrent acquire attempts remain safe;
+no lease command changes tracked or staged files.
+```
+
+Use a temporary initialized Git repository and `Symfony\Component\Process\Process`; do not test against the active `.git` lease.
+
+- [ ] **Step 2: Run RED**
+
+```bash
+php artisan test --filter=GitWorkspaceLeaseScriptTest
+```
+
+Expected: FAIL because the lease script does not exist.
+
+- [ ] **Step 3: Implement the minimal cooperative lease**
+
+Use atomic directory creation below the repository Git directory. `acquire` prints the raw token once to stdout for the caller to place only in its process environment; disk receives only a SHA-256 digest. `status` never prints the token/digest. `release` requires the matching token. Stale recovery refuses while the recorded PID exists and never removes any path outside the exact validated lease directory.
+
+No generic recursive deletion command is allowed. Every removal target must be the resolved lease metadata/file/directory created by this script and must pass exact-name/repository checks first.
+
+- [ ] **Step 4: Integrate hooks without weakening current guards**
+
+Add `seasonvar_git_guard_require_workspace_lease` before staged/tracked path and clean-tree checks. Preserve `seasonvar_git_guard_require_main`, conflict detection, sensitive/temporary path checks, no-unstaged/no-untracked checks, documentation policy and pre-push quality gate.
+
+The existing emergency `SEASONVAR_SKIP_GIT_GUARD=1` remains an explicitly reported exceptional path; this task must not make it the normal workflow.
+
+- [ ] **Step 5: Run GREEN and hook contracts**
+
+```bash
+php artisan test --filter=GitWorkspaceLeaseScriptTest
+php artisan test --filter=CiQualityGateContractTest
+bash -n scripts/task-workspace-lease.sh .githooks/pre-commit .githooks/pre-push .githooks/lib/git-guard.sh
+bash scripts/ci-check.sh docs
+git diff --check
+```
+
+Expected: all pass; tests prove a second owner cannot acquire/release the active lease and hooks still run every existing guard.
+
+- [ ] **Step 6: Document adoption and rollback**
+
+Document exact acquire/status/release commands, token handling, stale recovery and failure messages. Rollback removes only the lease requirement/script/tests/docs and leaves all previous Git guards intact. Existing active leases are released before rollback; no source change is touched.
+
+- [ ] **Step 7: Commit in isolation**
+
+```bash
+git add scripts/task-workspace-lease.sh .githooks/lib/git-guard.sh .githooks/pre-commit .githooks/pre-push tests/Unit/GitWorkspaceLeaseScriptTest.php tests/Unit/CiQualityGateContractTest.php docs/development.md docs/plans/current-task-plan.md CHANGELOG.md
+git add README.md
+git commit -m "feat: serialize shared main delivery ownership"
+git push origin main
+```
+
+Before staging `README.md`, require a meaningful contributor-facing change. Do not include importer, player, dependency, application or production files.
+
+---
+
+### Task 31: Reconcile Child Roadmaps before Production Activation
+
+**Status:** `planned_cross_cutting`; documentation reconciliation may run read-only, but no child rollout may bypass Tasks 3–5.
+
+**Files:**
+- Modify: `docs/superpowers/plans/2026-07-24-system-maintenance-and-optimization-master-plan.md`
+- Modify: `docs/superpowers/plans/2026-07-24-seasonvar-importer-improvement-master-plan.md`
+- Modify: `docs/superpowers/plans/2026-07-24-player-seamless-episode-switching.md`
+- Modify: `docs/plans/current-task-plan.md`
+- Modify: affected canonical owner docs only when delivered behavior changed
+- Modify: `README.md` only for actual visitor/development/operations change
+- Modify: `CHANGELOG.md`
+
+**Interfaces:**
+- Consumes: completed commits and verification evidence from the system, importer and player streams.
+- Produces: one dated dependency/status matrix with no duplicated ownership and an explicit activation decision per child stream.
+- Preserves: system plan owns Redis/backup/process/deployment gates; importer plan owns importer internals; player plan owns playback behavior; current plan reports execution without redefining permanent requirements.
+
+- [ ] **Step 1: Snapshot exact child status**
+
+```bash
+git status --short --branch
+git log --oneline --decorate -30
+rg -n "^\\*\\*Status|^Статус:|^- \\[[ x]\\]" docs/superpowers/plans/2026-07-24-system-maintenance-and-optimization-master-plan.md docs/superpowers/plans/2026-07-24-seasonvar-importer-improvement-master-plan.md docs/superpowers/plans/2026-07-24-player-seamless-episode-switching.md docs/plans/current-task-plan.md
+```
+
+Classify only commit-backed work as `completed`. Dirty or unpushed work stays `in_progress`/`unresolved`.
+
+- [ ] **Step 2: Reconcile the dependency map**
+
+Record these non-bypassable mappings:
+
+```text
+System Task 3 -> safe Redis persistence/restart boundary.
+System Task 4 -> Importer Task 1 process/scheduler ownership.
+System Task 5 -> importer worker canary and backlog trend.
+System Tasks 6–7 -> importer failed-job/retention rollout.
+System Tasks 13–14 -> immutable player/importer deployment and runtime permissions.
+System Tasks 20–21 -> shared performance budgets before optimization claims.
+System Tasks 24 and 28 -> player security/browser and final cross-system acceptance.
+```
+
+Importer code preparation may precede activation, but Redis/process/data mutations may not. Player commits may proceed independently, but deployment must not overlap a Redis/database maintenance window.
+
+- [ ] **Step 3: Re-run affected verification**
+
+Run only the matrix required by actual child changes, then the shared docs gate:
+
+```bash
+bash scripts/ci-check.sh docs
+git diff --check
+```
+
+PHP/frontend/browser/full checks are selected from the child plans; no completed status is copied without its exact evidence.
+
+- [ ] **Step 4: Update compliance and release decision**
+
+For authentication, authorization, translations, caching, search, notifications, SEO, privacy, mobile, administration, audit, imports, premium, regional/legal, player, deployment, backup and rollback, record `completed`, `already_compliant`, `not_applicable` or `unresolved` with evidence.
+
+- [ ] **Step 5: Commit only reconciliation evidence**
+
+```bash
+git add docs/superpowers/plans/2026-07-24-system-maintenance-and-optimization-master-plan.md docs/superpowers/plans/2026-07-24-seasonvar-importer-improvement-master-plan.md docs/superpowers/plans/2026-07-24-player-seamless-episode-switching.md docs/plans/current-task-plan.md CHANGELOG.md
+git add README.md
+git commit -m "docs: reconcile system and feature roadmaps"
+git push origin main
+```
+
+Stage only files with factual changes. If a child owner is concurrently editing one of them, stop rather than overwrite, stage or reformat its work.
+
+---
+
 ## Deferred until a Separate Approved Decision
 
 - Redis `8.6.x → 8.8.x` major/minor update after persistence recovery, build provenance, module/client/session/queue/lock compatibility and restore proof.
@@ -2197,5 +2482,8 @@ Before staging `README.md`, confirm it contains a meaningful actual change; othe
 - PHP-FPM, OPcache, cold/warm public routes and SQLite writers meet measured budgets.
 - Large-class refactors and static-analysis ratchets preserve every compatibility domain.
 - CSP/alerts/database direction reflect implemented, verified capabilities rather than aspirational claims.
+- Local and remote `main` refs match after a normal authenticated fast-forward push; no credential or rewritten-history workaround was used.
+- Shared-checkout delivery has one cooperative owner at a time while every existing main/conflict/path/clean-tree/documentation guard remains enforced.
+- System, importer and player roadmaps contain commit-backed statuses and an explicit non-conflicting production activation/deployment order.
 - README, canonical owners, maintenance registries, current plan, Russian changelog and final compliance matrix match actual state.
 - Every completed allowed change is committed in existing `main`; push result is reported truthfully.

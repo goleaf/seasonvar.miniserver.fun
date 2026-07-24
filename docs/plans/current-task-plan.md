@@ -1,9 +1,9 @@
 # Текущая задача — безлимитная программа стабилизации, обновления и оптимизации
 
 Дата: 24.07.2026
-Статус: полный master implementation plan подготовлен по фактическому аудиту и закоммичен в существующей `main` как `535f4b8`; application/runtime/data changes этой planning-задачей не выполнялись, а push остаётся `unresolved` из-за отсутствующей HTTPS-аутентификации GitHub.
+Статус: master implementation plan актуализирован после выполнения Tasks 1–2: Task 3 остаётся безопасно остановлен перед production mutation gate, а измеренные delivery/concurrency/cross-plan discoveries добавлены как Tasks 29–31 и безлимитный rolling extension protocol. Application/runtime/data этой planning-актуализацией не меняются.
 
-## Активное исполнение — Batch 1: baseline и Redis persistence observability
+## Завершённое исполнение — Batch 1: baseline и Redis persistence observability
 
 Статус: Task 1 и Task 2 завершены и закоммичены в `main` как `2227c08`; отправка в configured remote остаётся `unresolved` из-за отсутствующей HTTPS-аутентификации GitHub. Task 3 не получает implicit authority на остановку producers, Redis restart, signal/kill, backup overwrite или любое изменение production state.
 
@@ -80,13 +80,73 @@
 | Master plan commit granularity | `unresolved` | Task 1–2 объединены в `2227c08`; безопасно разделить опубликованную локальную историю без rewrite уже нельзя. |
 | Commit/push | `unresolved` | Commit `2227c08` создан в существующей `main`; push в `origin` отклонён из-за отсутствующей HTTPS-аутентификации. |
 
+## Актуализация master-плана — rolling extension без верхнего лимита
+
+### Текущий gate
+
+- [x] Сопоставить Tasks 1–2 с commit/test/health evidence и отметить их `completed` в master plan.
+- [x] Сохранить отклонение commit granularity без rewrite истории.
+- [x] Зафиксировать Task 3 как `unresolved` до независимого backup, точного Redis process owner, maintenance/session-impact approval и остановки producers.
+- [x] Добавить System Master Task 29 для обычной authenticated fast-forward доставки накопившихся локальных commit’ов без secrets, force push или alternate branch.
+- [x] Добавить System Master Task 30 для cooperative shared-`main` delivery lease без stash/reset/worktree, удаления чужих изменений или ослабления существующих Git guards.
+- [x] Добавить System Master Task 31 для обязательной сверки system/importer/player roadmaps до production activation/deployment.
+- [x] Добавить rolling protocol: новые измеренные discovery получают монотонный Task ID, exact files/contracts, dependency, rollback, verification, docs и delivery gates; завершённая история не перенумеровывается.
+- [ ] Task 3 production execution: `unresolved`; эта planning-задача не даёт authority на Redis/service/data mutation.
+
+### Новая очередь и зависимости
+
+| Пункт | Приоритет / статус | Dependency / решение |
+| --- | --- | --- |
+| Task 3 — controlled Redis recovery | `P0 unresolved` | Нужны approved protected artifact, process-manager owner, producer stop и maintenance/session-impact boundary. До этого никакого signal/restart/`SAVE`/`BGSAVE`/backup overwrite. |
+| System Master Task 29 — authenticated `main` delivery | `P0 unresolved_external` | Выполним независимо от Redis только после clean shared tree и credentials outside repository; local `main` сейчас на 13 commit’ов впереди `origin/main`. |
+| System Master Task 30 — shared-`main` delivery ownership | `P0 planned` | Реализация только после завершения текущих importer/player owners; TDD lease дополняет, но не ослабляет clean-tree guards. |
+| System Master Task 31 — child-roadmap reconciliation | `cross_cutting planned` | System Tasks 3–5 блокируют importer activation; player deploy не совмещается с Redis/database maintenance; commit-backed status only. |
+| System Master Task 32+ | `rolling` | Добавляются только по измеренному evidence и полному requirement/change/rollback/verification contract, без искусственного потолка. |
+
+### Expected files этой актуализации
+
+- `docs/superpowers/plans/2026-07-24-system-maintenance-and-optimization-master-plan.md` — execution ledger, честные статусы Tasks 1–3, rolling protocol и Tasks 29–31.
+- `docs/plans/current-task-plan.md` — текущий gate, очередь, совместимость и compliance evidence без перезаписи активного importer/player scope.
+- `CHANGELOG.md` — отдельная русская planning-only запись, если её можно безопасно отделить от concurrent importer entry.
+
+`README.md` проверяется, но не получает отдельного изменения от этой актуализации: visitor/product/development/deployment behavior не изменён, а concurrent importer/player изменения принадлежат их владельцам. Application code, routes, migrations, config, `.env.example`, dependencies, lock files, assets, Redis, services, queues и database rows не меняются.
+
+### Protected contracts и риски
+
+| Область | Статус | Решение |
+| --- | --- | --- |
+| Database/migrations/data | `not_applicable` | Planning-only; Task 3 не выполняется. |
+| Routes/API/translations/cache keys | `not_applicable` | Runtime/public contract не меняется. |
+| Redis/session/queues/locks | `affected_future` | Только планирование; сохранность и connectivity identities защищены, mutation blocked. |
+| Authentication/privacy/secrets | `already_compliant` | Task 29 запрещает credential values в repo, URL, docs, logs, screenshots и shell history. |
+| Git history | `affected_future` | Только normal fast-forward `main`; no force/rewrite/alternate branch/worktree. |
+| Shared workspace | `unresolved` | Активны независимые importer/player owners; их paths не stage-ятся и не переформатируются этой задачей. |
+| Importer activation | `blocked` | System Tasks 3–5 обязательны перед production consumer ramp; текущая code preparation не равна rollout. |
+| Player deployment | `affected_future` | Отдельные commits/verification; deployment не совмещается с Redis/database maintenance. |
+| Rollback | `completed_for_plan` | Откат этой актуализации — только документационный; будущие Tasks 29–31 имеют собственные non-destructive rollback gates. |
+
+### Requirement-compliance matrix этой актуализации
+
+| Требование | Статус | Evidence / ограничение |
+| --- | --- | --- |
+| Root/canonical read order | `completed` | Requirements и применимые operations/maintenance/system owners перечитаны до правки плана. |
+| Versions/existing state | `completed` | Boost/runtime: PHP `8.5.8`, Laravel `13.21.1`, Livewire `4.3.3`, Boost `2.4.13`, Pint `1.29.3`, PHPUnit `12.5.31`; Git `main` ahead 13. |
+| Existing implementation | `completed` | Проверены Batch 1 commit/evidence, Git guards/hooks/tests, importer/player master plans и concurrent path ownership. |
+| Business/security/maintenance reason | `completed` | Новые задачи следуют из фактических auth delivery failure, shared-tree collision risk и cross-roadmap activation dependencies. |
+| Expected files/contracts/risks | `completed` | Перечислены здесь; подробные TDD/operational steps находятся в Tasks 29–31 master plan. |
+| Production/data safety | `completed_for_plan` | Mutation не выполнялась; Task 3 явно остаётся blocked. |
+| README review | `already_compliant` | Отдельного roadmap/product/operator result для README эта reconciliation не создаёт. |
+| CHANGELOG | `completed` | Добавлена отдельная русская planning-only строка; полная проверка working-copy остаётся зависимой от concurrent importer/player entries их владельцев. |
+| Commit in `main` | `in_progress` | Допустим только task-owned docs diff после проверки concurrent overlap. |
+| Push | `unresolved` | HTTPS credentials отсутствуют; Task 29 описывает безопасное восстановление без хранения secrets. |
+
 ## Цель и главный документ исполнения
 
 - [x] Заново прочитать корневой `AGENTS.md`, `docs/requirements/index.md`, все обязательные canonical requirements и применимые тематические Markdown owners.
 - [x] Проверить существующую реализацию, фактические версии framework/runtime/packages, host services, процессы, scheduler, очереди, Redis, SQLite, storage, permissions, production logs, dependency state и verification gates.
 - [x] Выполнить полный read-only аудит без очистки очередей/кешей, мутации production-like данных, обновления packages, изменения `.env` или перезапуска сервисов.
 - [x] Зафиксировать измеренный baseline, compatibility domains, зависимости этапов, rollback gates и критерии завершения.
-- [x] Подготовить полный 28-задачный TDD/operations implementation plan [`2026-07-24-system-maintenance-and-optimization-master-plan.md`](../superpowers/plans/2026-07-24-system-maintenance-and-optimization-master-plan.md).
+- [x] Подготовить и актуализировать TDD/operations implementation plan: стабильные Tasks 1–28, новые измеренные Tasks 29–31 и rolling protocol без верхнего лимита [`2026-07-24-system-maintenance-and-optimization-master-plan.md`](../superpowers/plans/2026-07-24-system-maintenance-and-optimization-master-plan.md).
 - [x] Сохранить параллельный согласованный player workstream ниже; новый master plan не разрешает смешивать его implementation с operational/package/database этапами.
 - [ ] Выполнять master plan только последовательно по dependency graph, начиная с нового датированного baseline и Redis/process/backup boundaries.
 
@@ -120,6 +180,7 @@ Master plan является единственным подробным executi
 | 6. Performance/architecture | Tasks 20–23 | Telemetry budgets, evidence-based hot-path fixes, bounded decomposition и strict-types/Larastan ratchet. |
 | 7. Security/operations | Tasks 24–25 | Поэтапный CSP enforcement и честная optional alert boundary без fake delivery claims. |
 | 8. Strategic closeout | Tasks 26–28 | Измеренное решение по DB engine, архив планов и полная cross-system acceptance. |
+| Сквозное расширение | Tasks 29–31 и далее | Git delivery, shared-`main` ownership, child-roadmap reconciliation и последующие evidence-backed discovery без перенумерации истории. |
 
 ## Expected files этой planning-задачи
 
