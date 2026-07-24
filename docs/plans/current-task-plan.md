@@ -227,7 +227,7 @@
 ## Активная реализация — Task 32, изолированная подготовка reviewed-index boundary
 
 Дата: 24.07.2026
-Статус: `preparation_completed_pending_delivery`; live hooks и application/runtime/data не меняются.
+Статус: `preparation_completed_local_delivery_unresolved_remote`; implementation commit `2a7f636` создан в `main`, live hooks и application/runtime/data не меняются.
 
 ### Причина и dependency decision
 
@@ -262,7 +262,7 @@
 
 | Domain | Статус | Evidence / решение |
 | --- | --- | --- |
-| Shared Git ownership | `handoff_received_for_task_delivery` | Importer owner остаётся активен только в своём unstaged/untracked scope; player owner освободил index отдельным commit `a14cdf5`. Task 32 не меняет hooks и stage-ит только точный preparation manifest. |
+| Shared Git ownership | `task_snapshot_committed` | Importer owner остаётся активен только в своём unstaged/untracked scope; player owner освободил index отдельным commit `a14cdf5`. Точный Task 32 preparation manifest зафиксирован отдельно как `2a7f636`; hooks не менялись. |
 | Existing lease security | `completed_for_preparation` | Exact Git path, task-ID/PID validation, token digest, atomic acquire, safe status и non-recursive cleanup сохранены и проходят focused regression. |
 | Index integrity | `completed_for_preparation` | Digest строится только из полного NUL-safe index listing; staged paths/content не пишутся в approval metadata; add/edit/delete/rename/mode/unstage mutations покрыты tests. |
 | Hook/backward compatibility | `already_compliant_for_preparation` | Existing hooks и guards не меняются; старые `acquire|status|release|recover` остаются совместимыми. |
@@ -281,7 +281,7 @@
 | Written plan before code | `completed` | Scope, exact files/contracts, compatibility, risks, rollback и verification записаны здесь до test/code edit. |
 | TDD | `completed_for_preparation` | RED: `13` passed / `10` expected failures. GREEN: `23` tests / `122` assertions; unchanged hook contract: `17` / `95`. |
 | README/CHANGELOG/docs | `completed_with_concurrent_limitation` | README policy и managed docs/docs CI прошли; task-owned русский CHANGELOG entry проходит изолированно, full working policy останавливается на concurrent строке со словом `master`. |
-| Commit/push | `pending` | Только task-owned paths в существующей `main`; importer scope исключается, remote auth failure при повторении остаётся `unresolved`. |
+| Commit/push | `unresolved_remote` | Только task-owned paths зафиксированы в существующей `main` как `2a7f636`; importer scope исключён. Обычный push достиг `origin`, но HTTPS-аутентификация недоступна. |
 
 ### TDD и verification checklist
 
@@ -291,7 +291,7 @@
 - [x] Получить GREEN focused suite (`23`/`122`), проверить `bash -n`, Pint и неизменённый `CiQualityGateContractTest` (`17`/`95`).
 - [x] Выполнить legacy/duplicate/temp/secret scan, README review, managed docs, docs CI и task-scoped diff checks.
 - [x] Перечитать применимые requirements и task-specific compliance matrix после реализации.
-- [ ] Изолированно commit-ить разрешённые paths в `main` и выполнить обычный push.
+- [x] Изолированно commit-ить разрешённые paths в `main` как `2a7f636` и выполнить обычный push; внешний auth failure оставить `unresolved_remote`.
 
 ### Verification evidence подготовки
 
@@ -774,6 +774,7 @@ Rollback реализации: вернуть прежний countdown/обыч�
 | Root/canonical read order | `completed` | Перед edit перечитаны `AGENTS.md`, requirement index и применимые code/architecture/development/multilingual/security/maintenance/system-integration owners. |
 | Versions/existing implementation | `completed` | Boost подтвердил PHP `8.5`, Laravel `13.21.1`, Livewire `4.3.3`, PHPUnit `12.5.31`; существующие hooks, guard library и contract tests проверены. |
 | Written plan before code | `completed` | Scope, files, совместимость, риски и rollback зафиксированы здесь и в Task 30 master plan до test/code edit. |
+- Implementation commit `2a7f636` создан в существующей `main` после повторной staged-проверки. Обычный `git push --porcelain origin main` достиг configured remote и вернул `could not read Username for 'https://github.com': No such device or address`; force, history rewrite, alternate branch и хранение credentials не применялись.
 | TDD | `completed` | Наблюдаемый RED: 6 failures из-за отсутствующего script. Первый GREEN: 11 тестов/50 утверждений; cleanup review добавил отдельный RED на потерю metadata, финальный GREEN: 12/56. |
 | Git/shared workspace | `completed_for_preparation` | Только новые isolated paths и task-specific plan hunks; live hooks и concurrent importer/player files не меняются и не stage-ятся. |
 | Security/privacy/secrets | `completed` | Tests проверяют metadata allowlist, SHA-256 digest вместо raw token, single raw-token output, safe status, wrong-token refusal, exact cleanup и сохранение metadata при unexpected content. |
