@@ -30,6 +30,7 @@
 - README получил фактический operator contract без visitor-history записи; operations/environment owners, `.env.example` и русский `CHANGELOG.md` обновлены.
 - Focused verification прошёл `RedisPersistenceInspectorTest` (`8`/`27`), `InfrastructureHealthCheckTest` (`5`/`21`) и `CheckInfrastructureHealthCommandTest` (`1`/`9`); `bash scripts/ci-check.sh docs`, `project:docs-refresh --check` и `git diff --check` завершились успешно.
 - Commit `2227c08` (`feat: report Redis persistence health`) создан в существующей `main` только из task-owned staged paths. Обычный push дошёл до `origin` и вернул `could not read Username for 'https://github.com': No such device or address`; доставка честно остаётся `unresolved`.
+- Отклонение от planned commit granularity: Task 1 и Task 2 вошли в один изолированный Batch 1 commit, потому что baseline и inspector одновременно меняли общие operations owners, а shared worktree уже содержал параллельные importer/player изменения. История `main` не переписывается; следующие workstreams снова получают отдельные commits.
 
 ### Expected files Batch 1
 
@@ -76,6 +77,7 @@
 | Production operations | `completed` для Task 1–2 | Data-safety/rollback/failure boundary записаны; новый health evidence получен read-only, Task 3 mutation authority не расширена. |
 | README | `completed` | Operator command/behavior обновлены; visitor-facing capability и история посетителей не изменялись. |
 | CHANGELOG/current docs | `completed` | Operations/environment owners и отдельная русская delivered entry обновлены по фактическому результату. |
+| Master plan commit granularity | `unresolved` | Task 1–2 объединены в `2227c08`; безопасно разделить опубликованную локальную историю без rewrite уже нельзя. |
 | Commit/push | `unresolved` | Commit `2227c08` создан в существующей `main`; push в `origin` отклонён из-за отсутствующей HTTPS-аутентификации. |
 
 ## Цель и главный документ исполнения
