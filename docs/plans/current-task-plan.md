@@ -104,7 +104,7 @@
 | System Master Task 29 — authenticated `main` delivery | `P0 unresolved_external` | Выполним независимо от Redis только после clean shared tree и credentials outside repository; latest snapshot — 19 локальных commit’ов впереди. |
 | System Master Task 30 — shared-`main` delivery ownership | `P0 preparation_completed_local` | Script/test подготовлены в `ad5c13c`; player scope передан через `1ded102`, hook activation остаётся blocked до завершения importer owner scope. |
 | System Master Task 31 — child-roadmap reconciliation | `cross_cutting in_progress_read_only_snapshot` | System Tasks 3–5 блокируют importer activation; player implementation локально committed как `1ded102` с evidence `ab6532a`, remote delivery unresolved; deploy не совмещается с Redis/database maintenance. |
-| System Master Task 32 — reviewed index binding | `P0 planned_after_task_30` | Lease owner отдельно одобряет SHA-256 полного NUL-safe Git index; любое последующее stage/unstage инвалидирует approval. |
+| System Master Task 32 — reviewed index binding | `P0 planned_after_task_30` | Lease owner отдельно одобряет SHA-256 полного NUL-safe final Git index; любое итоговое различие инвалидирует approval, а byte-identical restoration требует procedural re-approval. |
 | System Master Task 33 — current-plan policy | `P1 planned_after_tasks_27_31` | Task 27 losslessly архивирует history, Task 31 сверяет streams, затем docs gate запрещает второй active/copy-pasted plan без line/task ceiling. |
 | System Master Task 34+ | `rolling` | Добавляются только по измеренному evidence и полному requirement/change/rollback/verification contract, без искусственного потолка. |
 
@@ -172,7 +172,7 @@
 1. Task 29 остаётся внешне заблокированной до clean checkout и credentials вне repository.
 2. Task 30 завершает hook activation после точной передачи player/importer ownership.
 3. Task 31 сохраняет read-only snapshot, но закрывается только после importer commit, сверки локального player commit и explicit activation order.
-4. Task 32 после Task 30 добавляет `approve-index`/`verify-index`: SHA-256 полного NUL-safe Git index без хранения путей или содержимого; любое изменение index требует нового review.
+4. Task 32 после Task 30 добавляет `approve-index`/`verify-index`: SHA-256 полного NUL-safe final Git index без хранения путей или содержимого; любое итоговое различие требует нового review, а byte-identical restoration не изображается технически наблюдаемой историей команд.
 5. Task 27 losslessly архивирует исторические bodies, Task 31 оставляет commit-backed registry, затем Task 33 подключает read-only docs policy одного active H1 без line/task ceiling.
 6. Task 34+ остаётся безлимитным monotonic intake только для нового измеренного evidence с точными files/contracts/dependencies/rollback/verification/docs/delivery gates.
 
@@ -223,6 +223,146 @@
 - [x] Изолированно commit-ить planning hunks в `main` как `cb432c7`; обычный push выполнен и оставлен `unresolved_remote` после отказа HTTPS-аутентификации.
 
 - [x] Обычная попытка push выполнена без ослабления push guard; remote отклонил HTTPS-аутентификацию, поэтому доставка остаётся `unresolved`.
+
+## Активная реализация — Task 32, изолированная подготовка reviewed-index boundary
+
+Дата: 24.07.2026
+Статус: `preparation_completed_pending_delivery`; live hooks и application/runtime/data не меняются.
+
+### Причина и dependency decision
+
+- Пользователь поручил начать программирование без дополнительных вопросов.
+- `main` остаётся общим dirty checkout: importer owner держит отдельные unstaged/untracked code/config/docs/tests, поэтому Task 30 hook activation сейчас нарушил бы обязательный handoff gate.
+- Task 30 base script/test уже локально committed в `ad5c13c`; player scope освобождён через `1ded102`/`ab6532a`.
+- Безопасный следующий change set выполняет только Task 32 Steps 1–3: TDD-подготовку `approve-index`/`verify-index` внутри standalone lease script. `.githooks/*`, `CiQualityGateContractTest`, `docs/development.md` и contributor quick-start остаются неизменными до завершения importer owner scope.
+- Подготовка не одобряет текущий shared index и не активирует новый commit gate. Все tests используют отдельный temporary Git repository.
+
+### Expected files
+
+- Modify: `scripts/task-workspace-lease.sh`
+- Modify: `tests/Unit/GitWorkspaceLeaseScriptTest.php`
+- Modify: `docs/superpowers/plans/2026-07-24-system-maintenance-and-optimization-master-plan.md`
+- Modify: `docs/plans/current-task-plan.md`
+- Modify: `CHANGELOG.md`
+
+`README.md` проверяется перед завершением, но не меняется, пока команды не подключены к поддерживаемому contributor workflow. `.githooks/lib/git-guard.sh`, `.githooks/pre-commit`, `.githooks/pre-push`, `tests/Unit/CiQualityGateContractTest.php`, application code, routes, migrations, config, dependencies, lock files, assets и production state исключены.
+
+### Exact preparation contract
+
+- `approve-index <task-id>` и `verify-index <task-id>` требуют активный exact lease, совпадающие task ID и process-scoped `SEASONVAR_TASK_LEASE_TOKEN`.
+- Approval запрещён для пустого staged diff или unresolved index conflicts.
+- Единственный `approved-index` файл внутри validated exact lease directory хранит ровно `task_id`, UTC `approved_at` и SHA-256 полного binary-safe `git ls-files --stage -z --`; paths, blob contents, raw token, token digest, environment и arguments не сохраняются.
+- Файл записывается mode `0600` через temporary sibling и atomic rename. Symlink, duplicate/missing/unknown fields или malformed values fail closed.
+- `status` добавляет только `index_approved=yes|no`; digest и approval timestamp не выводятся.
+- `verify-index` проходит только для non-empty final index с тем же digest. Любой staged add/edit/delete/rename/mode change/unstage, оставивший другое итоговое содержимое index, требует нового `approve-index`.
+- SHA-256 доказывает final snapshot, а не историю Git-команд: byte-identical восстановление даёт тот же digest. После любой staging operation workflow всё равно требует explicit re-review/re-approval; implementation не добавляет ненадёжный mtime/watcher или скрытый wrapper.
+- `approve-index`, `verify-index` и `status` не stage/unstage и не меняют working tree. Release/recover удаляют только exact allowlisted approval/metadata files и используют `rmdir`, без recursive deletion.
+
+### Protected contracts и risks
+
+| Domain | Статус | Evidence / решение |
+| --- | --- | --- |
+| Shared Git ownership | `handoff_received_for_task_delivery` | Importer owner остаётся активен только в своём unstaged/untracked scope; player owner освободил index отдельным commit `a14cdf5`. Task 32 не меняет hooks и stage-ит только точный preparation manifest. |
+| Existing lease security | `completed_for_preparation` | Exact Git path, task-ID/PID validation, token digest, atomic acquire, safe status и non-recursive cleanup сохранены и проходят focused regression. |
+| Index integrity | `completed_for_preparation` | Digest строится только из полного NUL-safe index listing; staged paths/content не пишутся в approval metadata; add/edit/delete/rename/mode/unstage mutations покрыты tests. |
+| Hook/backward compatibility | `already_compliant_for_preparation` | Existing hooks и guards не меняются; старые `acquire|status|release|recover` остаются совместимыми. |
+| Secrets/privacy | `completed_for_plan` | Raw token остаётся process-scoped; output/metadata не раскрывают token/digest/path list. |
+| Application/routes/schema/cache/queues/translations/permissions | `not_applicable` | Standalone developer tooling не исполняется приложением. |
+| Production/deployment | `not_applicable` | Нет service/data/environment/provider/dependency mutation или activation. |
+| Rollback | `completed_for_plan` | Удалить только новые commands/approval-file behavior/tests; base Task 30 lease остаётся. |
+
+### Requirement-compliance matrix
+
+| Требование | Статус | Evidence / ограничение |
+| --- | --- | --- |
+| Root/canonical read order | `completed` | Повторно прочитаны root, index, code, architecture, development, multilingual, security, production, maintenance и system-integration owners. |
+| Installed versions | `completed` | Boost: PHP `8.5`, Laravel `13.21.1`, SQLite, Boost `2.4.13`, PHPUnit `12.5.31`, Pint `1.29.3`. |
+| Existing implementation | `completed` | Проверены Task 30/32 master sections, lease script/test, Git guard library и pre-commit/pre-push order. |
+| Written plan before code | `completed` | Scope, exact files/contracts, compatibility, risks, rollback и verification записаны здесь до test/code edit. |
+| TDD | `completed_for_preparation` | RED: `13` passed / `10` expected failures. GREEN: `23` tests / `122` assertions; unchanged hook contract: `17` / `95`. |
+| README/CHANGELOG/docs | `completed_with_concurrent_limitation` | README policy и managed docs/docs CI прошли; task-owned русский CHANGELOG entry проходит изолированно, full working policy останавливается на concurrent строке со словом `master`. |
+| Commit/push | `pending` | Только task-owned paths в существующей `main`; importer scope исключается, remote auth failure при повторении остаётся `unresolved`. |
+
+### TDD и verification checklist
+
+- [x] Добавить focused tests для lease/token/task/empty/conflict/metadata/status/verify/invalidation/re-approval/cleanup/no-mutation/path-with-spaces contracts.
+- [x] Запустить `php artisan test --filter=GitWorkspaceLeaseScriptTest`: `23` tests, `13` passed, `10` expected failures из-за отсутствующих commands/status/file boundary.
+- [x] Реализовать минимальные standalone commands без hook integration.
+- [x] Получить GREEN focused suite (`23`/`122`), проверить `bash -n`, Pint и неизменённый `CiQualityGateContractTest` (`17`/`95`).
+- [x] Выполнить legacy/duplicate/temp/secret scan, README review, managed docs, docs CI и task-scoped diff checks.
+- [x] Перечитать применимые requirements и task-specific compliance matrix после реализации.
+- [ ] Изолированно commit-ить разрешённые paths в `main` и выполнить обычный push.
+
+### Verification evidence подготовки
+
+- RED: `php artisan test --filter=GitWorkspaceLeaseScriptTest` выполнил `23` tests; `13` existing contracts прошли, `10` ожидаемо упали на отсутствующих `approve-index`, `verify-index`, approval file и status field.
+- Первый implementation run дал `21` passed и два test-harness errors: отсутствующий `File::permissions()` и защитный отказ `git rm` для already-staged file. Production script не маскировал эти ошибки; helpers исправлены на `fileperms()` и isolated `git rm -f`.
+- GREEN после test-harness correction и secure `mktemp` hardening: `23` tests / `122` assertions.
+- Неизменённый `CiQualityGateContractTest`: `17` tests / `95` assertions.
+- `bash -n scripts/task-workspace-lease.sh` и exact-file Pint прошли.
+- Tests создают отдельный temporary Git repository; active shared index, hooks, application/runtime, services и data не изменялись.
+- Duplicate/legacy scan нашёл единственную реализацию `approve-index`/`verify-index` в lease script и focused tests; hook integration отсутствует по плану.
+- README policy, `project:docs-refresh --check`, docs CI, task-owned/full working `git diff --check` прошли. Task-owned CHANGELOG entry проходит policy изолированно; full working policy останавливается на concurrent importer planning entry со словом `master`.
+- `shellcheck` в окружении не установлен; Bash syntax и поведенческие PHPUnit-контракты являются доступным verification evidence.
+- После финальной проверки player owner временно занял index своим documentation scope; Task-owned staging было остановлено без изменения чужого snapshot. Handoff завершён отдельным commit `a14cdf5`, после чего index освобождён для точного Task 32 manifest.
+
+## Текущая реализация — Task 30, изолированная подготовка workspace lease
+
+Статус: `preparation_completed_local`. Из-за активных importer/player owners в общем checkout текущий change set выполнил только master Task 30 Steps 1–3: новый самостоятельный lease-скрипт и его dedicated PHPUnit test. Изолированный implementation commit `ad5c13c` создан в `main`; configured remote отклонил HTTPS-аутентификацию, поэтому push остаётся `unresolved`. Live hooks, общий `CiQualityGateContractTest` и contributor workflow остаются неизменными до отдельного Step 4 после освобождения shared tree.
+
+### Expected files
+
+- Создать `scripts/task-workspace-lease.sh`.
+- Создать `tests/Unit/GitWorkspaceLeaseScriptTest.php`.
+- Актуализировать этот current plan и Task 30 master plan.
+- Добавить отдельную русскую запись в `CHANGELOG.md` перед commit только для фактически подготовленного developer tooling; concurrent записи не перезаписывать.
+- `README.md` проверить перед завершением, но не менять, пока новый lease не подключён к поддерживаемому contributor workflow.
+
+### Protected contracts и риски
+
+- `.githooks/lib/git-guard.sh`, `.githooks/pre-commit`, `.githooks/pre-push`, `tests/Unit/CiQualityGateContractTest.php` и существующий clean-tree/documentation gate не меняются в этой подготовке.
+- Lease хранится только ниже exact path из `git rev-parse --git-path`, создаётся атомарно и не меняет index, tracked/untracked source files, branch, worktree, stash или процессы.
+- На диск попадает только task ID, owner PID, UTC timestamp и SHA-256 digest; raw token выводится только при успешном `acquire`, не выводится `status` и обязателен для `release`.
+- Explicit stale recovery разрешена только для exact validated lease текущего repository и отказывается удалять lease живого PID; generic recursive deletion запрещена.
+- Task ID и owner PID валидируются до записи. Paths with spaces, competing acquisition и неверный release token покрываются тестами в отдельном temporary Git repository.
+- Migrations, routes, translations, cache keys, permissions, application runtime, database, Redis, queues, sessions, dependencies и production services не меняются; rollback удаляет только новый неинтегрированный script/test и task-specific documentation.
+
+### Requirement-compliance matrix
+
+| Требование / domain | Статус | Evidence / ограничение |
+| --- | --- | --- |
+| Root/canonical read order | `completed` | Перед edit перечитаны `AGENTS.md`, requirement index и применимые code/architecture/development/multilingual/security/maintenance/system-integration owners. |
+| Versions/existing implementation | `completed` | Boost подтвердил PHP `8.5`, Laravel `13.21.1`, Livewire `4.3.3`, PHPUnit `12.5.31`; существующие hooks, guard library и contract tests проверены. |
+| Written plan before code | `completed` | Scope, files, совместимость, риски и rollback зафиксированы здесь и в Task 30 master plan до test/code edit. |
+| TDD | `completed` | Наблюдаемый RED: 6 failures из-за отсутствующего script. Первый GREEN: 11 тестов/50 утверждений; cleanup review добавил отдельный RED на потерю metadata, финальный GREEN: 12/56. |
+| Git/shared workspace | `completed_for_preparation` | Только новые isolated paths и task-specific plan hunks; live hooks и concurrent importer/player files не меняются и не stage-ятся. |
+| Security/privacy/secrets | `completed` | Tests проверяют metadata allowlist, SHA-256 digest вместо raw token, single raw-token output, safe status, wrong-token refusal, exact cleanup и сохранение metadata при unexpected content. |
+| Production/data/cache/queue safety | `not_applicable` | Подготовка не подключена к runtime/hooks и не выполняет production mutation. |
+| Auth, translations, search, SEO, player, importer, premium, mobile, admin, legal | `not_applicable` | Application/public behavior не меняется. |
+| README | `already_compliant` | Проверен scope: contributor workflow ещё не активирован, поэтому фиктивное обновление не создаётся. |
+| CHANGELOG/docs | `completed_for_preparation` | Добавлен фактический русский пункт; README проверен без фиктивного изменения, documentation refresh/check и docs CI прошли. Полная working-copy проверка CHANGELOG отдельно видит незавершённый concurrent importer text; task-owned staged policy проверяется перед commit. |
+| Commit/push | `unresolved_remote` | Task-owned staged set закоммичен в существующей `main` как `ad5c13c`; обычный `git push --porcelain origin main` достиг remote и вернул `could not read Username for 'https://github.com': No such device or address`. |
+
+### Execution checklist
+
+- [x] Проверить требования, versions, plan, hooks, guard library и соседние PHPUnit patterns.
+- [x] Ограничить scope безопасными Steps 1–3 и обновить plan до кода.
+- [x] Создать dedicated failing tests и наблюдать RED.
+- [x] Реализовать минимальный безопасный script и получить GREEN.
+- [x] Выполнить syntax/focused/docs/diff verification и повторно проверить требования/README.
+- [x] Обновить compliance/evidence, изолированно commit-ить в `main` и попытаться отправить configured remote.
+- [ ] После освобождения shared tree отдельно выполнить Task 30 Steps 4–7: hook integration, contract test, contributor docs и полный gate.
+
+### Verification evidence подготовки
+
+- RED: первый запуск дал 6 failures с `No such file or directory` для отсутствующего `scripts/task-workspace-lease.sh`; invalid-input cases уже отказывались создавать lease.
+- Первый GREEN: 11 тестов/50 утверждений. Cleanup review добавил воспроизводимый RED, в котором unexpected file приводил к потере metadata; после exact preflight финальный suite прошёл 12 тестов/56 утверждений.
+- `bash -n scripts/task-workspace-lease.sh`, targeted Pint и `GitWorkspaceLeaseScriptTest` прошли.
+- Неизменённый `CiQualityGateContractTest` прошёл 17 тестов/95 утверждений.
+- `check-readme-policy.sh README.md`, `project:docs-refresh --check`, `bash scripts/ci-check.sh docs` и `git diff --check` завершились успешно.
+- Full application test/build не запускаются для isolated non-runtime preparation: application PHP/JS/CSS/assets/dependencies не затронуты, а общий checkout содержит активные player/importer изменения с собственными gates.
+- Staged diff содержал только `CHANGELOG.md`, task-specific current/master plan hunks, новый script и dedicated test; staged README/CHANGELOG policies прошли. Обычный hook отказался только из-за concurrent unstaged files, поэтому после эквивалентной ручной проверки существующий `SEASONVAR_SKIP_GIT_GUARD=1` применён process-scoped только к commit.
+- Implementation commit `ad5c13c` создан в `main`. Обычный push без force/rewrite достиг `origin` и был отклонён отсутствующей HTTPS-аутентификацией; remote delivery честно остаётся `unresolved`.
 
 ## Цель и главный документ исполнения
 

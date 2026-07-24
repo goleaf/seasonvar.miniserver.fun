@@ -2480,9 +2480,9 @@ Stage only files with factual changes. If a child owner is concurrently editing 
 
 ### Task 32: Bind a Reviewed Git Index Snapshot to the Workspace Lease
 
-**Status:** `planned_after_task_30_activation`. The observed staged-player/unstaged-importer collision proves that owner identity alone does not prove the final index was reviewed.
+**Status:** `standalone_preparation_verified_pending_delivery`. The observed staged-player/unstaged-importer collision proves that owner identity alone does not prove the final index was reviewed. While the importer owner still has an active unstaged scope, only Steps 1–3 prepare the standalone commands and dedicated tests; hook/guard integration, contributor workflow activation and the final Task 32 commit contract remain blocked behind the Task 30 handoff gate. The preparation RED was `13` passed / `10` expected failures; standalone GREEN is `23` tests / `122` assertions, while the unchanged hook contract remains `17` tests / `95` assertions.
 
-**Reason:** Task 30 serializes cooperative owner handoff, but an active owner can still inherit or accidentally accept previously staged paths. A commit must be bound to the exact reviewed Git index, and every later stage/unstage operation must invalidate that approval.
+**Reason:** Task 30 serializes cooperative owner handoff, but an active owner can still inherit or accidentally accept previously staged paths. A commit must be bound to the exact reviewed final Git index. A SHA-256 snapshot detects every final index difference, but cannot prove the history of commands when an index is restored byte-for-byte before verification; the documented workflow therefore still requires explicit re-review and re-approval after staging operations.
 
 **Files:**
 - Modify: `scripts/task-workspace-lease.sh`
@@ -2500,10 +2500,10 @@ Stage only files with factual changes. If a child owner is concurrently editing 
 - Produces: `approve-index <task-id>` and `verify-index <task-id>` commands plus an exact `approved-index` file inside the validated lease directory.
 - The approval file contains only `task_id`, UTC `approved_at` and a SHA-256 digest of the NUL-safe full index entries returned by `git ls-files --stage -z`; repository paths, blob contents, raw token, token digest, command arguments and environment values are not stored.
 - `approve-index` refuses an empty staged diff, unresolved conflicts, a wrong task ID or token, and does not stage/unstage any path.
-- Pre-commit first validates Task 30 ownership, then requires the approved digest to equal the current index digest. Any later `git add`, `git reset <path>`, conflict resolution or index replacement invalidates approval and requires a new explicit review/approval.
+- Pre-commit first validates Task 30 ownership, then requires the approved digest to equal the current index digest. Any later `git add`, `git reset <path>`, conflict resolution or index replacement that leaves a different final index invalidates approval and requires a new explicit review/approval. A byte-identical restoration is cryptographically the same snapshot, so the contributor procedure—not an unverifiable operation-history claim—requires re-approval after any staging operation.
 - Existing main/conflict/sensitive/temporary/unstaged/untracked/docs/README/CHANGELOG gates remain mandatory. Approval never converts an unsafe staged set into an allowed one.
 
-- [ ] **Step 1: Write failing index-approval tests**
+- [x] **Step 1: Write failing index-approval tests**
 
 Add tests covering:
 
@@ -2514,7 +2514,7 @@ an empty staged diff cannot be approved;
 approval stores only task ID, UTC timestamp and SHA-256 index digest;
 status reports only index_approved=yes|no and never prints the digest;
 verify succeeds for the unchanged reviewed index;
-any staged add, edit, delete, rename, mode change or unstage invalidates approval;
+any staged add, edit, delete, rename, mode change or unstage that changes the final index invalidates approval;
 restoring and re-approving the exact index succeeds;
 release removes only the exact approval file and lease metadata;
 approve/verify never change the index or working tree;
@@ -2523,15 +2523,15 @@ paths with spaces and NUL-safe index input remain deterministic.
 
 Use only a temporary initialized Git repository. Never approve the active shared index from PHPUnit.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```bash
 php artisan test --filter=GitWorkspaceLeaseScriptTest
 ```
 
-Expected: FAIL because `approve-index`/`verify-index` and the approval file do not exist.
+Observed preparation RED: `23` tests executed; `13` existing contracts passed and `10` failed on the missing commands/status/file boundary.
 
-- [ ] **Step 3: Implement the minimal fingerprint boundary**
+- [x] **Step 3: Implement the minimal fingerprint boundary**
 
 The digest source is the complete binary-safe index listing:
 
@@ -2752,7 +2752,7 @@ Stage `README.md` only when the supported development workflow actually changed.
 - CSP/alerts/database direction reflect implemented, verified capabilities rather than aspirational claims.
 - Local and remote `main` refs match after a normal authenticated fast-forward push; no credential or rewritten-history workaround was used.
 - Shared-checkout delivery has one cooperative owner at a time while every existing main/conflict/path/clean-tree/documentation guard remains enforced.
-- Every commit from a shared checkout is bound to an explicitly reviewed staged-index SHA-256; any later index mutation invalidates approval without storing paths, contents or credentials.
+- Every commit from a shared checkout is bound to an explicitly reviewed final staged-index SHA-256; any final index difference invalidates approval without storing paths, contents or credentials, while byte-identical restoration remains an explicit procedural re-approval boundary.
 - System, importer and player roadmaps contain commit-backed statuses and an explicit non-conflicting production activation/deployment order.
 - The current-plan registry has one active owner and linked commit-backed stream rows; completed bodies remain losslessly archived, and the docs gate prevents a copied second active plan without imposing a task/line ceiling.
 - README, canonical owners, maintenance registries, current plan, Russian changelog and final compliance matrix match actual state.
