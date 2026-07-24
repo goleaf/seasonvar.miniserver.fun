@@ -98,7 +98,7 @@
 | Пункт | Приоритет / статус | Dependency / решение |
 | --- | --- | --- |
 | Task 3 — controlled Redis recovery | `P0 unresolved` | Нужны approved protected artifact, process-manager owner, producer stop и maintenance/session-impact boundary. До этого никакого signal/restart/`SAVE`/`BGSAVE`/backup overwrite. |
-| System Master Task 29 — authenticated `main` delivery | `P0 unresolved_external` | Выполним независимо от Redis только после clean shared tree и credentials outside repository; local `main` сейчас на 13 commit’ов впереди `origin/main`. |
+| System Master Task 29 — authenticated `main` delivery | `P0 unresolved_external` | Выполним независимо от Redis только после clean shared tree и credentials outside repository; до актуализации было 13 локальных commit’ов впереди, а счётчик растёт с новыми evidence commits до восстановления доставки. |
 | System Master Task 30 — shared-`main` delivery ownership | `P0 planned` | Реализация только после завершения текущих importer/player owners; TDD lease дополняет, но не ослабляет clean-tree guards. |
 | System Master Task 31 — child-roadmap reconciliation | `cross_cutting planned` | System Tasks 3–5 блокируют importer activation; player deploy не совмещается с Redis/database maintenance; commit-backed status only. |
 | System Master Task 32+ | `rolling` | Добавляются только по измеренному evidence и полному requirement/change/rollback/verification contract, без искусственного потолка. |
@@ -123,7 +123,7 @@
 | Shared workspace | `unresolved` | Активны независимые importer/player owners; их paths не stage-ятся и не переформатируются этой задачей. |
 | Importer activation | `blocked` | System Tasks 3–5 обязательны перед production consumer ramp; текущая code preparation не равна rollout. |
 | Player deployment | `affected_future` | Отдельные commits/verification; deployment не совмещается с Redis/database maintenance. |
-| Rollback | `completed_for_plan` | Откат этой актуализации — только документационный; будущие Tasks 29–31 имеют собственные non-destructive rollback gates. |
+| Rollback | `completed` | Откат этой актуализации — только документационный; будущие Tasks 29–31 имеют собственные non-destructive rollback gates. |
 
 ### Requirement-compliance matrix этой актуализации
 
@@ -134,11 +134,20 @@
 | Existing implementation | `completed` | Проверены Batch 1 commit/evidence, Git guards/hooks/tests, importer/player master plans и concurrent path ownership. |
 | Business/security/maintenance reason | `completed` | Новые задачи следуют из фактических auth delivery failure, shared-tree collision risk и cross-roadmap activation dependencies. |
 | Expected files/contracts/risks | `completed` | Перечислены здесь; подробные TDD/operational steps находятся в Tasks 29–31 master plan. |
-| Production/data safety | `completed_for_plan` | Mutation не выполнялась; Task 3 явно остаётся blocked. |
+| Production/data safety | `completed` | Mutation не выполнялась; Task 3 явно остаётся blocked. |
 | README review | `already_compliant` | Отдельного roadmap/product/operator result для README эта reconciliation не создаёт. |
 | CHANGELOG | `completed` | Добавлена отдельная русская planning-only строка; полная проверка working-copy остаётся зависимой от concurrent importer/player entries их владельцев. |
-| Commit in `main` | `in_progress` | Допустим только task-owned docs diff после проверки concurrent overlap. |
-| Push | `unresolved` | HTTPS credentials отсутствуют; Task 29 описывает безопасное восстановление без хранения secrets. |
+| Commit in `main` | `completed` | Task-owned staged diff закоммичен в существующей `main` как `7ce8e37`; concurrent importer/player paths не включены. |
+| Push | `unresolved` | Обычный `git push origin main` вернул `could not read Username for 'https://github.com': No such device or address`; Task 29 описывает безопасное восстановление без хранения secrets. |
+
+### Verification и delivery evidence этой актуализации
+
+- [x] `git diff --cached --check`.
+- [x] Staged `README.md`/`CHANGELOG.md` policy checks.
+- [x] `php artisan project:docs-refresh --check --no-interaction`.
+- [x] `bash scripts/ci-check.sh docs`.
+- [x] Task-owned commit `7ce8e37` создан в `main`; `SEASONVAR_SKIP_GIT_GUARD=1` применён только к commit после ручного прохождения документационных проверок, потому что concurrent work оставляет разрешённый staged scope внутри общего dirty tree.
+- [x] Обычная попытка push выполнена без ослабления push guard; remote отклонил HTTPS-аутентификацию, поэтому доставка остаётся `unresolved`.
 
 ## Цель и главный документ исполнения
 

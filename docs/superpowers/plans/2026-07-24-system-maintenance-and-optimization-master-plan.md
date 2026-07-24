@@ -32,7 +32,7 @@
 | --- | --- | --- |
 | Task 1 — operational baseline | `completed` | Dated read-only evidence is committed in `2227c08`; no production state was mutated. |
 | Task 2 — Redis persistence observability | `completed` | TDD implementation and documentation are committed in `2227c08`; `app:health --json` now reports `redis_persistence=failed` while preserving `ready=true`. |
-| Task 1–2 remote delivery | `unresolved` | The normal push reached configured `origin` but failed because HTTPS credentials were unavailable. Local `main` is currently 13 commits ahead of `origin/main`; no force push or history rewrite is allowed. |
+| Task 1–2 remote delivery | `unresolved` | The normal push reached configured `origin` but failed because HTTPS credentials were unavailable. The pre-update audit counted 13 local commits ahead; this count grows with later evidence commits until Task 29 delivers them. No force push or history rewrite is allowed. |
 | Task 3 — controlled Redis recovery | `unresolved` | Blocked before any mutation: independent protected backup, exact Redis process-manager ownership, maintenance/session-impact approval and producer stop boundary are not verified. |
 | Tasks 4–28 | `not_started` | They remain ordered behind the Task 3 recoverability gate unless a task is explicitly marked cross-cutting and read-only. |
 | Importer child roadmap | `in_progress_preparation` | Importer Task 2 prepares bounded event admission in code, but production activation remains gated by Tasks 3–5 of this plan. |
