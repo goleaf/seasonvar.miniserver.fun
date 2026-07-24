@@ -1,4 +1,128 @@
-# Текущая задача — бесшовное переключение сезонов, серий и переводов в плеере
+# Текущая задача — безлимитная программа стабилизации, обновления и оптимизации
+
+Дата: 24.07.2026
+Статус: полный master implementation plan подготовлен по фактическому аудиту; application/runtime/data changes этой planning-задачей не выполнялись.
+
+## Цель и главный документ исполнения
+
+- [x] Заново прочитать корневой `AGENTS.md`, `docs/requirements/index.md`, все обязательные canonical requirements и применимые тематические Markdown owners.
+- [x] Проверить существующую реализацию, фактические версии framework/runtime/packages, host services, процессы, scheduler, очереди, Redis, SQLite, storage, permissions, production logs, dependency state и verification gates.
+- [x] Выполнить полный read-only аудит без очистки очередей/кешей, мутации production-like данных, обновления packages, изменения `.env` или перезапуска сервисов.
+- [x] Зафиксировать измеренный baseline, compatibility domains, зависимости этапов, rollback gates и критерии завершения.
+- [x] Подготовить полный 28-задачный TDD/operations implementation plan [`2026-07-24-system-maintenance-and-optimization-master-plan.md`](../superpowers/plans/2026-07-24-system-maintenance-and-optimization-master-plan.md).
+- [x] Сохранить параллельный согласованный player workstream ниже; новый master plan не разрешает смешивать его implementation с operational/package/database этапами.
+- [ ] Выполнять master plan только последовательно по dependency graph, начиная с нового датированного baseline и Redis/process/backup boundaries.
+
+Master plan является единственным подробным execution document этой программы. Он не ограничен искусственным количеством задач или сроком: работа продолжается отдельными проверяемыми change sets, пока выполнены измеримые completion criteria либо конкретный пункт честно отмечен `unresolved` из-за отсутствующего production evidence, внешней авторизации или отдельного разрешения на destructive/data/provider action.
+
+## Почему выбран operations-first порядок
+
+Текущий кодовый baseline качественный: полный gate ранее прошёл `1 453` PHPUnit tests, `123 094` assertions, `42` Playwright checks, Pint, PHPStan, Rector, syntax/audit/build. Главный риск находится не в наличии более новых packages, а в production operations:
+
+- Redis persistence завис в `BGSAVE` примерно на 28 часов при отключённом AOF и более чем 10,5 млн незафиксированных изменений.
+- В Redis накоплены 43 078 pending и 29 045 delayed jobs, но heartbeats трёх специализированных очередей отсутствуют.
+- Одновременно существуют `schedule:work` и per-minute cron `schedule:run`; intended importer/title-refresh/cache-warm workers не запущены.
+- В `failed_jobs` 33 597 записей; 12 851 parsed finalizers являются кандидатами на точечное terminal disposition, но массовая очистка не разрешена.
+- SQLite занимает около 28,15 GiB; крупнейшие пользовательские/демонстрационные таблицы содержат миллионы строк, а synthetic timestamps доходят до 2037 года.
+- Backups занимают около 48 GiB на том же volume; off-host copy и isolated restore rehearsal не подтверждены.
+- Runtime writable/cache trees содержат `root:root` и `777`, а production log подтверждает `touch(): Utime failed`.
+- Node `26` является Current, а не утверждённой LTS build line; PHP-FPM/OPcache требуют измеренного capacity tuning.
+
+Поэтому package patches, performance refactors, CSP enforcement, static-analysis ratchet и решение SQLite/PostgreSQL находятся после recoverability, Redis, process ownership, queue, failed-job, retention, backup и permission gates.
+
+## Фазы программы
+
+| Фаза | Задачи master plan | Результат |
+| --- | --- | --- |
+| 0. Evidence | Task 1 | Новый датированный operational baseline без мутаций. |
+| 1. Recoverability | Tasks 2–3 | Наблюдаемое и восстановленное Redis persistence с approved restart/restore boundary. |
+| 2. Process control | Tasks 4–7 | Один scheduler/process owner, безопасный worker ramp, bounded failed-job disposition и независимый retention. |
+| 3. Data safety | Tasks 8–12 | Fast/full checks, off-host backup, restore rehearsal, разделение demo/load-test, reconciliation и copy-and-swap compaction. |
+| 4. Deployment/runtime | Tasks 13–16 | Immutable releases, корректные permissions, измеренный PHP-FPM/OPcache и LTS Node pin. |
+| 5. Dependency maintenance | Tasks 17–19 | Изолированные Composer/npm patch groups и подготовка PHPUnit 13 без преждевременного major update. |
+| 6. Performance/architecture | Tasks 20–23 | Telemetry budgets, evidence-based hot-path fixes, bounded decomposition и strict-types/Larastan ratchet. |
+| 7. Security/operations | Tasks 24–25 | Поэтапный CSP enforcement и честная optional alert boundary без fake delivery claims. |
+| 8. Strategic closeout | Tasks 26–28 | Измеренное решение по DB engine, архив планов и полная cross-system acceptance. |
+
+## Expected files этой planning-задачи
+
+- `docs/superpowers/plans/2026-07-24-system-maintenance-and-optimization-master-plan.md` — новый полный execution plan.
+- `docs/plans/current-task-plan.md` — управляющий статус и compatibility/compliance evidence.
+- `docs/maintenance/technical-debt.md` — выявленные operational/data/runtime debts с критериями закрытия.
+- `CHANGELOG.md` — отдельная русская planning-only запись без заявления о runtime delivery.
+
+`README.md` проверяется, но не меняется: эта задача не изменила visitor/product/development/deployment behavior. Application code, routes, migrations, config, `.env.example`, Composer/npm manifests и lock files этой planning-задачей не изменяются.
+
+## Protected compatibility contracts
+
+- Public RU/EN routes, route names, `CatalogTitle` slug binding, canonical SEO, streamed sitemap/feed и API v1 shapes.
+- Authentication, verified/private/account restrictions, roles, permission codes, sessions, Sanctum tokens и policies/gates.
+- `CatalogTitle → Season → Episode` identity, importer merge/checkpoint semantics и единственная публичная команда `php artisan seasonvar:import`.
+- Queue names, serialized job compatibility, retry/finalizer checkpoints и cache/session/lock identities.
+- Player grants, entitlement, progress sequence, HLS/MP4 lifecycle, private provider URLs и personal library state.
+- Comments, reactions, reviews, tags, collections, recommendations, premium/region/legal/advertising boundaries.
+- SQLite remains production source of truth until Task 26 produces a separately approved measured decision.
+- Service worker, HA/failover, external alerts, payment/provider integrations remain honestly unavailable until actually implemented and verified.
+
+## Migrations, routes, translations, cache, permissions и backward-compatibility risks
+
+| Область | Planning status / execution rule |
+| --- | --- |
+| Database/migrations | `not_applicable` для этой planning-задачи. Будущие cleanup/compaction/migration actions требуют verified backup, exact selection, reconciliation и rollback. |
+| Routes/API | `not_applicable`: public contracts не меняются. Каждый будущий route change проходит отдельный architecture/validation/security review. |
+| Translations | `not_applicable` сейчас. Будущая user/admin copy обязана сохранять RU/EN semantic parity и стабильные identity values. |
+| Cache/session/queue | `affected_future`: никакая broad clear/retry не разрешена; сначала persistence/process/compatibility evidence. |
+| Permissions | `affected_future`: исправление выполняется allowlisted paths/owner/modes с dry-run и повторной проверкой, не recursive `777`. |
+| Dependencies | `affected_future`: Laravel/Sanctum и frontend patch groups разделены; Node LTS выполняется раньше npm patch groups; major updates deferred. |
+| Backward compatibility | `affected_future`: job payloads, DB identities, route names, event/permission/cache codes и player/access contracts защищены в каждом workstream. |
+| Production operations | `affected_future`: каждый change set имеет preflight, backup/data-safety, activation, rollback, failure recovery и honest verification. |
+| Parallel work | `unresolved`: в shared workspace существуют независимые player/importer documentation streams и pre-existing `composer.lock`; task commit обязан включить только явно принадлежащие этой программе файлы. |
+
+## Cross-feature impact
+
+| Domain | Статус | Решение |
+| --- | --- | --- |
+| Authentication/authorization/privacy | `already_compliant` | Planning-only change не трогает runtime; будущие maintenance actions сохраняют server-side boundaries и не логируют secrets/private URLs. |
+| Catalog/search/SEO/API | `affected_future` | Проверяются после каждого package/runtime/performance/data workstream; public shapes и identities не меняются без отдельного решения. |
+| Importer/queue/scheduler | `affected_future` | Самый ранний operational scope после Redis recovery; единственная публичная import command и checkpoint semantics защищены. |
+| Cache/session/Redis/Memcached | `affected_future` | Persistence и process evidence предшествуют backlog drain и dependency updates; Memcached остаётся disposable hot tier. |
+| Player/premium/region/legal | `affected_future` | Включены в acceptance matrix; master plan не подменяет отдельно согласованный player implementation. |
+| User data/demo data | `affected_future` | Curated/load-test split и reconciliation предшествуют любому удалению; production cleanup требует отдельного прямого разрешения. |
+| Mobile/accessibility/frontend | `affected_future` | Node/package/CSP changes требуют browser matrix; real-device limitations остаются unresolved без evidence. |
+| Administration/audit/notifications | `affected_future` | Permission/audit identities сохраняются; alert boundary не заявляет delivery без real transport. |
+| Deployment/backups/rollback | `affected_future` | Immutable releases и off-host restore evidence являются обязательными gates, а не документационными обещаниями. |
+
+## Requirement-compliance matrix
+
+| Требование | Статус | Evidence / ограничение |
+| --- | --- | --- |
+| Корневой `AGENTS.md` и canonical read order | `completed` | Повторно прочитаны root instructions, requirement index и все обязательные owners в указанном порядке. |
+| Применимые Markdown owners | `completed` | Проверены documentation map, current plan, development/architecture/operations/maintenance/security/performance/cache/UI/frontend/auth/admin contracts и существующие audits. |
+| Фактические версии и существующая implementation | `completed` | Версии получены из runtime/lock/CLI; services/processes/queues/Redis/SQLite/storage/logs/config/contracts проверены до планирования замены. |
+| Business/security/compatibility reason | `completed` | Каждое upgrade/optimization привязано к измеренному риску или maintenance outcome; newest-version-only updates запрещены. |
+| Compatibility map / migration / rollback / production impact | `completed` | Master plan содержит dependency graph, protected domains, exact files/commands, rollback/data-safety/verification/commit gates. |
+| Architectural regression search | `completed` | Baseline review охватывает Volt, `@php`, inline CSS/JS, hardcoded copy, client trust, duplicate services, cache invalidation и documentation drift; финальный scan повторяется Task 28. |
+| Cross-feature impact | `completed` | Все обязательные authentication, authorization, translations, caching, search, notifications, SEO, privacy, mobile, admin, audit, imports, premium, regional/legal, deployment и backup domains присутствуют. |
+| Task-specific expected files/contracts/risks | `completed` | Planning files перечислены выше; implementation files и public contracts перечислены внутри каждого из 28 workstreams. |
+| README актуальность | `already_compliant` | Runtime/product/development/deployment не изменились; фиктивная visitor history entry не добавляется. |
+| CHANGELOG | `completed` | Добавлена отдельная русская planning-only запись, прямо подтверждающая отсутствие operational/runtime/data delivery. |
+| Commit только в `main` | `pending` | Перед commit требуется повторный status/staged-scope review; parallel/unrelated files нельзя поглощать. |
+| Push configured remote | `unresolved` до попытки | Предыдущие попытки HTTPS push блокировались отсутствующей GitHub-аутентификацией; итог фиксирует фактический результат новой попытки. |
+
+## Verification этой planning-задачи
+
+- [x] Проверить отсутствие шаблонных аргументов, broken local links и placeholder implementation в master plan.
+- [x] Выполнить `git diff --check`.
+- [x] Выполнить documentation gate `bash scripts/ci-check.sh docs`.
+- [x] Перечитать `AGENTS.md`, applicable canonical requirements, master/current plans и compliance matrix.
+- [x] Проверить `README.md` и не создавать фиктивное изменение.
+- [x] Добавить русскую planning-only запись в `CHANGELOG.md`.
+- [ ] Закоммитить только task-owned planning docs в существующей `main`.
+- [ ] Выполнить `git push origin main`; внешний отказ записать как `unresolved`.
+
+---
+
+# Параллельный согласованный поток — бесшовное переключение сезонов, серий и переводов в плеере
 
 Дата: 24.07.2026
 Статус: design согласован пользователем; полный TDD implementation plan записан, runtime implementation ещё не начата, предыдущие push заблокированы отсутствующей HTTPS-аутентификацией GitHub.
