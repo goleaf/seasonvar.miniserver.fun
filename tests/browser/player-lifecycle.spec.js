@@ -648,6 +648,8 @@ test('global playback shortcuts work outside the player and respect interaction 
     await page.goto('/titles/browser-smoke?episode=1&format=mp4');
     await waitForPlayer(page);
     await setAutoplayPreference(page, false);
+    const copy = await playerCopy(page);
+    const menuDialog = page.getByRole('dialog', { name: copy.menu.title });
 
     await currentVideo(page).evaluate((video) => {
         const state = {
@@ -735,6 +737,10 @@ test('global playback shortcuts work outside the player and respect interaction 
     const input = page.locator('#site-search');
 
     await input.focus();
+    await input.press('Shift+E');
+    await expect(input).toHaveValue('E');
+    await expect(menuDialog).not.toBeVisible();
+    await input.fill('');
     await page.keyboard.press('k');
     await page.keyboard.press('ArrowLeft');
     expect(await input.inputValue()).toBe('k');
@@ -745,11 +751,16 @@ test('global playback shortcuts work outside the player and respect interaction 
     });
 
     await page.locator('[data-player-shortcuts-open]').click();
-    await expect(page.locator('[data-player-shortcuts-dialog]')).toHaveAttribute('open', '');
-    await page.locator('[data-player-shortcuts-dialog]').evaluate((dialog) => {
+    const shortcutsDialog = page.locator('[data-player-shortcuts-dialog]');
+
+    await expect(shortcutsDialog).toHaveAttribute('open', '');
+    await shortcutsDialog.evaluate((dialog) => {
         dialog.tabIndex = -1;
         dialog.focus();
     });
+    await page.keyboard.press('Shift+E');
+    await expect(shortcutsDialog).toHaveAttribute('open', '');
+    await expect(menuDialog).not.toBeVisible();
     await page.keyboard.press('Space');
     expect(await page.evaluate(() => window.__playerKeyboardState.plays)).toBe(2);
     await page.locator('[data-player-shortcuts-close]').click();

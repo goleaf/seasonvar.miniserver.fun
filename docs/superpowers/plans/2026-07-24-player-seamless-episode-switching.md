@@ -2499,6 +2499,7 @@ evidence, security requirement, совместимое изменение provid
 | Task 15: rollback/delivery evidence | `completed_local` | `completed` | `ab6532a` | `unresolved_auth` | `not_claimed` |
 | Native iOS fullscreen evidence | `not_applicable_to_code` | `unresolved_device` | `not_applicable` | `not_applicable` | `unresolved_device` |
 | Rolling roadmap update | `not_applicable_to_runtime` | `completed` | `a14cdf5` | `unresolved_auth` | `not_applicable` |
+| Task 20: Shift+E interaction boundaries | `completed_local` | `completed` | `pending_commit` | `unresolved_auth` | `not_claimed` |
 
 Статусы независимы. `completed` code не означает published remote, deployed
 production или проверенный native iOS. Отсутствующий внешний evidence никогда
@@ -2883,6 +2884,143 @@ The new task must include exact evidence, files, interfaces, RED/GREEN
 commands, compatibility matrix, rollback and delivery gate. It may add more
 future triggers to a lane, but it must not pre-approve speculative code,
 dependencies, routes, schema, provider access or production action.
+
+---
+
+### Task 20: Не перехватывать Shift+E в полях и открытых диалогах
+
+**Status:** `completed_local`; delivery ещё выполняется.
+
+**Dated evidence (24.07.2026):** ограниченный code-order audit
+`CatalogPlayerSession.handleKeyboard()` подтвердил, что глобальная ветка
+`Shift+E` выполняется до проверок `interactive` и `dialog[open]`. Поэтому при
+активной player session комбинация может отменить ввод заглавной `E` в
+`#site-search` и открыть player menu поверх уже открытого shortcut dialog.
+Это противоречит каноническому контракту: editable/interactive controls и
+открытые dialogs не перехватываются player shortcuts.
+
+**Files:**
+
+- Modify: `tests/browser/player-lifecycle.spec.js`
+- Modify: `resources/js/player.js`
+- Modify: `docs/audits/video-playback-report.md`
+- Modify: `docs/frontend.md`
+- Modify: `docs/plans/current-task-plan.md`
+- Modify: `README.md`
+- Modify: `CHANGELOG.md`
+- Modify: `docs/superpowers/plans/2026-07-24-player-seamless-episode-switching.md`
+
+**Interfaces:**
+
+- Consumes: единственный document `keydown` listener текущего
+  `CatalogPlayerSession`, `preferences.keyboardShortcutsEnabled`,
+  `CatalogPlayerMenu.toggle()`, существующие interactive-selector и
+  `dialog[open]` detection.
+- Produces: `Shift+E` открывает меню при неинтерактивной цели или player-owned
+  interactive control, но не во внешнем поле/кнопке и не при уже открытом
+  dialog; `Space`/`K`, стрелки, Plyr focused keyboard,
+  `Shift+N`/`Shift+P`, `P`, `?`, `Escape` и session cleanup сохраняются.
+
+**Compatibility matrix:**
+
+| Domain | Status | Evidence / boundary |
+| --- | --- | --- |
+| Keyboard/accessibility | `affected` | RED должен доказать обычный ввод `E`, отсутствие второго dialog и сохранение shortcut на player-owned opener |
+| One player lifecycle | `already_compliant` | Listener, session, video, Plyr, HLS и AbortController не дублируются |
+| Menu/fullscreen | `already_compliant` | DOM menu и fullscreen placement не меняются; исправляется только admission |
+| Translations | `not_applicable` | Нового user-facing copy или key нет |
+| Auth/source/privacy/progress | `not_applicable` | Server actions, grant, source URL, token и progress context не меняются |
+| Routes/API/schema/cache/queues | `not_applicable` | Public/persisted contracts и infrastructure не меняются |
+| Importer/admin/search | `already_compliant` | Header search сохраняет собственный keyboard input; соседние domains не меняются |
+| Dependencies/runtime | `not_applicable` | Package manifests, lock files и runtime requirements не меняются |
+| Production assets | `affected` | Delivery требует matching Vite manifest/assets; activation authority отдельно не выдана |
+| Native iOS fullscreen | `unresolved_device` | Этот keyboard fix не доказывает OS-owned fullscreen behavior |
+
+- [x] **Step 1: Добавить Playwright RED**
+
+В существующий сценарий
+`global playback shortcuts work outside the player and respect interaction boundaries`
+после получения `#site-search` добавить:
+
+```javascript
+await input.fill('');
+await input.press('Shift+E');
+await expect(input).toHaveValue('E');
+await expect(page.getByRole('dialog', { name: copy.menu.title })).not.toBeVisible();
+```
+
+В блоке открытого shortcut dialog отправить `Shift+E` и подтвердить, что
+shortcut dialog остаётся открытым, а player menu закрыт.
+
+- [x] **Step 2: Наблюдать правильный RED**
+
+Run:
+
+```bash
+npx playwright test tests/browser/player-lifecycle.spec.js \
+  --project="Desktop Chromium" \
+  --grep="global playback shortcuts work outside the player"
+```
+
+Expected before GREEN: assertion ввода получает пустую строку вместо `E` либо
+player menu становится видимым. Infrastructure/fixture error не считается RED.
+
+Observed: focused Desktop Chromium получил `Expected "E", Received ""` на
+`#site-search`; player/menu fixtures были успешно инициализированы.
+
+- [x] **Step 3: Реализовать минимальный GREEN**
+
+В `CatalogPlayerSession.handleKeyboard()` сохранить глобальный `Shift+E`, но
+не вызывать `preventDefault()`/`menu.toggle()`, когда interactive target
+находится вне текущего player, есть system modifier или существует
+`dialog[open]`. Player-owned opener и controls сохраняют прежний shortcut.
+Не добавлять второй listener, device detection, timeout или новый shortcut
+state.
+
+- [x] **Step 4: Проверить focused GREEN и соседние contracts**
+
+Run:
+
+```bash
+npm run build
+npx playwright test tests/browser/player-lifecycle.spec.js \
+  --project="Desktop Chromium" \
+  --grep="global playback shortcuts work outside the player"
+php artisan test --filter='FrontendAssetContractTest|LivewireWireIgnoreContractTest'
+```
+
+Expected: focused browser regression, static player contracts и Vite build
+проходят без нового browser/first-party error.
+
+Playwright fixture обслуживается Laravel через текущий Vite manifest, поэтому
+browser GREEN всегда запускается после сборки свежего player chunk.
+
+Observed: Vite собрал `24` модуля; focused Desktop Chromium прошёл `2/2`,
+focused player PHP — `114` тестов и `1492` утверждения, а полный
+`player-lifecycle.spec.js` — `15` сценариев при `12` ожидаемых skips.
+
+- [x] **Step 5: Обновить evidence и выполнить широкую player-проверку**
+
+Обновить тематические документы, README visitor history, русский CHANGELOG и
+task compliance. Затем выполнить полный focused player PHP aggregate и
+`tests/browser/player-lifecycle.spec.js`.
+
+Observed: focused player PHP прошёл `114/114` тестов и `1492` утверждения;
+полный browser matrix — `15 passed` при `12 expected skipped`; managed-docs,
+docs CI, README policy и whitespace gates прошли. Полная общая working-copy
+проверка CHANGELOG отдельно видит concurrent importer text; task-owned staged
+snapshot проверяется перед commit.
+
+- [ ] **Step 6: Изолировать delivery**
+
+Stage только exact Task 20 manifest, повторно проверить staged
+README/CHANGELOG policies и diff. Commit только в существующую `main`;
+обычный push выполняется без force. Отсутствующая HTTPS-аутентификация остаётся
+`unresolved_auth`, а production activation — `not_claimed`.
+
+**Rollback:** вернуть одно admission condition, browser regression и
+Task 20 documentation вместе с matching previous Vite assets. Schema, data,
+cache, queues, provider state и `.env` не затрагиваются.
 
 ---
 

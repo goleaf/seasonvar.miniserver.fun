@@ -1274,7 +1274,9 @@ class CatalogPlayerSession {
         const hasOpenDialog = document.querySelector('dialog[open]') !== null;
 
         if (
-            !hasSystemModifier
+            (!interactive || withinPlayer)
+            && !hasSystemModifier
+            && !hasOpenDialog
             && event.shiftKey
             && event.key.toLowerCase() === 'e'
             && this.menu

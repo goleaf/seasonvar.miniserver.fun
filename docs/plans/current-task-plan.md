@@ -3,6 +3,96 @@
 Дата: 24.07.2026
 Статус: master implementation plan актуализирован после выполнения Tasks 1–2: Task 3 остаётся безопасно остановлен перед production mutation gate, а измеренные delivery/concurrency/cross-plan discoveries добавлены как Tasks 29–31 и безлимитный rolling extension protocol. Application/runtime/data этой planning-актуализацией не меняются.
 
+## Параллельное активное исполнение — Player Task 20: границы Shift+E
+
+Статус: `completed_local_pending_delivery`; пользователь прямо разрешил начать
+программирование без
+дополнительных вопросов. Worktree/subagents не используются из-за обязательной
+`main` и developer prohibition; активный importer/collection scope не
+stage/reset/stash/delete.
+
+### Evidence и решение
+
+- `Tasks 1–15` player master уже реализованы; `Tasks 16–19` заблокированы
+  внешними Git credentials, real iOS device и production authority.
+- 24.07.2026 code-order audit нашёл следующий evidence-driven `Task 20`:
+  `handleKeyboard()` обрабатывает глобальный `Shift+E` до проверок
+  `interactive` и `dialog[open]`.
+- В результате при активном player заглавная `E` может не попасть в
+  `#site-search`, а player menu может открыться поверх существующего dialog.
+- Минимальное решение сохраняет global menu shortcut на обычной странице и
+  player-owned opener, но применяет existing external-interactive/dialog
+  exclusions до `preventDefault()` и `menu.toggle()`.
+
+### Expected files
+
+- Modify: `tests/browser/player-lifecycle.spec.js`
+- Modify: `resources/js/player.js`
+- Modify: `docs/audits/video-playback-report.md`
+- Modify: `docs/frontend.md`
+- Modify: `docs/superpowers/plans/2026-07-24-player-seamless-episode-switching.md`
+- Modify: `docs/plans/current-task-plan.md`
+- Modify: `README.md`
+- Modify: `CHANGELOG.md`
+
+### Protected contracts и cross-feature impact
+
+| Domain | Status | Evidence / boundary |
+| --- | --- | --- |
+| Global keyboard | `affected` | `Shift+E` сохраняется на свободной странице и player-owned controls, но не во внешних interactive/open-dialog boundaries |
+| Header search/dialogs | `affected` | Обычный ввод заглавной `E` и existing dialog ownership должны сохраняться |
+| Plyr/menu/player lifecycle | `already_compliant` | Один listener/session/video/Plyr/HLS/menu и AbortController cleanup не меняются |
+| Seasons/episodes/translations/auto-next | `already_compliant` | Transition factory/actions/order/source swap не меняются |
+| Auth/authorization/privacy/source | `not_applicable` | Entitlement, signed grant, raw provider URL prohibition и viewer binding не меняются |
+| Progress/history/preferences | `already_compliant` | Keyboard preference остаётся admission boundary; progress/session/token не меняются |
+| RU/EN translations | `not_applicable` | Нового интерфейсного текста и key нет |
+| Routes/API/SEO | `not_applicable` | Public URLs, route names, payloads и canonical не меняются |
+| Migrations/schema/data | `not_applicable` | Database и persisted identities не меняются |
+| Cache/queues/service worker | `not_applicable` | Keys, invalidation, jobs и offline boundary не меняются |
+| Dependencies/runtime | `not_applicable` | Composer/npm manifests и lock files не меняются |
+| Mobile/fullscreen | `already_compliant` | Standard fullscreen DOM contract не меняется; native iOS evidence остаётся `unresolved_device` |
+| Production/rollback | `completed_for_plan` | Code + matching Vite assets; rollback без schema/data/cache/queue mutation |
+| Shared worktree | `unresolved` | Foreign importer/collection/system files остаются dirty и исключаются из Task 20 manifest |
+
+### Requirement-compliance matrix
+
+| Requirement | Status | Evidence |
+| --- | --- | --- |
+| Root/canonical read order | `completed` | Root, requirement registry и 15 canonical owners перечитаны 24.07.2026 |
+| Feature docs/current implementation | `completed` | Player audit/frontend/UI/data/views, keyboard/seamless plans, runtime и tests проверены |
+| Installed versions | `completed` | Boost: PHP `8.5`, Laravel `13.21.1`, Livewire `4.3.3`, Tailwind `4.3.2`; npm: Plyr `3.8.4`, HLS.js `1.6.16`, Vite `8.1.4`, Playwright `1.61.1` |
+| Official library evidence | `completed` | Playwright `1.61` docs подтверждают `Locator.press()` для special key combination и web-first locator assertions |
+| Plan before code | `completed` | Task 20 exact files, contracts, matrix, RED/GREEN, rollback и delivery записаны здесь и в player master |
+| TDD | `completed` | RED получил `Expected "E", Received ""`; после минимального admission condition focused Desktop Chromium прошёл `1/1` |
+| README/CHANGELOG/docs | `completed` | README получил один visitor-visible пункт; player audit/frontend и русский CHANGELOG обновлены фактическим результатом |
+| Verification | `completed` | Vite `24` modules; focused Playwright `2/2`; focused player PHP `114` тестов / `1492` утверждения; полный browser matrix `15` passed / `12` expected skipped; managed docs/docs CI/README/whitespace прошли |
+| Commit/push | `unresolved` | Только exact Task 20 manifest из `main`; remote auth failure не маскируется |
+
+### TDD checklist
+
+- [x] Добавить regression в существующий global-keyboard Playwright scenario.
+- [x] Наблюдать RED именно из-за перехваченного `Shift+E`.
+- [x] Добавить минимальную interactive/open-dialog admission проверку.
+- [x] Получить focused GREEN и проверить соседние player static contracts.
+- [x] Выполнить полный player browser matrix, Vite и documentation gates.
+- [ ] Обновить evidence/compliance, изолированно commit-ить и выполнить push.
+
+Playwright web server использует Laravel и текущий Vite manifest; после
+изменения `resources/js/player.js` browser GREEN требует `npm run build` до
+запуска focused scenario. Повторный RED до сборки подтвердил stale hashed
+chunk, а не новый production-code defect.
+
+Широкий player matrix дополнительно подтвердил compatibility requirement:
+после `Escape` focus возвращается на player menu opener, и `Shift+E` обязан
+снова открыть меню. Первое слишком широкое `!interactive` условие нарушило
+этот existing scenario (`14 passed`, `12 skipped`, `1 failed`); final
+admission исключает только interactive target вне активного player.
+
+Полная working-copy проверка CHANGELOG отдельно останавливается на concurrent
+importer-строке с обычным английским `network-free`; Task 20 не переписывает
+чужой пункт. Перед commit обязателен exact staged CHANGELOG policy.
+
+
 ## Завершённое исполнение — Batch 1: baseline и Redis persistence observability
 
 Статус: Task 1 и Task 2 завершены и закоммичены в `main` как `2227c08`; отправка в configured remote остаётся `unresolved` из-за отсутствующей HTTPS-аутентификации GitHub. Task 3 не получает implicit authority на остановку producers, Redis restart, signal/kill, backup overwrite или любое изменение production state.
