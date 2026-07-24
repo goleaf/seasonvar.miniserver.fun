@@ -42,6 +42,8 @@
 
 Task 1 and Task 2 were delivered as one isolated Batch 1 commit because they shared operations owners while unrelated importer/player changes already occupied the worktree. This is a recorded commit-granularity deviation, not a reason to rewrite `main`. Every later implementation task returns to one independently reviewable commit.
 
+The Tasks 32–33 roadmap extension is committed locally in `cb432c7`. A normal push to configured `origin` failed with unavailable HTTPS credentials, so remote delivery remains `unresolved` under Task 29; no force push, alternate branch, credential storage or history rewrite was used.
+
 ## Baseline Evidence — 24.07.2026
 
 | Boundary | Verified state |

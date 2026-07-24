@@ -155,7 +155,7 @@
 ## Повторная актуализация безлимитного system plan — reviewed index и active-plan policy
 
 Дата: 24.07.2026
-Статус: `planning_completed_pending_delivery`; application/runtime/data не меняются. Обновляется тот же system master plan, а не создаётся параллельный roadmap.
+Статус: `planning_completed_local_delivery_unresolved`; application/runtime/data не меняются. Обновляется тот же system master plan, а не создаётся параллельный roadmap.
 
 ### Проверенный discovery
 
@@ -210,7 +210,7 @@
 | Cross-feature/production safety | `completed` | Planning-only matrix выше; никакая data/service/provider/environment mutation не выполняется. |
 | README review | `already_compliant` | Фактический product/development/operations workflow не изменён. |
 | CHANGELOG | `unresolved_preexisting` | Task-owned русский planning-only пункт проходит изолированную policy-проверку; full staged policy останавливается на уже закоммиченной player-строке со словом `dialog`, которую эта задача не переписывает. |
-| Commit/push | `pending` | Только task-owned Markdown hunks в существующей `main`; index освобождён player commits `1ded102`/`ab6532a`, unstaged importer files исключаются. |
+| Commit/push | `unresolved_remote` | Task-owned roadmap зафиксирован в существующей `main` как `cb432c7`; обычный `git push --porcelain origin main` вернул `could not read Username for 'https://github.com': No such device or address`, importer files исключены. |
 
 ### Verification checklist
 
@@ -220,7 +220,7 @@
 - [x] Добавить отдельный русский `CHANGELOG.md` пункт и проверить его изолированно; общий staged gate честно оставить `unresolved_preexisting` на существующей player-строке.
 - [x] Выполнить `project:docs-refresh --check`, docs CI и task-scoped `git diff --check`.
 - [x] Перечитать применимые requirements и task-specific compliance matrix.
-- [ ] Изолированно commit-ить planning hunks в `main` и выполнить обычный push; внешний отказ сохранить `unresolved`.
+- [x] Изолированно commit-ить planning hunks в `main` как `cb432c7`; обычный push выполнен и оставлен `unresolved_remote` после отказа HTTPS-аутентификации.
 
 - [x] Обычная попытка push выполнена без ослабления push guard; remote отклонил HTTPS-аутентификацию, поэтому доставка остаётся `unresolved`.
 
