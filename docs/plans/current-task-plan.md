@@ -1,7 +1,7 @@
 # Текущая задача — безлимитная программа стабилизации, обновления и оптимизации
 
 Дата: 24.07.2026
-Статус: полный master implementation plan подготовлен по фактическому аудиту и закоммичен в существующей `main` как `535f4b8`; application/runtime/data changes этой planning-задачей не выполнялись, push ещё требует фактической попытки.
+Статус: полный master implementation plan подготовлен по фактическому аудиту и закоммичен в существующей `main` как `535f4b8`; application/runtime/data changes этой planning-задачей не выполнялись, а push остаётся `unresolved` из-за отсутствующей HTTPS-аутентификации GitHub.
 
 ## Цель и главный документ исполнения
 
@@ -107,7 +107,7 @@ Master plan является единственным подробным executi
 | README актуальность | `already_compliant` | Runtime/product/development/deployment не изменились; фиктивная visitor history entry не добавляется. |
 | CHANGELOG | `completed` | Добавлена отдельная русская planning-only запись, прямо подтверждающая отсутствие operational/runtime/data delivery. |
 | Commit только в `main` | `completed` | Commit `535f4b8` содержит только master plan, current plan, technical-debt update и planning-only changelog; pre-existing `composer.lock` исключён. |
-| Push configured remote | `unresolved` до попытки | Предыдущие попытки HTTPS push блокировались отсутствующей GitHub-аутентификацией; итог фиксирует фактический результат новой попытки. |
+| Push configured remote | `unresolved` | `git push origin main` фактически вернул `could not read Username for 'https://github.com': No such device or address`; remote delivery не заявляется. |
 
 ## Verification этой planning-задачи
 
@@ -118,7 +118,7 @@ Master plan является единственным подробным executi
 - [x] Проверить `README.md` и не создавать фиктивное изменение.
 - [x] Добавить русскую planning-only запись в `CHANGELOG.md`.
 - [x] Закоммитить только task-owned planning docs в существующей `main`.
-- [ ] Выполнить `git push origin main`; внешний отказ записать как `unresolved`.
+- [x] Выполнить `git push origin main`; внешний отказ записать как `unresolved`.
 
 ## Planning delivery evidence
 
@@ -126,6 +126,7 @@ Master plan является единственным подробным executi
 - Первоначальный обычный commit был корректно остановлен pre-commit guard из-за pre-existing unstaged `composer.lock`.
 - Staged scope, `git diff --cached --check`, local links и documentation gate проверены вручную; предусмотренный проектом `SEASONVAR_SKIP_GIT_GUARD=1` применён только к commit, не к push.
 - Пользовательский `composer.lock` не staged, не изменён и не включён в commit этой программы.
+- Обычный `git push origin main` дошёл до configured HTTPS remote и завершился `could not read Username for 'https://github.com': No such device or address`; статус отправки честно остаётся `unresolved`.
 
 ---
 
