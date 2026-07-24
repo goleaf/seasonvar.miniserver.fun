@@ -649,6 +649,8 @@ git push origin main
 
 ### Task 7: Make Import Storage Retention Independent
 
+**Status:** `superseded_by_importer_master_task_3`. Исполнимый контракт перенесён в [`2026-07-24-seasonvar-importer-improvement-master-plan.md`](2026-07-24-seasonvar-importer-improvement-master-plan.md), где реализован internal empty-payload queued job с общим row/chunk/time budget и выключенным по умолчанию schedule. Описанные ниже отдельная `app:seasonvar-storage-prune` command, другой DTO namespace и `04:31` schedule являются историческим proposal и не должны реализовываться параллельно.
+
 **Files:**
 - Create: `app/DTOs/SeasonvarImportStoragePreview.php`
 - Modify: `app/Services/Seasonvar/SeasonvarImportStorageMaintenance.php`
@@ -2297,7 +2299,7 @@ Stage only files that actually changed. Verify the final remote ref again. If no
 
 ### Task 30: Serialize Shared-`main` Delivery Ownership
 
-**Status:** `planned`; blocked until current importer/player owners finish or commit their exact work, because this task may not overwrite their shared hook/docs/test files.
+**Status:** `preparation_completed_pending_delivery`; Steps 1–3 prepared and verified the new isolated script and its dedicated test without touching live hooks. Steps 4–7 remain blocked until current importer/player owners finish or commit their exact work, because hook integration and shared documentation must not overwrite or interrupt their delivery.
 
 **Reason:** Multiple independent tasks currently edit one checkout while project policy forbids branches and worktrees. The existing clean-tree guard prevents accidental partial commits but has no cooperative task-owner lease, leading to repeated guard bypass pressure and overlapping owner documents.
 
@@ -2319,7 +2321,7 @@ Stage only files that actually changed. Verify the final remote ref again. If no
 - Hooks validate an ephemeral `SEASONVAR_TASK_LEASE_TOKEN` against the digest and fail closed for a different active owner.
 - The lease never stages files, stashes work, switches branches, creates worktrees, kills processes, deletes changes or weakens existing main/conflict/path/clean-tree/documentation gates.
 
-- [ ] **Step 1: Write failing script tests**
+- [x] **Step 1: Write failing script tests**
 
 Cover:
 
@@ -2337,7 +2339,7 @@ no lease command changes tracked or staged files.
 
 Use a temporary initialized Git repository and `Symfony\Component\Process\Process`; do not test against the active `.git` lease.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```bash
 php artisan test --filter=GitWorkspaceLeaseScriptTest
@@ -2345,11 +2347,15 @@ php artisan test --filter=GitWorkspaceLeaseScriptTest
 
 Expected: FAIL because the lease script does not exist.
 
-- [ ] **Step 3: Implement the minimal cooperative lease**
+- [x] **Step 3: Implement the minimal cooperative lease**
 
 Use atomic directory creation below the repository Git directory. `acquire` prints the raw token once to stdout for the caller to place only in its process environment; disk receives only a SHA-256 digest. `status` never prints the token/digest. `release` requires the matching token. Stale recovery refuses while the recorded PID exists and never removes any path outside the exact validated lease directory.
 
 No generic recursive deletion command is allowed. Every removal target must be the resolved lease metadata/file/directory created by this script and must pass exact-name/repository checks first.
+
+Preparation may complete this step and its dedicated test in an isolated commit while the shared tree is busy. That preparation must not modify `.githooks/*`, `CiQualityGateContractTest`, contributor documentation or the active hook behavior; those remain Step 4+ work after the shared-tree gate clears.
+
+Preparation evidence: initial RED failed because `scripts/task-workspace-lease.sh` did not exist; GREEN passed 12 tests and 56 assertions. The dedicated suite also proves unexpected directory contents block release while preserving metadata.
 
 - [ ] **Step 4: Integrate hooks without weakening current guards**
 

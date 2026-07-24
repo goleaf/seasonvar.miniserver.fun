@@ -451,6 +451,62 @@ Rollback будущей реализации: вернуть countdown/обыч�
 - [x] Выполнить Vite build и релевантные repository gates.
 - [x] Обновить playback/frontend owners, README, русский CHANGELOG и финальную compliance evidence.
 - [x] Выполнить legacy/duplicate/stale scan.
+## Текущая реализация — Task 30, изолированная подготовка workspace lease
+
+Статус: `preparation_completed_pending_delivery`. Из-за активных importer/player owners в общем checkout текущий change set выполнил только master Task 30 Steps 1–3: новый самостоятельный lease-скрипт и его dedicated PHPUnit test. Live hooks, общий `CiQualityGateContractTest` и contributor workflow остаются неизменными до отдельного Step 4 после освобождения shared tree.
+
+### Expected files
+
+- Создать `scripts/task-workspace-lease.sh`.
+- Создать `tests/Unit/GitWorkspaceLeaseScriptTest.php`.
+- Актуализировать этот current plan и Task 30 master plan.
+- Добавить отдельную русскую запись в `CHANGELOG.md` перед commit только для фактически подготовленного developer tooling; concurrent записи не перезаписывать.
+- `README.md` проверить перед завершением, но не менять, пока новый lease не подключён к поддерживаемому contributor workflow.
+
+### Protected contracts и риски
+
+- `.githooks/lib/git-guard.sh`, `.githooks/pre-commit`, `.githooks/pre-push`, `tests/Unit/CiQualityGateContractTest.php` и существующий clean-tree/documentation gate не меняются в этой подготовке.
+- Lease хранится только ниже exact path из `git rev-parse --git-path`, создаётся атомарно и не меняет index, tracked/untracked source files, branch, worktree, stash или процессы.
+- На диск попадает только task ID, owner PID, UTC timestamp и SHA-256 digest; raw token выводится только при успешном `acquire`, не выводится `status` и обязателен для `release`.
+- Explicit stale recovery разрешена только для exact validated lease текущего repository и отказывается удалять lease живого PID; generic recursive deletion запрещена.
+- Task ID и owner PID валидируются до записи. Paths with spaces, competing acquisition и неверный release token покрываются тестами в отдельном temporary Git repository.
+- Migrations, routes, translations, cache keys, permissions, application runtime, database, Redis, queues, sessions, dependencies и production services не меняются; rollback удаляет только новый неинтегрированный script/test и task-specific documentation.
+
+### Requirement-compliance matrix
+
+| Требование / domain | Статус | Evidence / ограничение |
+| --- | --- | --- |
+| Root/canonical read order | `completed` | Перед edit перечитаны `AGENTS.md`, requirement index и применимые code/architecture/development/multilingual/security/maintenance/system-integration owners. |
+| Versions/existing implementation | `completed` | Boost подтвердил PHP `8.5`, Laravel `13.21.1`, Livewire `4.3.3`, PHPUnit `12.5.31`; существующие hooks, guard library и contract tests проверены. |
+| Written plan before code | `completed` | Scope, files, совместимость, риски и rollback зафиксированы здесь и в Task 30 master plan до test/code edit. |
+| TDD | `completed` | Наблюдаемый RED: 6 failures из-за отсутствующего script. Первый GREEN: 11 тестов/50 утверждений; cleanup review добавил отдельный RED на потерю metadata, финальный GREEN: 12/56. |
+| Git/shared workspace | `completed_for_preparation` | Только новые isolated paths и task-specific plan hunks; live hooks и concurrent importer/player files не меняются и не stage-ятся. |
+| Security/privacy/secrets | `completed` | Tests проверяют metadata allowlist, SHA-256 digest вместо raw token, single raw-token output, safe status, wrong-token refusal, exact cleanup и сохранение metadata при unexpected content. |
+| Production/data/cache/queue safety | `not_applicable` | Подготовка не подключена к runtime/hooks и не выполняет production mutation. |
+| Auth, translations, search, SEO, player, importer, premium, mobile, admin, legal | `not_applicable` | Application/public behavior не меняется. |
+| README | `already_compliant` | Проверен scope: contributor workflow ещё не активирован, поэтому фиктивное обновление не создаётся. |
+| CHANGELOG/docs | `completed_for_preparation` | Добавлен фактический русский пункт; README проверен без фиктивного изменения, documentation refresh/check и docs CI прошли. Полная working-copy проверка CHANGELOG отдельно видит незавершённый concurrent importer text; task-owned staged policy проверяется перед commit. |
+| Commit/push | `pending` | Только task-owned paths в существующей `main`; обычный push будет выполнен, внешний auth failure останется честным `unresolved`. |
+
+### Execution checklist
+
+- [x] Проверить требования, versions, plan, hooks, guard library и соседние PHPUnit patterns.
+- [x] Ограничить scope безопасными Steps 1–3 и обновить plan до кода.
+- [x] Создать dedicated failing tests и наблюдать RED.
+- [x] Реализовать минимальный безопасный script и получить GREEN.
+- [x] Выполнить syntax/focused/docs/diff verification и повторно проверить требования/README.
+- [ ] Обновить compliance/evidence, изолированно commit-ить в `main` и попытаться отправить configured remote.
+- [ ] После освобождения shared tree отдельно выполнить Task 30 Steps 4–7: hook integration, contract test, contributor docs и полный gate.
+
+### Verification evidence подготовки
+
+- RED: первый запуск дал 6 failures с `No such file or directory` для отсутствующего `scripts/task-workspace-lease.sh`; invalid-input cases уже отказывались создавать lease.
+- Первый GREEN: 11 тестов/50 утверждений. Cleanup review добавил воспроизводимый RED, в котором unexpected file приводил к потере metadata; после exact preflight финальный suite прошёл 12 тестов/56 утверждений.
+- `bash -n scripts/task-workspace-lease.sh`, targeted Pint и `GitWorkspaceLeaseScriptTest` прошли.
+- Неизменённый `CiQualityGateContractTest` прошёл 17 тестов/95 утверждений.
+- `check-readme-policy.sh README.md`, `project:docs-refresh --check`, `bash scripts/ci-check.sh docs` и `git diff --check` завершились успешно.
+- Full application test/build не запускаются для isolated non-runtime preparation: application PHP/JS/CSS/assets/dependencies не затронуты, а общий checkout содержит активные player/importer изменения с собственными gates.
+
 - [x] Выполнить task-owned commit только из существующей `main`.
 - [ ] Отправить `main` в configured remote — `unresolved`: `git push origin main` вернул `could not read Username for 'https://github.com'`, а `gh` в окружении не установлен.
 
