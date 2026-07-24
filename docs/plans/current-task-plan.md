@@ -1,7 +1,7 @@
 # Текущая задача — бесшовное переключение сезонов, серий и переводов в плеере
 
 Дата: 24.07.2026
-Статус: design согласован и сохранён в `ea8f7ad`; runtime implementation ещё не начата, push заблокирован отсутствующей HTTPS-аутентификацией GitHub, ожидается отдельный review спецификации пользователем.
+Статус: design согласован пользователем; полный TDD implementation plan записан, runtime implementation ещё не начата, предыдущие push заблокированы отсутствующей HTTPS-аутентификацией GitHub.
 
 ## Цель и согласованное решение
 
@@ -14,21 +14,21 @@
 - [x] Зафиксировать platform limitation native iOS fullscreen без fake fullscreen.
 - [x] Сначала обновить canonical owner новым постоянным целевым правилом, не выдавая его за уже работающий runtime.
 - [x] Записать и закоммитить в `main` design spec [`2026-07-24-player-seamless-episode-switching-design.md`](../superpowers/specs/2026-07-24-player-seamless-episode-switching-design.md) как `ea8f7ad`.
-- [ ] Получить отдельное подтверждение пользователя после просмотра записанной спецификации.
-- [ ] После подтверждения записать подробный TDD implementation plan и перечитать его до application edits.
+- [x] Получить отдельное подтверждение пользователя после просмотра записанной спецификации.
+- [x] После подтверждения записать и перечитать полный TDD implementation plan [`2026-07-24-player-seamless-episode-switching.md`](../superpowers/plans/2026-07-24-player-seamless-episode-switching.md) до application edits.
 - [ ] Выполнить RED → GREEN implementation, focused/full verification, runtime docs, README/CHANGELOG, commit и push только в существующей `main`.
 
-Выбранная архитектура: один последовательный Livewire `#[Json]` contract подготавливает bounded menu page или один авторизованный transition; JavaScript применяет transition к тому же `<video>`, Plyr/fullscreen root и `CatalogPlayerSession`. Server остаётся владельцем hierarchy, playability, entitlement, source grant и progress token. Browser владеет только realtime menu/source lifecycle и игнорирует stale responses по монотонной generation.
+Выбранная архитектура: три последовательных Livewire `#[Renderless]` actions возвращают bounded страницу серий, подготавливают один авторизованный transition без преждевременного изменения текущего состояния и фиксируют только фактически принятый браузером transition. JavaScript применяет transition к тому же `<video>`, Plyr/fullscreen root и `CatalogPlayerSession`. Server остаётся владельцем hierarchy, playability, entitlement, source grant и progress token. Browser владеет только realtime menu/source lifecycle и игнорирует stale responses по монотонной generation. Установленный Livewire `4.3.3` автоматически делает `#[Json]` actions параллельными, поэтому этот атрибут после version-specific discovery исключён из transition boundary.
 
 Текущий runtime до implementation commit остаётся прежним: выбор через Livewire заменяет keyed media shell, а `ended` запускает countdown `3..30` секунд. Canonical docs явно отделяют это фактическое состояние от согласованного target.
 
-Rollback будущей реализации: вернуть countdown/обычную Livewire-навигацию, удалить JSON transition/menu additions и опубликовать согласованный прежний Vite manifest с hashed assets. Migration, data repair, cache flush, queue clear, storage cleanup и dependency reinstall не требуются.
+Rollback будущей реализации: вернуть countdown/обычную Livewire-навигацию, удалить renderless transition/menu additions и опубликовать согласованный прежний Vite manifest с hashed assets. Migration, data repair, cache flush, queue clear, storage cleanup и dependency reinstall не требуются.
 
 ## Проверенный baseline и версии
 
 - PHP `8.5.8`; Laravel `13.21.1`; Livewire `4.3.3`; Laravel Boost `2.4.13`; Pint `1.29.3`; PHPUnit `12.5.31`.
 - Node `26.4.0`; npm `12.0.1`; Plyr `3.8.4`; HLS.js `1.6.16`; Vite `8.1.4`; Tailwind CSS `4.3.2`; Playwright `1.61.1`.
-- Официальная документация установленного Livewire подтверждает: `#[Json]` возвращает action value JavaScript promise, отклоняет validation error и пропускает render. `#[Async]` для transition запрещён из-за порядка и stale state.
+- Официальная документация установленного Livewire подтверждает: любой action возвращает value через JavaScript promise; `#[Renderless]` пропускает render без включения async, а `#[Json]` одновременно пропускает render и автоматически запускается параллельно. Поэтому menu/transition используют `#[Renderless]`, а `#[Json]`/`#[Async]` запрещены из-за порядка и stale state.
 - `CatalogTitlePlayer` уже валидирует episode/media hierarchy, сохраняет URL-state и выдаёт один source/progress context.
 - `CatalogTitlePlaybackQuery` уже определяет cross-season previous/next и раздельные regular/special lanes.
 - `player.js` уже является единственным владельцем Plyr/HLS, source failure, progress, preferences, keyboard, fullscreen/PiP и Media Session.
@@ -37,17 +37,20 @@ Rollback будущей реализации: вернуть countdown/обыч�
 
 ## Expected implementation files
 
-- `app/Livewire/CatalogTitlePlayer.php` — bounded `#[Json]` menu/transition actions, server validation, progress context и discussion dispatch.
+- `app/Livewire/CatalogTitlePlayer.php` — bounded последовательные `#[Renderless]` menu/transition actions, server validation, progress context и discussion dispatch.
 - `app/Services/Catalog/CatalogTitlePlaybackQuery.php` — bounded page текущего сезона и reuse канонического cross-season order.
-- `app/DTOs/PlaybackTransitionData.php` или эквивалентный typed DTO — allowlisted transition payload в существующем `app/DTOs`.
+- `app/DTOs/PlayerEpisodePageData.php`, `app/DTOs/PlaybackTransitionData.php` — точные allowlisted browser payloads в существующем `app/DTOs`.
+- `app/Services/Catalog/CatalogPlayerTransitionFactory.php` — read-only orchestration bounded menu page, source resolver, navigation и progress context.
 - `app/View/ViewData/CatalogPlayerCopy.php` — RU/EN allowlisted menu/runtime copy.
 - `app/View/ViewModels/CatalogShowViewModel.php` — reuse существующей grouping/profile presentation без queries в Blade.
 - `resources/views/livewire/catalog-title-player.blade.php` — bootstrap markers, SSR fallback и удаление delivered countdown controls.
-- `resources/js/player.js` — JavaScript-owned accessible menu, in-place hot-swap, prefetch, generation и auto-next.
-- `resources/js/player-navigation.js` — JSON bridge, URL/client Livewire state, Back/Forward и discussion target.
+- `resources/js/player-menu.js` — единственный JavaScript-owned accessible menu DOM/focus/pagination owner.
+- `resources/js/player.js` — in-place hot-swap, prefetch, generation, progress rotation и auto-next внутри текущей session.
+- `resources/js/player-navigation.js` — renderless action bridge, URL/client Livewire state, Back/Forward и discussion target.
 - `resources/css/app.css` — responsive fullscreen/menu presentation и safe-area.
 - `lang/ru/catalog.php`, `lang/en/catalog.php` — exact semantic parity, `Shift+E`, new states, removal of stale countdown copy.
 - `tests/Feature/CatalogPageTest.php`, `tests/Feature/CatalogTitlePlaybackQueryTest.php`, `tests/Unit/CatalogPlayerCopyTest.php` — server contracts.
+- `tests/Feature/CatalogPlayerTransitionFactoryTest.php`, `tests/Unit/PlayerEpisodePageDataTest.php`, `tests/Unit/PlaybackTransitionDataTest.php`, `tests/Unit/LivewireWireIgnoreContractTest.php` — typed/security/DOM-boundary contracts.
 - `tests/browser/player-lifecycle.spec.js` и при необходимости fixture/support — DOM identity, fullscreen, menu, auto-next и failures.
 - `docs/audits/video-playback-report.md`, `docs/architecture.md`, `docs/frontend.md`, `docs/UI_STANDARDS.md` при фактическом UI delivery.
 - `docs/superpowers/plans/2026-07-24-player-seamless-episode-switching.md` — подробный TDD implementation plan после review.
@@ -93,7 +96,7 @@ Rollback будущей реализации: вернуть countdown/обыч�
 | --- | --- | --- |
 | Player/source lifecycle | `affected` | In-place transition добавляется только в существующую `CatalogPlayerSession`; второй player/controller отсутствует. |
 | Catalog ordering | `affected` | Next и season page используют текущий `CatalogTitlePlaybackQuery`, не client ID order. |
-| Livewire state/history | `affected` | `#[Json]` пропускает render; accepted safe state синхронизируется с URL-backed properties и текущей history boundary. |
+| Livewire state/history | `affected` | `#[Renderless]` пропускает render без автоматической параллельности; accepted safe state синхронизируется с URL-backed properties и текущей history boundary. |
 | Discussions | `affected` | Accepted episode transition обязан обновить существующий episode discussion target. |
 | Media Session | `affected` | Metadata и previous/next actions принимают новый current context без recreation. |
 | Authentication/privacy | `already_compliant` | Viewer revalidation server-side; user/account identity и provider URL отсутствуют в payload. |
@@ -109,17 +112,17 @@ Rollback будущей реализации: вернуть countdown/обыч�
 | Корневой `AGENTS.md` и canonical read order | `completed` | Заново прочитаны `docs/requirements/index.md` и применимые code, architecture, development, multilingual, security, performance, cache, UI, frontend, production, maintenance, system-wide и playback owners. |
 | Все применимые Markdown owners | `completed` | Проверены `docs/README.md`, `DATA_RELATIONS.md`, playback audit, current plan, соседний player design и тематические документы. |
 | Existing implementation до замены | `completed` | Прослежены Livewire actions/render, Blade shell/fallback controls, query/resolver, JS lifecycle/history и PHPUnit/Playwright inventory. |
-| Версии и official framework behavior | `completed` | Installed versions зафиксированы; Livewire `#[Json]`/`#[Renderless]` promise/render behavior проверено по документации установленной ветки. |
+| Версии и official framework behavior | `completed` | Installed versions зафиксированы; документация Livewire `4.3.3` выявила автоматическую параллельность `#[Json]`, поэтому plan/spec/owners исправлены на последовательный `#[Renderless]`. |
 | Новое постоянное правило сначала в canonical owner | `completed` | Playback owner сначала получил явно помеченный target immediate auto-next/in-place transition; architecture/frontend owners получили узкое future exception внутри единственного ignore. |
 | Design alternatives и пользовательское approval | `completed` | Пользователь выбрал in-place вариант и отдельно подтвердил architecture, UX, auto-next, security/performance и testing/compatibility sections. |
-| Task-specific spec и expected files/contracts/risks | `completed` | Записана linked design spec; текущий plan перечисляет файлы, compatibility contracts и cross-feature risks. |
+| Task-specific spec и expected files/contracts/risks | `completed` | Записаны linked design spec и полный 15-задачный TDD implementation plan с точными DTO/action/JavaScript interfaces, RED/GREEN командами, commit checkpoints, compatibility contracts и cross-feature risks. |
 | Security/privacy | `already_compliant` | Spec сохраняет server revalidation, signed same-origin grant и запрет raw source/private state в browser payload. |
 | Performance/cache | `completed` | Spec ограничивает страницу 24 сериями, prefetch одной серией и исключает polling/full graph/new shared cache. Runtime evidence ещё pending. |
 | Accessibility/mobile | `completed` | Spec фиксирует keyboard/focus/touch/pagination/safe-area/reduced-motion и честное native iOS limitation. Runtime evidence ещё pending. |
 | Maintenance/production/rollback | `completed` | Причина browser behavior change зафиксирована; dependency update отсутствует; code/assets rollback и failure boundary описаны. |
 | README актуальность | `already_compliant` | На design-only стадии visitor/product runtime не изменился; фиктивная visitor history entry запрещена и не добавляется. |
-| CHANGELOG | `completed` | Добавлена отдельная русская design-only запись, явно подтверждающая отсутствие runtime/schema/route/cache/dependency changes. |
-| Git `main`, commit и push | `unresolved` | Design docs закоммичены в существующей `main` как `ea8f7ad`; pre-existing `composer.lock` исключён. `git push origin main` вернул `could not read Username for 'https://github.com'`, поэтому remote delivery не заявляется. |
+| CHANGELOG | `completed` | Добавлены отдельные русские design/plan-only записи, явно подтверждающие отсутствие runtime/schema/route/cache/dependency changes. |
+| Git `main`, commit и push | `unresolved` | Design docs закоммичены в существующей `main`; новый implementation plan ожидает task commit. Pre-existing `composer.lock` исключён. Предыдущий `git push origin main` вернул `could not read Username for 'https://github.com'`, поэтому remote delivery не заявляется. |
 
 ## Design verification checklist
 
@@ -132,6 +135,8 @@ Rollback будущей реализации: вернуть countdown/обыч�
 - [x] Commit task-owned design docs в существующей `main`, исключив `composer.lock`.
 - [x] Попытаться отправить commit в configured remote; внешний auth failure зафиксирован как `unresolved`.
 - [x] Передать пользователю spec на отдельный review.
+- [x] Получить пользовательское подтверждение design.
+- [x] Записать полный implementation plan из 15 TDD-задач и выполнить self-review без application edits.
 
 ## Design evidence
 
@@ -139,6 +144,7 @@ Rollback будущей реализации: вернуть countdown/обыч�
 - `bash scripts/ci-check.sh docs`, staged README/CHANGELOG policy checks, `project:docs-refresh --check`, Markdown target checks и `git diff --check` прошли.
 - README проверен без изменения: design-only commit не меняет фактическую visitor capability и не создаёт фиктивную запись истории.
 - Application PHP/Blade/JavaScript/CSS, routes, schema, data, cache, packages и built assets не менялись; runtime countdown остаётся фактическим до будущего implementation commit.
+- Полный execution plan зафиксировал точные payload shapes, три последовательных `#[Renderless]` actions, отдельные prepare/commit границы, bounded pagination, hot-swap/progress/auto-next sequence, PHPUnit/Playwright matrix, production rollback и Git delivery.
 - Project pre-commit guard обнаружил pre-existing unstaged `composer.lock`; task-owned diff прошёл его read-only checks вручную, после чего предусмотренный `SEASONVAR_SKIP_GIT_GUARD=1` применён только к commit. Пользовательский lock diff не добавлен и не изменён этой задачей.
 - `git push origin main` завершился внешним отказом HTTPS credential lookup; commit существует только локально и push остаётся `unresolved`.
 

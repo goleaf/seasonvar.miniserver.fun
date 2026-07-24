@@ -21,7 +21,7 @@
 
 ## Выбранный подход
 
-Единственная `CatalogPlayerSession` получает JavaScript-владельца меню и внутреннюю операцию hot-swap. Серверные Livewire `#[Json]` actions возвращают только перепроверенные bounded menu data и один подготовленный playback transition. JavaScript применяет подтверждённый transition к существующему video/Plyr/HLS lifecycle без morph или замены media shell.
+Единственная `CatalogPlayerSession` получает JavaScript-владельца меню и внутреннюю операцию hot-swap. Серверные последовательные Livewire `#[Renderless]` actions возвращают только перепроверенные bounded menu data и один подготовленный playback transition. JavaScript применяет подтверждённый transition к существующему video/Plyr/HLS lifecycle без morph или замены media shell.
 
 Этот подход выбран, потому что он одновременно сохраняет fullscreen DOM identity, серверную авторизацию, обычный SSR fallback и один canonical player owner.
 
@@ -48,7 +48,7 @@
 
 ### Подготовка перехода
 
-Планируемый `#[Json]` action принимает opaque `episodeId` и необязательный `mediaId`. Он:
+Планируемый `#[Renderless]` action подготовки принимает opaque `episodeId` и необязательный `mediaId`. Он:
 
 1. нормализует ввод и применяет bounded rate limit;
 2. повторно загружает текущий title и viewer;
@@ -72,7 +72,9 @@ Payload содержит:
 
 Payload не содержит upstream URL, credentials, provider response, private entitlement reason, user ID или необработанный exception text.
 
-`#[Async]` не применяется: соседние выборы должны иметь строгий порядок, а stale response не может заменить более новый выбор. Browser присваивает каждому запросу монотонный generation; применим только ответ последней generation.
+`#[Json]` и `#[Async]` не применяются: в установленном Livewire `4.3.3` `#[Json]` автоматически включает параллельное выполнение, а соседние выборы должны сохранять обычную последовательную action boundary. `#[Renderless]` пропускает morph и возвращает action value через JavaScript promise без автоматического async. Browser дополнительно присваивает каждому запросу монотонный generation; применим только ответ последней generation.
+
+Подготовка около конца серии является read-only для текущего выбора: она не меняет Livewire properties, URL, discussion target или Media Session до фактического `ended`. После принятия transition текущей browser generation отдельный последовательный `#[Renderless]` commit повторно проверяет episode/media hierarchy, синхронизирует URL-backed state и отправляет существующий discussion event. Source hot-swap и `play()` не ждут этот второй сетевой round trip, поэтому prefetch не создаёт преждевременное состояние, а commit не добавляет искусственную задержку к воспроизведению.
 
 ### Предпочтение и фактический перевод
 
