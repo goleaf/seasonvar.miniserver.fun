@@ -1,7 +1,7 @@
 # Глобальное управление плеером с клавиатуры
 
 Дата: 24.07.2026
-Статус: согласовано для подготовки implementation plan
+Статус: согласовано; implementation discovery о существующей подсказке отражено 24.07.2026
 
 ## Цель
 
@@ -65,7 +65,7 @@
 - `input`, `textarea`, `select`, `[contenteditable]`, native buttons/links и ARIA controls сохраняют собственное keyboard behavior.
 - При открытом native dialog фоновое видео не реагирует на глобальные playback-команды.
 - Сочетания с `Ctrl`, `Alt` или `Meta` не перехватываются. `Shift` остаётся доступным существующим episode shortcuts и не превращает требуемые playback keys в новый contract.
-- Изменение не добавляет видимый control или поясняющий текст. Существующие pointer/touch controls остаются полным альтернативным способом управления.
+- Изменение не добавляет видимый control или новый translation key. Обнаруженная при реализации существующая RU/EN подсказка о scoped-only поведении обновляется на точное описание global playback/seek и оставшихся scoped-команд; pointer/touch controls остаются полным альтернативным способом управления.
 - Mobile/touch presentation, fullscreen/PiP capability detection, reduced motion и Media Session не меняются.
 
 ## Testing strategy
@@ -100,7 +100,7 @@ Unchanged:
 - playback grants, provider URLs, source resolution и CSP;
 - progress cadence, completion, history и Media Session;
 - database schema, migrations, queries и indexes;
-- translations и translation keys;
+- translation keys и структура catalogs; текст существующего `keyboard_shortcuts_hint` обновляется синхронно в RU/EN;
 - cache keys, invalidation, service worker и API;
 - npm/Composer dependencies и lock files.
 
@@ -111,11 +111,13 @@ Unchanged:
 - `docs/audits/video-playback-report.md`
 - `docs/frontend.md`
 - `docs/plans/current-task-plan.md`
+- `lang/ru/catalog.php`
+- `lang/en/catalog.php`
 - `README.md`
 - `CHANGELOG.md`
 - implementation plan under `docs/superpowers/plans/`
 
-No Blade, PHP, route, migration, config, translation, package or lock-file change is expected.
+No Blade, PHP, route, migration, config, translation-key, package or lock-file change is expected. Существующие RU/EN значения `keyboard_shortcuts_hint` входят в scope после обнаружения устаревшего scoped-only обещания.
 
 ## Compatibility and rollback
 

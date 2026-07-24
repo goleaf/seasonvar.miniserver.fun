@@ -1,3 +1,99 @@
+# Текущая задача — глобальные пауза и перемотка плеера с клавиатуры
+
+Дата: 24.07.2026
+Статус: implementation и verification завершены; commit/push из `main` выполняются.
+
+## Цель и согласованное решение
+
+- [x] Проверить существующий player/Plyr/Livewire lifecycle и keyboard preference.
+- [x] Подтвердить требуемый scope: команды работают глобально, пока существует активное видео.
+- [x] Согласовать клавиши: `Space`/`K` — play/pause, `ArrowLeft`/`ArrowRight` — ровно `-10/+10` секунд.
+- [x] Сравнить `Plyr keyboard.global`, отдельный controller и расширение текущего `CatalogPlayerSession`; выбрать существующую session boundary.
+- [x] Записать и закоммитить design spec `0785eff`.
+- [x] Записать подробный TDD implementation plan и перечитать его перед кодом.
+- [x] Добавить Playwright RED regression для глобального управления, exclusions, bounds и cleanup.
+- [x] Реализовать минимальное расширение `CatalogPlayerSession.handleKeyboard()`.
+- [x] Выполнить focused browser test и полный player browser matrix.
+- [x] Выполнить Vite build и релевантные repository gates.
+- [x] Обновить playback/frontend owners, README, русский CHANGELOG и финальную compliance evidence.
+- [x] Выполнить legacy/duplicate/stale scan.
+- [ ] Выполнить commit и push только из существующей `main`.
+
+Design: [`2026-07-24-player-global-keyboard-controls-design.md`](../superpowers/specs/2026-07-24-player-global-keyboard-controls-design.md).
+
+Rollback: вернуть глобальную ветку `handleKeyboard()` к прежнему scoped-only поведению и удалить новый browser regression. Schema, data, routes, preferences, cache, queue, storage, packages и lock files не меняются; migration, cache flush, worker restart и data repair не нужны. Production asset rollback требует вернуть совместимый Vite manifest и его hashed player chunk вместе с code release.
+
+## Expected changed files
+
+- `resources/js/player.js` — global fallback только для `Space`, `K`, `ArrowLeft`, `ArrowRight` внутри текущей session lifecycle.
+- `tests/browser/player-lifecycle.spec.js` — deterministic RED/GREEN keyboard regression.
+- `lang/ru/catalog.php`, `lang/en/catalog.php` — точная справка о global playback/seek и оставшихся scoped shortcuts.
+- `docs/audits/video-playback-report.md` — изменить канонический scoped shortcut contract и acceptance.
+- `docs/frontend.md` — зафиксировать player-owned global keyboard lifecycle.
+- `docs/plans/current-task-plan.md` — scope, matrix и final evidence.
+- `docs/superpowers/plans/2026-07-24-player-global-keyboard-controls.md` — исполнимый TDD-план.
+- `README.md` — visitor-visible результат и датированная история.
+- `CHANGELOG.md` — отдельная русская техническая запись.
+
+Не ожидаются изменения Blade, PHP/application classes, routes, migrations, configuration, database, package manifests или lock files. После GREEN обнаружена устаревшая RU/EN подсказка о прежнем scoped-only поведении; scope документации расширен на существующие translation catalogs без новых ключей или изменения identity.
+
+## Совместимые contracts
+
+- `CatalogTitlePlayer`, его `wire:ignore` shell, `wire:key`, data attributes и Livewire actions остаются неизменными.
+- `player.js` остаётся единственным Plyr/HLS/session owner; `player-navigation.js` и exported initialize/flush/destroy APIs не меняются.
+- `seasonvar.account-preferences.v1`, `keyboardShortcutsEnabled`, anonymous progress keys и account setting semantics сохраняются.
+- Existing scoped `Escape`, `?`, `P`, `Shift+P`, `Shift+N`, Plyr-focused controls и pointer/touch controls сохраняются.
+- Playback grants, raw-provider protection, entitlement, progress event cadence, completion, source fallback, Media Session и signed routes не меняются.
+- RU/EN translation keys, public routes, API shapes, cache identities и persisted database identities сохраняются.
+- Disabled keyboard preference остаётся authoritative и запрещает новые глобальные команды.
+
+## Cross-feature impact
+
+| Область | Статус | Evidence / решение |
+| --- | --- | --- |
+| Player JavaScript lifecycle | `affected` | Расширяется существующий document listener одной active session; cleanup остаётся через её `AbortController`. |
+| Browser keyboard и accessibility | `affected` | Global fallback получает exact keys, interactive/editable/dialog/modifier exclusions и duplicate-action regression. |
+| Livewire navigation/mobile | `affected` | Desktop keyboard behavior меняется; phone/tablet markup и touch behavior неизменны, lifecycle cleanup проверяется после navigation. |
+| Translations | `affected` | Существующий `keyboard_shortcuts_hint` в RU/EN обязан точно отделить новые global playback/seek keys от остальных scoped shortcuts; новый key не создаётся. |
+| Authentication/settings/privacy | `already_compliant` | Existing server/device keyboard preference сохраняется; user identity/private state не добавляются в browser payload или storage. |
+| Authorization/premium/region/legal | `not_applicable` | Keyboard event не разрешает source и не меняет server-owned entitlement. |
+| Progress/history/recommendations | `already_compliant` | Native play/pause/seek events продолжают идти через прежний bounded progress lifecycle; cadence и server write contract не меняются. |
+| Routes/API/SEO/sitemap/search | `not_applicable` | URL, response, metadata, discovery и indexing contracts не меняются. |
+| Database/migrations/indexes | `not_applicable` | Persistent schema/query/write отсутствуют. |
+| Cache/service worker | `already_compliant` | Новый key/invalidation/store отсутствует; hashed asset release использует existing manifest boundary, service worker не установлен. |
+| Administration/imports/notifications/audit | `not_applicable` | Каталожные и operational state transitions не затронуты. |
+| Dependencies/runtime | `already_compliant` | Используются installed Plyr `3.8.4`, HLS.js `1.6.16`, Vite `8.1.4`; package/lock update не выполняется. |
+| Production operations | `affected` | Требуется production Vite build и согласованная публикация manifest+hashed asset; rollback code/assets совместный. Data backup и migration не применимы. |
+| Pre-existing work | `unresolved` | До задачи `composer.lock` уже содержал пользовательское patch-update изменение. Оно сохраняется, исключается из task commits и остаётся отдельным dirty-worktree blocker/evidence. |
+
+## Requirement-compliance matrix
+
+| Требование | Статус | Evidence / ограничение |
+| --- | --- | --- |
+| Корневой `AGENTS.md` и canonical read order | `completed` | Прочитаны index и применимые code/architecture/development/multilingual/security/performance/cache/UI/frontend/production/maintenance/system/playback owners до application edit. |
+| Existing implementation и versions | `completed` | Проверены `player.js`, `player-navigation.js`, player Blade, browser tests и installed PHP/Node/Composer/npm/Plyr/HLS/Vite/Livewire versions. |
+| Новое постоянное правило сначала в owner | `completed` | `docs/audits/video-playback-report.md` заменил scoped-only правило точным global/scoped lifecycle и acceptance evidence. |
+| Один canonical player boundary | `completed` | Расширен только `CatalogPlayerSession`; новый controller или второй document listener не добавлен. |
+| TDD RED → GREEN | `completed` | RED: focused Chromium получил `Expected: 1 / Received: 0` на первом global `Space`. После minimal session change и обязательной Vite-сборки тот же test прошёл `1 passed`. |
+| Accessibility/keyboard safety | `completed` | Focused test подтвердил `Space`/`K`, `-10/+10`, clamp `0..duration`, отсутствие duplicate focused action, exclusions для поиска/dialog/`Ctrl` и отсутствие browser errors. |
+| Livewire cleanup/backward compatibility | `completed` | Regression подтвердил отсутствие действия после `Livewire.navigate('/titles')`; полный `player-lifecycle.spec.js` прошёл `8 passed`, `4 skipped` на desktop/mobile/tablet. |
+| Security/privacy | `already_compliant` | Client event не расширяет access, URL/token/source/storage/identity payload отсутствует. |
+| Performance/cache | `completed` | Сохранён один existing document listener без нового polling/network/query/cache; scan подтвердил один session owner и `Plyr global: false`. |
+| Mobile/responsive | `already_compliant` | DOM/CSS/Blade не меняются; existing viewport matrix остаётся совместимой, browser suite сохраняет phone/tablet projects. |
+| Production/rollback | `completed` | Vite `8.1.4` собрал `23 modules` и новый hashed player chunk; code+manifest/assets откатываются совместно, schema/backup/cache/queue actions `not_applicable`. |
+| README/owner docs/CHANGELOG/current evidence | `completed` | Обновлены playback/frontend owners, RU/EN shortcut hint, visitor capability/history, русский technical changelog и текущая evidence matrix. |
+| Git `main`, commit и push | `pending` | Работа ведётся в `main`; task files должны быть committed/pushed, pre-existing `composer.lock` исключён и честно отражён. |
+
+## Verification evidence
+
+- RED: `npx playwright test ... --grep="global playback shortcuts"` завершился ожидаемым `Expected: 1`, `Received: 0` на первом global `Space`.
+- После production asset build тот же focused сценарий прошёл: `1 passed`.
+- Полный `tests/browser/player-lifecycle.spec.js`: `8 passed`, `4 skipped` на Desktop/Mobile/Tablet Chromium; skips ограничены desktop-only media/keyboard cases на touch projects.
+- `CatalogPlayerCopyTest`: `2 passed`, `12 assertions`; `CatalogVisualSystemTest`: `31 passed`, `307 assertions`.
+- `npm run build`: Vite `8.1.4`, `23 modules`, `player-Ce6RC40Q.js` `31.94 kB` (`8.19 kB gzip`).
+- `node --check` для player/test, `php -l` для RU/EN catalogs, `project:docs-refresh --check`, `git diff --check` и repository duplicate/debug scans прошли.
+- Совместимость: routes, Blade DOM, schema, grants, authorization, progress cadence, cache keys, packages и persisted preference identity не изменены; touch/pointer и scoped portal/Plyr controls сохранены.
+
 # Текущая задача — даты серий Seasonvar в календаре и XML-tail backfill
 
 Дата: 20.07.2026

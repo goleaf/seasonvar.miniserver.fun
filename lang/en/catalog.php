@@ -776,7 +776,7 @@ return [
         'play_next_now' => 'Play now',
         'cancel_autoplay' => 'Cancel autoplay',
         'keyboard_shortcuts' => 'Keyboard shortcuts',
-        'keyboard_shortcuts_hint' => 'Shortcuts work while focus is inside the player and never while you type in a form.',
+        'keyboard_shortcuts_hint' => 'Space, K, and the arrow keys control video across the page; other shortcuts work while the player is focused. Shortcuts stay inactive in forms and open dialogs.',
         'close_shortcuts' => 'Close keyboard shortcuts',
         'fallback_unavailable' => 'No other authorized compatible source is currently available.',
         'authorization_refresh_limited' => 'Playback authorization was refreshed too often. Wait a minute and retry.',

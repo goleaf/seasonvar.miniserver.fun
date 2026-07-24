@@ -622,21 +622,74 @@ class CatalogPlayerSession {
         }
     }
 
+    handleGlobalPlaybackKeyboard(event) {
+        if (
+            event.shiftKey
+            || !this.plyr
+            || ![' ', 'k', 'ArrowLeft', 'ArrowRight'].includes(event.key)
+        ) {
+            return false;
+        }
+
+        event.preventDefault();
+
+        if (event.key === ' ' || event.key === 'k') {
+            if (!event.repeat) {
+                void Promise.resolve(this.plyr.togglePlay()).catch(() => {});
+            }
+
+            return true;
+        }
+
+        this.seekMediaBy(event.key === 'ArrowLeft' ? -10 : 10);
+
+        return true;
+    }
+
     handleKeyboard(event) {
-        if (!this.preferences.keyboardShortcutsEnabled || this.destroyed || !this.root) {
+        if (
+            !this.preferences.keyboardShortcutsEnabled
+            || this.destroyed
+            || !this.root
+            || !this.root.isConnected
+            || !this.video.isConnected
+        ) {
             return;
         }
 
         const target = event.target instanceof Element ? event.target : null;
-        const editable = target?.matches('input, textarea, select, [contenteditable="true"]');
+        const interactive = target?.closest([
+            'input',
+            'textarea',
+            'select',
+            '[contenteditable="true"]',
+            'button',
+            'a[href]',
+            '[role="button"]',
+            '[role^="menuitem"]',
+            '[role="slider"]',
+            '[role="combobox"]',
+            '[role="textbox"]',
+            'summary',
+        ].join(','));
         const withinPlayer = target !== null && (
             this.shell?.contains(target)
             || this.autoplayToggle?.contains(target)
             || this.restartButton?.contains(target)
             || this.shortcutsOpenButton?.contains(target)
         );
+        const hasSystemModifier = event.altKey || event.ctrlKey || event.metaKey;
+        const hasOpenDialog = document.querySelector('dialog[open]') !== null;
 
-        if (editable || !withinPlayer) {
+        if (interactive || hasSystemModifier) {
+            return;
+        }
+
+        if (!withinPlayer && !hasOpenDialog && this.handleGlobalPlaybackKeyboard(event)) {
+            return;
+        }
+
+        if (!withinPlayer) {
             return;
         }
 

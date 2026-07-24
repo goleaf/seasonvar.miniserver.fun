@@ -163,8 +163,8 @@ Authenticated changes проходят existing `AccountSettingsService`, CSRF/L
 
 Plyr остаётся владельцем play/pause, seek, time, mute/volume, speed, captions, PiP и fullscreen. Portal controls добавляют previous/next, autoplay, restart, source groups, report/help и keyboard-help dialog.
 
-- Space/K, arrows, M, F и C следуют scoped Plyr keyboard behavior; `Shift+N`, `Shift+P`, `P`, `?` и Escape обслуживают portal actions.
-- Shortcuts работают только при focus внутри player/tools, не срабатывают в input/textarea/select/contenteditable и не являются единственным способом действия.
+- `Space`/`K` и `ArrowLeft`/`ArrowRight` управляют play/pause и перемоткой ровно на `-10/+10` секунд на всей странице, пока существует подключённая активная player session и включена каноническая настройка горячих клавиш. Внутри Plyr эти клавиши остаются в его focused keyboard boundary без двойного действия; M, F и C также остаются scoped Plyr controls, а `Shift+N`, `Shift+P`, `P`, `?` и Escape — scoped portal actions.
+- Global playback fallback принадлежит существующему `CatalogPlayerSession`, использует его единственный document listener и уничтожается тем же `AbortController`. Он не перехватывает editable/interactive controls, открытые dialog, системные `Alt`/`Ctrl`/`Meta` combinations или отключённую keyboard preference; pointer/touch controls остаются полным альтернативным способом действия.
 - Native fullscreen/PiP feature-detect-ятся; unsupported control library скрывает. Fake CSS fullscreen и fake PiP не создаются.
 - Player использует `aspect-ratio: 16/9`, safe-area insets, 44 px coarse-pointer controls, bounded mobile menu, readable captions и landscape fullscreen geometry.
 - iOS получает `playsinline`, native HLS fallback и browser-governed fullscreen/PiP/autoplay/background behavior. Android/Chromium использует feature detection, HLS.js/MSE только при поддержке и не получает device-specific hacks.
@@ -213,7 +213,7 @@ Player различает preparing/loading/ready/playing/paused/seeking/bufferi
 - authenticated and anonymous progress cadence, stale sequence, restart, resume и completion thresholds;
 - volume/mute/remember-volume/speed validation and persistence;
 - RU/EN dictionary parity, отсутствие raw keys/hardcoded labels;
-- keyboard/editable exclusion/focus/dialog/live regions/reduced motion;
+- global `Space`/`K` и `-10/+10` arrow seek, отсутствие double action внутри Plyr, keyboard preference/editable/interactive/modifier/dialog exclusions, focus/live regions/reduced motion и cleanup после Livewire navigation;
 - phone/tablet/desktop overflow, coarse touch, captions, iOS/Android feature boundaries;
 - error/help/report context без URLs/secrets;
 - selected-episode-only source query, existing indexes/query plans and no N+1;
@@ -225,3 +225,5 @@ Rollback — revert Task 07 code/assets/translations/docs. Database rollback и 
 Автоматизированные tests для Task 07 не создаются и не запускаются по прямому требованию. Разрешённые evidence gates: PHP/JS syntax, Pint, Blade compilation, route/schema/query/index inspection, translation parity, Vite production build, static secret/URL/DOM-sink scans и browser smoke с console/network/viewport inspection.
 
 Фактическая приёмка 18.07.2026 прошла все эти gates. PHP syntax, Pint, focused Larastan, JS syntax, Blade compilation, Vite build, docs-refresh и whitespace checks успешны; SQLite `quick_check(1)` вернул `ok`, а query-plan inspection использовал существующие индексы порядка эпизодов, доступности источников и уникального progress. Рекурсивный RU/EN key/placeholder contract совпадает. Статический HTML содержит только короткоживущий same-origin `/playback/{id}` grant и не содержит CDN URL или `VideoObject.contentUrl`. Ручной Chromium smoke на desktop и `390×844` подтвердил один Plyr/video instance, отсутствие overflow и console errors, локализованный keyboard dialog с возвратом focus, переход Livewire с 1-й на 2-ю серию, сохранение канонической device preference и реальную выдачу CDN с `206 Partial Content`. Automated test suite не запускался.
+
+Добавочная приёмка глобальных playback-команд 24.07.2026 относится к отдельному последующему изменению, поэтому прежний task-specific запрет Task 07 на automated tests к ней не применяется. Новый Playwright regression сначала зафиксировал прежнее отсутствие global fallback (`Expected: 1`, `Received: 0`), затем подтвердил `Space`/`K`, `ArrowLeft`/`ArrowRight`, точный шаг и границы времени, отсутствие двойного focused-действия, exclusions форм/dialog/modifier и cleanup после `Livewire` navigation. Focused сценарий прошёл `1 test`, полный `player-lifecycle.spec.js` — `8 passed`, `4 skipped`; RU/EN copy и visual contracts прошли `33 tests`, `319 assertions`, Vite собрал `23 modules`, JS/PHP syntax, docs-refresh и whitespace checks завершились успешно.

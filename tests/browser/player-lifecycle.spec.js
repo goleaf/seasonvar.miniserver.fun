@@ -242,6 +242,140 @@ for (const locale of [
     });
 }
 
+test('global playback shortcuts work outside the player and respect interaction boundaries', async ({ page, baseURL }, testInfo) => {
+    test.skip(testInfo.project.name !== 'Desktop Chromium', 'Keyboard behavior runs once.');
+
+    const errors = await installBrowserGuard(page, baseURL);
+
+    await installPlayerMediaFixtures(page);
+    await login(page);
+    await page.goto('/titles/browser-smoke?format=mp4');
+    await waitForPlayer(page);
+
+    await currentVideo(page).evaluate((video) => {
+        const state = {
+            currentTime: 50,
+            duration: 120,
+            paused: true,
+            plays: 0,
+            pauses: 0,
+        };
+
+        window.__playerKeyboardState = state;
+        Object.defineProperties(video, {
+            currentTime: {
+                configurable: true,
+                get: () => state.currentTime,
+                set: (value) => {
+                    state.currentTime = Number(value);
+                },
+            },
+            duration: {
+                configurable: true,
+                get: () => state.duration,
+            },
+            ended: {
+                configurable: true,
+                get: () => false,
+            },
+            paused: {
+                configurable: true,
+                get: () => state.paused,
+            },
+        });
+        video.play = () => {
+            state.paused = false;
+            state.plays += 1;
+            video.dispatchEvent(new Event('play'));
+
+            return Promise.resolve();
+        };
+        video.pause = () => {
+            state.paused = true;
+            state.pauses += 1;
+            video.dispatchEvent(new Event('pause'));
+        };
+    });
+
+    const focusPage = () => page.evaluate(() => {
+        if (document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+        }
+    });
+
+    await focusPage();
+    await page.keyboard.press('Space');
+    await expect.poll(() => page.evaluate(() => window.__playerKeyboardState.plays)).toBe(1);
+    await page.keyboard.press('k');
+    await expect.poll(() => page.evaluate(() => window.__playerKeyboardState.pauses)).toBe(1);
+
+    const playButton = page.locator('[data-plyr="play"]').first();
+
+    await playButton.focus();
+    await page.keyboard.press('k');
+    await expect.poll(() => page.evaluate(() => window.__playerKeyboardState.plays)).toBe(2);
+    await page.keyboard.press('k');
+    await expect.poll(() => page.evaluate(() => window.__playerKeyboardState.pauses)).toBe(2);
+
+    await focusPage();
+    await page.keyboard.press('ArrowRight');
+    expect(await page.evaluate(() => window.__playerKeyboardState.currentTime)).toBe(60);
+    await page.keyboard.press('ArrowLeft');
+    expect(await page.evaluate(() => window.__playerKeyboardState.currentTime)).toBe(50);
+
+    await page.evaluate(() => {
+        window.__playerKeyboardState.currentTime = 5;
+    });
+    await page.keyboard.press('ArrowLeft');
+    expect(await page.evaluate(() => window.__playerKeyboardState.currentTime)).toBe(0);
+
+    await page.evaluate(() => {
+        window.__playerKeyboardState.currentTime = 115;
+    });
+    await page.keyboard.press('ArrowRight');
+    expect(await page.evaluate(() => window.__playerKeyboardState.currentTime)).toBe(120);
+
+    const input = page.locator('#site-search');
+
+    await input.focus();
+    await page.keyboard.press('k');
+    await page.keyboard.press('ArrowLeft');
+    expect(await input.inputValue()).toBe('k');
+    expect(await page.evaluate(() => window.__playerKeyboardState)).toMatchObject({
+        currentTime: 120,
+        plays: 2,
+        pauses: 2,
+    });
+
+    await page.locator('[data-player-shortcuts-open]').click();
+    await expect(page.locator('[data-player-shortcuts-dialog]')).toHaveAttribute('open', '');
+    await page.locator('[data-player-shortcuts-dialog]').evaluate((dialog) => {
+        dialog.tabIndex = -1;
+        dialog.focus();
+    });
+    await page.keyboard.press('Space');
+    expect(await page.evaluate(() => window.__playerKeyboardState.plays)).toBe(2);
+    await page.locator('[data-player-shortcuts-close]').click();
+
+    await focusPage();
+    await page.keyboard.press('Control+k');
+    expect(await page.evaluate(() => window.__playerKeyboardState.plays)).toBe(2);
+
+    await page.evaluate(() => window.Livewire.navigate('/titles'));
+    await expect(page).toHaveURL(/\/titles$/);
+    await expect(currentVideo(page)).toHaveCount(0);
+    await page.locator('body').evaluate((body) => {
+        body.focus();
+        body.dispatchEvent(new KeyboardEvent('keydown', {
+            key: ' ',
+            bubbles: true,
+            cancelable: true,
+        }));
+    });
+    expect(await page.evaluate(() => window.__playerKeyboardState.plays)).toBe(2);
+    assertNoBrowserErrors(errors);
+});
+
 test('desktop player uses deterministic HLS recovery, MP4 ranges, and WebVTT states', async ({ page, baseURL }, testInfo) => {
     test.skip(testInfo.project.name !== 'Desktop Chromium', 'Detailed media matrix runs once.');
     test.setTimeout(90_000);
