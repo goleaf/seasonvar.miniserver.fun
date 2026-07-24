@@ -2500,6 +2500,7 @@ evidence, security requirement, совместимое изменение provid
 | Native iOS fullscreen evidence | `not_applicable_to_code` | `unresolved_device` | `not_applicable` | `not_applicable` | `unresolved_device` |
 | Rolling roadmap update | `not_applicable_to_runtime` | `completed` | `a14cdf5` | `unresolved_auth` | `not_applicable` |
 | Task 20: Shift+E interaction boundaries | `completed_local` | `completed` | `d781661` | `unresolved_auth` | `not_claimed` |
+| Task 21 planning + Task 22+ intake pointer | `planning_complete` | `completed` | `56ac94d` | `unresolved_auth` | `not_applicable` |
 | Task 21: centered touch controls | `in_progress` | `red_pending` | `unresolved_shared_worktree` | `unresolved_shared_worktree` | `not_claimed` |
 
 Статусы независимы. `completed` code не означает published remote, deployed
