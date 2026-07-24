@@ -5,7 +5,7 @@
 
 ## Активное исполнение — Batch 1: baseline и Redis persistence observability
 
-Статус: Task 1 и реализация Task 2 завершены; выполняются финальные documentation/verification/commit gates. Пользователь прямо разрешил начать программирование без дополнительных вопросов. Выполняются только Task 1 и Task 2 master plan; Task 3 не получает implicit authority на остановку producers, Redis restart, signal/kill, backup overwrite или любое изменение production state.
+Статус: Task 1 и Task 2 завершены и закоммичены в `main` как `2227c08`; отправка в configured remote остаётся `unresolved` из-за отсутствующей HTTPS-аутентификации GitHub. Task 3 не получает implicit authority на остановку producers, Redis restart, signal/kill, backup overwrite или любое изменение production state.
 
 ### Проверенная подготовка
 
@@ -18,7 +18,7 @@
 - [x] Обновить Task 1 evidence по свежим read-only probes.
 - [x] Выполнить обязательный RED → GREEN цикл Task 2.
 - [x] Завершить focused/wider verification и documentation.
-- [ ] Завершить commit и push evidence.
+- [x] Завершить commit и push-attempt evidence.
 
 ### Выполненный evidence Task 1–2
 
@@ -29,6 +29,7 @@
 - Production-like read-only `app:health --json` после реализации вернул `redis_persistence=failed`, `current_save_seconds=106333`, `last_save_age_seconds=106394`, `changes_since_last_save=10671434`, `aof_enabled=false`; top-level остался `degraded`, `ready=true`.
 - README получил фактический operator contract без visitor-history записи; operations/environment owners, `.env.example` и русский `CHANGELOG.md` обновлены.
 - Focused verification прошёл `RedisPersistenceInspectorTest` (`8`/`27`), `InfrastructureHealthCheckTest` (`5`/`21`) и `CheckInfrastructureHealthCommandTest` (`1`/`9`); `bash scripts/ci-check.sh docs`, `project:docs-refresh --check` и `git diff --check` завершились успешно.
+- Commit `2227c08` (`feat: report Redis persistence health`) создан в существующей `main` только из task-owned staged paths. Обычный push дошёл до `origin` и вернул `could not read Username for 'https://github.com': No such device or address`; доставка честно остаётся `unresolved`.
 
 ### Expected files Batch 1
 
@@ -75,7 +76,7 @@
 | Production operations | `completed` для Task 1–2 | Data-safety/rollback/failure boundary записаны; новый health evidence получен read-only, Task 3 mutation authority не расширена. |
 | README | `completed` | Operator command/behavior обновлены; visitor-facing capability и история посетителей не изменялись. |
 | CHANGELOG/current docs | `completed` | Operations/environment owners и отдельная русская delivered entry обновлены по фактическому результату. |
-| Commit/push | `pending` | Только существующая `main`; внешний auth failure фиксируется `unresolved`. |
+| Commit/push | `unresolved` | Commit `2227c08` создан в существующей `main`; push в `origin` отклонён из-за отсутствующей HTTPS-аутентификации. |
 
 ## Цель и главный документ исполнения
 
