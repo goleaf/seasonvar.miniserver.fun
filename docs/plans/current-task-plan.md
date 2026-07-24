@@ -280,7 +280,7 @@ Master plan является единственным подробным executi
 # Параллельный согласованный поток — бесшовное переключение сезонов, серий и переводов в плеере
 
 Дата: 24.07.2026
-Статус: runtime implementation, full verification и repository scan завершены; выполняются изолированный commit и push в существующей `main`. Предыдущие push заблокированы отсутствующей HTTPS-аутентификацией GitHub.
+Статус: runtime implementation, full verification, repository scan и локальный commit `1ded102` завершены; push в `origin/main` остаётся `unresolved` из-за отсутствующей HTTPS-аутентификации GitHub.
 
 ## Цель и согласованное решение
 
@@ -299,7 +299,8 @@ Master plan является единственным подробным executi
 - [x] Обновить canonical runtime docs, README и CHANGELOG по фактически доставленному поведению.
 - [x] Завершить полный PHP/Playwright/build gate.
 - [x] Завершить docs/legacy/privacy scan.
-- [ ] Commit и push только в существующей `main`.
+- [x] Изолированно commit-ить task-owned runtime в существующей `main` как `1ded102`.
+- [ ] Push в `origin/main` — `unresolved`: remote вернул `could not read Username for 'https://github.com'`.
 
 Выбранная архитектура: три последовательных Livewire `#[Renderless]` actions возвращают bounded страницу серий, подготавливают один авторизованный transition без преждевременного изменения текущего состояния и фиксируют только фактически принятый браузером transition. JavaScript применяет transition к тому же `<video>`, Plyr/fullscreen root и `CatalogPlayerSession`. Server остаётся владельцем hierarchy, playability, entitlement, source grant и progress token. Browser владеет только realtime menu/source lifecycle и игнорирует stale responses по монотонной generation. Установленный Livewire `4.3.3` автоматически делает `#[Json]` actions параллельными, поэтому этот атрибут после version-specific discovery исключён из transition boundary.
 
@@ -405,7 +406,7 @@ Rollback реализации: вернуть прежний countdown/обыч�
 | Maintenance/production/rollback | `completed` | Причина browser behavior change зафиксирована; dependency update отсутствует; code/assets rollback и failure boundary описаны. |
 | README актуальность | `completed` | Описание проигрывателя, roadmap и датированная visitor history отражают меню, in-place transition, немедленный auto-next и новые клавиши. |
 | CHANGELOG | `completed` | Добавлена отдельная русская runtime-запись с фактическим поведением, проверками и сохранёнными compatibility boundaries. |
-| Git `main`, commit и push | `unresolved` | Полный implementation plan и task-owned corrections закоммичены в существующей `main` как `d5aaad7`; pre-existing `composer.lock` и параллельный master-plan исключены. Новая попытка `git push origin main` вернула `could not read Username for 'https://github.com'`, поэтому remote delivery не заявляется. |
+| Git `main`, commit и push | `unresolved_remote` | Runtime, tests и docs изолированно закоммичены в существующей `main` как `1ded102`; concurrent importer work и `composer.lock` исключены. Обычный `git push origin main` вернул `could not read Username for 'https://github.com'`, поэтому remote delivery не заявляется. |
 
 ## Runtime implementation evidence
 
