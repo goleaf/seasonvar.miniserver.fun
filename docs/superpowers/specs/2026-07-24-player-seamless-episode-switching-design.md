@@ -1,7 +1,7 @@
 # Бесшовное переключение сезонов, серий и переводов в плеере
 
 Дата: 24.07.2026
-Статус: согласовано; реализация ещё не начата
+Статус: реализовано и локально проверено; runtime commit `1ded102`, delivery evidence `ab6532a`, remote push `unresolved`, native iOS fullscreen `unresolved`
 
 ## Цель
 
@@ -9,14 +9,14 @@
 
 При ручном выборе серии или перевода и при автоматическом переходе должны сохраняться тот же `<video>`, тот же экземпляр Plyr, текущая fullscreen-оболочка и одна `CatalogPlayerSession`. Повторный рендер плеера, выход из стандартного fullscreen, отдельная player-страница и повторное открытие тайтла не допускаются.
 
-## Подтверждённый baseline
+## Исторический baseline до реализации
 
 - `CatalogTitlePlayer` владеет URL-state `season`, `episode`, `media`, `variant`, `quality`, `format`.
 - `CatalogTitlePlaybackQuery` единолично определяет доступность и порядок серий, включая переход через границу сезона.
 - `CatalogPlaybackSourceResolver` и `CatalogEntitlementService` повторно проверяют hierarchy, publication, audience, availability window и разрешённый источник.
 - HTML получает только один короткоживущий same-origin signed grant; исходный URL поставщика не попадает в Livewire state, HTML или JSON.
 - `resources/js/player.js` создаёт одну `CatalogPlayerSession`, один Plyr и при необходимости один HLS.js instance внутри единственного keyed `wire:ignore` media shell.
-- Текущий `ended` запускает настраиваемый отсчёт `3..30` секунд и затем активирует обычную Livewire-ссылку следующей серии. Из-за замены keyed media shell этот путь не может сохранить fullscreen.
+- До реализации `ended` запускал настраиваемый отсчёт `3..30` секунд и затем активировал обычную Livewire-ссылку следующей серии. Этот исторический путь заменён немедленным in-place transition без countdown; активный runtime сохраняет keyed media shell и fullscreen DOM identity.
 - Списки сезонов, серий и вариантов под плеером остаются доступным SSR/Livewire fallback.
 
 ## Выбранный подход

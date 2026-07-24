@@ -1,14 +1,16 @@
-# Seamless Player Episode Switching Implementation Plan
+# Безлимитный master plan развития бесшовного проигрывателя
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add an accessible in-player `Сезон → Серия → Перевод` menu and switch manually or automatically to the next authorized episode inside the existing `<video>`, Plyr instance, player session, and standard fullscreen element without a countdown, page navigation, or player reopen.
+**Goal:** Сохранять и развивать доступный player-owned контур `Сезон → Серия → Перевод`, в котором ручной и автоматический переход меняет только авторизованный источник внутри существующих `<video>`, Plyr, player session и standard fullscreen element, а новые задачи добавляются без искусственного верхнего лимита только по проверенному evidence.
 
-**Architecture:** `CatalogTitlePlaybackQuery` remains the only ordering and watchability owner. Three sequential Livewire `#[Renderless]` actions expose a bounded episode page, prepare one revalidated transition without mutating visible state, and commit only the transition actually accepted by the browser. `CatalogPlayerTransitionFactory` creates typed allowlisted DTOs containing one same-origin signed source and a fresh progress context. A JavaScript-owned menu and hot-swap state machine live inside the existing keyed `wire:ignore` shell; monotonic client generations discard stale responses while the same `CatalogPlayerSession`, `<video>`, Plyr root, and fullscreen node stay alive.
+**Architecture:** `CatalogTitlePlaybackQuery` remains the only ordering and watchability owner. Three sequential Livewire `#[Renderless]` actions expose a bounded episode page, prepare one revalidated transition without mutating visible state, and commit only the transition actually accepted by the browser. `CatalogPlayerTransitionFactory` creates typed allowlisted DTOs containing one same-origin signed source and a fresh progress context. A JavaScript-owned menu and hot-swap state machine live inside the existing keyed `wire:ignore` shell; monotonic client generations discard stale responses while the same `CatalogPlayerSession`, `<video>`, Plyr root, and fullscreen node stay alive. Tasks 1–15 preserve the delivered baseline; Tasks 16+ form one monotonic evidence-driven rolling queue with separate code, delivery, production and platform-evidence states.
 
 **Tech Stack:** PHP 8.5.8, Laravel 13.21.1, Livewire 4.3.3, Laravel Boost 2.4.13, PHPUnit 12.5.31, Node 26.4.0, npm 12.0.1, Plyr 3.8.4, HLS.js 1.6.16, Tailwind CSS 4.3.2, Vite 8.1.4, Playwright 1.61.1.
 
-**Delivery status (24.07.2026):** Tasks 1–14 are implemented and verified through RED → GREEN change sets. Typed payloads, bounded query/factory/actions, safe bootstrap, accessible menu, generation-guarded bridge, in-place MP4/HLS transition, immediate auto-next, progress/context rotation, History API, responsive/fullscreen behavior, lazy sibling compatibility, and runtime documentation are complete. Final evidence: focused player PHP `108/108` tests and `1164` assertions; full PHPUnit `1510` tests, `1499` passed, `11` expected skipped, `123588` assertions; Vite `24` modules; Playwright player matrix `15` passed and `12` expected skipped across desktop/mobile/tablet. Task 15 commit/push evidence is in progress; native iOS fullscreen remains explicitly unresolved without a real device.
+**Delivery status (24.07.2026):** Tasks 1–15 are locally implemented, verified and recorded through RED → GREEN change sets and commits `1ded102`/`ab6532a`. Typed payloads, bounded query/factory/actions, safe bootstrap, accessible menu, generation-guarded bridge, in-place MP4/HLS transition, immediate auto-next, progress/context rotation, History API, responsive/fullscreen behavior, lazy sibling compatibility, and runtime documentation are complete. Final evidence: focused player PHP `108/108` tests and `1164` assertions; full PHPUnit `1510` tests, `1499` passed, `11` expected skipped, `123588` assertions; Vite `24` modules; Playwright player matrix `15` passed and `12` expected skipped across desktop/mobile/tablet. Remote delivery remains `unresolved` because configured GitHub HTTPS authentication is unavailable; native iOS fullscreen remains `unresolved` without a real device; production activation is not claimed.
+
+**Plan model:** безлимитный rolling roadmap не имеет верхнего номера или срока окончания, но каждая принятая задача конечна, bounded, TDD-проверяема, обратима и не расширяет user/production authority. Неподтверждённые capabilities остаются triggers, а не обещанными implementation tasks.
 
 ## Global Constraints
 
@@ -224,7 +226,7 @@ array{
 
 - DTOs accept only scalars and already-normalized arrays; they never accept Eloquent models.
 
-- [ ] **Step 1: Write the RED episode-page DTO test**
+- [x] **Step 1: Write the RED episode-page DTO test**
 
 Create `tests/Unit/PlayerEpisodePageDataTest.php`:
 
@@ -277,7 +279,7 @@ final class PlayerEpisodePageDataTest extends TestCase
 }
 ```
 
-- [ ] **Step 2: Write the RED transition DTO tests**
+- [x] **Step 2: Write the RED transition DTO tests**
 
 Create `tests/Unit/PlaybackTransitionDataTest.php` with one ready-payload test and one unavailable-payload test. The ready test must instantiate every constructor field and use `assertSame()` against the exact array above. The unavailable test must assert:
 
@@ -300,7 +302,7 @@ self::assertArrayNotHasKey('providerUrl', $data->toArray()['source']);
 self::assertArrayNotHasKey('userId', $data->toArray()['progress']);
 ```
 
-- [ ] **Step 3: Run both tests and verify RED**
+- [x] **Step 3: Run both tests and verify RED**
 
 Run:
 
@@ -310,13 +312,13 @@ php artisan test tests/Unit/PlayerEpisodePageDataTest.php tests/Unit/PlaybackTra
 
 Expected: FAIL because both DTO classes do not exist.
 
-- [ ] **Step 4: Implement immutable DTOs**
+- [x] **Step 4: Implement immutable DTOs**
 
 Implement both classes as `final readonly class` with fully typed constructor properties, PHPDoc array shapes, and explicit `toArray()` methods. Clamp neither values nor labels in the DTO; validation and normalization belong to the factory/action boundary.
 
 `PlayerEpisodePageData` derives `previousPage` and `nextPage` only from validated `page`/`lastPage`. `PlaybackTransitionData::ready()` requires all ready fields, while `unavailable()` creates the two-key failure payload. Do not serialize null ready fields into an unavailable payload.
 
-- [ ] **Step 5: Verify GREEN and formatting**
+- [x] **Step 5: Verify GREEN and formatting**
 
 Run:
 
@@ -327,7 +329,7 @@ php artisan test tests/Unit/PlayerEpisodePageDataTest.php tests/Unit/PlaybackTra
 
 Expected: both tests pass; Pint reports no remaining style change.
 
-- [ ] **Step 6: Commit the isolated typed contract**
+- [x] **Step 6: Commit the isolated typed contract**
 
 Run:
 
@@ -378,7 +380,7 @@ public function navigationForEpisode(
 - Extract a private `episodesForSeasonQuery(CatalogTitle $catalogTitle, Season $season, ?User $user, bool $withMedia): Builder` used by both existing `episodesForSeason()` and the new paginator.
 - Preserve existing `episodesForSeason()` and `episodeNavigation()` public behavior for rendered fallback consumers.
 
-- [ ] **Step 1: Add the RED bounded-page test**
+- [x] **Step 1: Add the RED bounded-page test**
 
 Append a test that creates 27 visible regular episodes with one published playable media each, plus:
 
@@ -410,13 +412,13 @@ self::assertNotContains($foreignEpisode->id, $secondPage->getCollection()->model
 
 Also assert every item has `available_media_count` and that no `licensedMedia` relation was eager loaded.
 
-- [ ] **Step 2: Add the RED invalid hierarchy and page-bound test**
+- [x] **Step 2: Add the RED invalid hierarchy and page-bound test**
 
 Call `episodesForSeasonPage()` with a season belonging to another title and assert an empty paginator. Call it with `page` values `0`, `-1`, and `1000001`; assert that the service returns an empty paginator without issuing an item query. The query service itself must never issue an unbounded offset.
 
 Use `DB::listen()` or query log to assert the page response performs a bounded count plus bounded item query, not one query per episode.
 
-- [ ] **Step 3: Add RED direct-navigation tests**
+- [x] **Step 3: Add RED direct-navigation tests**
 
 Add a test with:
 
@@ -436,7 +438,7 @@ self::assertSame($firstRegularInSeasonTwo->id, $navigation->next?->id);
 
 Then assert that a special episode points only to the next special episode in the compatible special lane and never to a regular episode or an episode in an incompatible season-kind lane. Assert both values are null for the final accessible episode.
 
-- [ ] **Step 4: Run focused query tests and verify RED**
+- [x] **Step 4: Run focused query tests and verify RED**
 
 Run:
 
@@ -446,7 +448,7 @@ php artisan test tests/Feature/CatalogTitlePlaybackQueryTest.php
 
 Expected: existing tests pass and new tests fail because the two public methods do not exist.
 
-- [ ] **Step 5: Extract the shared season query**
+- [x] **Step 5: Extract the shared season query**
 
 Move the existing `Episode::query()` construction from `episodesForSeason()` into:
 
@@ -464,7 +466,7 @@ Before constructing the query, fail closed when `(int) $season->catalog_title_id
 
 Keep the current select list, `available_media_count`, relation hierarchy constraints, viewer scopes, release ordering, and optional media eager load unchanged. `episodesForSeason()` calls `->get()`. `episodesForSeasonPage()` validates `1 <= $perPage <= 24` and `1 <= $page <= 10000`, uses Laravel `paginate(perPage: $perPage, page: $page)`, and returns an empty length-aware paginator for invalid hierarchy/page input.
 
-- [ ] **Step 6: Implement direct adjacent navigation**
+- [x] **Step 6: Implement direct adjacent navigation**
 
 `navigationForEpisode()` must:
 
@@ -476,7 +478,7 @@ Keep the current select list, `available_media_count`, relation hierarchy constr
 
 Do not load the full active season merely to find adjacent episodes.
 
-- [ ] **Step 7: Verify GREEN, query bounds, and existing compatibility**
+- [x] **Step 7: Verify GREEN, query bounds, and existing compatibility**
 
 Run:
 
@@ -488,7 +490,7 @@ php artisan test --filter=test_catalog_title_player_navigates_only_accessible_ep
 
 Expected: all query tests and the existing rendered-navigation feature test pass.
 
-- [ ] **Step 8: Commit the query boundary**
+- [x] **Step 8: Commit the query boundary**
 
 Run:
 
@@ -543,7 +545,7 @@ final readonly class CatalogPlayerTransitionFactory
 - The factory does not mutate `CatalogTitlePlayer`, account preferences, progress rows, URLs, or discussion state.
 - A call produces at most one signed source grant.
 
-- [ ] **Step 1: Create the RED episode-page factory test**
+- [x] **Step 1: Create the RED episode-page factory test**
 
 Create `tests/Feature/CatalogPlayerTransitionFactoryTest.php` with `RefreshDatabase`.
 
@@ -574,7 +576,7 @@ self::assertLessThanOrEqual(24, count($page['episodes']));
 
 Assert there is no `source`, `playback_url`, `path`, `user_id`, or `catalogTitle` key anywhere in `json_encode($page, JSON_THROW_ON_ERROR)`.
 
-- [ ] **Step 2: Create the RED ready-transition security test**
+- [x] **Step 2: Create the RED ready-transition security test**
 
 Use `Http::preventStrayRequests()`. Create a verified user, public title/season/episode, and a playable media row whose upstream `playback_url` is `https://data00-cdn.11cdn.org/private-origin.m3u8`.
 
@@ -609,7 +611,7 @@ self::assertStringNotContainsString((string) $user->id, $transition['contextKey'
 
 Also issue the signed URL as the same user and assert the existing playback responder remains `private, no-store`. Issue it as another user and assert the current viewer-binding rejection remains unchanged.
 
-- [ ] **Step 3: Add RED hierarchy and access denial cases**
+- [x] **Step 3: Add RED hierarchy and access denial cases**
 
 Use a data provider or separate assertions for:
 
@@ -635,7 +637,7 @@ self::assertSame([
 
 Do not assert a private entitlement reason.
 
-- [ ] **Step 4: Add RED preferred-translation and fallback tests**
+- [x] **Step 4: Add RED preferred-translation and fallback tests**
 
 Create two media variants for episode one and only one variant for episode two:
 
@@ -648,7 +650,7 @@ Assert episode one selects studio A. Assert episode two selects studio B, return
 
 Create a second test with explicit `$requestedMediaId` for studio B and assert the explicit, authorized media wins over the preference only for this transition.
 
-- [ ] **Step 5: Add RED navigation, query, labels, and progress-rotation tests**
+- [x] **Step 5: Add RED navigation, query, labels, and progress-rotation tests**
 
 Prepare transitions for consecutive episodes across a season boundary. Assert:
 
@@ -662,7 +664,7 @@ Prepare transitions for consecutive episodes across a season boundary. Assert:
 - authenticated transitions for episode A and episode B have distinct `contextKey` and progress token values;
 - guest transition has `progress.enabled=false` and `progress.token=''`.
 
-- [ ] **Step 6: Run factory tests and verify RED**
+- [x] **Step 6: Run factory tests and verify RED**
 
 Run:
 
@@ -672,7 +674,7 @@ php artisan test tests/Feature/CatalogPlayerTransitionFactoryTest.php
 
 Expected: FAIL because the factory does not exist.
 
-- [ ] **Step 7: Implement `episodePage()`**
+- [x] **Step 7: Implement `episodePage()`**
 
 The method must:
 
@@ -684,7 +686,7 @@ The method must:
 
 Do not expose a Laravel paginator object directly.
 
-- [ ] **Step 8: Implement `prepare()` with one source resolution**
+- [x] **Step 8: Implement `prepare()` with one source resolution**
 
 The method must execute this order:
 
@@ -703,7 +705,7 @@ If any required model/source is unavailable, return `PlaybackTransitionData::una
 
 Add exact RU/EN server messages `catalog.player.transition_unavailable` and `catalog.player.transition_limited` before the factory/action tests become GREEN. These messages remain generic and never expose an entitlement or provider failure reason.
 
-- [ ] **Step 9: Reuse media-profile presentation**
+- [x] **Step 9: Reuse media-profile presentation**
 
 Extract only the smallest pure label/profile helpers needed by both `CatalogShowViewModel` and the transition factory. If direct extraction would change unrelated view output, keep `CatalogShowViewModel` unchanged and add equivalent private factory helpers covered by exact RU/EN tests.
 
@@ -718,7 +720,7 @@ The transition `translations` list must:
 
 Do not add a public model method solely for UI copy.
 
-- [ ] **Step 10: Verify GREEN and no hidden writes**
+- [x] **Step 10: Verify GREEN and no hidden writes**
 
 Run:
 
@@ -731,7 +733,7 @@ php artisan test --filter=CatalogPlaybackSource
 
 Expected: focused tests pass, no upstream request escapes, and source resolver compatibility tests remain GREEN.
 
-- [ ] **Step 11: Commit the transition factory**
+- [x] **Step 11: Commit the transition factory**
 
 Run:
 
@@ -770,7 +772,7 @@ public function commitPlayerTransition(mixed $episodeId, mixed $mediaId): array;
 - `preparePlayerTransition()` is read-only from the perspective of Livewire selection. This is mandatory because near-end prefetch must not change the currently playing episode.
 - `commitPlayerTransition()` changes only the canonical URL-backed selection after revalidation and returns the canonical query map.
 
-- [ ] **Step 1: Add the RED menu-action test**
+- [x] **Step 1: Add the RED menu-action test**
 
 Create a title with 25 playable episodes and call:
 
@@ -789,7 +791,7 @@ Assert the returned page is `ready`, contains one episode on page two, and the c
 
 Call with arrays, zero, negative, oversized numeric strings, a foreign season, and page `1000001`. Assert the returned result is a localized unavailable or empty bounded result, no exception text is returned, and selection is unchanged.
 
-- [ ] **Step 2: Add the RED prepare-without-mutation test**
+- [x] **Step 2: Add the RED prepare-without-mutation test**
 
 Set the component to episode one, then call:
 
@@ -815,7 +817,7 @@ $component
 
 Assert `discussion-target-selected` was not dispatched by preparation.
 
-- [ ] **Step 3: Add the RED commit test**
+- [x] **Step 3: Add the RED commit test**
 
 Call:
 
@@ -841,7 +843,7 @@ Assert:
 - the returned query map exactly matches the component state;
 - no render-side player shell replacement is required for the action result.
 
-- [ ] **Step 4: Add RED invalid commit and rate-limit tests**
+- [x] **Step 4: Add RED invalid commit and rate-limit tests**
 
 Assert a foreign/hidden/unavailable episode or mismatched media:
 
@@ -858,7 +860,7 @@ Exercise the existing `attemptPlaybackAction()` pattern with distinct keys:
 
 The test after the limit must fail closed with localized `transition_limited` copy and leave state unchanged.
 
-- [ ] **Step 5: Run focused Livewire tests and verify RED**
+- [x] **Step 5: Run focused Livewire tests and verify RED**
 
 Run:
 
@@ -868,7 +870,7 @@ php artisan test --filter=CatalogTitlePlayer
 
 Expected: new methods are missing or return no typed payload; existing player tests remain GREEN.
 
-- [ ] **Step 6: Inject the factory and implement normalization**
+- [x] **Step 6: Inject the factory and implement normalization**
 
 Add `CatalogPlayerTransitionFactory` to `boot()`. Use existing `positiveId()`, `nonNegativeInteger()`, viewer resolution, `attemptPlaybackAction()`, and error/reset conventions.
 
@@ -888,7 +890,7 @@ For `preparePlayerTransition()`:
 4. call factory `prepare()`;
 5. return its array without changing public selection.
 
-- [ ] **Step 7: Implement commit-after-acceptance**
+- [x] **Step 7: Implement commit-after-acceptance**
 
 `commitPlayerTransition()` must:
 
@@ -918,7 +920,7 @@ For `preparePlayerTransition()`:
 
 Filter empty profile values from `query`. Do not call `$refresh()` and do not increment `authorizationVersion`.
 
-- [ ] **Step 8: Verify GREEN and renderless compatibility**
+- [x] **Step 8: Verify GREEN and renderless compatibility**
 
 Run:
 
@@ -930,7 +932,7 @@ php artisan test tests/Unit/LivewireWireIgnoreContractTest.php
 
 Expected: all focused tests pass and the ignored-shell contract still reports exactly one full `wire:ignore`.
 
-- [ ] **Step 9: Commit the Livewire boundary**
+- [x] **Step 9: Commit the Livewire boundary**
 
 Run:
 
@@ -989,7 +991,7 @@ array{
   - `loading`
   - `retry`
 
-- [ ] **Step 1: Update the exact-key test first**
+- [x] **Step 1: Update the exact-key test first**
 
 Change `CatalogPlayerCopyTest` to assert all three exact groups. Keep `array_keys(Arr::dot($ru)) === array_keys(Arr::dot($en))`, non-empty values, and locale inequality for representative strings.
 
@@ -1005,13 +1007,13 @@ foreach (array_keys(Arr::dot($payloads['ru'])) as $key) {
 }
 ```
 
-- [ ] **Step 2: Add translation-file assertions**
+- [x] **Step 2: Add translation-file assertions**
 
 Assert Russian visible values include `Серии`, `Сезоны`, `Переводы`, `Назад`, `Предыдущая страница`, and `Следующая страница`. Assert English values are genuine English copy and not Russian duplicates.
 
 Change the shortcut help from only `Shift+P / Shift+N` to include `Shift+E` with a localized explanation.
 
-- [ ] **Step 3: Run the copy test and verify RED**
+- [x] **Step 3: Run the copy test and verify RED**
 
 Run:
 
@@ -1021,13 +1023,13 @@ php artisan test tests/Unit/CatalogPlayerCopyTest.php
 
 Expected: FAIL because `menu` and the new runtime keys are absent.
 
-- [ ] **Step 4: Add translations and allowlist them**
+- [x] **Step 4: Add translations and allowlist them**
 
 Add semantic keys under `catalog.player.runtime`, `catalog.player.menu`, and the existing shortcuts section in both locales. Update `CatalogPlayerCopy` explicitly; do not serialize an entire translation subtree.
 
 Keep existing countdown strings until Task 10 has delivered immediate auto-next and a repository scan proves they have no consumer.
 
-- [ ] **Step 5: Verify GREEN and translation parity**
+- [x] **Step 5: Verify GREEN and translation parity**
 
 Run:
 
@@ -1039,7 +1041,7 @@ php artisan test --filter=Translation
 
 Expected: copy and broader translation tests pass.
 
-- [ ] **Step 6: Commit the copy contract**
+- [x] **Step 6: Commit the copy contract**
 
 Run:
 
@@ -1090,7 +1092,7 @@ array{
 - Initial bootstrap contains no source URL, progress token, user identity, raw model, or more than the bounded season summaries and current episode's authorized translation options.
 - Existing season/episode/media anchors keep their current `href` and Livewire fallback methods.
 
-- [ ] **Step 1: Add the RED escaped-bootstrap feature test**
+- [x] **Step 1: Add the RED escaped-bootstrap feature test**
 
 Render a title containing:
 
@@ -1114,7 +1116,7 @@ $response
 
 Parse `data-player-menu-bootstrap` with `Crawler` or a DOM helper and assert the exact keys and authorized IDs.
 
-- [ ] **Step 2: Strengthen the ignored-shell RED contract**
+- [x] **Step 2: Strengthen the ignored-shell RED contract**
 
 Update `LivewireWireIgnoreContractTest` to assert:
 
@@ -1132,7 +1134,7 @@ Assert fallback episode/media controls remain after the closing ignored shell an
 - `data-catalog-history`;
 - their normal `href`.
 
-- [ ] **Step 3: Run focused tests and verify RED**
+- [x] **Step 3: Run focused tests and verify RED**
 
 Run:
 
@@ -1143,7 +1145,7 @@ php artisan test --filter=player_menu_bootstrap
 
 Expected: bootstrap marker and transition markers are absent.
 
-- [ ] **Step 4: Build safe bootstrap data in `render()`**
+- [x] **Step 4: Build safe bootstrap data in `render()`**
 
 Map existing loaded season summaries and current episode media into scalars. Reuse factory/presentation helpers where available, but do not call source resolution again.
 
@@ -1156,7 +1158,7 @@ Hard bounds:
 
 Pass `$playerMenuBootstrap` to Blade.
 
-- [ ] **Step 5: Add escaped markers and progressive-enhancement hooks**
+- [x] **Step 5: Add escaped markers and progressive-enhancement hooks**
 
 Inside the existing `data-player-shell`, add:
 
@@ -1179,7 +1181,7 @@ data-player-transition-media="{{ $mediaOption['mediaId'] }}"
 
 Do not move these controls inside `wire:ignore`. JavaScript will intercept only when a live `CatalogPlayerSession` accepts the event; otherwise the current Livewire/no-JavaScript behavior remains.
 
-- [ ] **Step 6: Verify GREEN and HTML privacy**
+- [x] **Step 6: Verify GREEN and HTML privacy**
 
 Run:
 
@@ -1191,7 +1193,7 @@ php artisan test --filter=CatalogTitlePlayer
 
 Expected: tests pass, exactly one ignored shell and one video remain, and upstream URLs are absent from bootstrap.
 
-- [ ] **Step 7: Commit the bootstrap contract**
+- [x] **Step 7: Commit the bootstrap contract**
 
 Run:
 
@@ -1244,7 +1246,7 @@ export class CatalogPlayerMenu {
 - It never calls Livewire directly and never reads an upstream URL.
 - All dynamic server text is assigned with `textContent`.
 
-- [ ] **Step 1: Add the RED Playwright menu-presence test**
+- [x] **Step 1: Add the RED Playwright menu-presence test**
 
 In `tests/browser/player-lifecycle.spec.js`, add a desktop-only test that:
 
@@ -1264,7 +1266,7 @@ npx playwright test tests/browser/player-lifecycle.spec.js --project="Desktop Ch
 
 Expected: FAIL because the button/dialog do not exist.
 
-- [ ] **Step 2: Add RED keyboard and focus behavior**
+- [x] **Step 2: Add RED keyboard and focus behavior**
 
 Extend the same test:
 
@@ -1276,7 +1278,7 @@ Extend the same test:
 - press `Escape`; dialog closes and opener regains focus;
 - while dialog is open, press `Space`, `k`, `ArrowLeft`, and `ArrowRight`; assert playback state/time do not change.
 
-- [ ] **Step 3: Implement semantic DOM construction**
+- [x] **Step 3: Implement semantic DOM construction**
 
 Create `player-menu.js` using `document.createElement()`:
 
@@ -1292,7 +1294,7 @@ Create `player-menu.js` using `document.createElement()`:
 
 Use an internal helper that accepts only tag name, class list, text, and attributes. Do not accept raw HTML.
 
-- [ ] **Step 4: Implement focus and keyboard rules**
+- [x] **Step 4: Implement focus and keyboard rules**
 
 Implement:
 
@@ -1310,7 +1312,7 @@ Implement:
 
 The dialog stays open while season pages load. Selecting a season invokes `loadEpisodePage(seasonId, 1)` and does not invoke `selectEpisode`.
 
-- [ ] **Step 5: Integrate with `CatalogPlayerSession`**
+- [x] **Step 5: Integrate with `CatalogPlayerSession`**
 
 After Plyr initialization:
 
@@ -1324,7 +1326,7 @@ After Plyr initialization:
 
 If bootstrap is missing/invalid or controls root is absent, playback remains functional and no broken menu is displayed.
 
-- [ ] **Step 6: Preserve standard fullscreen placement**
+- [x] **Step 6: Preserve standard fullscreen placement**
 
 When the menu opens:
 
@@ -1334,7 +1336,7 @@ When the menu opens:
 - return the dialog to the shell on close only if both nodes remain connected;
 - never call fullscreen enter/exit and never replace `document.fullscreenElement`.
 
-- [ ] **Step 7: Verify GREEN and Vite compilation**
+- [x] **Step 7: Verify GREEN and Vite compilation**
 
 Run:
 
@@ -1345,7 +1347,7 @@ npx playwright test tests/browser/player-lifecycle.spec.js --project="Desktop Ch
 
 Expected: build succeeds and the menu/focus test passes.
 
-- [ ] **Step 8: Commit the menu owner**
+- [x] **Step 8: Commit the menu owner**
 
 Run:
 
@@ -1378,7 +1380,7 @@ Do not stage `composer.lock` or generated untracked artifacts.
 - Each event detail includes immutable scalar request data, a monotonic `generation`, and `resolve`/`reject` callbacks.
 - The bridge calls exactly one matching Livewire action and never calls `$refresh()`.
 
-- [ ] **Step 1: Add the RED season-browse test**
+- [x] **Step 1: Add the RED season-browse test**
 
 In Playwright, stub or observe Livewire action calls and:
 
@@ -1391,7 +1393,7 @@ In Playwright, stub or observe Livewire action calls and:
 7. assert source/session/URL/current discussion target did not change;
 8. assert only `playerEpisodePage` was called.
 
-- [ ] **Step 2: Add the RED last-selection-wins test**
+- [x] **Step 2: Add the RED last-selection-wins test**
 
 Delay the response for episode A and allow episode B to resolve first. Trigger A then B rapidly. Assert:
 
@@ -1400,7 +1402,7 @@ Delay the response for episode A and allow episode B to resolve first. Trigger A
 - loading state ends for the accepted generation;
 - no uncaught promise rejection is recorded.
 
-- [ ] **Step 3: Implement event bridge helpers**
+- [x] **Step 3: Implement event bridge helpers**
 
 In `player-navigation.js`, add:
 
@@ -1431,7 +1433,7 @@ Before invoking a callback, verify:
 
 Pass failures to `reject()` with no raw server exception text.
 
-- [ ] **Step 4: Implement monotonic generations in the session**
+- [x] **Step 4: Implement monotonic generations in the session**
 
 Add:
 
@@ -1445,7 +1447,7 @@ Each menu page request increments `menuGeneration`. Each manual selection increm
 
 Callbacks compare exact generation before changing any session/menu state. `destroy()` increments both generation counters and rejects/discards pending callbacks through the existing `AbortController`.
 
-- [ ] **Step 5: Intercept fallback links only when the session can handle them**
+- [x] **Step 5: Intercept fallback links only when the session can handle them**
 
 In the existing root click capture:
 
@@ -1456,7 +1458,7 @@ In the existing root click capture:
 
 Do not remove `wire:click.prevent`, `href`, or existing rendered methods.
 
-- [ ] **Step 6: Verify GREEN and lifecycle cleanup**
+- [x] **Step 6: Verify GREEN and lifecycle cleanup**
 
 Run:
 
@@ -1467,7 +1469,7 @@ npx playwright test tests/browser/player-lifecycle.spec.js --project="Desktop Ch
 
 Expected: both tests pass, no duplicate listener/action appears after repeated `livewire:navigated`.
 
-- [ ] **Step 7: Commit the bridge**
+- [x] **Step 7: Commit the bridge**
 
 Run:
 
@@ -1504,7 +1506,7 @@ CatalogPlayerSession.prototype.applyTransition = async function (
 - The method resolves only after the new source reaches metadata/ready or a bounded error state.
 - It never replaces `this.video`, `this.plyr`, `this.shell`, or the Plyr container.
 
-- [ ] **Step 1: Add the RED manual episode identity test**
+- [x] **Step 1: Add the RED manual episode identity test**
 
 In Playwright:
 
@@ -1519,7 +1521,7 @@ In Playwright:
 
 Run once in normal mode and once after entering standard fullscreen when the browser permits it. Skip only with an explicit capability check, not on assertion failure.
 
-- [ ] **Step 2: Add the RED translation identity test**
+- [x] **Step 2: Add the RED translation identity test**
 
 Select another translation for the current episode and assert:
 
@@ -1529,7 +1531,7 @@ Select another translation for the current episode and assert:
 - menu closes and focus returns to the player control;
 - preferred profile storage changes only through the existing explicit preference path, not through technical fallback.
 
-- [ ] **Step 3: Add the RED progress-context separation test**
+- [x] **Step 3: Add the RED progress-context separation test**
 
 Capture emitted `catalog-progress` payloads. Begin episode A at 40 seconds, apply transition to episode B, begin B at 5 seconds, then pause.
 
@@ -1540,7 +1542,7 @@ Assert:
 - no event combines A token with B episode ID;
 - root/video active session markers match the new context only after A's immutable flush event is constructed.
 
-- [ ] **Step 4: Implement immutable old-context flush**
+- [x] **Step 4: Implement immutable old-context flush**
 
 Before changing any mutable session field:
 
@@ -1551,7 +1553,7 @@ Before changing any mutable session field:
 
 The network call triggered by the progress event is not awaited.
 
-- [ ] **Step 5: Implement atomic context rotation**
+- [x] **Step 5: Implement atomic context rotation**
 
 Set the accepted transition fields as one synchronous block:
 
@@ -1574,7 +1576,7 @@ Set the accepted transition fields as one synchronous block:
 
 Update menu current markers after the context block.
 
-- [ ] **Step 6: Replace MP4 and HLS sources without replacing nodes**
+- [x] **Step 6: Replace MP4 and HLS sources without replacing nodes**
 
 For every transition:
 
@@ -1589,7 +1591,7 @@ For every transition:
 
 Do not use a Plyr source setter if it replaces or reconstructs the video node. Keep the existing Plyr instance attached.
 
-- [ ] **Step 7: Apply playback policy**
+- [x] **Step 7: Apply playback policy**
 
 After metadata:
 
@@ -1601,7 +1603,7 @@ After metadata:
 
 Technical same-episode fallback continues using `queueTransientResume()` and must not call the new zero-position transition path.
 
-- [ ] **Step 8: Commit accepted selection without blocking source start**
+- [x] **Step 8: Commit accepted selection without blocking source start**
 
 Immediately after atomic context rotation, dispatch `catalog-player-transition-commit`. Do not await this network request before media loading/play begins.
 
@@ -1617,11 +1619,11 @@ On commit failure:
 - never apply an older generation;
 - allow retry of state synchronization without reissuing an upstream URL.
 
-- [ ] **Step 9: Refresh Media Session without reinitializing the player**
+- [x] **Step 9: Refresh Media Session without reinitializing the player**
 
 Replace captured DOM-anchor handlers with handlers that consult current in-memory `navigation.previous`/`navigation.next`. Update metadata from `transition.mediaSession`, retain play/pause/seek handlers, and set next/previous handlers to request player transitions.
 
-- [ ] **Step 10: Verify GREEN for MP4, HLS, progress, and fullscreen**
+- [x] **Step 10: Verify GREEN for MP4, HLS, progress, and fullscreen**
 
 Run:
 
@@ -1632,7 +1634,7 @@ npx playwright test tests/browser/player-lifecycle.spec.js --project="Desktop Ch
 
 Expected: all focused cases pass with one video/Plyr/HLS owner and no external leak/browser error.
 
-- [ ] **Step 11: Commit the in-place transition**
+- [x] **Step 11: Commit the in-place transition**
 
 Run:
 
@@ -1674,7 +1676,7 @@ this.prefetchEpisodeId = null;
 - Prefetch threshold: known remaining duration `<= 60` seconds.
 - Artificial countdown/timer: absent.
 
-- [ ] **Step 1: Add RED immediate auto-next test**
+- [x] **Step 1: Add RED immediate auto-next test**
 
 Prepare two playable episodes. Instrument:
 
@@ -1693,7 +1695,7 @@ Enable autoplay, make a valid next transition ready, dispatch `ended`, and asser
 - new episode starts at `0`;
 - DOM/fullscreen identity remains unchanged.
 
-- [ ] **Step 2: Add RED near-end prefetch bounds**
+- [x] **Step 2: Add RED near-end prefetch bounds**
 
 Set known duration to 120 seconds and dispatch time updates at 20, 59, 60, 61, and 70 seconds.
 
@@ -1706,7 +1708,7 @@ Assert:
 - manual episode choice, autoplay disable, navigation, or destroy invalidates the prefetched transition;
 - no menu-page request occurs from time updates.
 
-- [ ] **Step 3: Add RED autoplay-off, final, expiry, network, and blocked-play cases**
+- [x] **Step 3: Add RED autoplay-off, final, expiry, network, and blocked-play cases**
 
 Assert:
 
@@ -1718,7 +1720,7 @@ Assert:
 - blocked `play()`: new source stays selected at `0`, status is `playRequired`, and user can press play;
 - unrelated recommendation is never started.
 
-- [ ] **Step 4: Run browser test and verify RED**
+- [x] **Step 4: Run browser test and verify RED**
 
 Run:
 
@@ -1728,7 +1730,7 @@ npx playwright test tests/browser/player-lifecycle.spec.js --project="Desktop Ch
 
 Expected: FAIL because current code displays and updates the countdown, then clicks a link.
 
-- [ ] **Step 5: Implement one bounded near-end prefetch**
+- [x] **Step 5: Implement one bounded near-end prefetch**
 
 In `handleTimeUpdate()`:
 
@@ -1744,7 +1746,7 @@ In `handleTimeUpdate()`:
 
 Never show a loading state during prefetch.
 
-- [ ] **Step 6: Replace `handleEnded()` behavior**
+- [x] **Step 6: Replace `handleEnded()` behavior**
 
 The new order is:
 
@@ -1760,7 +1762,7 @@ The new order is:
 
 No countdown, `setInterval`, cancel button, or “watch now” path remains.
 
-- [ ] **Step 7: Remove delivered countdown code and markup**
+- [x] **Step 7: Remove delivered countdown code and markup**
 
 Delete:
 
@@ -1777,7 +1779,7 @@ Delete:
 
 Keep the autoplay toggle. Escape closes the player menu/help dialog; it no longer “cancels” a post-ended countdown.
 
-- [ ] **Step 8: Update PHP/Blade tests for countdown removal**
+- [x] **Step 8: Update PHP/Blade tests for countdown removal**
 
 Assert:
 
@@ -1790,7 +1792,7 @@ self::assertStringNotContainsString('setInterval(() => {\n            this.count
 
 Update exact copy keys only after the runtime references are removed.
 
-- [ ] **Step 9: Verify GREEN and search for stale countdown paths**
+- [x] **Step 9: Verify GREEN and search for stale countdown paths**
 
 Run:
 
@@ -1805,7 +1807,7 @@ rg -n "autoplay-countdown|countdownRemaining|startAutoplayCountdown|next_episode
 
 Expected: tests/build pass. The final search finds only historical design/plan/changelog evidence, not active application or test consumers.
 
-- [ ] **Step 10: Commit immediate auto-next**
+- [x] **Step 10: Commit immediate auto-next**
 
 Run:
 
@@ -1852,7 +1854,7 @@ const pushPlayerHistory = (query) => void;
 - Current pathname, locale prefix, unrelated query parameters, and `#player` are preserved.
 - Accepted transition creates one history entry only after a successful server commit response.
 
-- [ ] **Step 1: Add the RED history test**
+- [x] **Step 1: Add the RED history test**
 
 Start on a localized title URL containing an unrelated safe query parameter and the player anchor. Select episode two, then translation two.
 
@@ -1868,7 +1870,7 @@ Assert after each accepted transition:
 
 Press Back and Forward. Assert the existing popstate restoration selects the matching rendered state without a broken player, duplicate session, or lost unrelated query parameter.
 
-- [ ] **Step 2: Add RED discussion and Media Session assertions**
+- [x] **Step 2: Add RED discussion and Media Session assertions**
 
 Observe the discussion Livewire component/event and `navigator.mediaSession` test shim.
 
@@ -1882,7 +1884,7 @@ After accepted transition assert:
 - final episode has no active next handler;
 - handlers are cleared on destroy.
 
-- [ ] **Step 3: Add RED no-JavaScript fallback test**
+- [x] **Step 3: Add RED no-JavaScript fallback test**
 
 Disable JavaScript in a dedicated Playwright context or assert server HTML directly:
 
@@ -1891,7 +1893,7 @@ Disable JavaScript in a dedicated Playwright context or assert server HTML direc
 - unknown or inaccessible IDs normalize to the existing safe default;
 - no new public endpoint is required.
 
-- [ ] **Step 4: Implement URL construction**
+- [x] **Step 4: Implement URL construction**
 
 `playerUrlForQuery()` must:
 
@@ -1906,7 +1908,7 @@ Disable JavaScript in a dedicated Playwright context or assert server HTML direc
 
 Do not trust the pre-commit transition query for history; use the query returned by `commitPlayerTransition()`.
 
-- [ ] **Step 5: Keep popstate compatibility explicit**
+- [x] **Step 5: Keep popstate compatibility explicit**
 
 Retain `restoreSelectionFromLocation()` and its existing `$set('season'|'episode'|'media'|'variant'|'quality'|'format'|'marker', value, false)` calls plus one `$refresh()` for Back/Forward recovery. Do not call it for normal in-place transitions.
 
@@ -1919,7 +1921,7 @@ Before popstate refresh:
 
 After refresh, assert one new valid session is initialized. This compatibility path may recreate the rendered player because browser Back/Forward is explicit navigation; manual selection and auto-next remain in-place.
 
-- [ ] **Step 6: Verify GREEN**
+- [x] **Step 6: Verify GREEN**
 
 Run:
 
@@ -1932,7 +1934,7 @@ npx playwright test tests/browser/player-lifecycle.spec.js --project="Desktop Ch
 
 Expected: accepted transitions preserve routing/discussion/media contracts and fallback navigation remains operational.
 
-- [ ] **Step 7: Commit compatibility integration**
+- [x] **Step 7: Commit compatibility integration**
 
 Run:
 
@@ -1964,7 +1966,7 @@ Do not stage `composer.lock`.
 - Season summaries: client-side pages of at most 12 buttons so the dialog never needs an internal scrolling list.
 - Minimum coarse-pointer target: 44 CSS pixels.
 
-- [ ] **Step 1: Add RED responsive geometry tests**
+- [x] **Step 1: Add RED responsive geometry tests**
 
 For Desktop, Tablet, and Mobile Chromium assert:
 
@@ -1978,7 +1980,7 @@ For Desktop, Tablet, and Mobile Chromium assert:
 - season client pagination shows at most 12 seasons at once;
 - current episode remains discoverable by opening its containing page.
 
-- [ ] **Step 2: Add RED fullscreen and safe-area tests**
+- [x] **Step 2: Add RED fullscreen and safe-area tests**
 
 In standard fullscreen:
 
@@ -1989,11 +1991,11 @@ In standard fullscreen:
 - safe-area padding resolves from `env(safe-area-inset-*)` declarations;
 - no page behind the dialog receives pointer input.
 
-- [ ] **Step 3: Add RED reduced-motion test**
+- [x] **Step 3: Add RED reduced-motion test**
 
 Emulate `prefers-reduced-motion: reduce`. Open/close menu and switch levels. Assert no required animation duration delays visibility, focus, or source selection.
 
-- [ ] **Step 4: Implement component classes in Tailwind source CSS**
+- [x] **Step 4: Implement component classes in Tailwind source CSS**
 
 Add narrowly named player classes under the existing CSS layer:
 
@@ -2019,7 +2021,7 @@ Use media queries for:
 
 Do not use a fixed-height list with `overflow-y:auto`. Page long episode and season lists instead.
 
-- [ ] **Step 5: Implement client-side season paging**
+- [x] **Step 5: Implement client-side season paging**
 
 In `CatalogPlayerMenu`:
 
@@ -2031,7 +2033,7 @@ In `CatalogPlayerMenu`:
 - choosing a season calls the bounded episode-page action;
 - retain logical focus after page changes.
 
-- [ ] **Step 6: Verify GREEN across configured browser projects**
+- [x] **Step 6: Verify GREEN across configured browser projects**
 
 Run:
 
@@ -2042,7 +2044,7 @@ npx playwright test tests/browser/player-lifecycle.spec.js --grep="responsive ep
 
 Expected: Desktop, Tablet, and Mobile Chromium cases pass with no overflow/internal scrolling and correct accessible layout.
 
-- [ ] **Step 7: Commit presentation**
+- [x] **Step 7: Commit presentation**
 
 Run:
 
@@ -2072,7 +2074,7 @@ Do not stage `composer.lock`.
 - Fixtures never call a real upstream source.
 - Every failure scenario has a finite request/retry count.
 
-- [ ] **Step 1: Add cross-season and release-lane coverage**
+- [x] **Step 1: Add cross-season and release-lane coverage**
 
 Create deterministic browser fixtures with:
 
@@ -2083,7 +2085,7 @@ Create deterministic browser fixtures with:
 
 Assert auto-next crosses regular season boundary, special navigation remains special-only, and the final episode displays localized final copy without a transition request.
 
-- [ ] **Step 2: Add preferred translation fallback coverage**
+- [x] **Step 2: Add preferred translation fallback coverage**
 
 Set preferred translation A. Make next episode expose only translation B.
 
@@ -2095,7 +2097,7 @@ Assert:
 - stored preferred translation remains A;
 - a later episode containing A selects A again.
 
-- [ ] **Step 3: Add network failure and retry coverage**
+- [x] **Step 3: Add network failure and retry coverage**
 
 Use fixture queues to produce:
 
@@ -2115,13 +2117,13 @@ Assert:
 - terminal state exposes one localized retry control;
 - no raw status/provider URL is visible.
 
-- [ ] **Step 4: Add blocked-play and data-saver coverage**
+- [x] **Step 4: Add blocked-play and data-saver coverage**
 
 Stub `video.play()` to reject. Assert source/current selection is committed, time remains `0`, play control is available, and no automatic retry loop starts.
 
 Emulate `navigator.connection.saveData=true`. Assert existing data-saver behavior still disables autoplay/prefetch and the ended episode remains ended.
 
-- [ ] **Step 5: Add cleanup and duplicate-owner coverage**
+- [x] **Step 5: Add cleanup and duplicate-owner coverage**
 
 Repeat:
 
@@ -2144,7 +2146,7 @@ Assert:
 - old generation cannot commit after navigation;
 - Media Session handlers are cleared/rebound once.
 
-- [ ] **Step 6: Run the full player browser file**
+- [x] **Step 6: Run the full player browser file**
 
 Run:
 
@@ -2154,11 +2156,11 @@ npx playwright test tests/browser/player-lifecycle.spec.js
 
 Expected: all player lifecycle tests pass in Desktop, Mobile, and Tablet Chromium, with intentional project skips only where a test is explicitly single-project.
 
-- [ ] **Step 7: Review Playwright artifacts**
+- [x] **Step 7: Review Playwright artifacts**
 
 Inspect failures if any through trace/screenshots/video. On success, confirm no unexpected retained failure artifacts or untracked fixture databases are staged.
 
-- [ ] **Step 8: Commit final browser coverage**
+- [x] **Step 8: Commit final browser coverage**
 
 Run:
 
@@ -2188,7 +2190,7 @@ Stage only files that changed. Do not stage `composer.lock`, `output/`, screensh
 - Modify: `README.md`
 - Modify: `CHANGELOG.md`
 
-- [ ] **Step 1: Re-read all applicable canonical requirements**
+- [x] **Step 1: Re-read all applicable canonical requirements**
 
 Read in index order:
 
@@ -2201,7 +2203,7 @@ Then re-read every player-applicable canonical owner listed by the index, includ
 
 Record any new discovery immediately in `docs/plans/current-task-plan.md` before further code changes.
 
-- [ ] **Step 2: Run PHP formatting and focused tests**
+- [x] **Step 2: Run PHP formatting and focused tests**
 
 Run:
 
@@ -2216,7 +2218,7 @@ php artisan test tests/Unit/CatalogPlayerCopyTest.php tests/Unit/LivewireWireIgn
 
 Expected: every focused test passes.
 
-- [ ] **Step 3: Run frontend and browser verification**
+- [x] **Step 3: Run frontend and browser verification**
 
 Run:
 
@@ -2227,7 +2229,7 @@ npx playwright test tests/browser/player-lifecycle.spec.js
 
 Expected: Vite build and the complete player browser matrix pass.
 
-- [ ] **Step 4: Run full repository verification**
+- [x] **Step 4: Run full repository verification**
 
 Run:
 
@@ -2242,7 +2244,7 @@ If project hooks document additional current checks in `docs/development.md`, ru
 
 Expected: full suites, managed-doc check, and whitespace check pass.
 
-- [ ] **Step 5: Perform repository-wide legacy and privacy scans**
+- [x] **Step 5: Perform repository-wide legacy and privacy scans**
 
 Run:
 
@@ -2257,7 +2259,7 @@ rg -n "<video|new this\\.Plyr|new this\\.Hls" resources/views/livewire/catalog-t
 
 Review every match semantically. Historical documentation references may remain. Active duplicate countdown implementations, raw URL serialization, second player/menu owners, unfinished paths, and dead controls must not remain.
 
-- [ ] **Step 6: Update canonical runtime documentation**
+- [x] **Step 6: Update canonical runtime documentation**
 
 Change implementation-pending language to delivered evidence only after all tests pass:
 
@@ -2270,7 +2272,7 @@ Change implementation-pending language to delivered evidence only after all test
 
 Do not claim native iOS fullscreen preservation without real-device evidence.
 
-- [ ] **Step 7: Update visitor documentation and changelog**
+- [x] **Step 7: Update visitor documentation and changelog**
 
 Because runtime behavior is now visitor-facing:
 
@@ -2283,7 +2285,7 @@ Because runtime behavior is now visitor-facing:
 
 Do not manually edit managed `project-docs` blocks. Run `php artisan project:docs-refresh` only if an owner change requires regeneration, then inspect the exact generated diff.
 
-- [ ] **Step 8: Complete the task compliance matrix**
+- [x] **Step 8: Complete the task compliance matrix**
 
 Record `completed`, `already_compliant`, `not_applicable`, or `unresolved` for:
 
@@ -2308,7 +2310,7 @@ Record `completed`, `already_compliant`, `not_applicable`, or `unresolved` for:
 
 Do not mark iOS evidence complete without a real device.
 
-- [ ] **Step 9: Commit verified runtime and documentation**
+- [x] **Step 9: Commit verified runtime and documentation**
 
 Run:
 
@@ -2334,7 +2336,7 @@ Stage `docs/UI_STANDARDS.md` only if it changed. The commit must be on `main`, i
 
 - Verify only; modify documentation only if verification discovers an inaccuracy.
 
-- [ ] **Step 1: Confirm no schema/dependency/route drift**
+- [x] **Step 1: Confirm no schema/dependency/route drift**
 
 Run:
 
@@ -2349,7 +2351,7 @@ Expected:
 - the existing signed playback route remains the only source delivery route;
 - pre-existing `composer.lock` remains unstaged and unmodified by this task.
 
-- [ ] **Step 2: Confirm production asset boundary**
+- [x] **Step 2: Confirm production asset boundary**
 
 Run:
 
@@ -2361,7 +2363,7 @@ git status --short --branch
 
 Document the deployment requirement: application code, Vite manifest, and referenced hashed assets activate together. A failed/interrupted build blocks activation; it is not repaired by clearing application data.
 
-- [ ] **Step 3: Record rollback strategy**
+- [x] **Step 3: Record rollback strategy**
 
 Rollback is code/assets only:
 
@@ -2378,7 +2380,7 @@ For partial deployment:
 - unavailable source/provider: current bounded error/retry remains;
 - stale browser asset: hashed manifest prevents mixed filenames; retain prior assets during rollout.
 
-- [ ] **Step 4: Record iOS real-device evidence**
+- [x] **Step 4: Record iOS real-device evidence**
 
 If a real iPhone/iPad is available, test:
 
@@ -2393,7 +2395,7 @@ If not available, keep this row:
 Native iOS fullscreen source-swap preservation: unresolved — Chromium emulation does not prove WebKit/OS fullscreen behavior; no fake fullscreen was added.
 ```
 
-- [ ] **Step 5: Final repository and branch check**
+- [x] **Step 5: Final repository and branch check**
 
 Run:
 
@@ -2405,7 +2407,7 @@ git diff --check
 
 Expected: branch is `main`; all authorized feature/docs changes are committed; only the pre-existing unstaged `composer.lock` may remain.
 
-- [ ] **Step 6: Push configured remote**
+- [x] **Step 6: Push configured remote**
 
 Run:
 
@@ -2415,7 +2417,7 @@ git push origin main
 
 Expected: push succeeds. If HTTPS authentication or remote access fails, record the exact failure as `unresolved`; do not claim delivery and do not change remote credentials.
 
-- [ ] **Step 7: Final handoff**
+- [x] **Step 7: Final handoff**
 
 Report:
 
@@ -2435,26 +2437,26 @@ Do not report implementation complete until all non-platform acceptance criteria
 
 ## Final Acceptance Checklist
 
-- [ ] In-player menu exposes seasons, bounded/paginated episodes, and authorized translations.
-- [ ] Desktop uses three columns; mobile uses sequential levels and Back.
-- [ ] `Shift+E`, Escape, focus trap/return, arrows, Enter, Space, touch targets, safe area, and reduced motion pass.
-- [ ] Browsing seasons does not pause/reset current playback.
-- [ ] Manual episode and translation changes start at `0`.
-- [ ] Automatic next begins immediately after `ended` with no countdown/artificial timer.
-- [ ] Autoplay off, final episode, prefetch failure, expired grant, source failure/retry, and blocked `play()` are honest finite states.
-- [ ] Regular cross-season and special-lane ordering are server-owned and deterministic.
-- [ ] Every transition revalidates hierarchy/access/source and returns one same-origin signed grant only.
-- [ ] Preferred translation survives temporary fallback and is retried on later episodes.
-- [ ] Old/new progress episode IDs, tokens, and sequences never mix.
-- [ ] Same `<video>`, Plyr root, player shell, and standard fullscreen element survive manual and automatic transitions.
-- [ ] URL/history, Back/Forward, discussion target, Media Session, source fallback, restart, preferences, PiP, and cleanup remain compatible.
-- [ ] SSR/no-JavaScript links remain valid.
-- [ ] One full `wire:ignore`, one video, one Plyr, and at most one HLS.js instance remain.
-- [ ] No route, migration, cache key, dependency, service worker, queue, or raw provider URL is added.
-- [ ] Focused PHP tests, full PHPUnit, Vite build, full player Playwright matrix, docs checks, scans, and `git diff --check` pass.
-- [ ] README, canonical owners, design, implementation plan, current-task compliance matrix, and Russian CHANGELOG reflect actual delivered state.
-- [ ] Native iOS fullscreen is either proven on a real device or honestly `unresolved`.
-- [ ] Authorized changes are committed on `main`; configured push is attempted and truthfully reported.
+- [x] In-player menu exposes seasons, bounded/paginated episodes, and authorized translations.
+- [x] Desktop uses three columns; mobile uses sequential levels and Back.
+- [x] `Shift+E`, Escape, focus trap/return, arrows, Enter, Space, touch targets, safe area, and reduced motion pass.
+- [x] Browsing seasons does not pause/reset current playback.
+- [x] Manual episode and translation changes start at `0`.
+- [x] Automatic next begins immediately after `ended` with no countdown/artificial timer.
+- [x] Autoplay off, final episode, prefetch failure, expired grant, source failure/retry, and blocked `play()` are honest finite states.
+- [x] Regular cross-season and special-lane ordering are server-owned and deterministic.
+- [x] Every transition revalidates hierarchy/access/source and returns one same-origin signed grant only.
+- [x] Preferred translation survives temporary fallback and is retried on later episodes.
+- [x] Old/new progress episode IDs, tokens, and sequences never mix.
+- [x] Same `<video>`, Plyr root, player shell, and standard fullscreen element survive manual and automatic transitions.
+- [x] URL/history, Back/Forward, discussion target, Media Session, source fallback, restart, preferences, PiP, and cleanup remain compatible.
+- [x] SSR/no-JavaScript links remain valid.
+- [x] One full `wire:ignore`, one video, one Plyr, and at most one HLS.js instance remain.
+- [x] No route, migration, cache key, dependency, service worker, queue, or raw provider URL is added.
+- [x] Focused PHP tests, full PHPUnit, Vite build, full player Playwright matrix, docs checks, scans, and `git diff --check` pass.
+- [x] README, canonical owners, design, implementation plan, current-task compliance matrix, and Russian CHANGELOG reflect actual delivered state.
+- [x] Native iOS fullscreen is either proven on a real device or honestly `unresolved`.
+- [x] Authorized changes are committed on `main`; configured push is attempted and truthfully reported.
 
 ## Plan Self-Review Checklist
 
@@ -2467,3 +2469,437 @@ Do not report implementation complete until all non-platform acceptance criteria
 - [x] No placeholder, deferred implementation note, unfinished stub, or omitted repetition remains.
 - [x] Commit steps exclude the pre-existing `composer.lock`.
 - [x] Documentation and production rollback are part of implementation, not an optional follow-up.
+
+---
+
+## Безлимитный rolling roadmap
+
+### Назначение
+
+Этот раздел продолжает тот же план после завершения Tasks 1–15. Он не
+объявляет проигрыватель «вечной незавершённой задачей» и не требует выполнять
+все возможные улучшения. Он задаёт постоянный механизм приёма новых задач:
+измеренный дефект, новый подтверждённый источник данных, browser/platform
+evidence, security requirement, совместимое изменение provider contract или
+обязательное сопровождение превращается в следующий монотонный `Task N`.
+
+План безлимитен по числу будущих evidence-driven задач. Каждая отдельная задача
+имеет ограниченный scope, завершение, rollback и commit. Task не создаётся
+только ради заполнения очереди, новой версии package или гипотетической
+возможности.
+
+### Execution ledger
+
+| Workstream | Code | Verification | Local delivery | Remote delivery | Production activation |
+| --- | --- | --- | --- | --- | --- |
+| Tasks 1–4: typed server transition boundary | `completed` | `completed` | `1ded102` | `unresolved_auth` | `not_claimed` |
+| Tasks 5–8: translations, bootstrap, menu и bridge | `completed` | `completed` | `1ded102` | `unresolved_auth` | `not_claimed` |
+| Tasks 9–12: hot swap, auto-next, history и responsive fullscreen | `completed` | `completed` | `1ded102` | `unresolved_auth` | `not_claimed` |
+| Tasks 13–14: lifecycle matrix, docs и compliance | `completed` | `completed` | `1ded102` | `unresolved_auth` | `not_claimed` |
+| Task 15: rollback/delivery evidence | `completed_local` | `completed` | `ab6532a` | `unresolved_auth` | `not_claimed` |
+| Native iOS fullscreen evidence | `not_applicable_to_code` | `unresolved_device` | `not_applicable` | `not_applicable` | `unresolved_device` |
+| Rolling roadmap update | `not_applicable_to_runtime` | `documentation_gate_required` | `pending_commit` | `unresolved_auth` | `not_applicable` |
+
+Статусы независимы. `completed` code не означает published remote, deployed
+production или проверенный native iOS. Отсутствующий внешний evidence никогда
+не понижает уже проверенный локальный runtime, но остаётся видимым gate.
+
+### Монотонная нумерация и intake
+
+- Tasks 1–15 никогда не перенумеровываются и не переписываются под новый scope.
+- Следующий принятый work item получает первый свободный номер начиная с
+  `Task 16`; удалённый кандидат не освобождает и не переиспользует номер.
+- `Task 20+` создаётся только после датированного evidence. Линия roadmap может
+  быть без верхнего предела, но в `in_progress` находится не более одной
+  player-задачи, если две задачи меняют общие PHP/JavaScript/Blade/CSS contracts.
+- Независимый read-only browser/provider audit может идти рядом только когда он
+  не меняет shared files, index, runtime или production state.
+- Новый Task сначала появляется в этом документе с reason, exact scope,
+  expected files, protected contracts, cross-feature matrix, RED/verification,
+  rollback и delivery gate. Только затем разрешены application edits.
+- Неподтверждённая идея остаётся trigger в permanent lane и не получает fake
+  checkbox, UI control, route, schema, environment variable или package.
+
+### Definition of Ready
+
+Будущий player Task готов к реализации только когда одновременно выполнено:
+
+1. Записан конкретный business, correctness, security, accessibility,
+   compatibility, performance или maintenance reason.
+2. Есть воспроизводящий тест, browser trace, production-safe observation,
+   provider contract, реальное устройство или authoritative version guidance.
+3. Проверены текущие `CatalogTitlePlayer`, `CatalogTitlePlaybackQuery`,
+   `CatalogPlayerTransitionFactory`, resolver/entitlement/progress boundaries,
+   `player.js`, `player-menu.js`, `player-navigation.js`, Blade, translations,
+   tests и тематические docs.
+4. Перечислены exact files и public/persisted contracts, которые должны
+   остаться совместимыми.
+5. Оценены routes, migrations, translations, cache keys, permissions,
+   progress/history, SEO, API, importer/admin, mobile, Premium/region/legal,
+   production assets и rollback.
+6. Любой dependency/runtime/provider change имеет отдельный decision record и
+   official version-specific evidence.
+7. Любое production действие имеет authority, previous known-good release,
+   data/asset safety и failure-recovery plan.
+8. Shared `main` и index не содержат чужого staged scope, который попадёт в
+   task commit или будет перезаписан.
+
+Если хотя бы одно обязательное условие отсутствует, статус задачи —
+`unresolved_prerequisite`, а не `in_progress`.
+
+### Definition of Done
+
+Будущий player Task завершён только когда:
+
+1. RED воспроизводит именно заявленный дефект или missing contract.
+2. Минимальный GREEN сохраняет один player lifecycle и server-owned access.
+3. Focused PHPUnit/contract tests, соответствующий Playwright matrix, Vite
+   build и применимые full gates проходят на окончательном diff.
+4. Проверены stale generations, cleanup, progress context, history,
+   translations, keyboard/touch/focus, source privacy и fallback bounds.
+5. Нет нового raw provider URL, client-trusted entitlement, второго player,
+   polling/timeupdate request, fake capability, unbounded list или global cache
+   flush.
+6. Canonical playback/frontend/security/performance/production owners,
+   current-task compliance, `README.md` при реальном product/roadmap change и
+   русский `CHANGELOG.md` отражают только фактический результат.
+7. Rollback охватывает code, matching Vite manifest/assets, schema/data/config
+   только если они действительно изменились; unsafe rollback честно запрещён.
+8. Task-owned diff изолированно закоммичен в существующей `main`, push
+   выполнен либо внешний отказ записан как `unresolved`.
+9. Не выполненная real-device/provider/production проверка остаётся отдельным
+   status, а не маскируется локальным test pass.
+
+### Постоянные workstream lanes
+
+| Lane | Trigger для нового Task | Защищённые contracts |
+| --- | --- | --- |
+| Delivery и production | Git authentication восстановлена, появился release authority или deployment evidence | direct-to-`main`, matching code/manifest/assets, no history rewrite, documented rollback |
+| Correctness и state machine | Воспроизводимый stale-response, double-transition, ended/final/blocked-play или cleanup defect | generation ordering, один session/video/Plyr/HLS, finite retry |
+| Access, security и privacy | Изменился entitlement/provider/legal contract или найден конкретный IDOR/SSRF/leak | server revalidation, viewer binding, allowlist/public DNS, no raw URL/private context |
+| Browser и platform | Новый подтверждённый WebKit/Chromium/Firefox/OS behavior либо regression | feature detection, no fake fullscreen/PiP, playsinline, standard fallback |
+| Formats и media capabilities | Каталог действительно получил разрешённый HLS/audio/subtitle/format contract | truthful capability UI, importer/admin ownership, codec/CORS/Range/MIME evidence |
+| Progress, history и preferences | Воспроизводимое смешение episode/token/sequence, resume, completion или device/account precedence | `(user_id, episode_id)`, monotonic writes, bounded anonymous store, stable preference key |
+| UX, accessibility и localization | Реальная keyboard/touch/screen-reader/zoom/long-label проблема | RU/EN parity, semantic dialog, 44 px targets, no internal scroll, reduced motion |
+| Performance и payload | Измеренный query, hydration, bundle, memory, startup, prefetch или playback latency regression | bounded menu/prefetch, no N+1/full graph, no unmeasured claim |
+| Provider reliability | Подтверждённый Range/CORS/MIME/manifest/segment/outage pattern | bounded retry/fallback, provider controls intact, safe user error |
+| API, importer и administration | Existing shared media/profile contract меняется у одного из соседних owners | canonical media identity, web/mobile parity, importer idempotency, one admin domain |
+| Maintenance и upgrades | Authoritative advisory, EOL, deprecation или justified compatibility need | isolated version group, lock review, browser matrix, production rollback |
+| Support и observability | Реальные tickets/health observations не позволяют безопасно диагностировать player defect | low-cardinality secret-free context, no playback analytics/fingerprinting by default |
+
+### Триггеры, которые не создают задачу автоматически
+
+- Появление более новой версии Laravel, Livewire, Plyr, HLS.js, Vite,
+  Tailwind, Node или Playwright без project-specific benefit.
+- Желание показать отдельный audio/subtitle selector без нормализованных tracks
+  и реально выдаваемых URLs.
+- DRM, MPEG-DASH, transcoding, offline video, generic proxy, HLS merge,
+  protected-stream scraping или fake CSS fullscreen без отдельного approved
+  product/legal/security/provider design.
+- Один client playback error без server/provider corroboration.
+- Желание добавить analytics, fingerprinting, heartbeat на каждую секунду,
+  polling или permanent source URL ради удобства диагностики.
+- Непроверенное обещание одинакового fullscreen/PiP/background поведения на
+  всех browser/OS.
+
+---
+
+### Task 16: Опубликовать локально проверенный player baseline
+
+**Status:** `unresolved_auth`. Это delivery-only Task; application code,
+schema, assets и документация не меняются только ради повторной попытки.
+
+**Files:**
+
+- Verify: Git history and configured remote.
+- Modify only after factual status change:
+  `docs/superpowers/plans/2026-07-24-player-seamless-episode-switching.md`
+  and `docs/plans/current-task-plan.md`.
+
+**Interfaces:**
+
+- Consumes: local commits `1ded102`, `ab6532a` and the later isolated rolling
+  plan commit.
+- Produces: ordinary fast-forward publication evidence for `origin/main`, or
+  an exact external failure classified `unresolved`.
+
+- [ ] **Step 1: Confirm exact branch and task commits**
+
+Run:
+
+```bash
+git status --short --branch
+git branch --show-current
+git log --oneline --decorate -12
+git remote -v
+```
+
+Expected: branch is `main`; player commits remain ancestors of `HEAD`; no
+credential value is printed or written.
+
+- [ ] **Step 2: Confirm no history rewrite is required**
+
+Run:
+
+```bash
+git merge-base --is-ancestor origin/main HEAD
+git rev-list --left-right --count origin/main...HEAD
+```
+
+Expected: `origin/main` is an ancestor of local `HEAD`; only ordinary
+fast-forward push is permitted. A failure stops the task for manual review;
+force push, rebase and reset are forbidden.
+
+- [ ] **Step 3: Execute the configured push**
+
+Run:
+
+```bash
+git push origin main
+```
+
+Expected: success updates `origin/main`. Missing HTTPS credentials or remote
+access remains `unresolved_auth`; do not edit remote credentials, expose a
+token or claim publication.
+
+- [ ] **Step 4: Record only the factual outcome**
+
+On success, update both plan ledgers with the published `HEAD` and remote
+status `completed`. On failure, keep the exact safe error category without
+username, token, private hostname or credential detail.
+
+- [ ] **Step 5: Commit a status-only correction only when it adds new evidence**
+
+Do not create a commit that merely repeats the same authentication failure.
+If publication status changed, run docs checks, stage only the two plan hunks,
+commit on `main`, and publish that follow-up through the same ordinary push.
+
+---
+
+### Task 17: Проверить native iOS/WebKit fullscreen на реальном устройстве
+
+**Status:** `unresolved_device`. Реализация не начинается без физического
+iPhone/iPad или эквивалентного approved device-lab evidence.
+
+**Files:**
+
+- Modify after evidence:
+  `docs/audits/video-playback-report.md`
+- Modify after evidence:
+  `docs/superpowers/plans/2026-07-24-player-seamless-episode-switching.md`
+- Modify after evidence:
+  `docs/plans/current-task-plan.md`
+- Test only if a defect is reproduced:
+  `tests/browser/player-lifecycle.spec.js`
+- Runtime files are chosen only after a reproduced defect and a new finite
+  implementation sub-plan.
+
+**Interfaces:**
+
+- Consumes: a published compatible build, public/authenticated test accounts,
+  one title with at least two playable episodes and two real source variants
+  when translation switching is tested.
+- Produces: device/OS/browser/build matrix, exact pass/fail behavior and either
+  confirmed limitation or a new bounded defect Task.
+
+- [ ] **Step 1: Record safe test identity**
+
+Record only device model family, iOS/iPadOS version, Safari/WebKit version,
+orientation and application commit/build identity. Do not record account,
+provider URL, signed grant, IP, cookie, token or private hostname.
+
+- [ ] **Step 2: Test inline and native fullscreen transitions**
+
+Execute manually:
+
+1. Start episode 1 inline and enter native fullscreen.
+2. Let immediate auto-next move to episode 2.
+3. Confirm whether native fullscreen remains active and playback continues.
+4. Exit to inline player and confirm menu, labels, URL and controls match
+   episode 2.
+5. Repeat with manual episode selection after returning inline.
+6. Repeat with orientation change and browser Back/Forward.
+
+Expected: no duplicate audio/session, no stale episode/progress context, and
+the inline player is recoverable even if OS fullscreen exits by platform
+design.
+
+- [ ] **Step 3: Test honest platform limitations**
+
+Confirm custom HTML menu is not claimed inside OS-owned native fullscreen when
+WebKit does not expose it. Confirm no fake fullscreen, device sniffing or
+hidden unsupported control was introduced.
+
+- [ ] **Step 4: Classify the result**
+
+- `completed`: behavior matches the documented limitation and no correctness
+  defect exists.
+- `unresolved_device`: device/build evidence is incomplete.
+- `new_defect`: duplicate session, stale progress/source, unrecoverable UI or
+  unsafe access behavior is reproducible.
+
+Only `new_defect` creates the next numbered implementation Task with RED
+evidence and exact affected files.
+
+- [ ] **Step 5: Update evidence and verify documentation**
+
+Run:
+
+```bash
+php artisan project:docs-refresh --check
+bash scripts/ci-check.sh docs
+git diff --check
+```
+
+Expected: docs pass and claims match the recorded device evidence.
+
+---
+
+### Task 18: Активировать matching player release и выполнить production smoke
+
+**Status:** `unresolved_authority`; blocked by Task 16 publication and explicit
+deployment authority. This Task never edits `.env`, restarts services, clears
+cache or deploys automatically without that authority.
+
+**Files:**
+
+- Verify/update after factual execution:
+  `docs/deployment.md`
+- Verify/update after factual execution:
+  `docs/audits/video-playback-report.md`
+- Update status:
+  `docs/superpowers/plans/2026-07-24-player-seamless-episode-switching.md`
+- Update status:
+  `docs/plans/current-task-plan.md`
+
+**Interfaces:**
+
+- Consumes: published intended commit, its matching Vite manifest/hashed
+  assets, previous known-good release and canonical deployment runbook.
+- Produces: safe activation/rollback evidence; no new application contract.
+
+- [ ] **Step 1: Satisfy activation prerequisites**
+
+Verify explicit intended commit, clean deploy source, matching locked
+dependencies, matching built assets, previous known-good release, backup
+decision, web/PHP runtime compatibility and authorized operator.
+
+Expected: any missing prerequisite blocks activation without changing runtime.
+
+- [ ] **Step 2: Activate code and matching assets as one release**
+
+Follow the existing deployment runbook. Do not mix new PHP/Blade/lang with old
+Vite manifest or old PHP with new player chunks. Do not use `Cache::flush()`,
+`cache:clear`, queue deletion, migration rollback or storage cleanup as a
+player deployment step.
+
+- [ ] **Step 3: Perform bounded smoke**
+
+Verify:
+
+1. public title page and one authenticated title page;
+2. one signed source grant with `private, no-store`;
+3. MP4 play/pause/seek and keyboard exclusions;
+4. menu season/episode/translation switch;
+5. immediate auto-next and autoplay off;
+6. Back/Forward, progress resume and source fallback;
+7. standard fullscreen DOM identity on a supported browser;
+8. no first-party 4xx/5xx, console error or raw provider URL in HTML/action
+   payload.
+
+- [ ] **Step 4: Roll back on compatibility failure**
+
+Activate the previous known-good code and its matching manifest/assets
+together. Do not repair player rollout with schema/data/cache/queue mutations;
+the player change has no migration or data repair.
+
+- [ ] **Step 5: Record factual production state**
+
+Use only `completed`, `rolled_back`, `unresolved_authority` or
+`unresolved_environment`. Do not claim zero downtime, provider health, native
+iOS compatibility or successful production activation without direct evidence.
+
+---
+
+### Task 19: Выполнить post-activation regression и принять следующий Task
+
+**Status:** `blocked_by_task_18`.
+
+**Files:**
+
+- Modify only if new evidence changes a contract:
+  `docs/audits/video-playback-report.md`
+- Modify intake/ledger:
+  `docs/superpowers/plans/2026-07-24-player-seamless-episode-switching.md`
+- Modify compliance:
+  `docs/plans/current-task-plan.md`
+- Add or modify application/tests only in a separately promoted `Task 20+`.
+
+**Interfaces:**
+
+- Consumes: successful or rolled-back Task 18 evidence and bounded support/
+  browser/provider observations.
+- Produces: either `no_new_task` or exactly one prioritized next Task with
+  evidence and prerequisites.
+
+- [ ] **Step 1: Re-run deterministic regression on the published build**
+
+Run in the verified application checkout:
+
+```bash
+php artisan test --filter='CatalogPageTest|CatalogPlayerTransitionFactoryTest|CatalogTitlePlaybackQueryTest|CatalogPlayerCopyTest|FrontendAssetContractTest|LivewireWireIgnoreContractTest|PlaybackTransitionDataTest|PlayerEpisodePageDataTest'
+npm run build
+npx playwright test tests/browser/player-lifecycle.spec.js
+```
+
+Expected: focused PHP, Vite and player browser matrix pass against the intended
+build. A failure is classified before any code edit.
+
+- [ ] **Step 2: Compare bounded runtime observations**
+
+Review only safe low-cardinality evidence: first-party response status,
+player initialization count, transition result code, provider error category,
+browser/platform and timestamp. Do not introduce analytics or retain source
+URLs, grants, account identity, cookies or per-second playback events.
+
+- [ ] **Step 3: Select the next work item**
+
+Priority order:
+
+1. security/privacy/data-integrity defect;
+2. reproducible correctness/progress/session defect;
+3. accessibility regression;
+4. provider/browser compatibility regression;
+5. measured performance regression;
+6. maintenance need with authoritative evidence;
+7. confirmed new capability with complete domain/provider contract.
+
+If no evidence meets Definition of Ready, record `no_new_task` and leave
+`Task 20+` uncreated.
+
+- [ ] **Step 4: Add exactly one next numbered Task**
+
+The new task must include exact evidence, files, interfaces, RED/GREEN
+commands, compatibility matrix, rollback and delivery gate. It may add more
+future triggers to a lane, but it must not pre-approve speculative code,
+dependencies, routes, schema, provider access or production action.
+
+---
+
+## Rolling plan self-review
+
+- [x] Existing Tasks 1–15 remain in the same document and retain historical
+  implementation details.
+- [x] Completed code, remote delivery, production activation and real-device
+  evidence are separate statuses.
+- [x] Initial Tasks 16–19 are finite, ordered and blocked honestly where
+  external prerequisites are absent.
+- [x] `Task 20+` has no artificial ceiling and is created only from dated
+  evidence through Definition of Ready.
+- [x] Permanent lanes cover correctness, security/privacy, browser/platform,
+  media capabilities, progress, UX/a11y/localization, performance, provider
+  reliability, integration, maintenance and operations.
+- [x] No placeholder, fake capability, invented package/update, provider URL,
+  production claim or destructive instruction was added.
+- [x] No route, schema, cache, queue, service worker, dependency, runtime or
+  application behavior changes in this planning update.

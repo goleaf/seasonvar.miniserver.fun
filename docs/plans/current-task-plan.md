@@ -529,6 +529,69 @@ Rollback реализации: вернуть прежний countdown/обыч�
 Дата: 24.07.2026
 Статус: implementation, verification и local commit завершены; push заблокирован отсутствующей HTTPS-аутентификацией GitHub.
 
+## Активная актуализация — безлимитный player roadmap
+
+Статус planning scope: `completed_local`; documentation gates пройдены, task-owned commit/push ещё не выполнены. Существующий план
+[`2026-07-24-player-seamless-episode-switching.md`](../superpowers/plans/2026-07-24-player-seamless-episode-switching.md)
+становится единственным безлимитным master plan проигрывателя; параллельный документ не создаётся.
+
+### Решение и границы
+
+- Tasks 1–15 сохраняются как неизменяемый исторический baseline реализованного бесшовного проигрывателя и получают честный completed/delivery ledger.
+- Новые задачи получают только монотонные номера `Task 16+`; прежние номера, evidence и зависимости не перенумеровываются.
+- Безлимитность означает отсутствие искусственного потолка по числу будущих evidence-driven задач, а не бесконечное исполнение одной задачи, неограниченные запросы, polling, хранение данных или расширение authority.
+- Каждая новая задача остаётся конечной, TDD-проверяемой, обратимой и получает собственные requirements intake, expected files, protected contracts, cross-feature matrix, production/rollback review, verification и commit/push gate.
+- Первичная очередь после planning update: remote delivery → real-device iOS/WebKit evidence → production activation smoke → post-deploy regression. Возможности HLS/audio/subtitles/DRM/offline/PWA не становятся задачами реализации без подтверждённых данных, provider/legal/security contract и отдельного user-approved design.
+- Текущий planning change не меняет PHP, Blade, JavaScript, CSS, routes, schema, database, cache, queues, dependencies, assets, `.env` или production services.
+
+### Expected files planning-актуализации
+
+- Modify: `docs/superpowers/plans/2026-07-24-player-seamless-episode-switching.md`
+- Modify: `docs/superpowers/specs/2026-07-24-player-seamless-episode-switching-design.md`
+- Modify: `docs/plans/current-task-plan.md`
+- Modify: `README.md` — только roadmap, без фиктивной visitor-history записи
+- Modify: `CHANGELOG.md` — отдельная русская planning-only запись
+
+### Protected contracts и риски
+
+| Область | Статус | Evidence / ограничение |
+| --- | --- | --- |
+| Один player lifecycle | `already_compliant` | Один `CatalogPlayerSession`, `<video>`, Plyr, full `wire:ignore` и не более одного HLS.js instance сохраняются |
+| Source access/privacy | `already_compliant` | Server-side hierarchy/entitlement/source revalidation и один same-origin signed grant остаются authority; raw provider URL запрещён |
+| Progress/preferences/history | `already_compliant` | `EpisodeViewProgress`, progress token/sequence, `seasonvar.account-preferences.v1`, URL Back/Forward и discussion target не переопределяются планом |
+| Routes/API/SEO | `not_applicable` | Planning-only изменение не добавляет и не меняет public route/API/canonical |
+| Schema/migrations/data | `not_applicable` | Таблицы, индексы и persisted identities не меняются |
+| Translations/UI/assets | `not_applicable` | Runtime copy/layout/build не меняются; будущие UI tasks обязаны сохранять RU/EN parity и browser matrix |
+| Cache/queues/service worker | `not_applicable` | Новый key/domain/job/scheduler/offline layer не создаётся |
+| Dependencies/runtime | `not_applicable` | Manifests и lock files не меняются; будущие updates проходят отдельный maintenance decision |
+| Production activation | `unresolved` | Remote delivery и production smoke требуют внешней Git/deployment authority |
+| Native iOS fullscreen | `unresolved` | Chromium emulation не доказывает WebKit/OS source swap; fake fullscreen запрещён |
+| Shared worktree/index | `unresolved` | Concurrent importer/system work сохраняет unstaged application/shared-doc changes; task commit обязан использовать только точные player-plan hunks и не включать чужой scope |
+
+### Requirement-compliance matrix planning-актуализации
+
+| Требование | Статус | Evidence |
+| --- | --- | --- |
+| Root instructions и canonical read order | `completed` | `AGENTS.md`, requirement index и обязательные owners перечитаны 24.07.2026 |
+| Existing implementation и versions | `completed` | Проверены runtime, player owners, recent commits и installed PHP/Laravel/Livewire/frontend versions |
+| Existing design/master/current plan | `completed` | Approved spec, Tasks 1–15, stale statuses/checklists и текущий player section просмотрены до edit |
+| Expected files/contracts/risks | `completed` | Перечислены выше до изменения master plan |
+| Cross-feature impact | `completed` | Rolling lanes обязаны проверять auth, privacy, translations, cache, SEO, mobile, progress, importer/admin/API и production |
+| README policy | `completed` | Добавлен один factual roadmap item; visitor-history не менялась, её положение последним H2 сохранено |
+| CHANGELOG | `completed` | Добавлена отдельная русская planning-only запись без runtime/production claim |
+| Verification | `completed` | Placeholder/status scan, README policy, managed-doc check, docs CI и `git diff --check` прошли; полный working-copy CHANGELOG scan отдельно видит concurrent строку другого scope |
+| Commit/push | `unresolved` | Зависит от безопасного освобождения concurrent staged index и внешней HTTPS-аутентификации |
+
+### Verification evidence planning-актуализации
+
+- Existing master plan сохранён на прежнем пути; отдельный player roadmap не создан.
+- 150 исторических шагов Tasks 1–15 синхронизированы с уже записанным runtime/test evidence; future Tasks 16–19 остаются открыты и имеют независимые external prerequisites.
+- Master plan содержит монотонный intake `Task 20+`, раздельный execution ledger, Definition of Ready/Done, 12 постоянных workstream lanes и explicit non-triggers для неподтверждённых capabilities.
+- Design spec больше не заявляет, что реализация не начата; старый countdown явно помечен как исторический baseline.
+- `scripts/check-readme-policy.sh README.md`, `php artisan project:docs-refresh --check`, `bash scripts/ci-check.sh docs` и `git diff --check` завершились успешно.
+- `scripts/check-changelog-policy.sh CHANGELOG.md` для полной общей working copy отдельно предупреждает о concurrent importer/system planning text; task-owned staged версия проверяется перед commit и не должна включать эти строки.
+- PHP/Blade/JavaScript/CSS, routes, schema, database, cache, queues, dependencies, assets, `.env` и production services этой planning-задачей не менялись; application tests/build не требуются для documentation-only diff.
+
 ## Цель и согласованное решение
 
 - [x] Проверить существующий player/Plyr/Livewire lifecycle и keyboard preference.
