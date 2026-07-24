@@ -32,23 +32,24 @@
 | --- | --- | --- |
 | Task 1 — operational baseline | `completed` | Dated read-only evidence is committed in `2227c08`; no production state was mutated. |
 | Task 2 — Redis persistence observability | `completed` | TDD implementation and documentation are committed in `2227c08`; `app:health --json` now reports `redis_persistence=failed` while preserving `ready=true`. |
-| Task 1–2 remote delivery | `unresolved` | The normal push reached configured `origin` but failed because HTTPS credentials were unavailable. The latest read-only snapshot counts 19 local commits ahead; this count grows with later evidence commits until Task 29 delivers them. No force push or history rewrite is allowed. |
+| Task 1–2 remote delivery | `unresolved` | The normal push reached configured `origin` but failed because HTTPS credentials were unavailable. The latest read-only snapshot counts 25 local commits ahead; this count grows with later evidence commits until Task 29 delivers them. No force push or history rewrite is allowed. |
 | Task 3 — controlled Redis recovery | `unresolved` | Blocked before any mutation: independent protected backup, exact Redis process-manager ownership, maintenance/session-impact approval and producer stop boundary are not verified. |
 | Tasks 4–6 and 8–28 | `not_started` | They remain ordered behind the Task 3 recoverability gate unless a task is explicitly marked cross-cutting and read-only. Task 7 is superseded by importer Task 3 and must not create a second retention boundary. |
-| Importer child roadmap | `implementation_prepared_uncommitted` | Importer Tasks 2–3 report focused implementation complete, but their files remain unstaged/uncommitted in the shared checkout and production activation remains gated by Tasks 3–5 of this plan. Importer Task 4 is only the next code-preparation candidate. |
-| Player child roadmap | `implementation_committed_local` | Seamless-player runtime work reports full PHPUnit/build/browser evidence and is committed locally in `1ded102`, with delivery evidence in `ab6532a`; remote delivery remains unresolved and deployment must not be combined with Redis, database, dependency or process-control work. |
-| Shared delivery state | `handoff_observed` | The player owner released the shared Git index through isolated commits `1ded102` and `ab6532a`; importer work remains unstaged/untracked. Task 30 base preparation is committed locally, hook activation remains blocked, and Task 32 will bind a reviewed index fingerprint after Task 30 is active. |
-| Rolling extension Tasks 29+ | `in_progress` | Delivery recovery, shared-`main` ownership, child-roadmap reconciliation, reviewed-index binding and current-plan policy are evidence-backed Tasks 29–33. Later discoveries continue with monotonic IDs without changing completed history. |
+| Importer child roadmap | `implementation_in_progress_uncommitted` | Importer Tasks 2–3 remain in the shared unstaged/untracked scope and Task 4 is now reported `in_progress_tdd`; production activation remains gated by Tasks 3–5 of this plan. No importer file belongs to the system planning manifest. |
+| Player child roadmap | `roadmap_committed_local` | Seamless-player runtime work is committed in `1ded102`/`ab6532a`; its unlimited roadmap and delivery evidence are committed in `a14cdf5`/`f22e755`. Remote delivery remains unresolved and deployment must not be combined with Redis, database, dependency or process-control work. |
+| Collection diagnostics workstream | `implementation_verified_uncommitted` | The collection-specific plan reports focused RED/GREEN, 72 tests / 431 assertions and Vite verification, but code, translations, owner docs and its task plan remain uncommitted in the shared checkout. Public collection, matching, route, cache and recommendation contracts are unchanged. |
+| Shared delivery state | `repeated_collision_observed` | Task 30 base preparation is committed in `ad5c13c`; Task 32 standalone index approval is committed in `2a7f636` with evidence `cb83684`. During Task 32 verification another owner added a player-plan path to the staged set and later removed only its own path before `f22e755`; this proves that a reviewed digest needs both hook activation and a declared-path boundary. |
+| Rolling extension Tasks 29+ | `in_progress` | Delivery recovery, shared-`main` ownership, cross-workstream reconciliation, reviewed-index binding, current-plan policy and declared-path ownership are evidence-backed Tasks 29–34. Later discoveries continue with monotonic IDs without changing completed history. |
 
 Task 1 and Task 2 were delivered as one isolated Batch 1 commit because they shared operations owners while unrelated importer/player changes already occupied the worktree. This is a recorded commit-granularity deviation, not a reason to rewrite `main`. Every later implementation task returns to one independently reviewable commit.
 
-The Tasks 32–33 roadmap extension is committed locally in `cb432c7`. A normal push to configured `origin` failed with unavailable HTTPS credentials, so remote delivery remains `unresolved` under Task 29; no force push, alternate branch, credential storage or history rewrite was used.
+The Tasks 32–33 roadmap extension is committed locally in `cb432c7`. Task 32 standalone preparation is committed in `2a7f636` with delivery evidence `cb83684`; the player roadmap follow-up is committed in `f22e755`. Normal pushes to configured `origin` failed with unavailable HTTPS credentials, so remote delivery remains `unresolved` under Task 29; no force push, alternate branch, credential storage or history rewrite was used.
 
 ## Baseline Evidence — 24.07.2026
 
 | Boundary | Verified state |
 | --- | --- |
-| Git | `main`; 19 local commits ahead of `origin/main`; index currently free after player commits `1ded102` and `ab6532a`; unstaged importer scope and unrelated `composer.lock` patch must not be mixed or absorbed accidentally |
+| Git | `main` at `f22e755`; 25 local commits ahead of `origin/main`; index free at the dated snapshot; unstaged importer/collection scopes and unrelated `composer.lock` patch must not be mixed or absorbed accidentally |
 | Application | PHP `8.5.8`; Laravel runtime `13.21.1`; Livewire `4.3.3`; Boost `2.4.13`; Pint `1.29.3`; PHPUnit `12.5.31` |
 | Frontend | Node `26.4.0` Current; npm `12.0.1`; Vite `8.1.4`; Tailwind `4.3.2`; Playwright `1.61.1` |
 | Services | nginx `1.31.3`; Redis `8.6.4`; Memcached `1.6.39`; SQLite `3.46.1`; PHP-FPM `8.5.8` |
@@ -2221,7 +2222,7 @@ New tasks never grant authority to mutate production data, stop processes, overw
 
 ### Task 29: Restore Authenticated Fast-Forward Delivery of `main`
 
-**Status:** `unresolved_external`; the latest read-only snapshot is 19 commits ahead of `origin/main`, HTTPS authentication is still unavailable, and the shared worktree remains dirty with uncommitted importer work. This task may run independently of production recovery only after exact stream commits and Task 30 ownership handoff make the checkout clean.
+**Status:** `unresolved_external`; the latest read-only snapshot is 25 commits ahead of `origin/main`, HTTPS authentication is still unavailable, and the shared worktree remains dirty with uncommitted importer and collection work. This task may run independently of production recovery only after exact stream commits and Task 30 ownership handoff make the checkout clean.
 
 **Files:**
 - Modify: `docs/development.md` only if the verified credential mechanism changes the documented workflow
@@ -2302,7 +2303,7 @@ Stage only files that actually changed. Verify the final remote ref again. If no
 
 ### Task 30: Serialize Shared-`main` Delivery Ownership
 
-**Status:** `preparation_completed_local`; Steps 1–3 were prepared, verified and committed in `main` as `ad5c13c` without touching live hooks. The configured remote rejected HTTPS authentication, so remote delivery remains `unresolved`. Steps 4–7 remain blocked until current importer/player owners finish or commit their exact work, because hook integration and shared documentation must not overwrite or interrupt their delivery.
+**Status:** `preparation_completed_local`; Steps 1–3 were prepared, verified and committed in `main` as `ad5c13c` without touching live hooks. The configured remote rejected HTTPS authentication, so remote delivery remains `unresolved`. Player handoff is commit-backed through `f22e755`; Steps 4–7 remain blocked until current importer and collection owners finish or commit their exact work, because hook integration and shared documentation must not overwrite or interrupt their delivery.
 
 **Reason:** Multiple independent tasks currently edit one checkout while project policy forbids branches and worktrees. The existing clean-tree guard prevents accidental partial commits but has no cooperative task-owner lease, leading to repeated guard bypass pressure and overlapping owner documents.
 
@@ -2395,7 +2396,7 @@ Before staging `README.md`, require a meaningful contributor-facing change. Do n
 
 ---
 
-### Task 31: Reconcile Child Roadmaps before Production Activation
+### Task 31: Reconcile Registered Workstream Roadmaps before Production Activation
 
 **Status:** `in_progress_read_only_snapshot`; Step 1 evidence is recorded below, but child files are concurrently owned and no child rollout may bypass Tasks 3–5. Reconciliation is not complete until every status is backed by an isolated commit.
 
@@ -2403,15 +2404,16 @@ Before staging `README.md`, require a meaningful contributor-facing change. Do n
 - Modify: `docs/superpowers/plans/2026-07-24-system-maintenance-and-optimization-master-plan.md`
 - Modify: `docs/superpowers/plans/2026-07-24-seasonvar-importer-improvement-master-plan.md`
 - Modify: `docs/superpowers/plans/2026-07-24-player-seamless-episode-switching.md`
+- Modify: `docs/superpowers/plans/2026-07-24-editorial-collection-health-diagnostics.md`
 - Modify: `docs/plans/current-task-plan.md`
 - Modify: affected canonical owner docs only when delivered behavior changed
 - Modify: `README.md` only for actual visitor/development/operations change
 - Modify: `CHANGELOG.md`
 
 **Interfaces:**
-- Consumes: completed commits and verification evidence from the system, importer and player streams.
-- Produces: one dated dependency/status matrix with no duplicated ownership and an explicit activation decision per child stream.
-- Preserves: system plan owns Redis/backup/process/deployment gates; importer plan owns importer internals; player plan owns playback behavior; current plan reports execution without redefining permanent requirements.
+- Consumes: completed commits and verification evidence from the system, importer, player, collection and later registered workstreams.
+- Produces: one dated dependency/status matrix with no duplicated ownership and an explicit activation decision per registered stream.
+- Preserves: system plan owns Redis/backup/process/deployment gates; importer plan owns importer internals; player plan owns playback behavior; collection plan owns collection diagnostics; current plan reports execution without redefining permanent requirements.
 
 - [x] **Step 1: Snapshot exact child status**
 
@@ -2427,11 +2429,12 @@ Read-only snapshot — 24.07.2026:
 
 | Stream | Verified state | Next non-bypassable gate |
 | --- | --- | --- |
-| System | `main` contains local commits through player evidence `ab6532a`, is 19 commits ahead of `origin/main`, Task 3 is still `unresolved`, and Task 30 preparation exists in `ad5c13c`. | Independent backup/process/maintenance evidence for Task 3; clean shared checkout and authenticated fast-forward for Tasks 29–30. |
-| Importer | Tasks 2–3 report implementation and focused verification complete, but their code/docs remain uncommitted in the shared checkout. Task 3 activation is disabled and blocked by importer Task 1/system Tasks 3–5. | Commit exact importer scope only after player index ownership is released; no production schedule/retention/data mutation. |
-| Player | Runtime plan reports full PHPUnit, Vite and Chromium evidence; its isolated implementation is committed locally in `1ded102`, with delivery evidence in `ab6532a`. Remote delivery remains unresolved. | Keep deployment separate from Redis/database maintenance and reconcile remote status only after verified delivery. |
-| Current plan | `docs/plans/current-task-plan.md` is 3,084 lines in the current shared snapshot and embeds several historical/parallel task bodies. | Task 27 archives completed bodies; Task 33 then prevents recurrence with a docs policy gate. |
-| Shared index | The player owner released the index through `1ded102` and `ab6532a`; importer files remain unstaged/untracked. | Preserve the completed handoff evidence; Task 30 serializes future ownership and Task 32 requires an explicit reviewed-index fingerprint before commit. |
+| System | `main` contains local commits through player roadmap evidence `f22e755`, is 25 commits ahead of `origin/main`, Task 3 is still `unresolved`, Task 30 preparation exists in `ad5c13c`, and Task 32 preparation/evidence exists in `2a7f636`/`cb83684`. | Independent backup/process/maintenance evidence for Task 3; clean shared checkout and authenticated fast-forward for Tasks 29–30/32. |
+| Importer | Tasks 2–3 remain uncommitted in the shared checkout and Task 4 reports active TDD implementation. Production activation is disabled and blocked by importer Task 1/system Tasks 3–5. | Commit exact importer scope only after an ownership handoff; no production schedule/retention/data mutation. |
+| Player | Runtime implementation/evidence is committed in `1ded102`/`ab6532a`; unlimited roadmap/evidence is committed in `a14cdf5`/`f22e755`. Remote delivery remains unresolved. | Keep deployment separate from Redis/database maintenance and reconcile remote status only after verified delivery. |
+| Collections | Diagnostics plan reports verified additive admin metrics, but collection PHP/Blade/translations/tests/docs remain uncommitted in the shared checkout. | Commit the exact collection manifest without importer/system files; keep provider sync, matching, public output and production state unchanged. |
+| Current plan | `docs/plans/current-task-plan.md` is 3,435 lines in the current shared snapshot, has 41 H1 headings and 8 active-like H1 headings. | Task 27 archives completed bodies; Task 33 then creates one linked registry and prevents recurrence with a docs policy gate. |
+| Shared index | During Task 32 delivery another owner inserted a player-plan path into the staged set; Task 32 commit stopped until that owner removed its path and completed `f22e755`. | Task 30 serializes ownership, Task 32 binds the final index, and Task 34 requires an exact declared path set before approval. |
 
 - [ ] **Step 2: Reconcile the dependency map**
 
@@ -2468,7 +2471,7 @@ For authentication, authorization, translations, caching, search, notifications,
 - [ ] **Step 5: Commit only reconciliation evidence**
 
 ```bash
-git add docs/superpowers/plans/2026-07-24-system-maintenance-and-optimization-master-plan.md docs/superpowers/plans/2026-07-24-seasonvar-importer-improvement-master-plan.md docs/superpowers/plans/2026-07-24-player-seamless-episode-switching.md docs/plans/current-task-plan.md CHANGELOG.md
+git add docs/superpowers/plans/2026-07-24-system-maintenance-and-optimization-master-plan.md docs/superpowers/plans/2026-07-24-seasonvar-importer-improvement-master-plan.md docs/superpowers/plans/2026-07-24-player-seamless-episode-switching.md docs/superpowers/plans/2026-07-24-editorial-collection-health-diagnostics.md docs/plans/current-task-plan.md CHANGELOG.md
 git add README.md
 git commit -m "docs: reconcile system and feature roadmaps"
 git push origin main
@@ -2480,7 +2483,7 @@ Stage only files with factual changes. If a child owner is concurrently editing 
 
 ### Task 32: Bind a Reviewed Git Index Snapshot to the Workspace Lease
 
-**Status:** `standalone_preparation_delivered_local_pending_activation`. The observed staged-player/unstaged-importer collision proves that owner identity alone does not prove the final index was reviewed. Steps 1–3 are committed in local `main` as `2a7f636`; the normal push reached `origin` but failed because HTTPS credentials are unavailable. Hook/guard integration, contributor workflow activation and the final Task 32 commit contract remain blocked behind the Task 30 handoff gate while the importer owner retains its unstaged scope. The preparation RED was `13` passed / `10` expected failures; standalone GREEN is `23` tests / `122` assertions, while the unchanged hook contract remains `17` tests / `95` assertions.
+**Status:** `standalone_preparation_delivered_local_pending_activation`. The observed staged-player/unstaged-importer collision proves that owner identity alone does not prove the final index was reviewed. Steps 1–3 are committed in local `main` as `2a7f636`, with delivery evidence in `cb83684`; the normal push reached `origin` but failed because HTTPS credentials are unavailable. During final verification another owner added a player-plan path to the staged set, so Task 32 stopped until that owner removed only its path and completed `f22e755`. Hook/guard integration, contributor workflow activation and the final Task 32 commit contract remain blocked behind the Task 30 handoff gate while importer and collection owners retain their unstaged scopes. The preparation RED was `13` passed / `10` expected failures; standalone GREEN is `23` tests / `122` assertions, while the unchanged hook contract remains `17` tests / `95` assertions.
 
 **Reason:** Task 30 serializes cooperative owner handoff, but an active owner can still inherit or accidentally accept previously staged paths. A commit must be bound to the exact reviewed final Git index. A SHA-256 snapshot detects every final index difference, but cannot prove the history of commands when an index is restored byte-for-byte before verification; the documented workflow therefore still requires explicit re-review and re-approval after staging operations.
 
@@ -2606,7 +2609,7 @@ Stage `README.md` only for an actual contributor-workflow change. Never include 
 
 ### Task 33: Enforce One Active Current-Plan Registry after Archival
 
-**Status:** `planned_after_tasks_27_and_31`. Task 27 performs the one-time lossless archive; Task 31 reconciles child status; this task prevents the 3,084-line multi-owner current plan from growing back.
+**Status:** `planned_after_tasks_27_and_31`. Task 27 performs the one-time lossless archive; Task 31 reconciles registered workstream status; this task prevents the now 3,435-line, 41-H1 multi-owner current plan from growing back.
 
 **Reason:** The current plan contains several historical and parallel full task bodies and multiple headings that claim to be current. Manual discipline has not preserved a single active owner, while the unlimited rolling protocol requires history to grow through linked archives and monotonic task IDs rather than one unbounded working file.
 
@@ -2627,7 +2630,8 @@ Stage `README.md` only for an actual contributor-workflow change. Never include 
 - Consumes: the lossless archive produced by Task 27 and the commit-backed stream matrix produced by Task 31.
 - Produces: a read-only documentation policy used locally, by `scripts/ci-check.sh docs`, pre-commit through the existing docs profile and CI.
 - The current file has exactly one H1 beginning `# Текущая задача`, one active workstream registry, one blocked/unresolved registry, one task-specific compliance matrix and linked latest evidence.
-- Completed historical bodies live only in dated archive files. Parallel importer/player/system work appears as links and status rows, not copied implementation plans.
+- Completed historical bodies live only in dated archive files. Parallel importer/player/collection/system work appears as links and status rows, not copied implementation plans.
+- Importer, player, collection and every later registered workstream has one row with exact owner plan, commit-backed status, declared owner/path manifest link and next non-bypassable gate.
 - The policy has no line-count ceiling and no maximum task ID: “безлимитный” remains evidence-driven and monotonic. It validates ownership/structure, not an artificial number of tasks.
 - Allowed machine statuses are exactly `planned`, `in_progress`, `completed`, `already_compliant`, `not_applicable` and `unresolved`, with optional documented qualifiers after `:`; unknown optimistic status text fails.
 
@@ -2680,6 +2684,7 @@ Do not delete historical evidence. Verify every moved heading has an archive tar
 system stabilization master plan;
 importer master plan;
 player plan until its delivery/activation closes;
+collection diagnostics plan until its delivery closes;
 remote delivery state;
 production activation blockers;
 latest commit-backed compliance evidence.
@@ -2726,6 +2731,141 @@ Stage `README.md` only when the supported development workflow actually changed.
 
 ---
 
+### Task 34: Bind Declared Task Paths to the Reviewed Index
+
+**Status:** `planned_after_tasks_30_and_32`. This task is a separate hardening layer, not a replacement for the owner lease, final-index SHA-256, human review or existing Git guards.
+
+**Reason:** During Task 32 delivery, another owner added a player-plan path to an already prepared staged set. The commit stopped and the foreign owner removed only its own path, but the incident proves a remaining pre-approval gap: an owner could accidentally review and approve a new snapshot that already contains a foreign path. The lease must therefore know the exact intended task path set before staging and require exact equality before index approval.
+
+**Files:**
+- Modify: `scripts/task-workspace-lease.sh`
+- Modify: `.githooks/lib/git-guard.sh`
+- Modify: `.githooks/pre-commit`
+- Modify: `tests/Unit/GitWorkspaceLeaseScriptTest.php`
+- Modify: `tests/Unit/CiQualityGateContractTest.php`
+- Modify: `docs/development.md`
+- Modify: `docs/plans/current-task-plan.md`
+- Modify: `README.md` only when the supported contributor sequence changes
+- Modify: `CHANGELOG.md`
+
+**Interfaces:**
+- Consumes: an active Task 30 lease, matching process-scoped `SEASONVAR_TASK_LEASE_TOKEN`, a human-reviewed NUL-delimited repository-relative path set declared before staging, and the Task 32 index-approval boundary.
+- Produces: `declare-paths <task-id>` and `verify-paths <task-id>` commands, an exact mode-`0600` `declared-paths` NUL file and an atomic mode-`0600` `declared-paths.meta` file inside the validated lease directory.
+- `declare-paths` reads only NUL-delimited stdin, requires a terminating NUL and at least one record, rejects empty or duplicate byte-identical records, absolute paths, any `.`/`..` component and `.git` itself or its descendants. Spaces, tabs and newlines remain valid filename bytes. It canonicalizes with `LC_ALL=C` binary-safe NUL sorting and never stages a file.
+- `verify-paths` compares the declared set with `git diff --cached --name-only -z --no-renames --`, also canonicalized with NUL-safe sorting. `--no-renames` intentionally represents a rename as the old deletion plus the new addition, so both owned paths must be declared.
+- A mode-only edit has the same single path; add/edit/delete paths are exact; any missing or additional staged path fails closed before `approve-index`.
+- `approve-index` invokes the path verification first. Pre-commit requires Task 30 ownership, Task 34 path equality and Task 32 final-index approval while preserving every existing main/conflict/sensitive/temporary/clean-tree/documentation guard.
+- Safe `status` may add only `paths_declared=yes|no`; it never prints paths, hashes, tokens, arguments, file contents or private absolute paths.
+- `release`/`recover` delete only the exact expanded allowlist after full preflight; symlinks, malformed metadata or unexpected entries keep the lease intact.
+
+- [ ] **Step 1: Write failing declared-path tests**
+
+Extend the temporary-repository PHPUnit suite with exact cases:
+
+```text
+declaration without an active lease fails;
+wrong task ID or token fails without replacing the first manifest;
+empty input, duplicate paths, absolute paths, dot segments and .git paths fail;
+tracked, deleted and new working-tree paths can be declared before staging;
+spaces and newline-containing paths remain NUL-safe and deterministic;
+status reports only paths_declared=yes|no;
+exact staged add/edit/delete/rename/mode sets verify successfully;
+one missing or one additional staged path fails;
+approve-index refuses a path mismatch even when the index is conflict-free;
+re-declaring an explicitly reviewed new set invalidates the previous index approval;
+release/recover remove only exact manifest/approval/lease files;
+declare/verify/approve do not change the index or working tree.
+```
+
+Never declare paths in the active shared repository from PHPUnit.
+
+- [ ] **Step 2: Run RED**
+
+```bash
+php artisan test --filter=GitWorkspaceLeaseScriptTest
+```
+
+Expected: existing Task 30/32 tests pass and the new cases fail because `declare-paths`, `verify-paths` and manifest files do not exist.
+
+- [ ] **Step 3: Implement the minimal NUL-safe manifest boundary**
+
+Use an exact repository-local temporary directory and binary-safe tools:
+
+```bash
+LC_ALL=C sort -zu
+git diff --cached --name-only -z --no-renames --
+```
+
+Write both manifest and metadata through mode-`0600` sibling temporary files and atomic renames only after every input path and lease/token/task field passes. Metadata contains exactly `task_id`, UTC `declared_at` and SHA-256 of the canonical NUL manifest. Parsing rejects duplicate, missing, unknown or malformed fields and all symlinks.
+
+Any successful new declaration removes only the exact existing `approved-index` file after complete validation because the previously approved index no longer has a proven relation to the new scope. Validation failure preserves the previous declaration and approval unchanged.
+
+- [ ] **Step 4: Integrate the hook after Tasks 30 and 32**
+
+Add a guard such as:
+
+```bash
+seasonvar_git_guard_require_declared_paths
+```
+
+Call order in pre-commit:
+
+```text
+main and exact workspace lease;
+conflicts and staged path safety;
+declared-path exact equality;
+reviewed final-index approval;
+unstaged/untracked clean-tree checks;
+README/CHANGELOG/docs and other quality gates.
+```
+
+Pre-push keeps the owner lease and clean-tree/full quality gates but does not require a non-empty path manifest or index approval after commit.
+
+- [ ] **Step 5: Run GREEN and regression verification**
+
+```bash
+php artisan test --filter=GitWorkspaceLeaseScriptTest
+php artisan test --filter=CiQualityGateContractTest
+bash -n scripts/task-workspace-lease.sh .githooks/pre-commit .githooks/pre-push .githooks/lib/git-guard.sh
+php artisan project:docs-refresh --check --no-interaction
+bash scripts/ci-check.sh docs
+git diff --check
+```
+
+Expected: all pass; the hook rejects undeclared, missing and foreign staged paths while every Task 30/32 and pre-existing Git guard remains active.
+
+- [ ] **Step 6: Document the contributor sequence and rollback**
+
+Document an exact path declaration before staging:
+
+```bash
+scripts/task-workspace-lease.sh acquire <task-id>
+printf '%s\0' path/one path/two |
+    SEASONVAR_TASK_LEASE_TOKEN=... scripts/task-workspace-lease.sh declare-paths <task-id>
+git add -- path/one path/two
+SEASONVAR_TASK_LEASE_TOKEN=... scripts/task-workspace-lease.sh verify-paths <task-id>
+git diff --cached --name-status
+git diff --cached --check
+SEASONVAR_TASK_LEASE_TOKEN=... scripts/task-workspace-lease.sh approve-index <task-id>
+git commit
+SEASONVAR_TASK_LEASE_TOKEN=... scripts/task-workspace-lease.sh release <task-id>
+```
+
+Documentation must state that task paths are repository metadata, not authorization; every staged diff still requires human review. Rollback removes only declared-path commands/files/guard/tests/docs and retains Task 30 ownership, Task 32 index approval and every older Git gate.
+
+- [ ] **Step 7: Commit and push in isolation**
+
+```bash
+git add scripts/task-workspace-lease.sh .githooks/lib/git-guard.sh .githooks/pre-commit tests/Unit/GitWorkspaceLeaseScriptTest.php tests/Unit/CiQualityGateContractTest.php docs/development.md docs/plans/current-task-plan.md CHANGELOG.md
+git add README.md
+git commit -m "feat: bind staged paths to task ownership"
+git push --porcelain origin main
+```
+
+Stage `README.md` only for the actual contributor-workflow change. Never include importer, player, collection, dependency, application or production files.
+
+---
+
 ## Deferred until a Separate Approved Decision
 
 - Redis `8.6.x → 8.8.x` major/minor update after persistence recovery, build provenance, module/client/session/queue/lock compatibility and restore proof.
@@ -2753,7 +2893,8 @@ Stage `README.md` only when the supported development workflow actually changed.
 - Local and remote `main` refs match after a normal authenticated fast-forward push; no credential or rewritten-history workaround was used.
 - Shared-checkout delivery has one cooperative owner at a time while every existing main/conflict/path/clean-tree/documentation guard remains enforced.
 - Every commit from a shared checkout is bound to an explicitly reviewed final staged-index SHA-256; any final index difference invalidates approval without storing paths, contents or credentials, while byte-identical restoration remains an explicit procedural re-approval boundary.
-- System, importer and player roadmaps contain commit-backed statuses and an explicit non-conflicting production activation/deployment order.
+- Every reviewed index has an exact predeclared NUL-safe task path set; any missing or foreign staged path fails before approval without printing paths, hashes, tokens or private absolute locations.
+- System, importer, player, collection and later registered roadmaps contain commit-backed statuses and an explicit non-conflicting production activation/deployment order.
 - The current-plan registry has one active owner and linked commit-backed stream rows; completed bodies remain losslessly archived, and the docs gate prevents a copied second active plan without imposing a task/line ceiling.
 - README, canonical owners, maintenance registries, current plan, Russian changelog and final compliance matrix match actual state.
 - Every completed allowed change is committed in existing `main`; push result is reported truthfully.

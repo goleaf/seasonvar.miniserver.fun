@@ -224,6 +224,93 @@
 
 - [x] Обычная попытка push выполнена без ослабления push guard; remote отклонил HTTPS-аутентификацию, поэтому доставка остаётся `unresolved`.
 
+## Актуализация безлимитного system plan — declared-path ownership
+
+Дата: 24.07.2026
+Статус: `planning_completed_pending_delivery`; обновлён существующий system master plan без нового параллельного roadmap, application/runtime/data не меняются.
+
+### Проверенный baseline и решение
+
+- [x] Повторно прочитаны root `AGENTS.md`, canonical requirements, documentation map, текущий/master plans и применимые maintenance/production/system-integration owners.
+- [x] Laravel Boost подтвердил PHP `8.5`, Laravel `13.21.1`, SQLite, Livewire `4.3.3`, Boost `2.4.13`, Pint `1.29.3`, PHPUnit `12.5.31` и Tailwind CSS `4.3.2`.
+- [x] Host tools подтверждают PHP `8.5.8`, Node `26.4.0`, npm `12.0.1`, Git `2.52.0` и SQLite `3.46.1`.
+- [x] `main` находится на `f22e755`, опережает `origin/main` на `25` commit’ов; configured HTTPS remote по-прежнему не имеет доступной аутентификации.
+- [x] Task 32 standalone preparation зафиксирована как `2a7f636`, delivery evidence — `cb83684`; hooks ещё не требуют lease/index approval.
+- [x] Player roadmap и evidence зафиксированы как `a14cdf5`/`f22e755`, а общий index после handoff свободен.
+- [x] Importer Task 4 и diagnostics редакционных подборок остаются отдельными незакоммиченными workstreams. Их application/config/docs/tests, `composer.lock` и task plans нельзя включать в system planning scope.
+- [x] Во время Task 32 verification другой owner добавил player-plan в уже подготовленный staged manifest; commit был остановлен, foreign path удалил только его владелец. SHA-256 approval обнаружит изменение после approval, но до approval остаётся риск случайно принять чужой путь как часть нового reviewed snapshot.
+- [x] `docs/plans/current-task-plan.md` вырос до `3435` строк, содержит `41` H1 и `8` active-like H1. Task 27/33 уже владеют lossless archive и single-registry policy; новый план не дублирует эту архитектуру.
+
+### Новая очередь без перенумерации истории
+
+1. Tasks 1–33 сохраняют прежние номера, completed evidence и dependency graph.
+2. Task 29 остаётся внешне заблокированной до credentials вне repository и clean exact `main`.
+3. Tasks 30 и 32 активируют cooperative lease и reviewed-index hook только после завершения активных importer/collection owners.
+4. Task 31 расширяет read-only reconciliation на collection diagnostics и любые будущие зарегистрированные workstreams, не копируя их domain plans.
+5. Task 33 после Task 27/31 превращает current plan в один registry с links, сохраняя unlimited monotonic intake без line/task ceiling.
+6. Новый Task 34 после Tasks 30/32 связывает lease с заранее объявленным exact NUL-safe path manifest. Staged path set обязан точно совпасть с declared set до index approval; это не заменяет human review или существующие guards.
+7. Task 35+ добавляется только по новому измеренному evidence с exact files/contracts/dependencies/rollback/verification/docs/delivery gates.
+
+### Expected changed files
+
+- Modify: `docs/superpowers/plans/2026-07-24-system-maintenance-and-optimization-master-plan.md`
+- Modify: `docs/plans/current-task-plan.md`
+- Modify: `README.md` — только factual development-roadmap bullet, без visitor-history claim
+- Modify: `CHANGELOG.md` — отдельная русская planning-only запись
+
+### Files и contracts, которые сохраняются
+
+- Preserve unchanged: `scripts/task-workspace-lease.sh`, `.githooks/*`, `tests/Unit/GitWorkspaceLeaseScriptTest.php`, `tests/Unit/CiQualityGateContractTest.php`, `docs/development.md`.
+- Preserve foreign: importer/collection PHP, config, routes, translations, tests, task plans, `composer.lock`, shared owner-document hunks и любые production artifacts.
+- Preserve public/runtime: routes, route names, schema, migrations, DB rows, cache keys, queues, permissions, translations, API/resources, player/importer behavior, dependencies и assets.
+- Preserve Git: только существующая `main`; no branch/worktree/stash/reset/rewrite/force; foreign staged paths не удаляются этой задачей.
+
+### Risks, rollback и cross-feature impact
+
+| Domain | Статус | Evidence / решение |
+| --- | --- | --- |
+| Shared Git ownership | `affected_future` | Task 34 добавляет planned declared-path layer после Tasks 30/32; текущие hooks/scripts не меняются |
+| Documentation ownership | `affected` | Current/master plan и README/CHANGELOG получают только task-owned hunks; importer/player/collection plans не редактируются |
+| Authentication/privacy/secrets | `already_compliant` | Будущий manifest хранится только внутри validated `.git` lease, не содержит token/credentials/content и не выводит paths через safe status |
+| Routes/schema/data/cache/queues | `not_applicable` | Documentation-only planning refresh; DDL/DML/cache clear/queue/service/provider action отсутствуют |
+| Translations/UI/mobile/SEO/search | `not_applicable` | Public presentation и locale contracts не меняются |
+| Importer/player/collections | `affected_read_only` | Task 31 регистрирует их commit-backed состояния и non-bypassable dependencies; domain code не меняется |
+| Production/deployment | `not_applicable` | Task 3 и activation gates не расширяются; никаких service/runtime/environment mutation |
+| Rollback | `completed_for_plan` | Откат удаляет только новую planning entry/Task 34/roadmap/changelog hunks; Tasks 1–33 и application остаются |
+| Remote delivery | `unresolved_external` | Обычный push обязателен, но credentials нельзя хранить или обходить force/history rewrite |
+
+### Requirement-compliance matrix
+
+| Требование | Статус | Evidence / ограничение |
+| --- | --- | --- |
+| Root/canonical read order | `completed` | Requirements и применимые owners перечитаны до edit |
+| Existing versions/implementation | `completed` | Boost/runtime, Tasks 29–33, lease/index code/tests, recent commits и shared status проверены |
+| Written scope before master edit | `completed` | Exact files, protected contracts, risks, rollback и cross-feature matrix записаны здесь |
+| No duplicate architecture | `completed` | Task 31/33 расширяются; новый Task 34 покрывает только отсутствующую declared-path boundary |
+| Security/data safety | `completed_for_plan` | No secrets, production mutation, dependency change или active-index approval |
+| README/CHANGELOG | `completed_with_concurrent_limitation` | README получил factual roadmap update без visitor-history claim; task-owned русский CHANGELOG пункт проходит policy, full working copy останавливается на foreign importer строке со словом `master` |
+| Verification | `completed` | Monotonic IDs, placeholders, links, interfaces, README policy, managed docs, docs CI и diff checks проверены |
+| Commit/push | `pending` | Только exact planning manifest в `main`; внешний auth failure остаётся честным `unresolved` |
+
+### Verification и delivery checklist
+
+- [x] Подтвердить последовательность Task IDs `1…34` без дублей и перенумерации.
+- [x] Выполнить self-review Task 34: spec coverage, placeholder scan, exact command/file/type consistency и link-target existence.
+- [x] Проверить `README.md` и добавить только factual roadmap bullet; visitor history не изменять.
+- [x] Добавить отдельный русский `CHANGELOG.md` пункт; full working-copy policy limitation привязать только к foreign importer строке.
+- [x] Выполнить `php artisan project:docs-refresh --check --no-interaction`, `bash scripts/ci-check.sh docs` и `git diff --check`.
+- [x] Подтвердить отсутствие application/hook/runtime/data/dependency diff в task-owned scope.
+- [ ] Изолированно stage/commit-ить current/master/README/CHANGELOG hunks в `main` и выполнить обычный push.
+
+### Verification evidence
+
+- Master task headings образуют точную последовательность `1…34`; `Task 35+` остаётся rolling intake, а не созданной фиктивной задачей.
+- Placeholder scan нашёл только исторические команды поиска и прежние evidence-строки; незаполненных `TBD`/`TODO`/`FIXME` в новой секции или Task 34 нет.
+- Importer, player и collection plan targets существуют; Task 34 использует согласованные `declare-paths`, `verify-paths`, `declared-paths`, `declared-paths.meta` и `approve-index` без расхождения имён.
+- `bash scripts/check-readme-policy.sh README.md`, managed docs check, docs CI и full `git diff --check` прошли.
+- Task-owned CHANGELOG строка проходит русскоязычную policy-проверку; полная working copy отдельно останавливается на concurrent importer строке со словом `master`, которую system planning scope не переписывает.
+- PHP/Blade/JavaScript/CSS, routes, migrations, schema, DB rows, cache, queues, dependencies, lock files, assets, Git hooks и production services не изменялись; application tests/build для documentation-only diff не требуются.
+
 ## Активная реализация — Task 32, изолированная подготовка reviewed-index boundary
 
 Дата: 24.07.2026
