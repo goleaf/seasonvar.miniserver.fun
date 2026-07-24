@@ -2498,7 +2498,7 @@ evidence, security requirement, совместимое изменение provid
 | Tasks 13–14: lifecycle matrix, docs и compliance | `completed` | `completed` | `1ded102` | `unresolved_auth` | `not_claimed` |
 | Task 15: rollback/delivery evidence | `completed_local` | `completed` | `ab6532a` | `unresolved_auth` | `not_claimed` |
 | Native iOS fullscreen evidence | `not_applicable_to_code` | `unresolved_device` | `not_applicable` | `not_applicable` | `unresolved_device` |
-| Rolling roadmap update | `not_applicable_to_runtime` | `documentation_gate_required` | `pending_commit` | `unresolved_auth` | `not_applicable` |
+| Rolling roadmap update | `not_applicable_to_runtime` | `completed` | `a14cdf5` | `unresolved_auth` | `not_applicable` |
 
 Статусы независимы. `completed` code не означает published remote, deployed
 production или проверенный native iOS. Отсутствующий внешний evidence никогда

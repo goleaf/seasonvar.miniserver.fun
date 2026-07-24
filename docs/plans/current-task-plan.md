@@ -671,7 +671,7 @@ Rollback реализации: вернуть прежний countdown/обыч�
 
 ## Активная актуализация — безлимитный player roadmap
 
-Статус planning scope: `completed_local`; documentation gates пройдены, task-owned commit/push ещё не выполнены. Существующий план
+Статус planning scope: `completed_local`; documentation gates и task-owned commit `a14cdf5` завершены, обязательный push выполнен и получил `unresolved_auth`. Существующий план
 [`2026-07-24-player-seamless-episode-switching.md`](../superpowers/plans/2026-07-24-player-seamless-episode-switching.md)
 становится единственным безлимитным master plan проигрывателя; параллельный документ не создаётся.
 
@@ -720,7 +720,7 @@ Rollback реализации: вернуть прежний countdown/обыч�
 | README policy | `completed` | Добавлен один factual roadmap item; visitor-history не менялась, её положение последним H2 сохранено |
 | CHANGELOG | `completed` | Добавлена отдельная русская planning-only запись без runtime/production claim |
 | Verification | `completed` | Placeholder/status scan, README policy, managed-doc check, docs CI и `git diff --check` прошли; полный working-copy CHANGELOG scan отдельно видит concurrent строку другого scope |
-| Commit/push | `unresolved` | Зависит от безопасного освобождения concurrent staged index и внешней HTTPS-аутентификации |
+| Commit/push | `unresolved_remote` | Task-owned planning snapshot зафиксирован в существующей `main` как `a14cdf5`; `git push origin main` вернул `could not read Username for 'https://github.com': No such device or address` |
 
 ### Verification evidence planning-актуализации
 
@@ -729,6 +729,7 @@ Rollback реализации: вернуть прежний countdown/обыч�
 - Master plan содержит монотонный intake `Task 20+`, раздельный execution ledger, Definition of Ready/Done, 12 постоянных workstream lanes и explicit non-triggers для неподтверждённых capabilities.
 - Design spec больше не заявляет, что реализация не начата; старый countdown явно помечен как исторический baseline.
 - `scripts/check-readme-policy.sh README.md`, `php artisan project:docs-refresh --check`, `bash scripts/ci-check.sh docs` и `git diff --check` завершились успешно.
+- Planning snapshot зафиксирован в `main` как `a14cdf5`; обязательный push выполнен, но остался `unresolved_auth` из-за отсутствующей HTTPS-аутентификации GitHub.
 - `scripts/check-changelog-policy.sh CHANGELOG.md` для полной общей working copy отдельно предупреждает о concurrent importer/system planning text; task-owned staged версия проверяется перед commit и не должна включать эти строки.
 - PHP/Blade/JavaScript/CSS, routes, schema, database, cache, queues, dependencies, assets, `.env` и production services этой planning-задачей не менялись; application tests/build не требуются для documentation-only diff.
 
