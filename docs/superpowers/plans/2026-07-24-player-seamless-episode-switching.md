@@ -2499,7 +2499,7 @@ evidence, security requirement, совместимое изменение provid
 | Task 15: rollback/delivery evidence | `completed_local` | `completed` | `ab6532a` | `unresolved_auth` | `not_claimed` |
 | Native iOS fullscreen evidence | `not_applicable_to_code` | `unresolved_device` | `not_applicable` | `not_applicable` | `unresolved_device` |
 | Rolling roadmap update | `not_applicable_to_runtime` | `completed` | `a14cdf5` | `unresolved_auth` | `not_applicable` |
-| Task 20: Shift+E interaction boundaries | `completed_local` | `completed` | `pending_commit` | `unresolved_auth` | `not_claimed` |
+| Task 20: Shift+E interaction boundaries | `completed_local` | `completed` | `d781661` | `unresolved_auth` | `not_claimed` |
 
 Статусы независимы. `completed` code не означает published remote, deployed
 production или проверенный native iOS. Отсутствующий внешний evidence никогда
@@ -2889,7 +2889,8 @@ dependencies, routes, schema, provider access or production action.
 
 ### Task 20: Не перехватывать Shift+E в полях и открытых диалогах
 
-**Status:** `completed_local`; delivery ещё выполняется.
+**Status:** `completed_local`; commit `d781661` создан в `main`, remote delivery
+остаётся `unresolved_auth`.
 
 **Dated evidence (24.07.2026):** ограниченный code-order audit
 `CatalogPlayerSession.handleKeyboard()` подтвердил, что глобальная ветка
@@ -3011,12 +3012,20 @@ docs CI, README policy и whitespace gates прошли. Полная общая
 проверка CHANGELOG отдельно видит concurrent importer text; task-owned staged
 snapshot проверяется перед commit.
 
-- [ ] **Step 6: Изолировать delivery**
+- [x] **Step 6: Изолировать delivery**
 
 Stage только exact Task 20 manifest, повторно проверить staged
 README/CHANGELOG policies и diff. Commit только в существующую `main`;
 обычный push выполняется без force. Отсутствующая HTTPS-аутентификация остаётся
 `unresolved_auth`, а production activation — `not_claimed`.
+
+Observed: staged manifest содержал ровно восемь Task 20 файлов, staged
+README/CHANGELOG policies и `git diff --cached --check` прошли. Commit
+`d781661` создан в существующей `main`. Обычный `git push origin main` без
+force/rewrite достиг настроенного HTTPS remote и вернул
+`could not read Username for 'https://github.com': No such device or address`;
+remote delivery честно остаётся `unresolved_auth`, production activation не
+заявляется.
 
 **Rollback:** вернуть одно admission condition, browser regression и
 Task 20 documentation вместе с matching previous Vite assets. Schema, data,

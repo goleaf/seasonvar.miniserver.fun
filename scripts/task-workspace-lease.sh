@@ -16,6 +16,8 @@ usage() {
 Использование:
   task-workspace-lease.sh acquire <task-id>
   task-workspace-lease.sh status
+  task-workspace-lease.sh declare-paths <task-id>
+  task-workspace-lease.sh verify-paths <task-id>
   task-workspace-lease.sh approve-index <task-id>
   task-workspace-lease.sh verify-index <task-id>
   task-workspace-lease.sh release <task-id>
@@ -48,6 +50,8 @@ resolve_lease_paths() {
     lease_dir="${resolved_lease_dir%/}"
     metadata_file="$lease_dir/metadata"
     approved_index_file="$lease_dir/approved-index"
+    declared_paths_file="$lease_dir/declared-paths"
+    declared_paths_metadata_file="$lease_dir/declared-paths.meta"
 
     if [[ "$lease_dir" != "$git_dir/$lease_name" ]]; then
         fail "Git вернул неожиданный lease path; файлы не изменены."
@@ -182,6 +186,139 @@ require_valid_optional_approval() {
     fi
 }
 
+load_declared_paths_metadata() {
+    local key
+    local value
+    local count=0
+    local seen_task_id=""
+    local seen_declared_at=""
+    local seen_paths_sha256=""
+
+    declaration_task_id=""
+    declaration_declared_at=""
+    declaration_paths_sha256=""
+
+    while IFS='=' read -r key value || [[ -n "$key$value" ]]; do
+        case "$key" in
+            task_id)
+                [[ -z "$seen_task_id" ]] || return 1
+                seen_task_id="1"
+                declaration_task_id="$value"
+                ;;
+            declared_at)
+                [[ -z "$seen_declared_at" ]] || return 1
+                seen_declared_at="1"
+                declaration_declared_at="$value"
+                ;;
+            paths_sha256)
+                [[ -z "$seen_paths_sha256" ]] || return 1
+                seen_paths_sha256="1"
+                declaration_paths_sha256="$value"
+                ;;
+            *)
+                return 1
+                ;;
+        esac
+
+        count=$((count + 1))
+    done < "$declared_paths_metadata_file"
+
+    [[ $count -eq 3 ]] || return 1
+    valid_task_id "$declaration_task_id" || return 1
+    [[ "$declaration_declared_at" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]] || return 1
+    [[ "$declaration_paths_sha256" =~ ^[a-f0-9]{64}$ ]] || return 1
+}
+
+validate_declared_paths_file() {
+    local path_file="$1"
+
+    php -r '
+        $contents = file_get_contents($argv[1]);
+
+        if ($contents === false || $contents === "" || ! str_ends_with($contents, "\0")) {
+            exit(1);
+        }
+
+        $paths = explode("\0", substr($contents, 0, -1));
+        sort($paths, SORT_STRING);
+        $previous = null;
+
+        foreach ($paths as $path) {
+            if ($path === "" || str_starts_with($path, "/")) {
+                exit(1);
+            }
+
+            $components = explode("/", $path);
+
+            if ($components[0] === ".git") {
+                exit(1);
+            }
+
+            foreach ($components as $component) {
+                if ($component === "." || $component === "..") {
+                    exit(1);
+                }
+            }
+
+            if ($previous !== null && $previous === $path) {
+                exit(1);
+            }
+
+            $previous = $path;
+        }
+    ' "$path_file"
+}
+
+declared_paths_digest() {
+    local path_file="$1"
+
+    php -r '
+        $digest = hash_file("sha256", $argv[1]);
+
+        if ($digest === false) {
+            exit(1);
+        }
+
+        echo $digest;
+    ' "$path_file"
+}
+
+require_loaded_declared_paths() {
+    local actual_digest
+
+    if [[ ! -f "$declared_paths_file" || -L "$declared_paths_file" ||
+        ! -f "$declared_paths_metadata_file" || -L "$declared_paths_metadata_file" ]]; then
+        fail "declared path manifest отсутствует или имеет небезопасный тип."
+    fi
+
+    [[ "$(stat -c '%a' -- "$declared_paths_file")" == "600" &&
+        "$(stat -c '%a' -- "$declared_paths_metadata_file")" == "600" ]] ||
+        fail "declared path manifest имеет небезопасные permissions."
+
+    load_declared_paths_metadata ||
+        fail "declared path metadata повреждена; automatic deletion запрещён."
+    [[ "$declaration_task_id" == "$lease_task_id" ]] ||
+        fail "declared path manifest принадлежит другой задаче."
+    validate_declared_paths_file "$declared_paths_file" ||
+        fail "declared path manifest повреждён."
+
+    if ! cmp -s -- "$declared_paths_file" <(LC_ALL=C sort -zu -- "$declared_paths_file"); then
+        fail "declared path manifest не canonical."
+    fi
+
+    actual_digest="$(declared_paths_digest "$declared_paths_file")" ||
+        fail "не удалось вычислить declared path digest."
+    [[ "$actual_digest" == "$declaration_paths_sha256" ]] ||
+        fail "declared path manifest не совпадает с metadata."
+}
+
+require_valid_optional_declared_paths() {
+    if [[ -e "$declared_paths_file" || -L "$declared_paths_file" ||
+        -e "$declared_paths_metadata_file" || -L "$declared_paths_metadata_file" ]]; then
+        require_loaded_declared_paths
+    fi
+}
+
 token_digest() {
     php -r 'echo hash("sha256", stream_get_contents(STDIN));'
 }
@@ -226,6 +363,22 @@ require_reviewable_index() {
         fail "reviewed index approval запрещён при unresolved conflicts."
 }
 
+declared_paths_match_index() {
+    git diff --cached --name-only -z --no-renames -- >/dev/null ||
+        fail "не удалось безопасно получить staged path set."
+
+    cmp -s -- "$declared_paths_file" <(
+        git diff --cached --name-only -z --no-renames -- |
+            LC_ALL=C sort -zu
+    )
+}
+
+require_declared_paths_match_index() {
+    require_loaded_declared_paths
+    declared_paths_match_index ||
+        fail "staged path set отличается от declared task paths."
+}
+
 remove_exact_lease() {
     local entry
     local -a entries=()
@@ -252,19 +405,33 @@ remove_exact_lease() {
                 [[ -f "$entry" && ! -L "$entry" ]] ||
                     unexpected_entries+=("$entry")
                 ;;
+            "$declared_paths_file" | "$declared_paths_metadata_file")
+                [[ -f "$entry" && ! -L "$entry" ]] ||
+                    unexpected_entries+=("$entry")
+                ;;
             *)
                 unexpected_entries+=("$entry")
                 ;;
         esac
     done
 
-    if (( ${#unexpected_entries[@]} > 0 || ${#entries[@]} < 1 || ${#entries[@]} > 2 )); then
+    if (( ${#unexpected_entries[@]} > 0 || ${#entries[@]} < 1 || ${#entries[@]} > 4 )); then
         fail "lease directory содержит неожиданные файлы; automatic deletion запрещён."
     fi
 
     if [[ -e "$approved_index_file" || -L "$approved_index_file" ]]; then
         unlink -- "$approved_index_file" ||
             fail "не удалось удалить exact reviewed index approval."
+    fi
+
+    if [[ -e "$declared_paths_metadata_file" || -L "$declared_paths_metadata_file" ]]; then
+        unlink -- "$declared_paths_metadata_file" ||
+            fail "не удалось удалить exact declared path metadata."
+    fi
+
+    if [[ -e "$declared_paths_file" || -L "$declared_paths_file" ]]; then
+        unlink -- "$declared_paths_file" ||
+            fail "не удалось удалить exact declared path manifest."
     fi
 
     unlink -- "$metadata_file" ||
@@ -343,12 +510,85 @@ acquire_lease() {
     printf 'SEASONVAR_TASK_LEASE_TOKEN=%s\n' "$raw_token"
 }
 
+declare_paths() {
+    local task_id="$1"
+    local declared_at
+    local digest
+    local input_temp=""
+    local manifest_temp=""
+    local metadata_temp=""
+
+    require_matching_owner "$task_id" "declare-paths"
+    umask 077
+
+    cleanup_incomplete_declaration() {
+        local temporary_path
+
+        for temporary_path in "$input_temp" "$manifest_temp" "$metadata_temp"; do
+            if [[ -n "$temporary_path" && -f "$temporary_path" && ! -L "$temporary_path" ]]; then
+                unlink -- "$temporary_path" 2>/dev/null || true
+            fi
+        done
+    }
+
+    trap cleanup_incomplete_declaration EXIT HUP INT TERM
+
+    input_temp="$(mktemp -- "$lease_dir/declared-paths.input.XXXXXX")" ||
+        fail "не удалось создать безопасный temporary input file."
+    manifest_temp="$(mktemp -- "$lease_dir/declared-paths.manifest.XXXXXX")" ||
+        fail "не удалось создать безопасный temporary manifest file."
+    metadata_temp="$(mktemp -- "$lease_dir/declared-paths.meta.XXXXXX")" ||
+        fail "не удалось создать безопасный temporary metadata file."
+
+    chmod 600 "$input_temp" "$manifest_temp" "$metadata_temp"
+    cat > "$input_temp"
+    validate_declared_paths_file "$input_temp" ||
+        fail "path declaration должна быть непустым безопасным NUL-delimited списком."
+
+    LC_ALL=C sort -zu -- "$input_temp" > "$manifest_temp"
+    validate_declared_paths_file "$manifest_temp" ||
+        fail "не удалось canonicalize declared path manifest."
+
+    digest="$(declared_paths_digest "$manifest_temp")" ||
+        fail "не удалось вычислить declared path digest."
+    [[ "$digest" =~ ^[a-f0-9]{64}$ ]] ||
+        fail "не удалось вычислить declared path digest."
+
+    declared_at="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+    printf 'task_id=%s\ndeclared_at=%s\npaths_sha256=%s\n' \
+        "$task_id" \
+        "$declared_at" \
+        "$digest" > "$metadata_temp"
+
+    require_valid_optional_declared_paths
+    require_valid_optional_approval
+
+    mv -- "$manifest_temp" "$declared_paths_file"
+    mv -- "$metadata_temp" "$declared_paths_metadata_file"
+
+    if [[ -e "$approved_index_file" || -L "$approved_index_file" ]]; then
+        unlink -- "$approved_index_file" ||
+            fail "не удалось инвалидировать exact reviewed index approval."
+    fi
+
+    unlink -- "$input_temp"
+    trap - EXIT HUP INT TERM
+
+    printf 'declared_task_id=%s\n' "$task_id"
+}
+
 show_status() {
     local index_approved="no"
+    local paths_declared="no"
     local current_digest
     local diff_status
 
     require_loaded_metadata
+    require_valid_optional_declared_paths
+
+    if [[ -e "$declared_paths_file" && -e "$declared_paths_metadata_file" ]]; then
+        paths_declared="yes"
+    fi
 
     if [[ -e "$approved_index_file" || -L "$approved_index_file" ]]; then
         require_loaded_approved_index
@@ -359,7 +599,9 @@ show_status() {
             diff_status=$?
         fi
 
-        if [[ $diff_status -eq 1 && -z "$(git ls-files --unmerged)" ]]; then
+        if [[ $diff_status -eq 1 && -z "$(git ls-files --unmerged)" &&
+            "$paths_declared" == "yes" ]] &&
+            declared_paths_match_index; then
             current_digest="$(index_digest)"
 
             if [[ "$current_digest" == "$approval_index_sha256" ]]; then
@@ -373,7 +615,17 @@ show_status() {
     printf 'task_id=%s\n' "$lease_task_id"
     printf 'owner_pid=%s\n' "$lease_owner_pid"
     printf 'acquired_at=%s\n' "$lease_acquired_at"
+    printf 'paths_declared=%s\n' "$paths_declared"
     printf 'index_approved=%s\n' "$index_approved"
+}
+
+verify_paths() {
+    local task_id="$1"
+
+    require_matching_owner "$task_id" "verify-paths"
+    require_declared_paths_match_index
+
+    printf 'verified_paths_task_id=%s\n' "$task_id"
 }
 
 approve_index() {
@@ -383,6 +635,7 @@ approve_index() {
     local approval_temp
 
     require_matching_owner "$task_id" "approve-index"
+    require_declared_paths_match_index
     require_reviewable_index
     require_valid_optional_approval
 
@@ -421,6 +674,7 @@ verify_index() {
 
     require_matching_owner "$task_id" "verify-index"
     require_loaded_approved_index
+    require_declared_paths_match_index
     require_reviewable_index
 
     current_digest="$(index_digest)"
@@ -450,6 +704,7 @@ release_lease() {
         fail "lease token не совпадает; workspace не изменён."
 
     require_valid_optional_approval
+    require_valid_optional_declared_paths
     remove_exact_lease
     printf 'released_task_id=%s\n' "$task_id"
 }
@@ -470,6 +725,7 @@ recover_stale_lease() {
     fi
 
     require_valid_optional_approval
+    require_valid_optional_declared_paths
     remove_exact_lease
     printf 'recovered_task_id=%s\n' "$task_id"
 }
@@ -490,6 +746,20 @@ case "$command" in
             exit 2
         }
         show_status
+        ;;
+    declare-paths)
+        [[ $# -eq 2 ]] || {
+            usage
+            exit 2
+        }
+        declare_paths "$2"
+        ;;
+    verify-paths)
+        [[ $# -eq 2 ]] || {
+            usage
+            exit 2
+        }
+        verify_paths "$2"
         ;;
     approve-index)
         [[ $# -eq 2 ]] || {

@@ -2735,7 +2735,7 @@ Stage `README.md` only when the supported development workflow actually changed.
 
 ### Task 34: Bind Declared Task Paths to the Reviewed Index
 
-**Status:** `planned_commit_backed_after_tasks_30_and_32`. The exact implementation plan is committed in local `main` as `ebbbc85`; implementation has not started and remote delivery is blocked by unavailable HTTPS credentials. This task is a separate hardening layer, not a replacement for the owner lease, final-index SHA-256, human review or existing Git guards.
+**Status:** `standalone_preparation_completed_local_delivery_pending`. The exact implementation plan is committed in local `main` as `ebbbc85`. By explicit user instruction, Steps 1–3 implement and verify only the standalone lease commands in isolated temporary repositories. Step 4 hook integration and the supported contributor workflow remain blocked until the active importer/collection owners hand off and Tasks 30/32 can be activated safely. This task is a separate hardening layer, not a replacement for the owner lease, final-index SHA-256, human review or existing Git guards.
 
 **Reason:** During Task 32 delivery, another owner added a player-plan path to an already prepared staged set. The commit stopped and the foreign owner removed only its own path, but the incident proves a remaining pre-approval gap: an owner could accidentally review and approve a new snapshot that already contains a foreign path. The lease must therefore know the exact intended task path set before staging and require exact equality before index approval.
 
@@ -2750,6 +2750,8 @@ Stage `README.md` only when the supported development workflow actually changed.
 - Modify: `README.md` only when the supported contributor sequence changes
 - Modify: `CHANGELOG.md`
 
+**Current standalone preparation scope:** modify only `scripts/task-workspace-lease.sh`, `tests/Unit/GitWorkspaceLeaseScriptTest.php`, this master plan, `docs/plans/current-task-plan.md` and `CHANGELOG.md`. Preserve `.githooks/*`, `tests/Unit/CiQualityGateContractTest.php`, `docs/development.md` and `README.md` until activation. Do not create an active lease, declaration or index approval in the shared repository during tests or verification.
+
 **Interfaces:**
 - Consumes: an active Task 30 lease, matching process-scoped `SEASONVAR_TASK_LEASE_TOKEN`, a human-reviewed NUL-delimited repository-relative path set declared before staging, and the Task 32 index-approval boundary.
 - Produces: `declare-paths <task-id>` and `verify-paths <task-id>` commands, an exact mode-`0600` `declared-paths` NUL file and an atomic mode-`0600` `declared-paths.meta` file inside the validated lease directory.
@@ -2760,7 +2762,7 @@ Stage `README.md` only when the supported development workflow actually changed.
 - Safe `status` may add only `paths_declared=yes|no`; it never prints paths, hashes, tokens, arguments, file contents or private absolute paths.
 - `release`/`recover` delete only the exact expanded allowlist after full preflight; symlinks, malformed metadata or unexpected entries keep the lease intact.
 
-- [ ] **Step 1: Write failing declared-path tests**
+- [x] **Step 1: Write failing declared-path tests**
 
 Extend the temporary-repository PHPUnit suite with exact cases:
 
@@ -2781,7 +2783,7 @@ declare/verify/approve do not change the index or working tree.
 
 Never declare paths in the active shared repository from PHPUnit.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```bash
 php artisan test --filter=GitWorkspaceLeaseScriptTest
@@ -2789,7 +2791,9 @@ php artisan test --filter=GitWorkspaceLeaseScriptTest
 
 Expected: existing Task 30/32 tests pass and the new cases fail because `declare-paths`, `verify-paths` and manifest files do not exist.
 
-- [ ] **Step 3: Implement the minimal NUL-safe manifest boundary**
+Observed standalone preparation RED: `41` test case, `19` passed and `22` expected failures. Failures are limited to the absent commands, manifest/status behavior and the now-required declaration before Task 32 approval; active shared repository paths/index were not used.
+
+- [x] **Step 3: Implement the minimal NUL-safe manifest boundary**
 
 Use an exact repository-local temporary directory and binary-safe tools:
 
@@ -2801,6 +2805,8 @@ git diff --cached --name-only -z --no-renames --
 Write both manifest and metadata through mode-`0600` sibling temporary files and atomic renames only after every input path and lease/token/task field passes. Metadata contains exactly `task_id`, UTC `declared_at` and SHA-256 of the canonical NUL manifest. Parsing rejects duplicate, missing, unknown or malformed fields and all symlinks.
 
 Any successful new declaration removes only the exact existing `approved-index` file after complete validation because the previously approved index no longer has a proven relation to the new scope. Validation failure preserves the previous declaration and approval unchanged.
+
+Observed standalone GREEN after Step 3 and additional fail-closed cases: `GitWorkspaceLeaseScriptTest` passes `44` tests / `256` assertions; unchanged `CiQualityGateContractTest` passes `17` / `95`; the complete Unit suite passes `472` / `107410`; `bash -n scripts/task-workspace-lease.sh`, Pint, README policy, managed docs, docs CI and full `git diff --check` pass. Manifest corruption, symlink refusal and exact stale recovery are covered without using the active shared repository. The full working-copy CHANGELOG policy stops only on the concurrent importer phrase `network-free`; the Task 34 Russian entry is reached and accepted before that foreign line.
 
 - [ ] **Step 4: Integrate the hook after Tasks 30 and 32**
 

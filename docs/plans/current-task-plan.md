@@ -5,11 +5,11 @@
 
 ## Параллельное активное исполнение — Player Task 20: границы Shift+E
 
-Статус: `completed_local_pending_delivery`; пользователь прямо разрешил начать
-программирование без
-дополнительных вопросов. Worktree/subagents не используются из-за обязательной
-`main` и developer prohibition; активный importer/collection scope не
-stage/reset/stash/delete.
+Статус: `completed_local`; commit `d781661` создан в существующей `main`,
+обычный push без force отклонён отсутствующей HTTPS-аутентификацией GitHub и
+остаётся `unresolved_auth`. Worktree/subagents не используются из-за
+обязательной `main` и developer prohibition; активный
+importer/collection scope не stage/reset/stash/delete.
 
 ### Evidence и решение
 
@@ -66,7 +66,7 @@ stage/reset/stash/delete.
 | TDD | `completed` | RED получил `Expected "E", Received ""`; после минимального admission condition focused Desktop Chromium прошёл `1/1` |
 | README/CHANGELOG/docs | `completed` | README получил один visitor-visible пункт; player audit/frontend и русский CHANGELOG обновлены фактическим результатом |
 | Verification | `completed` | Vite `24` modules; focused Playwright `2/2`; focused player PHP `114` тестов / `1492` утверждения; полный browser matrix `15` passed / `12` expected skipped; managed docs/docs CI/README/whitespace прошли |
-| Commit/push | `unresolved` | Только exact Task 20 manifest из `main`; remote auth failure не маскируется |
+| Commit/push | `unresolved_remote` | Exact восьмифайловый Task 20 manifest закоммичен как `d781661`; `git push origin main` вернул `could not read Username for 'https://github.com': No such device or address` |
 
 ### TDD checklist
 
@@ -75,7 +75,7 @@ stage/reset/stash/delete.
 - [x] Добавить минимальную interactive/open-dialog admission проверку.
 - [x] Получить focused GREEN и проверить соседние player static contracts.
 - [x] Выполнить полный player browser matrix, Vite и documentation gates.
-- [ ] Обновить evidence/compliance, изолированно commit-ить и выполнить push.
+- [x] Обновить evidence/compliance, изолированно commit-ить и выполнить push.
 
 Playwright web server использует Laravel и текущий Vite manifest; после
 изменения `resources/js/player.js` browser GREEN требует `npm run build` до
@@ -92,6 +92,11 @@ admission исключает только interactive target вне активн
 importer-строке с обычным английским `network-free`; Task 20 не переписывает
 чужой пункт. Перед commit обязателен exact staged CHANGELOG policy.
 
+Delivery evidence: staged manifest содержал ровно восемь Task 20 файлов;
+staged README/CHANGELOG policies и whitespace прошли. Commit `d781661` создан
+в `main`; обычная отправка без force/rewrite достигла configured HTTPS remote,
+но остановилась на отсутствующей GitHub-аутентификации. Production activation
+не выполнялась и не заявляется.
 
 ## Завершённое исполнение — Batch 1: baseline и Redis persistence observability
 

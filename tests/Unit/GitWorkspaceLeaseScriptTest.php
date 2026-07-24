@@ -73,6 +73,225 @@ final class GitWorkspaceLeaseScriptTest extends TestCase
         $this->assertStringNotContainsString(hash('sha256', $token), $status->getOutput());
         $this->assertStringNotContainsString('token', $status->getOutput());
         $this->assertStringNotContainsString('digest', $status->getOutput());
+        $this->assertStringContainsString('paths_declared=no', $status->getOutput());
+    }
+
+    public function test_path_declaration_requires_the_matching_active_lease_and_preserves_previous_state_on_failure(): void
+    {
+        $withoutLease = $this->declarePaths(str_repeat('1', 64), 'paths-task', ['tracked.txt']);
+
+        $this->assertFalse($withoutLease->isSuccessful());
+
+        $acquire = $this->runLease('acquire', 'paths-task');
+        $token = $this->tokenFrom($acquire);
+        $declaration = $this->declarePaths($token, 'paths-task', ['tracked.txt']);
+
+        $this->assertTrue($declaration->isSuccessful(), $declaration->getErrorOutput());
+
+        $manifest = File::get($this->declaredPathsPath());
+        $metadata = File::get($this->declaredPathsMetadataPath());
+        File::put($this->repositoryPath.'/tracked.txt', "проверенная версия\n");
+        $this->runGit('add', 'tracked.txt');
+        $approval = $this->runLeaseWithToken($token, 'approve-index', 'paths-task');
+
+        $this->assertTrue($approval->isSuccessful(), $approval->getErrorOutput());
+
+        $wrongToken = $this->declarePaths(str_repeat('2', 64), 'paths-task', ['other.txt']);
+        $wrongTask = $this->declarePaths($token, 'other-task', ['other.txt']);
+
+        $this->assertFalse($wrongToken->isSuccessful());
+        $this->assertFalse($wrongTask->isSuccessful());
+        $this->assertSame($manifest, File::get($this->declaredPathsPath()));
+        $this->assertSame($metadata, File::get($this->declaredPathsMetadataPath()));
+        $this->assertFileExists($this->approvedIndexPath());
+    }
+
+    #[DataProvider('invalidDeclaredPathInputs')]
+    public function test_path_declaration_rejects_malformed_or_unsafe_nul_input(string $input): void
+    {
+        $acquire = $this->runLease('acquire', 'invalid-paths');
+        $token = $this->tokenFrom($acquire);
+        $declaration = $this->runLeaseWithTokenAndInput(
+            $token,
+            $input,
+            'declare-paths',
+            'invalid-paths',
+        );
+
+        $this->assertFalse($declaration->isSuccessful());
+        $this->assertFileDoesNotExist($this->declaredPathsPath());
+        $this->assertFileDoesNotExist($this->declaredPathsMetadataPath());
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function invalidDeclaredPathInputs(): array
+    {
+        return [
+            'пустой input' => [''],
+            'нет завершающего NUL' => ['tracked.txt'],
+            'пустая запись' => ["tracked.txt\0\0"],
+            'дубликат' => ["tracked.txt\0tracked.txt\0"],
+            'абсолютный путь' => ["/tmp/file.txt\0"],
+            'dot component' => ["dir/./file.txt\0"],
+            'parent component' => ["dir/../file.txt\0"],
+            'Git directory' => [".git\0"],
+            'Git descendant' => [".git/config\0"],
+        ];
+    }
+
+    public function test_path_manifest_is_binary_safe_deterministic_private_and_can_be_declared_before_staging(): void
+    {
+        $acquire = $this->runLease('acquire', 'binary-paths');
+        $token = $this->tokenFrom($acquire);
+        $paths = [
+            "new path\nwith newline.txt",
+            'tracked.txt',
+            'deleted file.txt',
+        ];
+
+        File::put($this->repositoryPath.'/deleted file.txt', "для удаления\n");
+        $this->runGit('add', 'deleted file.txt');
+        $this->runGit('commit', '-m', 'Добавлен удаляемый файл');
+        File::put($this->repositoryPath.'/'.$paths[0], "новый файл\n");
+        File::delete($this->repositoryPath.'/deleted file.txt');
+
+        $declaration = $this->declarePaths($token, 'binary-paths', $paths);
+
+        $this->assertTrue($declaration->isSuccessful(), $declaration->getErrorOutput());
+        $this->assertSame("declared_task_id=binary-paths\n", $declaration->getOutput());
+        $this->assertSame('0600', substr(sprintf('%o', fileperms($this->declaredPathsPath())), -4));
+        $this->assertSame('0600', substr(sprintf('%o', fileperms($this->declaredPathsMetadataPath())), -4));
+
+        $expectedPaths = $paths;
+        sort($expectedPaths, SORT_STRING);
+        $expectedManifest = implode("\0", $expectedPaths)."\0";
+        $manifest = File::get($this->declaredPathsPath());
+        $metadata = File::get($this->declaredPathsMetadataPath());
+
+        $this->assertSame($expectedManifest, $manifest);
+        $this->assertMatchesRegularExpression(
+            '/^task_id=binary-paths\\ndeclared_at=\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z\\npaths_sha256=[a-f0-9]{64}\\n$/',
+            $metadata,
+        );
+        $this->assertStringContainsString('paths_sha256='.hash('sha256', $manifest), $metadata);
+        $this->assertStringNotContainsString($token, $metadata);
+        $this->assertStringNotContainsString($paths[0], $metadata);
+        $this->assertStringNotContainsString($paths[0], $declaration->getOutput());
+
+        $status = $this->runLease('status');
+
+        $this->assertTrue($status->isSuccessful(), $status->getErrorOutput());
+        $this->assertStringContainsString('paths_declared=yes', $status->getOutput());
+        $this->assertStringNotContainsString($paths[0], $status->getOutput());
+        $this->assertStringNotContainsString(hash('sha256', $manifest), $status->getOutput());
+        $this->assertStringNotContainsString('paths_sha256', $status->getOutput());
+        $this->assertStringNotContainsString('declared_at', $status->getOutput());
+    }
+
+    #[DataProvider('declaredPathScenarios')]
+    public function test_path_verification_accepts_exact_add_edit_delete_rename_and_mode_sets(string $scenario): void
+    {
+        $acquire = $this->runLease('acquire', 'exact-paths');
+        $token = $this->tokenFrom($acquire);
+        $paths = match ($scenario) {
+            'add' => ['added.txt'],
+            'edit', 'delete', 'mode' => ['tracked.txt'],
+            'rename' => ['renamed.txt', 'tracked.txt'],
+            default => self::fail('Неизвестный declared-path scenario: '.$scenario),
+        };
+
+        $declaration = $this->declarePaths($token, 'exact-paths', $paths);
+        $this->assertTrue($declaration->isSuccessful(), $declaration->getErrorOutput());
+
+        match ($scenario) {
+            'add' => $this->stageAddedFile(),
+            'edit' => $this->stageEditedFile(),
+            'delete' => $this->runGit('rm', '-f', 'tracked.txt'),
+            'rename' => $this->runGit('mv', 'tracked.txt', 'renamed.txt'),
+            'mode' => $this->stageModeChange(),
+            default => null,
+        };
+
+        $verification = $this->runLeaseWithToken($token, 'verify-paths', 'exact-paths');
+
+        $this->assertTrue($verification->isSuccessful(), $verification->getErrorOutput());
+        $this->assertSame("verified_paths_task_id=exact-paths\n", $verification->getOutput());
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function declaredPathScenarios(): array
+    {
+        return [
+            'добавление' => ['add'],
+            'редактирование' => ['edit'],
+            'удаление' => ['delete'],
+            'переименование' => ['rename'],
+            'смена mode' => ['mode'],
+        ];
+    }
+
+    public function test_path_verification_and_approval_reject_missing_or_additional_staged_paths(): void
+    {
+        $acquire = $this->runLease('acquire', 'mismatch-paths');
+        $token = $this->tokenFrom($acquire);
+        $declaration = $this->declarePaths($token, 'mismatch-paths', ['tracked.txt', 'missing.txt']);
+
+        $this->assertTrue($declaration->isSuccessful(), $declaration->getErrorOutput());
+
+        File::put($this->repositoryPath.'/tracked.txt', "проверенная версия\n");
+        $this->runGit('add', 'tracked.txt');
+
+        $missing = $this->runLeaseWithToken($token, 'verify-paths', 'mismatch-paths');
+        $approval = $this->runLeaseWithToken($token, 'approve-index', 'mismatch-paths');
+
+        $this->assertFalse($missing->isSuccessful());
+        $this->assertFalse($approval->isSuccessful());
+        $this->assertFileDoesNotExist($this->approvedIndexPath());
+
+        $replacement = $this->declarePaths($token, 'mismatch-paths', ['tracked.txt']);
+        $this->assertTrue($replacement->isSuccessful(), $replacement->getErrorOutput());
+        $this->stageAddedFile();
+
+        $additional = $this->runLeaseWithToken($token, 'verify-paths', 'mismatch-paths');
+
+        $this->assertFalse($additional->isSuccessful());
+    }
+
+    public function test_successful_redeclaration_invalidates_approval_but_failed_redeclaration_preserves_it(): void
+    {
+        $acquire = $this->runLease('acquire', 'redeclare-paths');
+        $token = $this->tokenFrom($acquire);
+        $declaration = $this->declarePaths($token, 'redeclare-paths', ['tracked.txt']);
+
+        $this->assertTrue($declaration->isSuccessful(), $declaration->getErrorOutput());
+
+        File::put($this->repositoryPath.'/tracked.txt', "проверенная версия\n");
+        $this->runGit('add', 'tracked.txt');
+        $approval = $this->runLeaseWithToken($token, 'approve-index', 'redeclare-paths');
+
+        $this->assertTrue($approval->isSuccessful(), $approval->getErrorOutput());
+
+        $failed = $this->runLeaseWithTokenAndInput(
+            $token,
+            "tracked.txt\0tracked.txt\0",
+            'declare-paths',
+            'redeclare-paths',
+        );
+
+        $this->assertFalse($failed->isSuccessful());
+        $this->assertFileExists($this->approvedIndexPath());
+
+        $replacement = $this->declarePaths($token, 'redeclare-paths', ['other.txt']);
+
+        $this->assertTrue($replacement->isSuccessful(), $replacement->getErrorOutput());
+        $this->assertFileDoesNotExist($this->approvedIndexPath());
+        $this->assertFalse(
+            $this->runLeaseWithToken($token, 'verify-index', 'redeclare-paths')->isSuccessful(),
+        );
     }
 
     public function test_index_approval_requires_a_matching_active_lease_and_non_empty_staged_diff(): void
@@ -90,6 +309,9 @@ final class GitWorkspaceLeaseScriptTest extends TestCase
 
         File::put($this->repositoryPath.'/tracked.txt', "проверенная версия\n");
         $this->runGit('add', 'tracked.txt');
+        $declaration = $this->declarePaths($token, 'approval-task', ['tracked.txt']);
+
+        $this->assertTrue($declaration->isSuccessful(), $declaration->getErrorOutput());
 
         $wrongToken = $this->runLeaseWithToken(str_repeat('2', 64), 'approve-index', 'approval-task');
         $wrongTask = $this->runLeaseWithToken($token, 'approve-index', 'other-task');
@@ -103,7 +325,9 @@ final class GitWorkspaceLeaseScriptTest extends TestCase
     {
         $acquire = $this->runLease('acquire', 'conflict-task');
         $token = $this->tokenFrom($acquire);
+        $declaration = $this->declarePaths($token, 'conflict-task', ['tracked.txt']);
 
+        $this->assertTrue($declaration->isSuccessful(), $declaration->getErrorOutput());
         $this->runGit('switch', '-c', 'conflict-source');
         File::put($this->repositoryPath.'/tracked.txt', "изменение source\n");
         $this->runGit('add', 'tracked.txt');
@@ -135,8 +359,10 @@ final class GitWorkspaceLeaseScriptTest extends TestCase
 
         $path = "path with spaces\nand newline.txt";
         File::put($this->repositoryPath.'/'.$path, "binary-safe content\n");
+        $declaration = $this->declarePaths($token, 'metadata-task', [$path]);
         $this->runGit('add', '--', $path);
 
+        $this->assertTrue($declaration->isSuccessful(), $declaration->getErrorOutput());
         $approval = $this->runLeaseWithToken($token, 'approve-index', 'metadata-task');
 
         $this->assertTrue($approval->isSuccessful(), $approval->getErrorOutput());
@@ -173,8 +399,10 @@ final class GitWorkspaceLeaseScriptTest extends TestCase
         $token = $this->tokenFrom($acquire);
 
         File::put($this->repositoryPath.'/tracked.txt', "первая проверенная версия\n");
+        $declaration = $this->declarePaths($token, 'verify-task', ['tracked.txt']);
         $this->runGit('add', 'tracked.txt');
 
+        $this->assertTrue($declaration->isSuccessful(), $declaration->getErrorOutput());
         $firstApproval = $this->runLeaseWithToken($token, 'approve-index', 'verify-task');
         $firstVerify = $this->runLeaseWithToken($token, 'verify-index', 'verify-task');
 
@@ -203,7 +431,10 @@ final class GitWorkspaceLeaseScriptTest extends TestCase
         $token = $this->tokenFrom($acquire);
 
         File::put($this->repositoryPath.'/tracked.txt', "проверенная версия\n");
+        $declaration = $this->declarePaths($token, 'mutation-task', ['tracked.txt']);
         $this->runGit('add', 'tracked.txt');
+
+        $this->assertTrue($declaration->isSuccessful(), $declaration->getErrorOutput());
         $approval = $this->runLeaseWithToken($token, 'approve-index', 'mutation-task');
 
         $this->assertTrue($approval->isSuccessful(), $approval->getErrorOutput());
@@ -243,7 +474,10 @@ final class GitWorkspaceLeaseScriptTest extends TestCase
         $acquire = $this->runLease('acquire', 'approval-release');
         $token = $this->tokenFrom($acquire);
         File::put($this->repositoryPath.'/tracked.txt', "проверенная версия\n");
+        $declaration = $this->declarePaths($token, 'approval-release', ['tracked.txt']);
         $this->runGit('add', 'tracked.txt');
+
+        $this->assertTrue($declaration->isSuccessful(), $declaration->getErrorOutput());
         $approval = $this->runLeaseWithToken($token, 'approve-index', 'approval-release');
 
         $this->assertTrue($approval->isSuccessful(), $approval->getErrorOutput());
@@ -263,6 +497,71 @@ final class GitWorkspaceLeaseScriptTest extends TestCase
         $release = $this->runLeaseWithToken($token, 'release', 'approval-release');
 
         $this->assertTrue($release->isSuccessful(), $release->getErrorOutput());
+        $this->assertDirectoryDoesNotExist($this->leasePath());
+    }
+
+    public function test_malformed_declaration_metadata_blocks_status_and_release_without_deleting_the_lease(): void
+    {
+        $acquire = $this->runLease('acquire', 'malformed-paths');
+        $token = $this->tokenFrom($acquire);
+        $declaration = $this->declarePaths($token, 'malformed-paths', ['tracked.txt']);
+
+        $this->assertTrue($declaration->isSuccessful(), $declaration->getErrorOutput());
+
+        File::append($this->declaredPathsMetadataPath(), "unknown=value\n");
+
+        $status = $this->runLease('status');
+        $release = $this->runLeaseWithToken($token, 'release', 'malformed-paths');
+
+        $this->assertFalse($status->isSuccessful());
+        $this->assertFalse($release->isSuccessful());
+        $this->assertFileExists($this->metadataPath());
+        $this->assertFileExists($this->declaredPathsPath());
+        $this->assertFileExists($this->declaredPathsMetadataPath());
+    }
+
+    public function test_symlinked_declaration_manifest_blocks_status_and_release_without_following_the_link(): void
+    {
+        $acquire = $this->runLease('acquire', 'symlink-paths');
+        $token = $this->tokenFrom($acquire);
+        $declaration = $this->declarePaths($token, 'symlink-paths', ['tracked.txt']);
+
+        $this->assertTrue($declaration->isSuccessful(), $declaration->getErrorOutput());
+
+        File::delete($this->declaredPathsPath());
+        symlink($this->repositoryPath.'/tracked.txt', $this->declaredPathsPath());
+
+        $status = $this->runLease('status');
+        $release = $this->runLeaseWithToken($token, 'release', 'symlink-paths');
+
+        $this->assertFalse($status->isSuccessful());
+        $this->assertFalse($release->isSuccessful());
+        $this->assertTrue(is_link($this->declaredPathsPath()));
+        $this->assertFileExists($this->metadataPath());
+        $this->assertFileExists($this->declaredPathsMetadataPath());
+        $this->assertSame("исходное состояние\n", File::get($this->repositoryPath.'/tracked.txt'));
+    }
+
+    public function test_stale_recovery_removes_the_exact_manifest_approval_and_lease_files(): void
+    {
+        $acquire = $this->runLeaseWithOwnerPid(2147483647, 'acquire', 'stale-paths');
+        $token = $this->tokenFrom($acquire);
+        $declaration = $this->declarePaths($token, 'stale-paths', ['tracked.txt']);
+
+        $this->assertTrue($declaration->isSuccessful(), $declaration->getErrorOutput());
+
+        File::put($this->repositoryPath.'/tracked.txt', "проверенная версия\n");
+        $this->runGit('add', 'tracked.txt');
+        $approval = $this->runLeaseWithToken($token, 'approve-index', 'stale-paths');
+
+        $this->assertTrue($approval->isSuccessful(), $approval->getErrorOutput());
+        $this->assertFileExists($this->declaredPathsPath());
+        $this->assertFileExists($this->declaredPathsMetadataPath());
+        $this->assertFileExists($this->approvedIndexPath());
+
+        $recovery = $this->runLease('recover', 'stale-paths');
+
+        $this->assertTrue($recovery->isSuccessful(), $recovery->getErrorOutput());
         $this->assertDirectoryDoesNotExist($this->leasePath());
     }
 
@@ -371,12 +670,16 @@ final class GitWorkspaceLeaseScriptTest extends TestCase
 
         $acquire = $this->runLease('acquire', 'clean-tree-task');
         $token = $this->tokenFrom($acquire);
+        $declaration = $this->declarePaths($token, 'clean-tree-task', ['tracked.txt']);
         $this->runLease('status');
         $approval = $this->runLeaseWithToken($token, 'approve-index', 'clean-tree-task');
+        $pathsVerification = $this->runLeaseWithToken($token, 'verify-paths', 'clean-tree-task');
         $verify = $this->runLeaseWithToken($token, 'verify-index', 'clean-tree-task');
         $release = $this->runLeaseWithToken($token, 'release', 'clean-tree-task');
 
+        $this->assertTrue($declaration->isSuccessful(), $declaration->getErrorOutput());
         $this->assertTrue($approval->isSuccessful(), $approval->getErrorOutput());
+        $this->assertTrue($pathsVerification->isSuccessful(), $pathsVerification->getErrorOutput());
         $this->assertTrue($verify->isSuccessful(), $verify->getErrorOutput());
         $this->assertTrue($release->isSuccessful(), $release->getErrorOutput());
         $this->assertSame($statusBefore, $this->gitOutput('status', '--porcelain=v1'));
@@ -420,6 +723,35 @@ final class GitWorkspaceLeaseScriptTest extends TestCase
         $process = $this->newLeaseProcess($arguments, [
             'SEASONVAR_TASK_LEASE_TOKEN' => $token,
         ]);
+        $process->run();
+
+        return $process;
+    }
+
+    /**
+     * @param  list<string>  $paths
+     */
+    private function declarePaths(string $token, string $taskId, array $paths): Process
+    {
+        $input = $paths === [] ? '' : implode("\0", $paths)."\0";
+
+        return $this->runLeaseWithTokenAndInput(
+            $token,
+            $input,
+            'declare-paths',
+            $taskId,
+        );
+    }
+
+    private function runLeaseWithTokenAndInput(
+        string $token,
+        string $input,
+        string ...$arguments,
+    ): Process {
+        $process = $this->newLeaseProcess($arguments, [
+            'SEASONVAR_TASK_LEASE_TOKEN' => $token,
+        ]);
+        $process->setInput($input);
         $process->run();
 
         return $process;
@@ -477,6 +809,16 @@ final class GitWorkspaceLeaseScriptTest extends TestCase
     private function approvedIndexPath(): string
     {
         return $this->leasePath().'/approved-index';
+    }
+
+    private function declaredPathsPath(): string
+    {
+        return $this->leasePath().'/declared-paths';
+    }
+
+    private function declaredPathsMetadataPath(): string
+    {
+        return $this->leasePath().'/declared-paths.meta';
     }
 
     private function stageAddedFile(): void
