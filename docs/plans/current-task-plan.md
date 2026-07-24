@@ -1,7 +1,7 @@
 # Текущая задача — глобальные пауза и перемотка плеера с клавиатуры
 
 Дата: 24.07.2026
-Статус: implementation и verification завершены; commit/push из `main` выполняются.
+Статус: implementation, verification и local commit завершены; push заблокирован отсутствующей HTTPS-аутентификацией GitHub.
 
 ## Цель и согласованное решение
 
@@ -17,7 +17,8 @@
 - [x] Выполнить Vite build и релевантные repository gates.
 - [x] Обновить playback/frontend owners, README, русский CHANGELOG и финальную compliance evidence.
 - [x] Выполнить legacy/duplicate/stale scan.
-- [ ] Выполнить commit и push только из существующей `main`.
+- [x] Выполнить task-owned commit только из существующей `main`.
+- [ ] Отправить `main` в configured remote — `unresolved`: `git push origin main` вернул `could not read Username for 'https://github.com'`, а `gh` в окружении не установлен.
 
 Design: [`2026-07-24-player-global-keyboard-controls-design.md`](../superpowers/specs/2026-07-24-player-global-keyboard-controls-design.md).
 
@@ -82,7 +83,7 @@ Rollback: вернуть глобальную ветку `handleKeyboard()` к �
 | Mobile/responsive | `already_compliant` | DOM/CSS/Blade не меняются; existing viewport matrix остаётся совместимой, browser suite сохраняет phone/tablet projects. |
 | Production/rollback | `completed` | Vite `8.1.4` собрал `23 modules` и новый hashed player chunk; code+manifest/assets откатываются совместно, schema/backup/cache/queue actions `not_applicable`. |
 | README/owner docs/CHANGELOG/current evidence | `completed` | Обновлены playback/frontend owners, RU/EN shortcut hint, visitor capability/history, русский technical changelog и текущая evidence matrix. |
-| Git `main`, commit и push | `pending` | Работа ведётся в `main`; task files должны быть committed/pushed, pre-existing `composer.lock` исключён и честно отражён. |
+| Git `main`, commit и push | `unresolved` | Design `0785eff` и implementation `5531c5b` закоммичены в `main`; pre-existing `composer.lock` исключён. `git push origin main` заблокирован отсутствующей HTTPS-аутентификацией GitHub; `gh` не установлен. |
 
 ## Verification evidence
 
@@ -93,6 +94,7 @@ Rollback: вернуть глобальную ветку `handleKeyboard()` к �
 - `npm run build`: Vite `8.1.4`, `23 modules`, `player-Ce6RC40Q.js` `31.94 kB` (`8.19 kB gzip`).
 - `node --check` для player/test, `php -l` для RU/EN catalogs, `project:docs-refresh --check`, `git diff --check` и repository duplicate/debug scans прошли.
 - Совместимость: routes, Blade DOM, schema, grants, authorization, progress cadence, cache keys, packages и persisted preference identity не изменены; touch/pointer и scoped portal/Plyr controls сохранены.
+- Git: task-owned implementation сохранена в `5531c5b` поверх design `0785eff`. Configured `origin` использует HTTPS; push завершился внешним отказом `could not read Username for 'https://github.com'`, доступного `gh` fallback нет.
 
 # Текущая задача — даты серий Seasonvar в календаре и XML-tail backfill
 

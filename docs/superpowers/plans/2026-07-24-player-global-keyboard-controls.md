@@ -428,7 +428,7 @@ git diff -- resources/js/player.js tests/browser/player-lifecycle.spec.js docs/a
 
 Expected: implementation, owner wording, tests, visitor text, rollback and compliance matrix describe the same behavior.
 
-- [ ] **Step 4: Commit only task-owned files**
+- [x] **Step 4: Commit only task-owned files**
 
 Before commit, temporarily preserve the pre-existing `composer.lock` change without staging it, then run:
 
@@ -453,3 +453,5 @@ git status --short --branch
 ```
 
 Expected: local and remote SHA match. Restore the exact pre-existing `composer.lock` work after the push and report it as preserved unrelated work. If remote authentication or the configured hook fails, record the exact failure as `unresolved`; do not claim success.
+
+Outcome: `unresolved`. Task-owned design `0785eff` and implementation `5531c5b` were committed on `main`, but `git push origin main` returned `could not read Username for 'https://github.com'`; `gh` is not installed in this environment. The pre-existing `composer.lock` patch remains preserved separately and is not part of either task commit.
