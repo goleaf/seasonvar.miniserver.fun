@@ -32,18 +32,20 @@
 | --- | --- | --- |
 | Task 1 — operational baseline | `completed` | Dated read-only evidence is committed in `2227c08`; no production state was mutated. |
 | Task 2 — Redis persistence observability | `completed` | TDD implementation and documentation are committed in `2227c08`; `app:health --json` now reports `redis_persistence=failed` while preserving `ready=true`. |
-| Task 1–2 remote delivery | `unresolved` | The normal push reached configured `origin` but failed because HTTPS credentials were unavailable. The latest read-only snapshot counts 25 local commits ahead; this count grows with later evidence commits until Task 29 delivers them. No force push or history rewrite is allowed. |
+| Task 1–2 remote delivery | `unresolved` | The normal push reached configured `origin` but failed because HTTPS credentials were unavailable. After the Task 34 evidence commit, local `main` is 27 commits ahead; this count grows with later evidence commits until Task 29 delivers them. No force push or history rewrite is allowed. |
 | Task 3 — controlled Redis recovery | `unresolved` | Blocked before any mutation: independent protected backup, exact Redis process-manager ownership, maintenance/session-impact approval and producer stop boundary are not verified. |
 | Tasks 4–6 and 8–28 | `not_started` | They remain ordered behind the Task 3 recoverability gate unless a task is explicitly marked cross-cutting and read-only. Task 7 is superseded by importer Task 3 and must not create a second retention boundary. |
 | Importer child roadmap | `implementation_in_progress_uncommitted` | Importer Tasks 2–3 remain in the shared unstaged/untracked scope and Task 4 is now reported `in_progress_tdd`; production activation remains gated by Tasks 3–5 of this plan. No importer file belongs to the system planning manifest. |
 | Player child roadmap | `roadmap_committed_local` | Seamless-player runtime work is committed in `1ded102`/`ab6532a`; its unlimited roadmap and delivery evidence are committed in `a14cdf5`/`f22e755`. Remote delivery remains unresolved and deployment must not be combined with Redis, database, dependency or process-control work. |
 | Collection diagnostics workstream | `implementation_verified_uncommitted` | The collection-specific plan reports focused RED/GREEN, 72 tests / 431 assertions and Vite verification, but code, translations, owner docs and its task plan remain uncommitted in the shared checkout. Public collection, matching, route, cache and recommendation contracts are unchanged. |
 | Shared delivery state | `repeated_collision_observed` | Task 30 base preparation is committed in `ad5c13c`; Task 32 standalone index approval is committed in `2a7f636` with evidence `cb83684`. During Task 32 verification another owner added a player-plan path to the staged set and later removed only its own path before `f22e755`; this proves that a reviewed digest needs both hook activation and a declared-path boundary. |
-| Rolling extension Tasks 29+ | `in_progress` | Delivery recovery, shared-`main` ownership, cross-workstream reconciliation, reviewed-index binding, current-plan policy and declared-path ownership are evidence-backed Tasks 29–34. Later discoveries continue with monotonic IDs without changing completed history. |
+| Rolling extension Tasks 29+ | `in_progress` | Delivery recovery, shared-`main` ownership, cross-workstream reconciliation, reviewed-index binding, current-plan policy and declared-path ownership are evidence-backed Tasks 29–34. Task 34 planning is committed in `ebbbc85`; implementation has not started. Later discoveries continue with monotonic IDs without changing completed history. |
 
 Task 1 and Task 2 were delivered as one isolated Batch 1 commit because they shared operations owners while unrelated importer/player changes already occupied the worktree. This is a recorded commit-granularity deviation, not a reason to rewrite `main`. Every later implementation task returns to one independently reviewable commit.
 
 The Tasks 32–33 roadmap extension is committed locally in `cb432c7`. Task 32 standalone preparation is committed in `2a7f636` with delivery evidence `cb83684`; the player roadmap follow-up is committed in `f22e755`. Normal pushes to configured `origin` failed with unavailable HTTPS credentials, so remote delivery remains `unresolved` under Task 29; no force push, alternate branch, credential storage or history rewrite was used.
+
+The Task 34 declared-path roadmap extension is committed locally in `ebbbc85`. Its normal push reached the configured HTTPS remote and failed because credentials are unavailable; no implementation, hook activation, force push, alternate branch, credential storage or history rewrite was performed.
 
 ## Baseline Evidence — 24.07.2026
 
@@ -2222,7 +2224,7 @@ New tasks never grant authority to mutate production data, stop processes, overw
 
 ### Task 29: Restore Authenticated Fast-Forward Delivery of `main`
 
-**Status:** `unresolved_external`; the latest read-only snapshot is 25 commits ahead of `origin/main`, HTTPS authentication is still unavailable, and the shared worktree remains dirty with uncommitted importer and collection work. This task may run independently of production recovery only after exact stream commits and Task 30 ownership handoff make the checkout clean.
+**Status:** `unresolved_external`; after the Task 34 evidence commit local `main` is 27 commits ahead of `origin/main`, HTTPS authentication is still unavailable, and the shared worktree remains dirty with uncommitted importer and collection work. This task may run independently of production recovery only after exact stream commits and Task 30 ownership handoff make the checkout clean.
 
 **Files:**
 - Modify: `docs/development.md` only if the verified credential mechanism changes the documented workflow
@@ -2733,7 +2735,7 @@ Stage `README.md` only when the supported development workflow actually changed.
 
 ### Task 34: Bind Declared Task Paths to the Reviewed Index
 
-**Status:** `planned_after_tasks_30_and_32`. This task is a separate hardening layer, not a replacement for the owner lease, final-index SHA-256, human review or existing Git guards.
+**Status:** `planned_commit_backed_after_tasks_30_and_32`. The exact implementation plan is committed in local `main` as `ebbbc85`; implementation has not started and remote delivery is blocked by unavailable HTTPS credentials. This task is a separate hardening layer, not a replacement for the owner lease, final-index SHA-256, human review or existing Git guards.
 
 **Reason:** During Task 32 delivery, another owner added a player-plan path to an already prepared staged set. The commit stopped and the foreign owner removed only its own path, but the incident proves a remaining pre-approval gap: an owner could accidentally review and approve a new snapshot that already contains a foreign path. The lease must therefore know the exact intended task path set before staging and require exact equality before index approval.
 

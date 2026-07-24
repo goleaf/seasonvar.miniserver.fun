@@ -227,7 +227,7 @@
 ## Актуализация безлимитного system plan — declared-path ownership
 
 Дата: 24.07.2026
-Статус: `planning_completed_pending_delivery`; обновлён существующий system master plan без нового параллельного roadmap, application/runtime/data не меняются.
+Статус: `planning_completed_local_delivery_unresolved_remote`; обновлён существующий system master plan без нового параллельного roadmap, planning commit `ebbbc85` создан в `main`, application/runtime/data не меняются.
 
 ### Проверенный baseline и решение
 
@@ -290,7 +290,7 @@
 | Security/data safety | `completed_for_plan` | No secrets, production mutation, dependency change или active-index approval |
 | README/CHANGELOG | `completed_with_concurrent_limitation` | README получил factual roadmap update без visitor-history claim; task-owned русский CHANGELOG пункт проходит policy, full working copy останавливается на foreign importer строке со словом `master` |
 | Verification | `completed` | Monotonic IDs, placeholders, links, interfaces, README policy, managed docs, docs CI и diff checks проверены |
-| Commit/push | `pending` | Только exact planning manifest в `main`; внешний auth failure остаётся честным `unresolved` |
+| Commit/push | `unresolved_remote` | Exact planning manifest зафиксирован в `main` как `ebbbc85`; обычный push достиг `origin`, но HTTPS credentials недоступны |
 
 ### Verification и delivery checklist
 
@@ -300,7 +300,7 @@
 - [x] Добавить отдельный русский `CHANGELOG.md` пункт; full working-copy policy limitation привязать только к foreign importer строке.
 - [x] Выполнить `php artisan project:docs-refresh --check --no-interaction`, `bash scripts/ci-check.sh docs` и `git diff --check`.
 - [x] Подтвердить отсутствие application/hook/runtime/data/dependency diff в task-owned scope.
-- [ ] Изолированно stage/commit-ить current/master/README/CHANGELOG hunks в `main` и выполнить обычный push.
+- [x] Изолированно stage/commit-ить current/master/README/CHANGELOG hunks в `main` как `ebbbc85` и выполнить обычный push; auth failure оставить `unresolved_remote`.
 
 ### Verification evidence
 
@@ -780,6 +780,7 @@ Rollback реализации: вернуть прежний countdown/обыч�
 - Modify: `CHANGELOG.md` — отдельная русская planning-only запись
 
 ### Protected contracts и риски
+- Planning commit `ebbbc85` создан в существующей `main`. Обычный `git push --porcelain origin main` достиг configured remote и вернул `could not read Username for 'https://github.com': No such device or address`; force, history rewrite, alternate branch и хранение credentials не применялись.
 
 | Область | Статус | Evidence / ограничение |
 | --- | --- | --- |
