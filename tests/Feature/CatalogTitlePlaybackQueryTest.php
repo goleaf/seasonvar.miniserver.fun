@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Enums\ContentAudience;
 use App\Enums\ReleaseKind;
 use App\Models\CatalogTitle;
 use App\Models\Episode;
@@ -220,6 +221,133 @@ class CatalogTitlePlaybackQueryTest extends TestCase
         $this->assertNull($navigation->previous);
         $this->assertNull($navigation->next);
         $this->assertSame(0, $queryCount);
+    }
+
+    public function test_episode_page_is_bounded_to_visible_playable_items_without_media_eager_loading(): void
+    {
+        $title = CatalogTitle::factory()->create();
+        $season = Season::factory()->create([
+            'catalog_title_id' => $title->id,
+            'number' => 1,
+            'sort_order' => 1,
+        ]);
+
+        for ($number = 1; $number <= 27; $number++) {
+            $this->publishedEpisode($title, $season, $number, $number);
+        }
+
+        $hiddenEpisode = $this->publishedEpisode($title, $season, 28, 28);
+        $hiddenEpisode->update(['publication_status' => 'hidden']);
+        $expiredEpisode = $this->publishedEpisode($title, $season, 29, 29);
+        $expiredEpisode->update(['available_until' => now()->subMinute()]);
+        $sourceLessEpisode = $this->publishedEpisode($title, $season, 30, 30);
+        $sourceLessEpisode->licensedMedia()->update(['path' => '', 'playback_url' => null]);
+        $authenticatedEpisode = $this->publishedEpisode($title, $season, 31, 31);
+        $authenticatedEpisode->update(['audience' => ContentAudience::Authenticated]);
+
+        $otherTitle = CatalogTitle::factory()->create();
+        $otherSeason = Season::factory()->create(['catalog_title_id' => $otherTitle->id]);
+        $foreignEpisode = $this->publishedEpisode($otherTitle, $otherSeason, 1, 1);
+        $playback = app(CatalogTitlePlaybackQuery::class);
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        $firstPage = $playback->episodesForSeasonPage($title, $season, null, 1);
+        $queryCount = count(DB::getQueryLog());
+        $secondPage = $playback->episodesForSeasonPage($title, $season, null, 2);
+
+        DB::disableQueryLog();
+
+        self::assertCount(24, $firstPage->items());
+        self::assertCount(3, $secondPage->items());
+        self::assertSame(27, $firstPage->total());
+        self::assertSame(2, $firstPage->lastPage());
+        self::assertSame(1, $firstPage->currentPage());
+        self::assertSame(2, $secondPage->currentPage());
+        self::assertNotContains($hiddenEpisode->id, $firstPage->getCollection()->modelKeys());
+        self::assertNotContains($expiredEpisode->id, $secondPage->getCollection()->modelKeys());
+        self::assertNotContains($sourceLessEpisode->id, $secondPage->getCollection()->modelKeys());
+        self::assertNotContains($authenticatedEpisode->id, $secondPage->getCollection()->modelKeys());
+        self::assertNotContains($foreignEpisode->id, $secondPage->getCollection()->modelKeys());
+        self::assertSame(2, $queryCount);
+
+        foreach ($firstPage as $episode) {
+            self::assertSame(1, (int) $episode->getAttribute('available_media_count'));
+            self::assertFalse($episode->relationLoaded('licensedMedia'));
+        }
+    }
+
+    public function test_episode_page_fails_closed_before_querying_for_invalid_hierarchy_or_bounds(): void
+    {
+        $title = CatalogTitle::factory()->create();
+        $season = Season::factory()->create(['catalog_title_id' => $title->id]);
+        $otherSeason = Season::factory()->create();
+        $playback = app(CatalogTitlePlaybackQuery::class);
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        $pages = [
+            $playback->episodesForSeasonPage($title, $otherSeason, null, 1),
+            $playback->episodesForSeasonPage($title, $season, null, 0),
+            $playback->episodesForSeasonPage($title, $season, null, -1),
+            $playback->episodesForSeasonPage($title, $season, null, 1_000_001),
+            $playback->episodesForSeasonPage($title, $season, null, 1, 25),
+        ];
+        $queryCount = count(DB::getQueryLog());
+
+        DB::disableQueryLog();
+
+        foreach ($pages as $page) {
+            self::assertSame([], $page->items());
+            self::assertSame(0, $page->total());
+        }
+
+        self::assertSame(0, $queryCount);
+    }
+
+    public function test_direct_episode_navigation_crosses_only_compatible_release_lanes(): void
+    {
+        $title = CatalogTitle::factory()->create();
+        $firstSeason = Season::factory()->create([
+            'catalog_title_id' => $title->id,
+            'kind' => ReleaseKind::Regular,
+            'number' => 1,
+            'sort_order' => 1,
+        ]);
+        $secondSeason = Season::factory()->create([
+            'catalog_title_id' => $title->id,
+            'kind' => ReleaseKind::Regular,
+            'number' => 2,
+            'sort_order' => 2,
+        ]);
+        $specialSeason = Season::factory()->create([
+            'catalog_title_id' => $title->id,
+            'kind' => ReleaseKind::Special,
+            'number' => 1,
+            'sort_order' => 3,
+        ]);
+        $previousRegular = $this->publishedEpisode($title, $firstSeason, 1, 1);
+        $lastRegularInSeasonOne = $this->publishedEpisode($title, $firstSeason, 2, 2);
+        $firstRegularInSeasonTwo = $this->publishedEpisode($title, $secondSeason, 1, 1);
+        $lastRegular = $this->publishedEpisode($title, $secondSeason, 2, 2);
+        $specialInSeasonOne = $this->publishedEpisode($title, $firstSeason, 1, 1, ReleaseKind::Special);
+        $specialInSeasonTwo = $this->publishedEpisode($title, $secondSeason, 1, 1, ReleaseKind::Special);
+        $incompatibleSpecial = $this->publishedEpisode($title, $specialSeason, 1, 1, ReleaseKind::Special);
+        $playback = app(CatalogTitlePlaybackQuery::class);
+
+        $navigation = $playback->navigationForEpisode($title, null, $lastRegularInSeasonOne);
+        $specialNavigation = $playback->navigationForEpisode($title, null, $specialInSeasonOne);
+        $finalNavigation = $playback->navigationForEpisode($title, null, $lastRegular);
+
+        self::assertSame($previousRegular->id, $navigation->previous?->id);
+        self::assertSame($firstRegularInSeasonTwo->id, $navigation->next?->id);
+        self::assertNull($specialNavigation->previous);
+        self::assertSame($specialInSeasonTwo->id, $specialNavigation->next?->id);
+        self::assertNotSame($incompatibleSpecial->id, $specialNavigation->next?->id);
+        self::assertSame($firstRegularInSeasonTwo->id, $finalNavigation->previous?->id);
+        self::assertNull($finalNavigation->next);
     }
 
     /** @return array{CatalogTitle, Season, Episode} */

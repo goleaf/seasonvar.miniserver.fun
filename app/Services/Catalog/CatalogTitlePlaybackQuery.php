@@ -16,6 +16,7 @@ use Illuminate\Container\Attributes\Scoped;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use LogicException;
@@ -207,6 +208,7 @@ final class CatalogTitlePlaybackQuery
                 $episode->qualifyColumn('number'),
                 $episode->qualifyColumn('kind'),
                 $episode->qualifyColumn('sort_order'),
+                $episode->qualifyColumn('title'),
                 $episode->qualifyColumn('publication_status'),
                 $episode->qualifyColumn('audience'),
                 $episode->qualifyColumn('available_from'),
@@ -280,6 +282,23 @@ final class CatalogTitlePlaybackQuery
         }
 
         return $this->adjacentEpisode($catalogTitle, $user, $current, true);
+    }
+
+    public function navigationForEpisode(
+        CatalogTitle $catalogTitle,
+        ?User $user,
+        Episode $episode,
+    ): CatalogEpisodeNavigation {
+        $current = $this->watchableEpisode($catalogTitle, $user, $episode->id);
+
+        if ($current === null) {
+            return new CatalogEpisodeNavigation;
+        }
+
+        return new CatalogEpisodeNavigation(
+            previous: $this->adjacentEpisode($catalogTitle, $user, $current, false),
+            next: $this->adjacentEpisode($catalogTitle, $user, $current, true),
+        );
     }
 
     /**
@@ -363,6 +382,63 @@ final class CatalogTitlePlaybackQuery
         ?User $user,
         bool $withMedia = true,
     ): Collection {
+        if ((int) $season->catalog_title_id !== $catalogTitle->id) {
+            return collect();
+        }
+
+        $episodes = $this->episodesForSeasonQuery($catalogTitle, $season, $user, $withMedia)->get();
+
+        $episodes->each(function (Episode $episode) use ($catalogTitle, $season): void {
+            $episode->setRelation('season', $season);
+
+            if (! $episode->relationLoaded('licensedMedia')) {
+                $episode->setRelation('licensedMedia', collect());
+            }
+
+            $episode->licensedMedia->each(function (LicensedMedia $media) use ($catalogTitle, $season, $episode): void {
+                $media->setRelation('catalogTitle', $catalogTitle);
+                $media->setRelation('season', $season);
+                $media->setRelation('episode', $episode);
+            });
+        });
+        $season->setRelation('episodes', $episodes);
+
+        return $episodes;
+    }
+
+    /** @return LengthAwarePaginator<int, Episode> */
+    public function episodesForSeasonPage(
+        CatalogTitle $catalogTitle,
+        Season $season,
+        ?User $user,
+        int $page,
+        int $perPage = 24,
+    ): LengthAwarePaginator {
+        if ((int) $season->catalog_title_id !== $catalogTitle->id
+            || $page < 1
+            || $page > 10_000
+            || $perPage < 1
+            || $perPage > 24) {
+            return $this->emptyEpisodePaginator($page, $perPage);
+        }
+
+        $episodes = $this->episodesForSeasonQuery($catalogTitle, $season, $user, false)
+            ->paginate(perPage: $perPage, pageName: 'playerEpisodePage', page: $page);
+
+        $episodes->getCollection()->each(
+            fn (Episode $episode): Episode => $episode->setRelation('season', $season),
+        );
+
+        return $episodes;
+    }
+
+    /** @return Builder<Episode> */
+    private function episodesForSeasonQuery(
+        CatalogTitle $catalogTitle,
+        Season $season,
+        ?User $user,
+        bool $withMedia,
+    ): Builder {
         $availableMediaIds = $this->availableMedia($catalogTitle, $user)
             ->select((new LicensedMedia)->qualifyColumn('id'));
         $episodesQuery = Episode::query()
@@ -445,29 +521,23 @@ final class CatalogTitlePlaybackQuery
             ]);
         }
 
-        $episodes = $episodesQuery
+        return $episodesQuery
             ->orderBy('kind')
             ->orderBy('sort_order')
             ->orderBy('number')
-            ->orderBy('id')
-            ->get();
+            ->orderBy('id');
+    }
 
-        $episodes->each(function (Episode $episode) use ($catalogTitle, $season): void {
-            $episode->setRelation('season', $season);
-
-            if (! $episode->relationLoaded('licensedMedia')) {
-                $episode->setRelation('licensedMedia', collect());
-            }
-
-            $episode->licensedMedia->each(function (LicensedMedia $media) use ($catalogTitle, $season, $episode): void {
-                $media->setRelation('catalogTitle', $catalogTitle);
-                $media->setRelation('season', $season);
-                $media->setRelation('episode', $episode);
-            });
-        });
-        $season->setRelation('episodes', $episodes);
-
-        return $episodes;
+    /** @return LengthAwarePaginator<int, Episode> */
+    private function emptyEpisodePaginator(int $page, int $perPage): LengthAwarePaginator
+    {
+        return new LengthAwarePaginator(
+            items: [],
+            total: 0,
+            perPage: $perPage >= 1 && $perPage <= 24 ? $perPage : 24,
+            currentPage: $page >= 1 && $page <= 10_000 ? $page : 1,
+            options: ['pageName' => 'playerEpisodePage'],
+        );
     }
 
     /** @return Collection<int, LicensedMedia> */

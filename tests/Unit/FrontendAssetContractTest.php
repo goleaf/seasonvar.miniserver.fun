@@ -166,7 +166,10 @@ class FrontendAssetContractTest extends TestCase
         $this->assertStringContainsString('STABLE_SEEK_DELAY_MS = 750', $player);
         $this->assertStringContainsString('this.progressSequence = 0', $player);
         $this->assertStringContainsString('eventSequence: ++this.progressSequence', $player);
-        $this->assertStringContainsString('if (!completed && this.hasDispatchedProgress && progressDelta === 0)', $player);
+        $this->assertStringContainsString('if (!completed && !force && this.hasDispatchedProgress && progressDelta === 0)', $player);
+        $this->assertStringContainsString('this.flushProgress(`transition-${reason}`)', $player);
+        $this->assertStringContainsString('syncPlyrOriginalMediaState()', $player);
+        $this->assertStringContainsString('this.syncPlyrOriginalMediaState();', $player);
         $this->assertStringContainsString('data-progress-session', File::get(resource_path('views/livewire/catalog-title-player.blade.php')));
         $this->assertStringContainsString("addEventListener('play'", $player);
         $this->assertStringContainsString("addEventListener('pause'", $player);

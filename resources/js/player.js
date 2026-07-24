@@ -6,6 +6,7 @@ import {
     persistAnonymousProgress,
     removeAnonymousProgress,
 } from './anonymous-playback-progress.js';
+import { CatalogPlayerMenu } from './player-menu.js';
 
 const PROGRESS_HEARTBEAT_MS = 30_000;
 const PROGRESS_HEARTBEAT_MIN_DELTA_SECONDS = 10;
@@ -16,6 +17,8 @@ const DEVICE_PREFERENCE_WRITE_DELAY_MS = 600;
 const MEDIA_SESSION_POSITION_INTERVAL_MS = 5_000;
 const BUFFERING_WARNING_DELAY_MS = 15_000;
 const PLAYER_NOTICE_DURATION_MS = 8_000;
+const TRANSITION_READY_TIMEOUT_MS = 15_000;
+const AUTO_NEXT_PREFETCH_SECONDS = 60;
 const TRANSIENT_RESUME_PREFIX = 'seasonvar.player-resume.v1:';
 const SUPPORTED_PLAYBACK_SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 
@@ -45,7 +48,9 @@ const playerCopyShape = {
         'playbackError', 'fatal', 'ended', 'captionsUnavailable',
         'offline', 'stalled', 'sourceFallback', 'sourceChanged',
         'authorizationRefreshed', 'fallbackUnavailable', 'finalEpisode',
-        'autoplayCancelled', 'restartFailed',
+        'restartFailed', 'loadingTransition',
+        'transitionUnavailable', 'transitionLimited',
+        'preferredTranslationUnavailable', 'playRequired',
     ],
     controls: [
         'restart', 'rewind', 'play', 'pause', 'fastForward', 'seek',
@@ -55,6 +60,11 @@ const playerCopyShape = {
         'captions', 'settings', 'pip', 'menuBack', 'speed', 'normal',
         'quality', 'loop', 'start', 'end', 'all', 'reset', 'disabled',
         'enabled', 'advertisement',
+    ],
+    menu: [
+        'open', 'close', 'title', 'seasons', 'episodes', 'translations',
+        'back', 'previousPage', 'nextPage', 'page', 'seasonEmpty',
+        'loading', 'retry',
     ],
 };
 
@@ -84,6 +94,40 @@ const playerCopyFor = (video) => {
     }
 
     return copy;
+};
+
+const playerMenuBootstrapFor = (shell) => {
+    const raw = shell?.dataset.playerMenuBootstrap;
+
+    if (!raw) {
+        return null;
+    }
+
+    try {
+        const parsed = JSON.parse(raw);
+
+        if (
+            !parsed
+            || !Array.isArray(parsed.seasons)
+            || !Array.isArray(parsed.translations)
+            || typeof parsed.current !== 'object'
+            || parsed.current === null
+        ) {
+            return null;
+        }
+
+        return {
+            seasons: parsed.seasons.slice(0, 100),
+            current: {
+                seasonId: boundedInteger(parsed.current.seasonId, 1, Number.MAX_SAFE_INTEGER),
+                episodeId: boundedInteger(parsed.current.episodeId, 1, Number.MAX_SAFE_INTEGER),
+                mediaId: boundedInteger(parsed.current.mediaId, 1, Number.MAX_SAFE_INTEGER),
+            },
+            translations: parsed.translations.slice(0, 24),
+        };
+    } catch {
+        return null;
+    }
 };
 
 const noInternalRetryPolicy = (maxLoadTimeMs) => ({
@@ -264,10 +308,6 @@ class CatalogPlayerSession {
         this.retryButton = this.shell?.querySelector('[data-player-retry]') || null;
         this.captionStatus = this.shell?.querySelector('[data-player-caption-status]') || null;
         this.notice = this.shell?.querySelector('[data-player-notice]') || null;
-        this.countdown = this.shell?.querySelector('[data-player-autoplay-countdown]') || null;
-        this.countdownText = this.shell?.querySelector('[data-player-countdown-text]') || null;
-        this.autoplayNowButton = this.shell?.querySelector('[data-player-autoplay-now]') || null;
-        this.autoplayCancelButton = this.shell?.querySelector('[data-player-autoplay-cancel]') || null;
         this.autoplayToggle = this.root?.querySelector('[data-player-autoplay-toggle]') || null;
         this.restartButton = this.root?.querySelector('[data-player-restart-episode]') || null;
         this.saveMarkerButton = this.root?.querySelector('[data-player-save-marker]') || null;
@@ -282,9 +322,7 @@ class CatalogPlayerSession {
         this.seekTimer = null;
         this.recoveryTimer = null;
         this.bufferingTimer = null;
-        this.countdownTimer = null;
         this.noticeTimer = null;
-        this.countdownRemaining = 0;
         this.transientResume = takeTransientResume(this.episodeId);
         const serverPosition = Number.parseInt(video.dataset.progressPosition || '', 10) || 0;
         const devicePosition = this.authenticated ? 0 : anonymousResumePosition(this.episodeId);
@@ -307,6 +345,18 @@ class CatalogPlayerSession {
         this.dataSaver = this.connection?.saveData === true;
         this.lastMediaSessionPositionUpdate = 0;
         this.ownsMediaSession = false;
+        this.menu = null;
+        this.menuGeneration = 0;
+        this.transitionGeneration = 0;
+        this.acceptedTransitionGeneration = 0;
+        this.prefetchedTransition = null;
+        this.prefetchPromise = null;
+        this.prefetchEpisodeId = null;
+        this.transitioning = false;
+        this.navigation = {
+            previous: this.navigationItemFrom('[data-player-previous-episode]'),
+            next: this.navigationItemFrom('[data-player-next-episode]'),
+        };
     }
 
     initialize() {
@@ -337,8 +387,6 @@ class CatalogPlayerSession {
         window.addEventListener('offline', () => this.handleConnectionChange(), { signal });
         this.connection?.addEventListener?.('change', this.connectionChangeHandler);
         this.retryButton?.addEventListener('click', () => this.retry(), { signal });
-        this.autoplayNowButton?.addEventListener('click', () => this.navigateToNextEpisode(), { signal });
-        this.autoplayCancelButton?.addEventListener('click', () => this.cancelAutoplayCountdown(true), { signal });
         this.autoplayToggle?.addEventListener('click', () => this.toggleAutoplayPreference(), { signal });
         this.restartButton?.addEventListener('click', () => this.requestRestart(), { signal });
         this.saveMarkerButton?.addEventListener('click', () => this.requestSaveMarker(), { signal });
@@ -348,6 +396,11 @@ class CatalogPlayerSession {
         this.root?.addEventListener('playback-fallback-unavailable', () => {
             this.fallbackRequested = false;
             this.setStatus('error', 'fallbackUnavailable', true);
+        }, { signal });
+        this.root?.addEventListener('catalog-player-popstate', () => {
+            this.flushProgress('popstate');
+            this.menu?.close({ restoreFocus: false });
+            this.invalidatePrefetchedTransition();
         }, { signal });
         document.addEventListener('keydown', (event) => this.handleKeyboard(event), { signal });
 
@@ -391,6 +444,7 @@ class CatalogPlayerSession {
                 enabled: false,
             },
         });
+        this.initializePlayerMenu();
         this.lastPreferenceFingerprint = `${this.preferences.volume}|${this.preferences.muted ? 1 : 0}|${Number(this.preferences.speed).toFixed(2)}`;
         this.initializeMediaSession();
         this.updateAutoplayToggle();
@@ -398,6 +452,438 @@ class CatalogPlayerSession {
         if (this.transientResume?.notice) {
             this.showNotice(this.transientResume.notice);
         }
+    }
+
+    initializePlayerMenu() {
+        const bootstrap = playerMenuBootstrapFor(this.shell);
+        const controlsRoot = this.plyr?.elements?.controls
+            || this.shell?.querySelector('.plyr__controls');
+
+        if (
+            !bootstrap
+            || !(controlsRoot instanceof HTMLElement)
+            || !(this.shell instanceof HTMLElement)
+        ) {
+            return;
+        }
+
+        this.menu = new CatalogPlayerMenu({
+            shell: this.shell,
+            controlsRoot,
+            copy: this.copy.menu,
+            bootstrap,
+            signal: this.abortController.signal,
+            loadEpisodePage: (seasonId, page) => this.requestMenuPage(seasonId, page),
+            selectEpisode: (episodeId) => this.requestPlayerTransition(episodeId, null),
+            selectTranslation: (episodeId, mediaId) => this.requestPlayerTransition(episodeId, mediaId),
+        });
+    }
+
+    requestMenuPage(seasonId, page) {
+        const generation = ++this.menuGeneration;
+
+        return this.dispatchPlayerRequest('catalog-player-menu-page-request', {
+            generation,
+            seasonId,
+            page,
+            accepted: () => (
+                !this.destroyed
+                && generation === this.menuGeneration
+            ),
+        });
+    }
+
+    navigationItemFrom(selector) {
+        const anchor = this.root?.querySelector(selector);
+
+        if (!(anchor instanceof HTMLAnchorElement)) {
+            return null;
+        }
+
+        const id = boundedInteger(
+            anchor.dataset.playerTransitionEpisode,
+            1,
+            Number.MAX_SAFE_INTEGER,
+        );
+
+        return id === null
+            ? null
+            : { id, label: anchor.textContent?.trim() || '' };
+    }
+
+    async requestPlayerTransition(episodeId, mediaId = null) {
+        const normalizedEpisodeId = boundedInteger(episodeId, 1, Number.MAX_SAFE_INTEGER);
+        const normalizedMediaId = mediaId === null
+            ? null
+            : boundedInteger(mediaId, 1, Number.MAX_SAFE_INTEGER);
+
+        if (normalizedEpisodeId === null || (mediaId !== null && normalizedMediaId === null)) {
+            return null;
+        }
+
+        const autoplay = !this.video.paused && !this.video.ended;
+        const generation = ++this.transitionGeneration;
+        this.acceptedTransitionGeneration = generation;
+        this.clearPrefetchedTransition();
+        this.menu?.setLoading(true);
+        this.setStatus('loading', 'loadingTransition');
+
+        try {
+            const payload = await this.dispatchPlayerRequest('catalog-player-transition-request', {
+                generation,
+                episodeId: normalizedEpisodeId,
+                mediaId: normalizedMediaId,
+                accepted: () => (
+                    !this.destroyed
+                    && generation === this.transitionGeneration
+                    && generation === this.acceptedTransitionGeneration
+                ),
+            });
+
+            if (
+                generation !== this.acceptedTransitionGeneration
+                || payload?.status !== 'ready'
+            ) {
+                if (payload?.status === 'unavailable') {
+                    this.menu?.setError(payload.message || this.copy.runtime.transitionUnavailable);
+                    this.showNotice('transitionUnavailable');
+                }
+
+                return payload;
+            }
+
+            await this.applyTransition(payload, {
+                autoplay,
+                reason: 'manual',
+                generation,
+            });
+
+            return payload;
+        } catch {
+            if (generation === this.acceptedTransitionGeneration) {
+                this.menu?.setError(this.copy.runtime.transitionUnavailable);
+                this.showNotice('transitionUnavailable');
+            }
+
+            return null;
+        } finally {
+            if (generation === this.acceptedTransitionGeneration) {
+                this.menu?.setLoading(false);
+            }
+        }
+    }
+
+    clearPrefetchedTransition() {
+        this.prefetchedTransition = null;
+        this.prefetchPromise = null;
+        this.prefetchEpisodeId = null;
+    }
+
+    invalidatePrefetchedTransition() {
+        this.clearPrefetchedTransition();
+        this.acceptedTransitionGeneration = ++this.transitionGeneration;
+    }
+
+    transitionIsFresh(transition) {
+        if (transition?.status !== 'ready') {
+            return false;
+        }
+
+        const expiresAt = Date.parse(transition.source?.expiresAt || '');
+
+        return !Number.isFinite(expiresAt) || expiresAt > Date.now() + 1_000;
+    }
+
+    async prefetchNextTransition() {
+        const nextEpisodeId = boundedInteger(
+            this.navigation?.next?.id,
+            1,
+            Number.MAX_SAFE_INTEGER,
+        );
+
+        if (
+            this.destroyed
+            || this.transitioning
+            || !this.preferences.autoplay
+            || this.dataSaver
+            || nextEpisodeId === null
+            || !Number.isFinite(this.video.duration)
+            || !Number.isFinite(this.video.currentTime)
+            || this.video.duration - this.video.currentTime < 0
+            || this.video.duration - this.video.currentTime > AUTO_NEXT_PREFETCH_SECONDS
+            || (
+                this.prefetchEpisodeId === nextEpisodeId
+                && (this.prefetchPromise || this.transitionIsFresh(this.prefetchedTransition?.payload))
+            )
+        ) {
+            return this.prefetchPromise;
+        }
+
+        const generation = ++this.transitionGeneration;
+        const sessionKey = this.sessionKey;
+
+        this.acceptedTransitionGeneration = generation;
+        this.prefetchEpisodeId = nextEpisodeId;
+        this.prefetchPromise = this.dispatchPlayerRequest('catalog-player-transition-request', {
+            generation,
+            episodeId: nextEpisodeId,
+            mediaId: null,
+            accepted: () => (
+                !this.destroyed
+                && this.preferences.autoplay
+                && generation === this.transitionGeneration
+                && generation === this.acceptedTransitionGeneration
+                && sessionKey === this.sessionKey
+                && nextEpisodeId === this.navigation?.next?.id
+            ),
+        })
+            .then((payload) => {
+                if (
+                    generation === this.acceptedTransitionGeneration
+                    && sessionKey === this.sessionKey
+                    && nextEpisodeId === this.navigation?.next?.id
+                    && this.transitionIsFresh(payload)
+                ) {
+                    this.prefetchedTransition = { payload, generation, episodeId: nextEpisodeId };
+                }
+
+                return payload;
+            })
+            .catch(() => null)
+            .finally(() => {
+                if (generation === this.acceptedTransitionGeneration) {
+                    this.prefetchPromise = null;
+                }
+            });
+
+        return this.prefetchPromise;
+    }
+
+    async applyTransition(transition, { autoplay, reason, generation }) {
+        if (
+            this.destroyed
+            || transition?.status !== 'ready'
+            || generation !== this.acceptedTransitionGeneration
+            || generation !== this.transitionGeneration
+        ) {
+            return false;
+        }
+
+        const sourceUrl = typeof transition.source?.url === 'string'
+            ? transition.source.url
+            : '';
+        const episodeId = boundedInteger(
+            transition.selection?.episodeId,
+            1,
+            Number.MAX_SAFE_INTEGER,
+        );
+        const mediaId = boundedInteger(
+            transition.selection?.mediaId,
+            1,
+            Number.MAX_SAFE_INTEGER,
+        );
+
+        if (!sourceUrl || !transition.contextKey || episodeId === null || mediaId === null) {
+            throw new Error('Invalid player transition.');
+        }
+
+        this.flushProgress(`transition-${reason}`);
+        this.transitioning = true;
+        this.stopHeartbeat();
+        this.clearSeekTimer();
+        this.clearRecoveryTimer();
+        this.clearBufferingTimer();
+        this.video.pause();
+
+        this.sessionKey = transition.contextKey;
+        this.episodeId = episodeId;
+        this.mediaId = mediaId;
+        this.playbackSessionToken = transition.progress?.token || '';
+        this.progressSequence = Number(transition.progress?.sequence) || 0;
+        this.completed = false;
+        this.expired = false;
+        this.fallbackRequested = false;
+        this.networkRetries = 0;
+        this.mediaRecoveries = 0;
+        this.hasStartedPlayback = false;
+        this.hasDispatchedProgress = false;
+        this.lastSavedPosition = 0;
+        this.resumePosition = 0;
+        this.authorizationVersion += 1;
+        this.navigation = {
+            previous: transition.navigation?.previous || null,
+            next: transition.navigation?.next || null,
+        };
+        this.clearPrefetchedTransition();
+
+        this.root.dataset.activePlayerSession = this.sessionKey;
+        this.video.dataset.playerSession = this.sessionKey;
+        this.video.dataset.progressEpisode = String(this.episodeId);
+        this.video.dataset.playerMediaId = String(this.mediaId);
+        this.video.dataset.progressSession = this.playbackSessionToken;
+        this.video.dataset.progressPosition = '0';
+        this.video.dataset.progressEnabled = transition.progress?.enabled ? '1' : '0';
+        this.video.dataset.playerSourceMime = transition.source?.mimeType || '';
+        this.video.dataset.playerSourceFormat = transition.source?.format || '';
+        this.video.dataset.playerSourceExpiresAt = transition.source?.expiresAt || '';
+        this.applyMediaSessionMetadata(transition.mediaSession);
+        this.refreshMediaSessionNavigation();
+        this.menu?.updateCurrent(transition);
+
+        void this.dispatchPlayerRequest('catalog-player-transition-commit', {
+            generation,
+            episodeId: this.episodeId,
+            mediaId: this.mediaId,
+            accepted: () => (
+                !this.destroyed
+                && this.sessionKey === transition.contextKey
+            ),
+        }).catch(() => {
+            if (
+                !this.destroyed
+                && this.sessionKey === transition.contextKey
+            ) {
+                this.showNotice('transitionUnavailable');
+            }
+        });
+
+        try {
+            await this.replaceMediaSource(
+                sourceUrl,
+                transition.source?.format,
+                () => (
+                    !this.destroyed
+                    && generation === this.acceptedTransitionGeneration
+                    && this.sessionKey === transition.contextKey
+                ),
+            );
+
+            if (
+                this.destroyed
+                || generation !== this.acceptedTransitionGeneration
+                || this.sessionKey !== transition.contextKey
+            ) {
+                return false;
+            }
+
+            this.video.currentTime = 0;
+            this.menu?.close();
+
+            if (transition.noticeCode === 'preferred_translation_unavailable') {
+                this.showNotice('preferredTranslationUnavailable');
+            }
+
+            if (autoplay) {
+                try {
+                    await this.video.play();
+                } catch {
+                    this.setStatus('ready', 'playRequired');
+                }
+            } else {
+                this.setStatus('ready', 'ready');
+            }
+
+            return true;
+        } catch {
+            if (
+                !this.destroyed
+                && generation === this.acceptedTransitionGeneration
+                && this.sessionKey === transition.contextKey
+            ) {
+                this.setStatus('error', 'transitionUnavailable', true);
+            }
+
+            return false;
+        } finally {
+            if (this.sessionKey === transition.contextKey) {
+                this.transitioning = false;
+            }
+        }
+    }
+
+    async replaceMediaSource(sourceUrl, format, accepted) {
+        const normalizedFormat = String(format || '').toLowerCase();
+
+        if (normalizedFormat === 'm3u8' && !this.Hls) {
+            this.Hls = await loadHls();
+        }
+
+        if (!accepted()) {
+            throw new Error('Player transition was superseded.');
+        }
+
+        this.hls?.destroy();
+        this.hls = null;
+        this.video.removeAttribute('src');
+        this.video.querySelectorAll('source').forEach((source) => source.remove());
+        delete this.video.dataset.hlsSrc;
+        this.video.load();
+
+        if (normalizedFormat === 'm3u8' && this.Hls?.isSupported()) {
+            this.video.dataset.hlsSrc = sourceUrl;
+            this.replaceHls(sourceUrl);
+        } else {
+            if (normalizedFormat === 'm3u8') {
+                this.video.dataset.hlsSrc = sourceUrl;
+            }
+
+            this.video.src = sourceUrl;
+            this.video.load();
+        }
+
+        await this.waitForMediaReady();
+    }
+
+    waitForMediaReady() {
+        if (this.video.readyState >= HTMLMediaElement.HAVE_METADATA) {
+            return Promise.resolve();
+        }
+
+        return new Promise((resolve, reject) => {
+            let settled = false;
+            const finish = (callback) => {
+                if (settled) {
+                    return;
+                }
+
+                settled = true;
+                window.clearTimeout(timeout);
+                this.video.removeEventListener('loadedmetadata', ready);
+                this.video.removeEventListener('canplay', ready);
+                this.video.removeEventListener('error', failed);
+                this.abortController.signal.removeEventListener('abort', aborted);
+                callback();
+            };
+            const ready = () => finish(resolve);
+            const failed = () => finish(() => reject(new Error('Media source failed.')));
+            const aborted = () => finish(() => reject(new Error('Player session ended.')));
+            const timeout = window.setTimeout(
+                () => finish(() => reject(new Error('Media source timed out.'))),
+                TRANSITION_READY_TIMEOUT_MS,
+            );
+
+            this.video.addEventListener('loadedmetadata', ready);
+            this.video.addEventListener('canplay', ready);
+            this.video.addEventListener('error', failed);
+            this.abortController.signal.addEventListener('abort', aborted, { once: true });
+        });
+    }
+
+    dispatchPlayerRequest(type, detail) {
+        if (!this.root || !this.root.isConnected || this.destroyed) {
+            return Promise.reject(new Error('Player session is unavailable.'));
+        }
+
+        return new Promise((resolve, reject) => {
+            this.root.dispatchEvent(new CustomEvent(type, {
+                detail: {
+                    ...detail,
+                    sessionKey: this.sessionKey,
+                    resolve,
+                    reject,
+                },
+            }));
+        });
     }
 
     initializeHls() {
@@ -463,7 +949,6 @@ class CatalogPlayerSession {
     }
 
     handlePlay() {
-        this.cancelAutoplayCountdown(false);
         this.clearBufferingTimer();
         this.hasStartedPlayback = true;
         this.hls?.startLoad?.();
@@ -477,6 +962,10 @@ class CatalogPlayerSession {
     handlePause() {
         this.stopHeartbeat();
         this.persistDevicePreferences();
+
+        if (this.transitioning) {
+            return;
+        }
 
         if (!this.video.ended) {
             this.flushProgress('pause');
@@ -508,6 +997,7 @@ class CatalogPlayerSession {
 
         this.shell?.setAttribute('data-player-position', String(Math.max(0, Math.floor(this.video.currentTime))));
         this.syncMediaSessionPosition();
+        void this.prefetchNextTransition();
     }
 
     handleEnded() {
@@ -521,7 +1011,75 @@ class CatalogPlayerSession {
         this.setStatus('ended', 'ended');
         this.syncMediaSessionPlaybackState('none');
         this.syncMediaSessionPosition(true);
-        this.startAutoplayCountdown();
+        void this.startImmediateAutoNext();
+    }
+
+    async startImmediateAutoNext() {
+        if (!this.preferences.autoplay || this.dataSaver) {
+            return;
+        }
+
+        const nextEpisodeId = boundedInteger(
+            this.navigation?.next?.id,
+            1,
+            Number.MAX_SAFE_INTEGER,
+        );
+
+        if (nextEpisodeId === null) {
+            this.showNotice('finalEpisode');
+
+            return;
+        }
+
+        const prepared = (
+            this.prefetchedTransition?.episodeId === nextEpisodeId
+            && this.transitionIsFresh(this.prefetchedTransition?.payload)
+        ) ? this.prefetchedTransition : null;
+
+        if (prepared) {
+            await this.applyTransition(prepared.payload, {
+                autoplay: true,
+                reason: 'auto-next',
+                generation: prepared.generation,
+            });
+
+            return;
+        }
+
+        const generation = ++this.transitionGeneration;
+
+        this.acceptedTransitionGeneration = generation;
+        this.clearPrefetchedTransition();
+        this.setStatus('loading', 'loadingTransition');
+
+        try {
+            const payload = await this.dispatchPlayerRequest('catalog-player-transition-request', {
+                generation,
+                episodeId: nextEpisodeId,
+                mediaId: null,
+                accepted: () => (
+                    !this.destroyed
+                    && this.preferences.autoplay
+                    && generation === this.transitionGeneration
+                    && generation === this.acceptedTransitionGeneration
+                    && nextEpisodeId === this.navigation?.next?.id
+                ),
+            });
+
+            if (payload?.status !== 'ready') {
+                throw new Error('Next episode is unavailable.');
+            }
+
+            await this.applyTransition(payload, {
+                autoplay: true,
+                reason: 'auto-next',
+                generation,
+            });
+        } catch {
+            if (!this.destroyed && generation === this.acceptedTransitionGeneration) {
+                this.setStatus('error', 'transitionUnavailable', true);
+            }
+        }
     }
 
     handleLoadedMetadata() {
@@ -615,7 +1173,41 @@ class CatalogPlayerSession {
 
     handleRootClick(event) {
         const target = event.target instanceof Element ? event.target : null;
+        const transition = target?.closest('[data-player-transition-episode]');
         const mediaOption = target?.closest('[data-player-media-option]');
+
+        if (
+            transition instanceof HTMLAnchorElement
+            && event.button === 0
+            && !event.altKey
+            && !event.ctrlKey
+            && !event.metaKey
+            && !event.shiftKey
+            && !transition.hasAttribute('download')
+            && (!transition.target || transition.target === '_self')
+            && transition.getAttribute('aria-current') !== 'true'
+        ) {
+            const episodeId = boundedInteger(
+                transition.dataset.playerTransitionEpisode,
+                1,
+                Number.MAX_SAFE_INTEGER,
+            );
+            const mediaId = transition.dataset.playerTransitionMedia
+                ? boundedInteger(
+                    transition.dataset.playerTransitionMedia,
+                    1,
+                    Number.MAX_SAFE_INTEGER,
+                )
+                : null;
+
+            if (episodeId !== null) {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                void this.requestPlayerTransition(episodeId, mediaId);
+
+                return;
+            }
+        }
 
         if (mediaOption instanceof HTMLAnchorElement && mediaOption.getAttribute('aria-current') !== 'true') {
             this.queueTransientResume();
@@ -681,6 +1273,22 @@ class CatalogPlayerSession {
         const hasSystemModifier = event.altKey || event.ctrlKey || event.metaKey;
         const hasOpenDialog = document.querySelector('dialog[open]') !== null;
 
+        if (
+            !hasSystemModifier
+            && event.shiftKey
+            && event.key.toLowerCase() === 'e'
+            && this.menu
+        ) {
+            event.preventDefault();
+            this.menu.toggle();
+
+            return;
+        }
+
+        if (this.menu?.isOpen()) {
+            return;
+        }
+
         if (interactive || hasSystemModifier) {
             return;
         }
@@ -694,7 +1302,6 @@ class CatalogPlayerSession {
         }
 
         if (event.key === 'Escape') {
-            this.cancelAutoplayCountdown(true);
             this.closeShortcutHelp();
 
             return;
@@ -709,18 +1316,15 @@ class CatalogPlayerSession {
 
         if (event.shiftKey && event.key.toLowerCase() === 'n') {
             event.preventDefault();
-            this.navigateToNextEpisode();
+            this.selectAdjacentEpisode('next');
 
             return;
         }
 
         if (event.shiftKey && event.key.toLowerCase() === 'p') {
-            const previous = this.root.querySelector('[data-player-previous-episode]');
-
-            if (previous instanceof HTMLAnchorElement) {
+            if (this.navigation?.previous?.id) {
                 event.preventDefault();
-                this.cancelAutoplayCountdown(false);
-                previous.click();
+                this.selectAdjacentEpisode('previous');
             }
 
             return;
@@ -785,7 +1389,7 @@ class CatalogPlayerSession {
         }
 
         if (!this.preferences.autoplay) {
-            this.cancelAutoplayCountdown(true);
+            this.invalidatePrefetchedTransition();
         }
     }
 
@@ -805,88 +1409,25 @@ class CatalogPlayerSession {
         }
     }
 
-    startAutoplayCountdown() {
-        this.cancelAutoplayCountdown(false);
-        const next = this.root?.querySelector('[data-player-next-episode]');
+    selectAdjacentEpisode(direction) {
+        const episodeId = boundedInteger(
+            this.navigation?.[direction]?.id,
+            1,
+            Number.MAX_SAFE_INTEGER,
+        );
 
-        if (!(next instanceof HTMLAnchorElement)) {
-            this.showNotice('finalEpisode');
-
-            return;
-        }
-
-        if (!this.preferences.autoplay || !(this.countdown instanceof HTMLElement)) {
-            return;
-        }
-
-        this.countdownRemaining = Math.max(3, Math.min(
-            30,
-            Number.parseInt(this.shell?.dataset.playerCountdownSeconds || '8', 10) || 8,
-        ));
-        this.countdown.hidden = false;
-        this.renderAutoplayCountdown();
-        this.countdownTimer = window.setInterval(() => {
-            this.countdownRemaining -= 1;
-
-            if (this.countdownRemaining <= 0) {
-                this.navigateToNextEpisode();
-
-                return;
+        if (episodeId === null) {
+            if (direction === 'next') {
+                this.showNotice('finalEpisode');
             }
 
-            this.renderAutoplayCountdown();
-        }, 1_000);
-        this.autoplayCancelButton?.focus({ preventScroll: true });
-    }
-
-    renderAutoplayCountdown() {
-        if (!(this.countdownText instanceof HTMLElement)) {
             return;
         }
 
-        const template = this.countdownText.dataset.playerCountdownTemplate || '';
-
-        this.countdownText.textContent = template.replace(':seconds', String(this.countdownRemaining));
-    }
-
-    cancelAutoplayCountdown(announce = false) {
-        const wasActive = this.countdownTimer !== null
-            || (this.countdown instanceof HTMLElement && !this.countdown.hidden);
-
-        if (this.countdownTimer !== null) {
-            window.clearInterval(this.countdownTimer);
-            this.countdownTimer = null;
-        }
-
-        this.countdownRemaining = 0;
-
-        if (this.countdown instanceof HTMLElement) {
-            this.countdown.hidden = true;
-        }
-
-        if (announce && wasActive) {
-            this.showNotice('autoplayCancelled');
-        }
-    }
-
-    navigateToNextEpisode() {
-        const next = this.root?.querySelector('[data-player-next-episode]');
-
-        if (!(next instanceof HTMLAnchorElement)) {
-            this.cancelAutoplayCountdown(false);
-            this.showNotice('finalEpisode');
-
-            return;
-        }
-
-        this.cancelAutoplayCountdown(false);
-        this.flushProgress('next-episode');
-        next.click();
+        void this.requestPlayerTransition(episodeId, null);
     }
 
     requestRestart() {
-        this.cancelAutoplayCountdown(false);
-
         if (!this.authenticated) {
             this.applyRestart();
 
@@ -1026,21 +1567,12 @@ class CatalogPlayerSession {
             return;
         }
 
-        const metadata = {
+        if (!this.applyMediaSessionMetadata({
             title: this.video.dataset.mediaTitle || document.title,
             artist: this.video.dataset.mediaArtist || '',
             album: this.video.dataset.mediaAlbum || '',
-        };
-        const artwork = this.video.dataset.mediaArtwork;
-
-        if (artwork) {
-            metadata.artwork = [{ src: artwork }];
-        }
-
-        try {
-            navigator.mediaSession.metadata = new window.MediaMetadata(metadata);
-            this.ownsMediaSession = true;
-        } catch {
+            artwork: this.video.dataset.mediaArtwork || null,
+        })) {
             return;
         }
 
@@ -1057,21 +1589,62 @@ class CatalogPlayerSession {
                 this.video.currentTime = Math.max(0, Math.min(details.seekTime, this.video.duration || details.seekTime));
             }
         });
-
-        const playerRoot = this.video.closest('[data-active-player-session]');
-        const previous = playerRoot?.querySelector('[data-player-previous-episode]');
-        const next = playerRoot?.querySelector('[data-player-next-episode]');
-
-        if (previous instanceof HTMLAnchorElement) {
-            this.setMediaSessionAction('previoustrack', () => previous.click());
-        }
-
-        if (next instanceof HTMLAnchorElement) {
-            this.setMediaSessionAction('nexttrack', () => next.click());
-        }
+        this.refreshMediaSessionNavigation();
 
         this.syncMediaSessionPlaybackState(this.video.paused ? 'paused' : 'playing');
         this.syncMediaSessionPosition(true);
+    }
+
+    applyMediaSessionMetadata(mediaSession) {
+        if (
+            !('mediaSession' in navigator)
+            || typeof window.MediaMetadata !== 'function'
+            || !mediaSession
+        ) {
+            return false;
+        }
+
+        const metadata = {
+            title: mediaSession.title || document.title,
+            artist: mediaSession.artist || '',
+            album: mediaSession.album || '',
+        };
+
+        if (mediaSession.artwork) {
+            metadata.artwork = [{ src: mediaSession.artwork }];
+        }
+
+        try {
+            navigator.mediaSession.metadata = new window.MediaMetadata(metadata);
+            this.ownsMediaSession = true;
+            this.video.dataset.mediaTitle = metadata.title;
+            this.video.dataset.mediaArtist = metadata.artist;
+            this.video.dataset.mediaAlbum = metadata.album;
+            this.video.dataset.mediaArtwork = mediaSession.artwork || '';
+
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    refreshMediaSessionNavigation() {
+        if (!this.ownsMediaSession) {
+            return;
+        }
+
+        this.setMediaSessionAction(
+            'previoustrack',
+            this.navigation?.previous?.id
+                ? () => this.selectAdjacentEpisode('previous')
+                : null,
+        );
+        this.setMediaSessionAction(
+            'nexttrack',
+            this.navigation?.next?.id
+                ? () => this.selectAdjacentEpisode('next')
+                : null,
+        );
     }
 
     setMediaSessionAction(action, handler) {
@@ -1303,7 +1876,7 @@ class CatalogPlayerSession {
             : this.video.currentTime));
         const progressDelta = Math.abs(positionSeconds - this.lastSavedPosition);
 
-        if (!completed && this.hasDispatchedProgress && progressDelta === 0) {
+        if (!completed && !force && this.hasDispatchedProgress && progressDelta === 0) {
             return;
         }
 
@@ -1466,6 +2039,74 @@ class CatalogPlayerSession {
         }
     }
 
+    syncPlyrOriginalMediaState() {
+        const original = this.plyr?.elements?.original;
+
+        if (!(original instanceof HTMLVideoElement)) {
+            return;
+        }
+
+        if (Number.isFinite(this.video.currentTime)) {
+            this.video.dataset.progressPosition = String(Math.max(0, Math.floor(this.video.currentTime)));
+        }
+
+        this.video.dataset.accountAutoplay = this.preferences.autoplay ? '1' : '0';
+        this.video.dataset.accountRememberVolume = this.preferences.rememberVolume ? '1' : '0';
+        this.video.dataset.accountVolume = String(Math.round(this.video.volume * 100));
+        this.video.dataset.accountMuted = this.video.muted ? '1' : '0';
+        this.video.dataset.accountSpeed = Number(this.video.playbackRate || 1).toFixed(2);
+        this.video.dataset.accountSubtitles = this.preferences.subtitlesEnabled ? '1' : '0';
+        this.video.dataset.accountKeyboard = this.preferences.keyboardShortcutsEnabled ? '1' : '0';
+
+        [
+            'data-player-session',
+            'data-player-media-id',
+            'data-player-authorization-version',
+            'data-progress-episode',
+            'data-progress-session',
+            'data-progress-position',
+            'data-progress-enabled',
+            'data-account-autoplay',
+            'data-account-remember-volume',
+            'data-account-volume',
+            'data-account-muted',
+            'data-account-speed',
+            'data-account-subtitles',
+            'data-account-keyboard',
+            'data-account-reduced-motion',
+            'data-account-authenticated',
+            'data-media-title',
+            'data-media-artist',
+            'data-media-album',
+            'data-media-artwork',
+            'data-player-source-mime',
+            'data-player-source-format',
+            'data-player-source-expires-at',
+        ].forEach((attribute) => {
+            if (this.video.hasAttribute(attribute)) {
+                original.setAttribute(attribute, this.video.getAttribute(attribute) || '');
+            } else {
+                original.removeAttribute(attribute);
+            }
+        });
+
+        const hlsSource = this.video.dataset.hlsSrc || '';
+        const directSource = this.video.getAttribute('src')
+            || this.video.querySelector('source')?.getAttribute('src')
+            || '';
+
+        original.removeAttribute('src');
+        original.querySelectorAll('source').forEach((source) => source.remove());
+        delete original.dataset.hlsSrc;
+        original.autoplay = false;
+
+        if (hlsSource !== '') {
+            original.dataset.hlsSrc = hlsSource;
+        } else if (directSource !== '' && !directSource.startsWith('blob:')) {
+            original.setAttribute('src', directSource);
+        }
+    }
+
     destroy({ flush = true, reason = 'destroy' } = {}) {
         if (this.destroyed) {
             return null;
@@ -1481,8 +2122,13 @@ class CatalogPlayerSession {
         this.clearSeekTimer();
         this.clearRecoveryTimer();
         this.clearBufferingTimer();
-        this.cancelAutoplayCountdown(false);
         this.closeShortcutHelp(false);
+        this.menuGeneration += 1;
+        this.transitionGeneration += 1;
+        this.acceptedTransitionGeneration = this.transitionGeneration;
+        this.clearPrefetchedTransition();
+        this.menu?.destroy();
+        this.menu = null;
 
         if (this.noticeTimer !== null) {
             window.clearTimeout(this.noticeTimer);
@@ -1497,6 +2143,7 @@ class CatalogPlayerSession {
         this.abortController.abort();
         this.connection?.removeEventListener?.('change', this.connectionChangeHandler);
         this.clearMediaSession();
+        this.syncPlyrOriginalMediaState();
         this.hls?.destroy();
         let restoredVideo = this.video;
 

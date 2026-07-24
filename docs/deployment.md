@@ -573,10 +573,10 @@ Rollback — вернуть PHP/Blade/JS/CSS commit и восстановить 
 
 ## Rollout playback Task 07
 
-1. Migration/dependency/backfill нет; развернуть PHP/Blade/lang/Vite/config одновременно, установить `PLAYBACK_AUTOPLAY_COUNTDOWN_SECONDS=8` или bounded `3..30` и сохранить short signed TTL.
+1. Migration/dependency/backfill нет; развернуть PHP/Blade/lang/Vite/config одновременно и сохранить short signed TTL. Настройки countdown больше нет: совместимый выпуск PHP/Blade/lang и matching Vite manifest с hashed assets должен активироваться одной версией.
 2. Сверить `PLAYBACK_ALLOWED_HOSTS` с реально разрешёнными HTTPS providers. Те же exact origins добавить в `SECURITY_CSP_MEDIA_SOURCES`/`SECURITY_CSP_CONNECT_SOURCES`; не возвращать общий `https:`. До CSP enforcement проанализировать report-only violations.
 3. На provider/CDN проверить MIME, CORS для manifest/segments/tracks, HEAD/Range/`206` и отсутствие credential requirement. PHP generic proxy не добавлять.
-4. Обновить Vite assets/cache и smoke title player на guest/verified user: source grant, progress/resume/restart, variant/quality, previous/next, autoplay countdown/final, failure/fallback/refresh, phone/tablet/desktop, keyboard/focus/live regions.
+4. Обновить Vite assets/cache и smoke title player на guest/verified user: source grant, progress/resume/restart, меню сезонов/серий/переводов, in-place MP4/HLS switch, previous/next, немедленный auto-next без countdown, final/blocked-play, failure/fallback/refresh, Back/Forward, standard fullscreen identity, phone/tablet/desktop, keyboard/focus/live regions.
 5. Проверить, что signed grant отсутствует в JSON-LD/OG/sitemap/shared cache/log/report context, а title page загружает source summaries только текущей серии.
 
 Rollback — revert Task 07 assets/code/config/docs; database data repair не требуется, grants истекают по TTL. Полный checklist и browser limitations: [`audits/video-playback-report.md`](audits/video-playback-report.md).

@@ -11,7 +11,7 @@ final readonly class CatalogPlayerCopy
     public function __construct(private Translator $translator) {}
 
     /**
-     * @return array{runtime: array<string, string>, controls: array<string, string>}
+     * @return array{runtime: array<string, string>, controls: array<string, string>, menu: array<string, string>}
      */
     public function current(): array
     {
@@ -38,8 +38,12 @@ final readonly class CatalogPlayerCopy
                 'authorizationRefreshed' => $this->text('runtime.authorization_refreshed'),
                 'fallbackUnavailable' => $this->text('runtime.fallback_unavailable'),
                 'finalEpisode' => $this->text('runtime.final_episode'),
-                'autoplayCancelled' => $this->text('runtime.autoplay_cancelled'),
                 'restartFailed' => $this->text('runtime.restart_failed'),
+                'loadingTransition' => $this->text('runtime.loading_transition'),
+                'transitionUnavailable' => $this->text('runtime.transition_unavailable'),
+                'transitionLimited' => $this->text('runtime.transition_limited'),
+                'preferredTranslationUnavailable' => $this->text('runtime.preferred_translation_unavailable'),
+                'playRequired' => $this->text('runtime.play_required'),
             ],
             'controls' => [
                 'restart' => $this->text('controls.restart'),
@@ -77,6 +81,21 @@ final readonly class CatalogPlayerCopy
                 'disabled' => $this->text('controls.disabled'),
                 'enabled' => $this->text('controls.enabled'),
                 'advertisement' => $this->text('controls.advertisement'),
+            ],
+            'menu' => [
+                'open' => $this->text('menu.open'),
+                'close' => $this->text('menu.close'),
+                'title' => $this->text('menu.title'),
+                'seasons' => $this->text('menu.seasons'),
+                'episodes' => $this->text('menu.episodes'),
+                'translations' => $this->text('menu.translations'),
+                'back' => $this->text('menu.back'),
+                'previousPage' => $this->text('menu.previous_page'),
+                'nextPage' => $this->text('menu.next_page'),
+                'page' => $this->text('menu.page'),
+                'seasonEmpty' => $this->text('menu.season_empty'),
+                'loading' => $this->text('menu.loading'),
+                'retry' => $this->text('menu.retry'),
             ],
         ];
     }

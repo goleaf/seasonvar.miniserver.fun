@@ -176,6 +176,12 @@ final class CommentDiscussion extends Component
 
     public function updatedSort(): void
     {
+        if ($this->isLazyPlaceholder()) {
+            $this->skipRender();
+
+            return;
+        }
+
         $this->normalizeSort();
         $this->resetPage(pageName: 'comments_page');
         $this->expandedThreadId = null;
@@ -183,6 +189,12 @@ final class CommentDiscussion extends Component
 
     public function updatedScope(CommentTargetResolver $targets): void
     {
+        if ($this->isLazyPlaceholder()) {
+            $this->skipRender();
+
+            return;
+        }
+
         $this->selectScopeValue($this->scope, $targets);
     }
 
@@ -896,6 +908,11 @@ final class CommentDiscussion extends Component
         if (CommentSort::tryFrom($this->sort) === null) {
             $this->sort = CommentSort::Newest->value;
         }
+    }
+
+    private function isLazyPlaceholder(): bool
+    {
+        return $this->baseTargetType === '' || $this->baseTargetId < 1;
     }
 
     private function applyInterfaceLocale(): void

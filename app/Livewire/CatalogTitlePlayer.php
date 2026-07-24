@@ -22,6 +22,7 @@ use App\Services\Auth\AccountSettingsService;
 use App\Services\Catalog\CatalogManualPlaybackService;
 use App\Services\Catalog\CatalogPlaybackProgressSession;
 use App\Services\Catalog\CatalogPlaybackSourceResolver;
+use App\Services\Catalog\CatalogPlayerTransitionFactory;
 use App\Services\Catalog\CatalogPrimaryActionResolver;
 use App\Services\Catalog\CatalogTitlePlaybackQuery;
 use App\Services\Catalog\CatalogUserStateService;
@@ -89,6 +90,8 @@ class CatalogTitlePlayer extends Component
 
     protected CatalogManualPlaybackService $manualPlayback;
 
+    protected CatalogPlayerTransitionFactory $playerTransitions;
+
     protected PlaybackTimeFormatter $playbackTimes;
 
     protected ExternalMediaMetadata $mediaMetadata;
@@ -122,6 +125,7 @@ class CatalogTitlePlayer extends Component
         CatalogPlaybackProgressSession $progressSessions,
         CatalogUserStateService $userState,
         CatalogManualPlaybackService $manualPlayback,
+        CatalogPlayerTransitionFactory $playerTransitions,
         PlaybackTimeFormatter $playbackTimes,
         ExternalMediaMetadata $mediaMetadata,
         AccountSettingsService $accountSettings,
@@ -136,6 +140,7 @@ class CatalogTitlePlayer extends Component
         $this->progressSessions = $progressSessions;
         $this->userState = $userState;
         $this->manualPlayback = $manualPlayback;
+        $this->playerTransitions = $playerTransitions;
         $this->playbackTimes = $playbackTimes;
         $this->mediaMetadata = $mediaMetadata;
         $this->accountSettings = $accountSettings;
@@ -340,6 +345,130 @@ class CatalogTitlePlayer extends Component
 
         $this->resetErrorBag('playback');
         $this->authorizationVersion++;
+    }
+
+    /** @return array<string, mixed> */
+    #[Renderless]
+    public function playerEpisodePage(mixed $seasonId, mixed $page = 1): array
+    {
+        $seasonId = $this->positiveId($seasonId);
+        $page = $this->nonNegativeInteger($page, minimum: 1);
+
+        if ($seasonId === null || $page === null || $page > 10_000) {
+            return $this->unavailableTransition();
+        }
+
+        if (! $this->attemptPlaybackAction('player-menu', 30)) {
+            return $this->unavailableTransition('catalog.player.transition_limited');
+        }
+
+        $title = $this->title();
+        $user = $this->user();
+        $season = $this->seasonSummaries($title, $user)->firstWhere('id', $seasonId);
+
+        if (! $season instanceof Season) {
+            return $this->unavailableTransition();
+        }
+
+        return $this->playerTransitions
+            ->episodePage(
+                $title,
+                $user,
+                $season,
+                $page,
+                $this->positiveId($this->episode),
+            )
+            ->toArray();
+    }
+
+    /** @return array<string, mixed> */
+    #[Renderless]
+    public function preparePlayerTransition(mixed $episodeId, mixed $mediaId = null): array
+    {
+        $episodeId = $this->positiveId($episodeId);
+        $hasRequestedMedia = $mediaId !== null && $mediaId !== '';
+        $mediaId = $hasRequestedMedia ? $this->positiveId($mediaId) : null;
+
+        if ($episodeId === null || ($hasRequestedMedia && $mediaId === null)) {
+            return $this->unavailableTransition();
+        }
+
+        if (! $this->attemptPlaybackAction('player-transition', 12)) {
+            return $this->unavailableTransition('catalog.player.transition_limited');
+        }
+
+        $title = $this->title();
+        $user = $this->user();
+        $episode = $this->playback->watchableEpisode($title, $user, $episodeId);
+
+        if (! $episode instanceof Episode) {
+            return $this->unavailableTransition();
+        }
+
+        return $this->playerTransitions
+            ->prepare($title, $user, $episode, $mediaId, $this->playbackPreferences())
+            ->toArray();
+    }
+
+    /** @return array<string, mixed> */
+    #[Renderless]
+    public function commitPlayerTransition(mixed $episodeId, mixed $mediaId): array
+    {
+        $episodeId = $this->positiveId($episodeId);
+        $mediaId = $this->positiveId($mediaId);
+
+        if ($episodeId === null || $mediaId === null) {
+            return $this->unavailableTransition();
+        }
+
+        if (! $this->attemptPlaybackAction('player-transition-commit', 20)) {
+            return $this->unavailableTransition('catalog.player.transition_limited');
+        }
+
+        $title = $this->title();
+        $user = $this->user();
+        $episode = $this->playback->watchableEpisode($title, $user, $episodeId);
+        $media = $this->playback->findAvailableMedia($title, $user, $mediaId);
+
+        if (! $episode instanceof Episode
+            || ! $media instanceof LicensedMedia
+            || (int) $media->catalog_title_id !== $title->id
+            || (int) $media->season_id !== (int) $episode->season_id
+            || (int) $media->episode_id !== $episode->id) {
+            return $this->unavailableTransition();
+        }
+
+        $previousEpisodeId = $this->positiveId($this->episode);
+        $this->season = (string) $episode->season_id;
+        $this->episode = (string) $episode->id;
+        $this->media = (string) $media->id;
+        $this->marker = '';
+        $this->failedMediaIds = [];
+        $this->resolvedEpisode = $episode;
+        $this->personalPlaybackNotice = null;
+        $this->resetErrorBag('playback');
+        $this->syncMediaProfile($media);
+        $profile = $this->playback->mediaProfile($media);
+        $query = collect([
+            'season' => $this->season,
+            'episode' => $this->episode,
+            'media' => $this->media,
+            'variant' => $profile['variant'],
+            'quality' => $profile['quality'],
+            'format' => $profile['format'],
+        ])
+            ->filter(fn (string|int|null $value): bool => $value !== null && $value !== '')
+            ->map(fn (string|int $value): string => (string) $value)
+            ->all();
+
+        if ($previousEpisodeId !== $episode->id) {
+            $this->dispatchDiscussionTarget();
+        }
+
+        return [
+            'status' => 'ready',
+            'query' => $query,
+        ];
     }
 
     #[Renderless]
@@ -683,6 +812,26 @@ class CatalogTitlePlayer extends Component
             : null;
         $progressResumePosition = $requestedMarker?->position_seconds
             ?? ($primaryAction->episodeId === $selectedEpisode?->id ? $primaryAction->positionSeconds : 0);
+        $playerMenuBootstrap = [
+            'seasons' => $seasons
+                ->take(100)
+                ->map(fn (Season $season): array => [
+                    'id' => $season->id,
+                    'label' => $this->seasonDisplayLabel($season),
+                    'episodeCount' => max(0, (int) $season->getAttribute('available_episodes_count')),
+                    'current' => $activeSeason?->id === $season->id,
+                ])
+                ->values()
+                ->all(),
+            'current' => [
+                'seasonId' => $activeSeason?->id,
+                'episodeId' => $selectedEpisode?->id,
+                'mediaId' => $selectedMedia?->id,
+            ],
+            'translations' => $selectedMedia !== null
+                ? $this->playerTransitions->translationOptions($mediaItems->take(100), $selectedMedia->id)
+                : [],
+        ];
 
         return view('livewire.catalog-title-player', [
             'title' => $title,
@@ -698,7 +847,6 @@ class CatalogTitlePlayer extends Component
             'playbackSourceIsPlayable' => $playbackSource->isPlayable(),
             'playerSessionKey' => $playerSessionKey,
             'authorizationVersion' => $this->authorizationVersion,
-            'autoplayCountdownSeconds' => max(3, min(30, (int) config('playback.autoplay_countdown_seconds', 8))),
             'progressSessionToken' => $progressSessionToken,
             'progressResumePosition' => $progressResumePosition,
             'mediaItems' => $mediaItems,
@@ -724,6 +872,7 @@ class CatalogTitlePlayer extends Component
             'playerHelpContext' => $playbackSource->isPlayable() ? 'controls' : 'error',
             'playerHelpRouteLocale' => $routeLocale,
             'playerCopy' => $playerCopy->current(),
+            'playerMenuBootstrap' => $playerMenuBootstrap,
             'mediaSession' => [
                 'title' => $selectedEpisode?->title ?: ($selectedEpisode !== null
                     ? $this->episodeDisplayLabel($selectedEpisode)
@@ -951,6 +1100,15 @@ class CatalogTitlePlayer extends Component
             fn (): bool => true,
             60,
         ) === true;
+    }
+
+    /** @return array{status: 'unavailable', message: string} */
+    private function unavailableTransition(string $messageKey = 'catalog.player.transition_unavailable'): array
+    {
+        return [
+            'status' => 'unavailable',
+            'message' => __($messageKey),
+        ];
     }
 
     private function resetPlaybackRecovery(): void

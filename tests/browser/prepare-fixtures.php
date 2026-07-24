@@ -165,6 +165,50 @@ LicensedMedia::factory()->create([
     'published_at' => now()->subMinute(),
 ]);
 
+$nextEpisode = Episode::factory()->create([
+    'season_id' => $season->id,
+    'number' => 2,
+    'title' => 'Серия 2',
+]);
+
+LicensedMedia::factory()->create([
+    'catalog_title_id' => $title->id,
+    'season_id' => $season->id,
+    'episode_id' => $nextEpisode->id,
+    'title' => 'Browser Smoke 2 серия',
+    'storage_disk' => 'external_playlist',
+    'path' => 'https://media.example.com/player-fixtures/valid-next.m3u8',
+    'playback_url' => 'https://media.example.com/player-fixtures/valid-next.m3u8',
+    'format' => 'm3u8',
+    'quality' => '1080p',
+    'variant_type' => 'original',
+    'variant_key' => 'browser-original',
+    'duration_seconds' => 600,
+    'status' => 'published',
+    'check_status' => 'available',
+    'health_status' => 'active',
+    'published_at' => now()->subMinute(),
+]);
+
+LicensedMedia::factory()->create([
+    'catalog_title_id' => $title->id,
+    'season_id' => $season->id,
+    'episode_id' => $nextEpisode->id,
+    'title' => 'Browser Smoke 2 серия MP4',
+    'storage_disk' => 'external_playlist',
+    'path' => 'https://media.example.com/player-fixtures/direct-next.mp4',
+    'playback_url' => 'https://media.example.com/player-fixtures/direct-next.mp4',
+    'format' => 'mp4',
+    'quality' => '720p',
+    'variant_type' => 'original',
+    'variant_key' => 'browser-original',
+    'duration_seconds' => 600,
+    'status' => 'published',
+    'check_status' => 'available',
+    'health_status' => 'active',
+    'published_at' => now()->subMinute(),
+]);
+
 $recommendedTitle = CatalogTitle::factory()->create([
     'slug' => 'browser-recommended',
     'title' => 'Рекомендованный браузерный сериал',

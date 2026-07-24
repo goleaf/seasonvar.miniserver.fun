@@ -280,7 +280,7 @@ Master plan является единственным подробным executi
 # Параллельный согласованный поток — бесшовное переключение сезонов, серий и переводов в плеере
 
 Дата: 24.07.2026
-Статус: design согласован пользователем; полный TDD implementation plan записан, runtime implementation ещё не начата, предыдущие push заблокированы отсутствующей HTTPS-аутентификацией GitHub.
+Статус: runtime implementation, full verification и repository scan завершены; выполняются изолированный commit и push в существующей `main`. Предыдущие push заблокированы отсутствующей HTTPS-аутентификацией GitHub.
 
 ## Цель и согласованное решение
 
@@ -295,13 +295,17 @@ Master plan является единственным подробным executi
 - [x] Записать и закоммитить в `main` design spec [`2026-07-24-player-seamless-episode-switching-design.md`](../superpowers/specs/2026-07-24-player-seamless-episode-switching-design.md) как `ea8f7ad`.
 - [x] Получить отдельное подтверждение пользователя после просмотра записанной спецификации.
 - [x] После подтверждения записать и перечитать полный TDD implementation plan [`2026-07-24-player-seamless-episode-switching.md`](../superpowers/plans/2026-07-24-player-seamless-episode-switching.md) до application edits.
-- [ ] Выполнить RED → GREEN implementation, focused/full verification, runtime docs, README/CHANGELOG, commit и push только в существующей `main`.
+- [x] Выполнить RED → GREEN runtime implementation и focused verification.
+- [x] Обновить canonical runtime docs, README и CHANGELOG по фактически доставленному поведению.
+- [x] Завершить полный PHP/Playwright/build gate.
+- [x] Завершить docs/legacy/privacy scan.
+- [ ] Commit и push только в существующей `main`.
 
 Выбранная архитектура: три последовательных Livewire `#[Renderless]` actions возвращают bounded страницу серий, подготавливают один авторизованный transition без преждевременного изменения текущего состояния и фиксируют только фактически принятый браузером transition. JavaScript применяет transition к тому же `<video>`, Plyr/fullscreen root и `CatalogPlayerSession`. Server остаётся владельцем hierarchy, playability, entitlement, source grant и progress token. Browser владеет только realtime menu/source lifecycle и игнорирует stale responses по монотонной generation. Установленный Livewire `4.3.3` автоматически делает `#[Json]` actions параллельными, поэтому этот атрибут после version-specific discovery исключён из transition boundary.
 
-Текущий runtime до implementation commit остаётся прежним: выбор через Livewire заменяет keyed media shell, а `ended` запускает countdown `3..30` секунд. Canonical docs явно отделяют это фактическое состояние от согласованного target.
+Текущий runtime меняет episode/media source внутри того же `<video>`, Plyr, media shell и стандартного fullscreen root. `ended` немедленно применяет заранее подготовленный следующий разрешённый transition без countdown или искусственной задержки; preference `off`, final state и blocked browser autoplay остаются честными конечными состояниями.
 
-Rollback будущей реализации: вернуть countdown/обычную Livewire-навигацию, удалить renderless transition/menu additions и опубликовать согласованный прежний Vite manifest с hashed assets. Migration, data repair, cache flush, queue clear, storage cleanup и dependency reinstall не требуются.
+Rollback реализации: вернуть прежний countdown/обычную Livewire-навигацию, удалить renderless transition/menu additions и опубликовать согласованный прежний Vite manifest с hashed assets. Migration, data repair, cache flush, queue clear, storage cleanup и dependency reinstall не требуются.
 
 ## Проверенный baseline и версии
 
@@ -396,12 +400,24 @@ Rollback будущей реализации: вернуть countdown/обыч�
 | Design alternatives и пользовательское approval | `completed` | Пользователь выбрал in-place вариант и отдельно подтвердил architecture, UX, auto-next, security/performance и testing/compatibility sections. |
 | Task-specific spec и expected files/contracts/risks | `completed` | Записаны linked design spec и полный 15-задачный TDD implementation plan с точными DTO/action/JavaScript interfaces, RED/GREEN командами, commit checkpoints, compatibility contracts и cross-feature risks. |
 | Security/privacy | `already_compliant` | Spec сохраняет server revalidation, signed same-origin grant и запрет raw source/private state в browser payload. |
-| Performance/cache | `completed` | Spec ограничивает страницу 24 сериями, prefetch одной серией и исключает polling/full graph/new shared cache. Runtime evidence ещё pending. |
-| Accessibility/mobile | `completed` | Spec фиксирует keyboard/focus/touch/pagination/safe-area/reduced-motion и честное native iOS limitation. Runtime evidence ещё pending. |
+| Performance/cache | `completed` | Runtime ограничивает страницу 24 сериями и сезонный клиентский список 12 пунктами, prefetch — одной следующей серией; polling/full graph/new shared cache отсутствуют. |
+| Accessibility/mobile | `completed` | Browser matrix подтверждает desktop three-column и mobile/tablet sequential menu, keyboard/focus/touch/pagination/safe-area/reduced-motion; native iOS остаётся честным `unresolved`. |
 | Maintenance/production/rollback | `completed` | Причина browser behavior change зафиксирована; dependency update отсутствует; code/assets rollback и failure boundary описаны. |
-| README актуальность | `already_compliant` | На design-only стадии visitor/product runtime не изменился; фиктивная visitor history entry запрещена и не добавляется. |
-| CHANGELOG | `completed` | Добавлены отдельные русские design/plan-only записи, явно подтверждающие отсутствие runtime/schema/route/cache/dependency changes. |
+| README актуальность | `completed` | Описание проигрывателя, roadmap и датированная visitor history отражают меню, in-place transition, немедленный auto-next и новые клавиши. |
+| CHANGELOG | `completed` | Добавлена отдельная русская runtime-запись с фактическим поведением, проверками и сохранёнными compatibility boundaries. |
 | Git `main`, commit и push | `unresolved` | Полный implementation plan и task-owned corrections закоммичены в существующей `main` как `d5aaad7`; pre-existing `composer.lock` и параллельный master-plan исключены. Новая попытка `git push origin main` вернула `could not read Username for 'https://github.com'`, поэтому remote delivery не заявляется. |
+
+## Runtime implementation evidence
+
+- Добавлены typed allowlisted DTO `PlayerEpisodePageData`/`PlaybackTransitionData`, bounded `CatalogPlayerTransitionFactory` и direct/cross-season методы канонического `CatalogTitlePlaybackQuery`.
+- `CatalogTitlePlayer` получил только последовательные `#[Renderless]` actions `playerEpisodePage`, `preparePlayerTransition` и `commitPlayerTransition`; commit повторно нормализует selection и меняет discussion target только при реальной смене серии.
+- `player-menu.js`, `player.js` и `player-navigation.js` сохраняют один DOM owner, выполняют generation-guarded MP4/HLS hot swap, progress context rotation, bounded near-end prefetch, немедленный auto-next, History API и Back/Forward.
+- Старый countdown DOM, timers, translations, config и `.env.example` key удалены; обычные SSR/no-JavaScript links и signed source route сохранены.
+- History regression выявил две соседние lazy Livewire границы: отзывы гарантируют boot-injected services перед render, а placeholder комментариев пропускает URL-render hooks до штатного lazy mount. Focused browser test после исправления проходит без first-party 404/500.
+- Focused player PHP-набор прошёл `108/108` тестов и `1164` утверждения; финальные frontend/static contracts — `11/11` и `450` утверждений. Полный PHPUnit на окончательном shared snapshot прошёл `1510` тестов: `1499` passed, `11` expected skipped, `123588` утверждений.
+- Vite `8.1.4` production build собрал `24` модуля, matching manifest и отдельные player/navigation/Plyr/HLS chunks. Финальный `player-lifecycle.spec.js` прошёл `15` browser-сценариев при `12` ожидаемых project/platform skips на Desktop/Mobile/Tablet Chromium: menu, keyboard, manual episode/translation hot swap, standard fullscreen identity, History API, immediate auto-next, HLS recovery, MP4 Range и WebVTT.
+- Новые routes, migrations, tables, indexes, cache keys, queues, service worker, Composer/npm packages и raw provider URL payloads не добавлены.
+- Native iOS fullscreen source-swap preservation: `unresolved` — Chromium emulation не доказывает WebKit/OS fullscreen behavior; fake fullscreen не добавлен.
 
 ## Design verification checklist
 

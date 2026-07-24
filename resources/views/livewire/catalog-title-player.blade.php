@@ -60,7 +60,7 @@
                             data-player-shell
                             data-player-state="loading"
                             data-player-copy="{{ \Illuminate\Support\Js::encode($playerCopy) }}"
-                            data-player-countdown-seconds="{{ $autoplayCountdownSeconds }}"
+                            data-player-menu-bootstrap="{{ \Illuminate\Support\Js::encode($playerMenuBootstrap) }}"
                             @if ($episodeNavigation->next) data-player-next-title="{{ $this->episodeDisplayLabel($episodeNavigation->next) }}" @endif
                             class="mt-3 overflow-hidden rounded-lg border border-emerald-200 bg-emerald-50"
                         >
@@ -134,32 +134,6 @@
                                 aria-live="polite"
                                 class="bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-900"
                             ></p>
-                            <section
-                                data-player-autoplay-countdown
-                                hidden
-                                aria-live="polite"
-                                aria-label="{{ __('catalog.player.next_episode_countdown') }}"
-                                class="border-t border-emerald-200 bg-emerald-50 p-3"
-                            >
-                                <p
-                                    data-player-countdown-text
-                                    data-player-countdown-template="{{ __('catalog.player.next_episode_starts', ['seconds' => ':seconds']) }}"
-                                    class="font-bold text-emerald-900 tabular-nums"
-                                ></p>
-                                @if ($episodeNavigation->next)
-                                    <p class="mt-1 text-sm text-emerald-800">{{ $this->episodeDisplayLabel($episodeNavigation->next) }}</p>
-                                @endif
-                                <div class="mt-3 flex flex-wrap gap-2">
-                                    <button type="button" data-player-autoplay-now class="inline-flex min-h-11 items-center gap-2 rounded-control bg-emerald-700 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700">
-                                        <x-ui.icon name="fa-solid fa-forward-step" />
-                                        <span>{{ __('catalog.player.play_next_now') }}</span>
-                                    </button>
-                                    <button type="button" data-player-autoplay-cancel class="inline-flex min-h-11 items-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700">
-                                        <x-ui.icon name="fa-solid fa-xmark" />
-                                        <span>{{ __('catalog.player.cancel_autoplay') }}</span>
-                                    </button>
-                                </div>
-                            </section>
                             <dialog data-player-shortcuts-dialog class="m-auto w-[min(34rem,calc(100%-2rem))] rounded-lg border-0 bg-white p-0 text-slate-800 shadow-xl backdrop:bg-slate-950/50">
                                 <div class="p-5">
                                     <div class="flex items-start justify-between gap-3">
@@ -316,6 +290,7 @@
                                 wire:click.prevent="selectEpisode({{ $episodeNavigation->previous->id }})"
                                 data-catalog-history
                                 data-player-previous-episode
+                                data-player-transition-episode="{{ $episodeNavigation->previous->id }}"
                                 class="flex min-h-11 items-center gap-3 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700"
                             >
                                 <x-ui.icon name="fa-solid fa-arrow-left" />
@@ -333,6 +308,7 @@
                                 wire:click.prevent="selectEpisode({{ $episodeNavigation->next->id }})"
                                 data-catalog-history
                                 data-player-next-episode
+                                data-player-transition-episode="{{ $episodeNavigation->next->id }}"
                                 class="flex min-h-11 items-center justify-end gap-3 rounded-control bg-slate-50 px-3 py-2 text-right text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 sm:col-start-2"
                             >
                                 <span class="min-w-0">
@@ -498,6 +474,8 @@
                                         data-catalog-history
                                         data-player-media-option="{{ $option['mediaId'] }}"
                                         data-player-media-format="{{ $option['format'] }}"
+                                        data-player-transition-episode="{{ $selectedEpisode->id }}"
+                                        data-player-transition-media="{{ $option['mediaId'] }}"
                                         @if ($option['active']) aria-current="true" @endif
                                         @class([
                                             'inline-flex min-h-11 max-w-full items-center gap-2 rounded-control px-3 py-2 text-left text-sm font-bold leading-5 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 data-loading:pointer-events-none data-loading:opacity-60',
@@ -586,6 +564,7 @@
                             wire:key="season-episode-{{ $episodeOption->id }}"
                             wire:click.prevent="selectEpisode({{ $episodeOption->id }})"
                             data-catalog-history
+                            data-player-transition-episode="{{ $episodeOption->id }}"
                             @if ($selectedEpisode?->id === $episodeOption->id) aria-current="true" @endif
                             @class([
                                 'grid min-h-20 content-center gap-1 rounded-lg px-3 py-3 text-left text-sm leading-5 transition',

@@ -1,6 +1,6 @@
 # Каноническая архитектура video playback
 
-Проверено: 24.07.2026. Этот документ — владелец фактического playback-контракта Task 07 и явно помеченных согласованных будущих изменений. Живой чек-лист реализации и отката находится в `docs/plans/laravel-video-portal-modernization.md`. Портал воспроизводит только разрешённые проекту источники и не реализует обход DRM, подписи, оплаты, региона или ограничений поставщика.
+Проверено: 24.07.2026. Этот документ — владелец фактического playback-контракта Task 07 и последующих изменений проигрывателя. Живой чек-лист реализации и отката находится в `docs/plans/laravel-video-portal-modernization.md`. Портал воспроизводит только разрешённые проекту источники и не реализует обход DRM, подписи, оплаты, региона или ограничений поставщика.
 
 ## Итог аудита
 
@@ -144,23 +144,21 @@ Resume выполняется после `loadedmetadata`, clamp-ится и н�
 
 Authenticated changes проходят existing `AccountSettingsService`, CSRF/Livewire session и bounded player action; anonymous changes остаются local. Slider/rate changes debounce-ятся, fingerprint-deduplicate-ятся и не создают write на каждый movement. При выключенном remember-volume server/device volume/mute не обновляются, speed сохраняется независимо.
 
-После `ended` autoplay использует только server-resolved next playable link. Client запускает configurable countdown `3..30` секунд (default 8), показывает название следующей серии, Play now и Cancel, объявляет состояние screen reader и не poll-ит сервер. Escape/play/restart/navigation/destroy отменяют единственный timer. Preference `off` предотвращает переход. Последняя серия показывает final state без loop и без unrelated recommendation autoplay. Browser policy всё равно может запретить начальный autoplay со звуком.
+После `ended` autoplay использует только заранее подготовленный server-authorized next transition и немедленно применяет его без countdown, кнопок Play now/Cancel и искусственного timeout. Preference `off` предотвращает переход. Последняя серия показывает final state без loop и без unrelated recommendation autoplay. Browser policy всё равно может заблокировать `play()`; тогда тот же выбранный источник остаётся открытым и проигрыватель показывает локализованное требование ручного запуска.
 
-### Согласованный целевой контракт 24.07.2026 — implementation pending
+Player-owned меню `Сезон → Серия → Перевод` выполняет in-place source transition: существующие `<video>`, Plyr root, `document.fullscreenElement` стандартного Fullscreen API и одна `CatalogPlayerSession` не заменяются. Меню является JavaScript-owned потомком единственного `wire:ignore` media shell. Server-owned hierarchy/access/source decisions возвращаются тремя последовательными bounded Livewire `#[Renderless]` actions: страница серий, подготовка одного перехода и фиксация только принятого браузером контекста. Установленный Livewire `4.3.3` автоматически делает `#[Json]` параллельным, поэтому этот атрибут запрещён для упорядоченного transition contract. Browser получает только один короткоживущий same-origin grant; raw provider URL и полный catalog graph в action payload не попадают.
 
-Пользователь явно изменил постоянное правило countdown: после реализации [`2026-07-24-player-seamless-episode-switching-design.md`](../superpowers/specs/2026-07-24-player-seamless-episode-switching-design.md) `ended` обязан немедленно применять заранее подготовленный server-authorized next transition без countdown, кнопок Play now/Cancel и искусственного timeout. Preference `off`, final state, browser autoplay policy и запрет unrelated recommendation autoplay сохраняются. До implementation commit предыдущий абзац честно описывает фактически работающий runtime.
-
-Тот же согласованный дизайн добавляет player-owned меню `Сезон → Серия → Перевод` и in-place source transition: существующие `<video>`, Plyr root, `document.fullscreenElement` стандартного Fullscreen API и одна `CatalogPlayerSession` не заменяются. Меню является JavaScript-owned потомком уже разрешённого `wire:ignore` media shell, а server-owned hierarchy/access/source decisions возвращаются последовательными bounded Livewire `#[Renderless]` actions. Установленный Livewire `4.3.3` автоматически делает `#[Json]` параллельным, поэтому этот атрибут запрещён для упорядоченного transition contract. Browser получает только один короткоживущий same-origin grant; raw provider URL и полный catalog graph в action payload не попадают.
+Ручной переход и auto-next сначала формируют best-effort flush старого progress context, затем атомарно меняют episode/media/session/token/sequence. URL получает только подтверждённый выбор и сохраняет остальные query-параметры и hash; Back/Forward восстанавливает источник через ту же server-authorized boundary. Один near-end prefetch ограничен следующей серией, не показывает ложное loading-состояние и игнорируется после смены поколения.
 
 Нативный iOS video fullscreen остаётся browser-governed: WebKit не гарантирует показ custom HTML поверх системного player UI или сохранение native fullscreen при source swap. Fake fullscreen не создаётся; реальная iOS-проверка до delivery остаётся обязательным evidence либо честным `unresolved`.
 
 ## Player JavaScript и Livewire lifecycle
 
-`resources/js/player.js` владеет video/Plyr/HLS lifecycle, source load/retry/fallback, buffering, progress, preferences, countdown, keyboard, fullscreen/PiP capability и Media Session. `player-navigation.js` — узкий Livewire bridge meaningful server actions. Blade содержит только prepared data/translated labels; inline CSS и application JavaScript отсутствуют.
+`resources/js/player.js` владеет video/Plyr/HLS lifecycle, source load/retry/fallback, buffering, progress, preferences, keyboard, fullscreen/PiP capability, transition generation и Media Session. `player-menu.js` владеет только DOM/focus/pagination меню внутри ignored shell, а `player-navigation.js` — узкий последовательный Livewire bridge meaningful server actions и History API. Blade содержит только prepared data/translated labels; inline CSS и application JavaScript отсутствуют.
 
 - initialization reserved/ready markers гарантируют один session на video;
 - `AbortController` снимает DOM/window/document listeners;
-- HLS instance, heartbeat, retry, buffering, preference, notice и countdown timers уничтожаются;
+- HLS instance, heartbeat, retry, buffering, preference и notice timers уничтожаются;
 - Livewire morph/navigation сначала flush-ит meaningful progress, затем pause/destroy старый player;
 - detached audio не продолжает играть;
 - `timeupdate` не вызывает Livewire;
@@ -169,14 +167,15 @@ Authenticated changes проходят existing `AccountSettingsService`, CSRF/L
 
 ## Controls, responsive behavior и accessibility
 
-Plyr остаётся владельцем play/pause, seek, time, mute/volume, speed, captions, PiP и fullscreen. Portal controls добавляют previous/next, autoplay, restart, source groups, report/help и keyboard-help dialog.
+Plyr остаётся владельцем play/pause, seek, time, mute/volume, speed, captions, PiP и fullscreen. Portal controls добавляют previous/next, autoplay, restart, меню сезонов/серий/переводов, source groups, report/help и keyboard-help dialog.
 
-- `Space`/`K` и `ArrowLeft`/`ArrowRight` управляют play/pause и перемоткой ровно на `-10/+10` секунд на всей странице, пока существует подключённая активная player session и включена каноническая настройка горячих клавиш. Внутри Plyr эти клавиши остаются в его focused keyboard boundary без двойного действия; M, F и C также остаются scoped Plyr controls, а `Shift+N`, `Shift+P`, `P`, `?` и Escape — scoped portal actions.
+- `Space`/`K` и `ArrowLeft`/`ArrowRight` управляют play/pause и перемоткой ровно на `-10/+10` секунд на всей странице, пока существует подключённая активная player session и включена каноническая настройка горячих клавиш. `Shift+N`/`Shift+P` переходят к следующей/предыдущей доступной серии, `Shift+E` открывает меню. Внутри Plyr совпадающие клавиши остаются в его focused keyboard boundary без двойного действия; M, F и C также остаются scoped Plyr controls, а `P`, `?` и Escape — scoped portal actions.
 - Global playback fallback принадлежит существующему `CatalogPlayerSession`, использует его единственный document listener и уничтожается тем же `AbortController`. Он не перехватывает editable/interactive controls, открытые dialog, системные `Alt`/`Ctrl`/`Meta` combinations или отключённую keyboard preference; pointer/touch controls остаются полным альтернативным способом действия.
 - Native fullscreen/PiP feature-detect-ятся; unsupported control library скрывает. Fake CSS fullscreen и fake PiP не создаются.
 - Player использует `aspect-ratio: 16/9`, safe-area insets, 44 px coarse-pointer controls, bounded mobile menu, readable captions и landscape fullscreen geometry.
+- Меню имеет один semantic `dialog`: на desktop видны три колонки, на телефоне — один последовательный уровень с возвратом; страницы серий ограничены 24 строками, сезонный список — 12 пунктами на клиентскую страницу. Focus trap, Escape, возврат focus, стрелки, Enter/Space, `aria-current`, видимый focus и reduced-motion входят в контракт.
 - iOS получает `playsinline`, native HLS fallback и browser-governed fullscreen/PiP/autoplay/background behavior. Android/Chromium использует feature detection, HLS.js/MSE только при поддержке и не получает device-specific hacks.
-- Focus visible глобально, dialog возвращает focus, status/countdown/error regions локализованы. Время не объявляется каждую секунду.
+- Focus visible глобально, dialog возвращает focus, status/error regions локализованы. Время не объявляется каждую секунду.
 - `prefers-reduced-motion` и account reduced-motion отключают необязательные transitions/animations, не скрывая loading state.
 - `navigator.connection.saveData` отключает autoplay, снижает HLS buffers и меняет preload на `none`; network API не используется для fingerprinting.
 
@@ -204,7 +203,7 @@ Player различает preparing/loading/ready/playing/paused/seeking/bufferi
 2. Нет реального HLS в текущем SQLite snapshot; HLS.js/native code сохраняется для разрешённых manifest sources, manual ABR level UI не заявляется.
 3. Premium существует как отдельный account/billing domain, но ни один playback feature/source не привязан к нему. Region-country и user-age playback schema также отсутствуют.
 4. External provider отвечает за codec, CORS, Range, manifest и segment availability. Portal может безопасно retry/fallback, но не обходит provider controls.
-5. Fullscreen/PiP/background/orientation отличаются между browser/OS и проверяются feature detection, а не обещанием идентичности.
+5. Fullscreen/PiP/background/orientation отличаются между browser/OS и проверяются feature detection, а не обещанием идентичности. Standard Fullscreen API проверен в Chromium; сохранение нативного iOS fullscreen при source swap остаётся `unresolved` без реального устройства.
 6. После verified login anonymous progress переносится best-effort через существующий settings migration endpoint: сервер повторно разрешает playable episode, сохраняет только position provenance `anonymous`, не доверяет completion hint и никогда не заменяет уже существующую account row.
 7. DRM, MPEG-DASH, transcoding, offline video, generic proxy, HLS merge и protected-stream scraping не поддерживаются.
 
@@ -216,7 +215,8 @@ Player различает preparing/loading/ready/playing/paused/seeking/bufferi
 - hierarchy/entitlement/viewer signature/URL-DNS/path guards и no-store headers;
 - один player instance, cleanup при Livewire morph/navigation/back-forward;
 - regular/special/cross-season previous/next и отсутствие final loop;
-- autoplay on/off/countdown/cancel/play-now и progress flush;
+- autoplay on/off, немедленный auto-next без countdown, final/blocked-play states и progress flush;
+- меню сезонов/серий/переводов, bounded pagination, focus/keyboard/touch и отсутствие смены DOM-владельцев;
 - variant/quality/format selection, position handoff, one-retry/fallback/refresh bounds;
 - authenticated and anonymous progress cadence, stale sequence, restart, resume и completion thresholds;
 - volume/mute/remember-volume/speed validation and persistence;
@@ -235,3 +235,5 @@ Rollback — revert Task 07 code/assets/translations/docs. Database rollback и 
 Фактическая приёмка 18.07.2026 прошла все эти gates. PHP syntax, Pint, focused Larastan, JS syntax, Blade compilation, Vite build, docs-refresh и whitespace checks успешны; SQLite `quick_check(1)` вернул `ok`, а query-plan inspection использовал существующие индексы порядка эпизодов, доступности источников и уникального progress. Рекурсивный RU/EN key/placeholder contract совпадает. Статический HTML содержит только короткоживущий same-origin `/playback/{id}` grant и не содержит CDN URL или `VideoObject.contentUrl`. Ручной Chromium smoke на desktop и `390×844` подтвердил один Plyr/video instance, отсутствие overflow и console errors, локализованный keyboard dialog с возвратом focus, переход Livewire с 1-й на 2-ю серию, сохранение канонической device preference и реальную выдачу CDN с `206 Partial Content`. Automated test suite не запускался.
 
 Добавочная приёмка глобальных playback-команд 24.07.2026 относится к отдельному последующему изменению, поэтому прежний task-specific запрет Task 07 на automated tests к ней не применяется. Новый Playwright regression сначала зафиксировал прежнее отсутствие global fallback (`Expected: 1`, `Received: 0`), затем подтвердил `Space`/`K`, `ArrowLeft`/`ArrowRight`, точный шаг и границы времени, отсутствие двойного focused-действия, exclusions форм/dialog/modifier и cleanup после `Livewire` navigation. Focused сценарий прошёл `1 test`, полный `player-lifecycle.spec.js` — `8 passed`, `4 skipped`; RU/EN copy и visual contracts прошли `33 tests`, `319 assertions`, Vite собрал `23 modules`, JS/PHP syntax, docs-refresh и whitespace checks завершились успешно.
+
+Приёмка бесшовных переходов 24.07.2026 добавила typed/query/factory/Livewire/browser контракты и обнаружила два реальных lifecycle edge case: Back/Forward не должен активировать URL-hooks ещё не смонтированных lazy-компонентов, а `Plyr.destroy()` перед bfcache restore обязан перенести текущие signed source и progress/session data в свой original video clone. После исправлений focused player PHP прошёл `108/108` тестов и `1164` утверждения; полный PHPUnit — `1510` тестов, `1499` успешных, `11` ожидаемо пропущенных и `123588` утверждений. Vite собрал `24` модуля. Финальный `player-lifecycle.spec.js` прошёл `15` сценариев при `12` ожидаемых desktop/mobile/tablet skips и подтвердил menu/focus, MP4/HLS hot swap, immediate auto-next, standard fullscreen DOM identity, History API, global keyboard, HLS recovery, MP4 Range и WebVTT без browser/first-party request errors. Native iOS fullscreen source swap остаётся `unresolved` без реального устройства.

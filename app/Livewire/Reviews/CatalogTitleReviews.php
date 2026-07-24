@@ -441,6 +441,7 @@ final class CatalogTitleReviews extends Component
 
     public function render(CatalogUserStateService $userStates): View
     {
+        $this->ensureServices();
         $this->normalizeFilterState();
         $title = $this->title();
         $user = $this->user();
@@ -527,6 +528,16 @@ final class CatalogTitleReviews extends Component
     private function title(): CatalogTitle
     {
         return $this->titles->visibleTo($this->user())->findOrFail($this->catalogTitleId);
+    }
+
+    private function ensureServices(): void
+    {
+        $this->reviews ??= app(CatalogTitleReviewQuery::class);
+        $this->aggregates ??= app(ReviewAggregateService::class);
+        $this->schema ??= app(ReviewSchema::class);
+        $this->titles ??= app(CatalogTitleQuery::class);
+        $this->restrictions ??= app(ReviewRestrictionService::class);
+        $this->relationships ??= app(ReviewRelationshipService::class);
     }
 
     private function normalizeFilterState(): void

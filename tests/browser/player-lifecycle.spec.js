@@ -103,6 +103,29 @@ const waitForPlayer = async (page) => {
     return currentVideo(page).getAttribute('data-player-session');
 };
 
+const setAutoplayPreference = async (page, enabled) => {
+    const toggle = page.locator('[data-player-autoplay-toggle]');
+    const desired = enabled ? 'true' : 'false';
+
+    await expect(toggle).toHaveAttribute('aria-pressed', /^(true|false)$/);
+
+    if (await toggle.getAttribute('aria-pressed') !== desired) {
+        const saved = page.waitForResponse((response) => (
+            new URL(response.url()).pathname.includes('/livewire')
+            && response.request().method() === 'POST'
+            && response.status() === 200
+        ));
+
+        await toggle.click();
+        await expect(toggle).toHaveAttribute('aria-pressed', desired);
+        await saved;
+    }
+
+    if (!enabled) {
+        await currentVideo(page).evaluate((video) => video.pause());
+    }
+};
+
 const playerCopy = async (page) => page.locator('[data-player-shell]').evaluate(
     (shell) => JSON.parse(shell.dataset.playerCopy),
 );
@@ -134,9 +157,10 @@ for (const locale of [
         const fixtures = await installPlayerMediaFixtures(page);
 
         await login(page, locale.prefix);
-        await page.goto('/titles/browser-smoke?format=m3u8');
+        await page.goto('/titles/browser-smoke?episode=1&format=m3u8');
 
         const initialSession = await waitForPlayer(page);
+        await setAutoplayPreference(page, false);
         const copy = await playerCopy(page);
         const statusText = await page.locator('[data-player-status-text]').textContent();
 
@@ -171,7 +195,7 @@ for (const locale of [
         await expect(currentVideo(page)).toHaveCount(0);
 
         await page.goBack();
-        await expect(page).toHaveURL(/\/titles\/browser-smoke\?format=m3u8$/);
+        await expect(page).toHaveURL(/\/titles\/browser-smoke\?episode=1&format=m3u8$/);
         await waitForPlayer(page);
         await expect(currentVideo(page)).not.toHaveAttribute('data-lifecycle-identity', 'preserved');
 
@@ -221,14 +245,23 @@ for (const locale of [
             Object.defineProperty(video, 'paused', { configurable: true, value: true });
             video.dispatchEvent(new Event('pause'));
 
-            return events.map(({ eventSequence, positionSeconds, reason }) => ({
-                eventSequence,
-                positionSeconds,
-                reason,
-            }));
+            return {
+                events: events.map(({ eventSequence, positionSeconds, reason }) => ({
+                    eventSequence,
+                    positionSeconds,
+                    reason,
+                })),
+                state: {
+                    activeSession: video.closest('[data-active-player-session]')?.dataset.activePlayerSession,
+                    playerSession: video.dataset.playerSession,
+                    progressEnabled: video.dataset.progressEnabled,
+                    hasToken: Boolean(video.dataset.progressSession),
+                    ready: video.dataset.playerReady,
+                },
+            };
         });
 
-        expect(progress).toEqual([
+        expect(progress.events, JSON.stringify(progress.state)).toEqual([
             { eventSequence: 1, positionSeconds: 10, reason: 'play' },
             { eventSequence: 2, positionSeconds: 20, reason: 'pause' },
         ]);
@@ -242,6 +275,369 @@ for (const locale of [
     });
 }
 
+test('episode menu keeps focus and exposes localized seasons episodes and translations', async ({ page, baseURL }, testInfo) => {
+    test.skip(testInfo.project.name !== 'Desktop Chromium', 'Episode menu keyboard behavior runs once.');
+
+    const errors = await installBrowserGuard(page, baseURL);
+
+    await installPlayerMediaFixtures(page);
+    await login(page);
+    await page.goto('/titles/browser-smoke?episode=1&format=mp4');
+    await waitForPlayer(page);
+    await setAutoplayPreference(page, false);
+
+    const copy = await playerCopy(page);
+    const opener = page.getByRole('button', { name: copy.menu.open });
+
+    await expect(opener).toHaveCount(1);
+    await opener.click();
+
+    const dialog = page.getByRole('dialog', { name: copy.menu.title });
+
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole('heading', { name: copy.menu.seasons, exact: true })).toBeVisible();
+    await expect(dialog.getByRole('heading', { name: copy.menu.episodes, exact: true })).toBeVisible();
+    await expect(dialog.getByRole('heading', { name: copy.menu.translations, exact: true })).toBeVisible();
+    await expect(dialog.locator('[data-player-menu-section="seasons"] [aria-current="true"]')).toHaveCount(1);
+    await expect(dialog.locator('[data-player-menu-section="translations"] [aria-current="true"]')).toHaveCount(1);
+
+    const focusedBeforeTab = await page.evaluate(() => document.activeElement?.closest('dialog') !== null);
+
+    expect(focusedBeforeTab).toBe(true);
+
+    for (let index = 0; index < 12; index += 1) {
+        await page.keyboard.press('Tab');
+        expect(await page.evaluate(() => document.activeElement?.closest('dialog') !== null)).toBe(true);
+    }
+
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    await expect(opener).toBeFocused();
+
+    await page.keyboard.press('Shift+E');
+    await expect(dialog).toBeVisible();
+
+    const playbackBefore = await currentVideo(page).evaluate((video) => ({
+        paused: video.paused,
+        currentTime: video.currentTime,
+    }));
+
+    for (const key of ['Space', 'k', 'ArrowLeft', 'ArrowRight']) {
+        if (!await dialog.isVisible()) {
+            await page.keyboard.press('Shift+E');
+            await expect(dialog).toBeVisible();
+        }
+
+        await dialog.getByRole('button', { name: copy.menu.close }).focus();
+        await page.keyboard.press(key);
+    }
+
+    const playbackAfter = await currentVideo(page).evaluate((video) => ({
+        paused: video.paused,
+        currentTime: video.currentTime,
+    }));
+
+    expect(playbackAfter).toEqual(playbackBefore);
+
+    if (await dialog.isVisible()) {
+        await page.keyboard.press('Escape');
+    }
+
+    assertNoBrowserErrors(errors);
+});
+
+test('player hot swaps episodes and translations without replacing its media owners', async ({ page, baseURL }, testInfo) => {
+    test.skip(testInfo.project.name !== 'Desktop Chromium', 'In-place identity behavior runs once.');
+
+    const errors = await installBrowserGuard(page, baseURL);
+
+    const fixtures = await installPlayerMediaFixtures(page);
+    await login(page);
+    await page.goto('/titles/browser-smoke?episode=1&format=mp4&ref=browser#player');
+    await waitForPlayer(page);
+    await setAutoplayPreference(page, false);
+
+    const copy = await playerCopy(page);
+    const initialEpisodeId = await currentVideo(page).getAttribute('data-progress-episode');
+
+    await page.evaluate(() => {
+        const video = document.querySelector('video.js-catalog-player');
+        const shell = video?.closest('[data-player-shell]');
+        const plyr = shell?.querySelector('.plyr');
+
+        window.__catalogPlayerIdentity = { video, shell, plyr };
+        video.dataset.hotSwapIdentity = 'video';
+        shell.dataset.hotSwapIdentity = 'shell';
+        plyr.dataset.hotSwapIdentity = 'plyr';
+    });
+
+    await page.getByRole('button', { name: copy.menu.open }).click();
+    const dialog = page.getByRole('dialog', { name: copy.menu.title });
+    const episodeOptions = dialog.locator('[data-player-menu-section="episodes"] [role="option"]');
+
+    await expect(episodeOptions).toHaveCount(2);
+    await episodeOptions.nth(1).click();
+    await expect(currentVideo(page)).not.toHaveAttribute('data-progress-episode', initialEpisodeId);
+    await expect(dialog).toBeHidden();
+
+    const episodeIdentity = await page.evaluate(() => {
+        const currentVideoNode = document.querySelector('video.js-catalog-player');
+        const currentShell = currentVideoNode?.closest('[data-player-shell]');
+        const currentPlyr = currentShell?.querySelector('.plyr');
+
+        return {
+            video: currentVideoNode === window.__catalogPlayerIdentity.video,
+            shell: currentShell === window.__catalogPlayerIdentity.shell,
+            plyr: currentPlyr === window.__catalogPlayerIdentity.plyr,
+            videoCount: document.querySelectorAll('video.js-catalog-player').length,
+            plyrCount: currentShell?.querySelectorAll('.plyr').length,
+            position: currentVideoNode?.currentTime,
+        };
+    });
+
+    expect(episodeIdentity).toEqual({
+        video: true,
+        shell: true,
+        plyr: true,
+        videoCount: 1,
+        plyrCount: 1,
+        position: 0,
+    });
+    await expect(page).toHaveURL(/episode=\d+.*#player$/);
+    expect(new URL(page.url()).searchParams.get('ref')).toBe('browser');
+
+    await page.getByRole('button', { name: copy.menu.open }).click();
+    const translationOptions = dialog.locator('[data-player-menu-section="translations"] [role="option"]');
+    const currentMediaId = await currentVideo(page).getAttribute('data-player-media-id');
+
+    await expect(translationOptions).toHaveCount(2);
+    await dialog.locator('[data-player-menu-section="translations"] [role="option"]:not([aria-current="true"])').first().click();
+    await expect(currentVideo(page)).not.toHaveAttribute('data-player-media-id', currentMediaId);
+    await waitForFixtureCount(fixtures, '/valid-next.m3u8', 1);
+    const translatedMediaId = await currentVideo(page).getAttribute('data-player-media-id');
+
+    await expect(currentVideo(page)).toHaveAttribute('data-hot-swap-identity', 'video');
+    await expect(page.locator('[data-player-shell]')).toHaveAttribute('data-hot-swap-identity', 'shell');
+    await expect(page.locator('[data-player-shell] .plyr')).toHaveAttribute('data-hot-swap-identity', 'plyr');
+    expect(new URL(page.url()).searchParams.get('ref')).toBe('browser');
+    expect(new URL(page.url()).hash).toBe('#player');
+    await expect.poll(() => new URL(page.url()).searchParams.get('media')).toBe(translatedMediaId);
+
+    await page.evaluate(() => window.history.back());
+    await expect(currentVideo(page)).toHaveAttribute('data-player-media-id', currentMediaId);
+    await expect(currentVideo(page)).toHaveCount(1);
+    expect(new URL(page.url()).searchParams.get('ref')).toBe('browser');
+
+    await page.evaluate(() => window.history.forward());
+    await expect(currentVideo(page)).toHaveAttribute('data-player-media-id', translatedMediaId);
+    await expect(currentVideo(page)).toHaveCount(1);
+    expect(new URL(page.url()).hash).toBe('#player');
+    assertNoBrowserErrors(errors);
+});
+
+test('immediate auto next keeps the same player and has no countdown delay', async ({ page, baseURL }, testInfo) => {
+    test.skip(testInfo.project.name !== 'Desktop Chromium', 'Immediate auto-next timing runs once.');
+
+    const errors = await installBrowserGuard(page, baseURL);
+
+    await installPlayerMediaFixtures(page);
+    await login(page);
+    await page.goto('/titles/browser-smoke?episode=1&format=mp4#player');
+    await waitForPlayer(page);
+
+    const initialEpisodeId = await currentVideo(page).getAttribute('data-progress-episode');
+
+    await expect(page.locator('[data-player-autoplay-countdown]')).toHaveCount(0);
+    await page.evaluate(() => {
+        const video = document.querySelector('video.js-catalog-player');
+
+        window.__autoNextEvidence = {
+            video,
+            shell: video.closest('[data-player-shell]'),
+            plyr: video.closest('[data-player-shell]').querySelector('.plyr'),
+            completedAt: null,
+            rotatedAt: null,
+            completedEpisodeId: null,
+        };
+        video.addEventListener('catalog-progress', (event) => {
+            if (event.detail?.completed) {
+                window.__autoNextEvidence.completedAt = performance.now();
+                window.__autoNextEvidence.completedEpisodeId = String(event.detail.episodeId);
+            }
+        });
+        new MutationObserver(() => {
+            if (
+                window.__autoNextEvidence.rotatedAt === null
+                && video.dataset.progressEpisode !== String(window.__autoNextEvidence.completedEpisodeId)
+            ) {
+                window.__autoNextEvidence.rotatedAt = performance.now();
+            }
+        }).observe(video, { attributes: true, attributeFilter: ['data-progress-episode'] });
+    });
+
+    await setAutoplayPreference(page, true);
+
+    await currentVideo(page).evaluate((video) => video.play());
+    await expect(currentVideo(page)).not.toHaveAttribute('data-progress-episode', initialEpisodeId, {
+        timeout: 5_000,
+    });
+
+    const evidence = await page.evaluate(() => {
+        const video = document.querySelector('video.js-catalog-player');
+        const shell = video.closest('[data-player-shell]');
+
+        return {
+            sameVideo: video === window.__autoNextEvidence.video,
+            sameShell: shell === window.__autoNextEvidence.shell,
+            samePlyr: shell.querySelector('.plyr') === window.__autoNextEvidence.plyr,
+            completedEpisodeId: window.__autoNextEvidence.completedEpisodeId,
+            transitionDelay: window.__autoNextEvidence.rotatedAt - window.__autoNextEvidence.completedAt,
+            currentTime: video.currentTime,
+        };
+    });
+
+    expect(evidence.sameVideo).toBe(true);
+    expect(evidence.sameShell).toBe(true);
+    expect(evidence.samePlyr).toBe(true);
+    expect(evidence.completedEpisodeId).toBe(initialEpisodeId);
+    expect(evidence.transitionDelay).toBeGreaterThanOrEqual(0);
+    expect(evidence.transitionDelay).toBeLessThan(1_000);
+    expect(evidence.currentTime).toBeLessThan(0.5);
+    await setAutoplayPreference(page, false);
+    assertNoBrowserErrors(errors);
+});
+
+test('responsive episode menu stays within the viewport with reachable touch controls', async ({ page, baseURL }) => {
+    const errors = await installBrowserGuard(page, baseURL);
+
+    await installPlayerMediaFixtures(page);
+    await login(page);
+    await page.goto('/titles/browser-smoke?episode=1&format=mp4#player');
+    await waitForPlayer(page);
+    await setAutoplayPreference(page, false);
+
+    const copy = await playerCopy(page);
+
+    await page.getByRole('button', { name: copy.menu.open }).click();
+    const dialog = page.getByRole('dialog', { name: copy.menu.title });
+
+    await expect(dialog).toBeVisible();
+    await expect(dialog.locator('[data-player-menu-section="episodes"] [role="option"]')).toHaveCount(2);
+
+    const geometry = await dialog.evaluate((menu) => {
+        const panel = menu.querySelector('.catalog-player-menu__panel');
+        const panelRect = panel.getBoundingClientRect();
+        const visibleSections = [...menu.querySelectorAll('[data-player-menu-section]')]
+            .filter((section) => {
+                const style = getComputedStyle(section);
+
+                return style.display !== 'none' && style.visibility !== 'hidden';
+            });
+        const visibleTargets = [...menu.querySelectorAll([
+            '.catalog-player-menu__option',
+            '.catalog-player-menu__back',
+            '.catalog-player-menu__close',
+            '.catalog-player-menu__pagination button',
+        ].join(','))]
+            .filter((target) => {
+                const rect = target.getBoundingClientRect();
+                const style = getComputedStyle(target);
+
+                return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden';
+            })
+            .map((target) => {
+                const rect = target.getBoundingClientRect();
+
+                return { width: rect.width, height: rect.height };
+            });
+
+        return {
+            documentOverflow: document.documentElement.scrollWidth - window.innerWidth,
+            panel: {
+                top: panelRect.top,
+                right: panelRect.right,
+                bottom: panelRect.bottom,
+                left: panelRect.left,
+            },
+            viewport: { width: window.innerWidth, height: window.innerHeight },
+            visibleSectionCount: visibleSections.length,
+            listOverflow: visibleSections.some((section) => {
+                const list = section.querySelector('.catalog-player-menu__list');
+
+                return list.scrollHeight > list.clientHeight + 1 || list.scrollWidth > list.clientWidth + 1;
+            }),
+            visibleTargets,
+        };
+    });
+
+    expect(geometry.documentOverflow).toBeLessThanOrEqual(1);
+    expect(geometry.panel.top).toBeGreaterThanOrEqual(0);
+    expect(geometry.panel.left).toBeGreaterThanOrEqual(0);
+    expect(geometry.panel.right).toBeLessThanOrEqual(geometry.viewport.width);
+    expect(geometry.panel.bottom).toBeLessThanOrEqual(geometry.viewport.height);
+    expect(geometry.visibleSectionCount).toBe(geometry.viewport.width >= 768 ? 3 : 1);
+    expect(geometry.listOverflow).toBe(false);
+
+    for (const target of geometry.visibleTargets) {
+        expect(target.width).toBeGreaterThanOrEqual(44);
+        expect(target.height).toBeGreaterThanOrEqual(44);
+    }
+
+    assertNoBrowserErrors(errors);
+});
+
+test('fullscreen identity survives an in-player episode transition', async ({ page, baseURL }, testInfo) => {
+    test.skip(testInfo.project.name !== 'Desktop Chromium', 'Standard fullscreen capability runs once.');
+
+    const errors = await installBrowserGuard(page, baseURL);
+
+    await installPlayerMediaFixtures(page);
+    await login(page);
+    await page.goto('/titles/browser-smoke?episode=1&format=mp4#player');
+    await waitForPlayer(page);
+    await setAutoplayPreference(page, false);
+
+    const enteredFullscreen = await page.evaluate(async () => {
+        const player = document.querySelector('[data-player-shell] .plyr');
+
+        if (!document.fullscreenEnabled || typeof player?.requestFullscreen !== 'function') {
+            return false;
+        }
+
+        try {
+            await player.requestFullscreen();
+
+            window.__fullscreenPlayerIdentity = document.fullscreenElement;
+
+            return document.fullscreenElement === player;
+        } catch {
+            return false;
+        }
+    });
+
+    test.skip(!enteredFullscreen, 'The browser did not grant standard fullscreen.');
+
+    const copy = await playerCopy(page);
+
+    await page.getByRole('button', { name: copy.menu.open }).click();
+    const dialog = page.getByRole('dialog', { name: copy.menu.title });
+
+    await expect(dialog).toBeVisible();
+    expect(await dialog.evaluate((node) => document.fullscreenElement?.contains(node))).toBe(true);
+
+    const episodeOptions = dialog.locator('[data-player-menu-section="episodes"] [role="option"]');
+    const currentEpisodeId = await currentVideo(page).getAttribute('data-progress-episode');
+
+    await expect(episodeOptions).toHaveCount(2);
+    await dialog.locator('[data-player-menu-section="episodes"] [role="option"]:not([aria-current="true"])').click();
+    await expect(currentVideo(page)).not.toHaveAttribute('data-progress-episode', currentEpisodeId);
+    expect(await page.evaluate(() => (
+        document.fullscreenElement === window.__fullscreenPlayerIdentity
+    ))).toBe(true);
+    expect(await page.evaluate(() => document.fullscreenElement?.querySelectorAll('video').length)).toBe(1);
+    assertNoBrowserErrors(errors);
+});
+
 test('global playback shortcuts work outside the player and respect interaction boundaries', async ({ page, baseURL }, testInfo) => {
     test.skip(testInfo.project.name !== 'Desktop Chromium', 'Keyboard behavior runs once.');
 
@@ -249,8 +645,9 @@ test('global playback shortcuts work outside the player and respect interaction 
 
     await installPlayerMediaFixtures(page);
     await login(page);
-    await page.goto('/titles/browser-smoke?format=mp4');
+    await page.goto('/titles/browser-smoke?episode=1&format=mp4');
     await waitForPlayer(page);
+    await setAutoplayPreference(page, false);
 
     await currentVideo(page).evaluate((video) => {
         const state = {
@@ -411,8 +808,9 @@ test('desktop player uses deterministic HLS recovery, MP4 ranges, and WebVTT sta
     });
 
     await login(page);
-    await page.goto('/titles/browser-smoke?format=m3u8');
+    await page.goto('/titles/browser-smoke?episode=1&format=m3u8');
     await waitForPlayer(page);
+    await setAutoplayPreference(page, false);
 
     const copy = await playerCopy(page);
 
@@ -456,20 +854,21 @@ test('desktop player uses deterministic HLS recovery, MP4 ranges, and WebVTT sta
     await page.waitForTimeout(1_500);
     expect(fixtures.count('/valid.m3u8')).toBe(expiredManifestBaseline + 2);
 
-    const manualRetryBaseline = fixtures.count('/valid.m3u8');
+    const fallbackManifestBaseline = fixtures.count('/valid.m3u8');
 
     fixtures.scenario.manifestStatuses.push(503, 503);
     await page.reload();
     await waitForPlayer(page);
-    await expect(page.locator('[data-player-shell]')).toHaveAttribute('data-player-state', 'error');
-    await expect(page.locator('[data-player-retry]')).toBeVisible();
-    const failedManifestCount = fixtures.count('/valid.m3u8');
+    await waitForFixtureCount(fixtures, '/valid.m3u8', fallbackManifestBaseline + 2);
+    await waitForFixtureCount(fixtures, '/direct.mp4', 1);
+    await expect(page.locator('[data-player-shell]')).toHaveAttribute('data-player-state', 'ready');
+    await expect(page).toHaveURL(/format=mp4/);
 
-    expect(failedManifestCount).toBe(manualRetryBaseline + 2);
-    await page.locator('[data-player-retry]').click();
-    await waitForFixtureCount(fixtures, '/valid.m3u8', failedManifestCount + 1);
-    await page.waitForTimeout(1_500);
-    expect(fixtures.count('/valid.m3u8')).toBe(failedManifestCount + 1);
+    const hlsUrl = await page.locator('[data-player-media-format="m3u8"]').getAttribute('href');
+
+    await page.goto(hlsUrl);
+    await expect(page).toHaveURL(/format=m3u8/);
+    await waitForPlayer(page);
 
     const corruptSegmentBaseline = fixtures.count('/hls-segment.m4s');
 

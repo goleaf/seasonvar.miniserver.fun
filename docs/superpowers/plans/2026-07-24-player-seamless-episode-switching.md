@@ -8,6 +8,8 @@
 
 **Tech Stack:** PHP 8.5.8, Laravel 13.21.1, Livewire 4.3.3, Laravel Boost 2.4.13, PHPUnit 12.5.31, Node 26.4.0, npm 12.0.1, Plyr 3.8.4, HLS.js 1.6.16, Tailwind CSS 4.3.2, Vite 8.1.4, Playwright 1.61.1.
 
+**Delivery status (24.07.2026):** Tasks 1–14 are implemented and verified through RED → GREEN change sets. Typed payloads, bounded query/factory/actions, safe bootstrap, accessible menu, generation-guarded bridge, in-place MP4/HLS transition, immediate auto-next, progress/context rotation, History API, responsive/fullscreen behavior, lazy sibling compatibility, and runtime documentation are complete. Final evidence: focused player PHP `108/108` tests and `1164` assertions; full PHPUnit `1510` tests, `1499` passed, `11` expected skipped, `123588` assertions; Vite `24` modules; Playwright player matrix `15` passed and `12` expected skipped across desktop/mobile/tablet. Task 15 commit/push evidence is in progress; native iOS fullscreen remains explicitly unresolved without a real device.
+
 ## Global Constraints
 
 - Work only on the existing `main` branch. Do not create a branch, worktree, or pull-request branch.

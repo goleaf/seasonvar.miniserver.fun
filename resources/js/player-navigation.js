@@ -1,4 +1,13 @@
 const boundRoots = new Map();
+const playerSelectionKeys = [
+    'season',
+    'episode',
+    'media',
+    'variant',
+    'quality',
+    'format',
+    'marker',
+];
 
 const playerRootsWithin = (root) => {
     if (root instanceof Element && root.matches('[data-active-player-session]')) {
@@ -17,6 +26,78 @@ const wireFor = (root) => {
     const componentId = component?.getAttribute('wire:id');
 
     return componentId ? window.Livewire?.find(componentId) : null;
+};
+
+const callWire = async (root, method, args) => {
+    const wire = wireFor(root);
+
+    if (!wire || typeof wire[method] !== 'function') {
+        throw new Error('Player component is unavailable.');
+    }
+
+    return wire[method](...args);
+};
+
+const playerUrlForQuery = (query) => {
+    const url = new URL(window.location.href);
+
+    playerSelectionKeys.forEach((key) => url.searchParams.delete(key));
+    Object.entries(query || {}).forEach(([key, value]) => {
+        if (
+            playerSelectionKeys.includes(key)
+            && typeof value === 'string'
+            && value.trim() !== ''
+        ) {
+            url.searchParams.set(key, value);
+        }
+    });
+    url.hash = url.hash || '#player';
+
+    return url;
+};
+
+const pushPlayerHistory = (query) => {
+    const url = playerUrlForQuery(query);
+
+    if (url.href !== window.location.href) {
+        window.history.pushState({ catalogPlayer: true }, '', url);
+    }
+};
+
+const runPlayerRequest = async (root, detail, method, args, onReady = null) => {
+    if (
+        !detail
+        || detail.sessionKey !== root.dataset.activePlayerSession
+        || typeof detail.resolve !== 'function'
+        || typeof detail.reject !== 'function'
+        || typeof detail.accepted !== 'function'
+        || !detail.accepted()
+    ) {
+        return;
+    }
+
+    try {
+        const payload = await callWire(root, method, args);
+
+        if (
+            !root.isConnected
+            || detail.sessionKey !== root.dataset.activePlayerSession
+            || !detail.accepted()
+            || !['ready', 'unavailable'].includes(payload?.status)
+        ) {
+            return;
+        }
+
+        if (payload.status === 'ready' && typeof onReady === 'function') {
+            onReady(payload);
+        }
+
+        detail.resolve(payload);
+    } catch {
+        if (root.isConnected && detail.accepted()) {
+            detail.reject(new Error('Player request failed.'));
+        }
+    }
 };
 
 const restoreSelectionFromLocation = async (root) => {
@@ -51,6 +132,37 @@ const bindRoot = (root) => {
     const { signal } = controller;
 
     boundRoots.set(root, controller);
+    root.addEventListener('catalog-player-menu-page-request', (event) => {
+        const detail = event.detail;
+
+        void runPlayerRequest(
+            root,
+            detail,
+            'playerEpisodePage',
+            [detail?.seasonId, detail?.page],
+        );
+    }, { signal });
+    root.addEventListener('catalog-player-transition-request', (event) => {
+        const detail = event.detail;
+
+        void runPlayerRequest(
+            root,
+            detail,
+            'preparePlayerTransition',
+            [detail?.episodeId, detail?.mediaId],
+        );
+    }, { signal });
+    root.addEventListener('catalog-player-transition-commit', (event) => {
+        const detail = event.detail;
+
+        void runPlayerRequest(
+            root,
+            detail,
+            'commitPlayerTransition',
+            [detail?.episodeId, detail?.mediaId],
+            (payload) => pushPlayerHistory(payload.query),
+        );
+    }, { signal });
     root.addEventListener('catalog-progress', (event) => {
         const detail = event.detail;
 
@@ -192,6 +304,7 @@ const bindRoot = (root) => {
     }, { capture: true, signal });
     window.addEventListener('popstate', () => {
         if (root.isConnected) {
+            root.dispatchEvent(new CustomEvent('catalog-player-popstate'));
             void restoreSelectionFromLocation(root);
         }
     }, { signal });

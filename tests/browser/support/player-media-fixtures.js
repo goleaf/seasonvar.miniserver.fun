@@ -10,6 +10,11 @@ const fixtures = new Map([
         contentType: 'video/mp4',
         range: true,
     }],
+    ['/player-fixtures/direct-next.mp4', {
+        body: readFixtureBytes('direct.mp4.b64'),
+        contentType: 'video/mp4',
+        range: true,
+    }],
     ['/player-fixtures/hls-init.mp4', {
         body: readFixtureBytes('hls-init.mp4.b64'),
         contentType: 'video/mp4',
@@ -21,6 +26,11 @@ const fixtures = new Map([
         range: true,
     }],
     ['/player-fixtures/valid.m3u8', {
+        body: readFixtureText('valid.m3u8'),
+        contentType: 'application/vnd.apple.mpegurl',
+        range: false,
+    }],
+    ['/player-fixtures/valid-next.m3u8', {
         body: readFixtureText('valid.m3u8'),
         contentType: 'application/vnd.apple.mpegurl',
         range: false,

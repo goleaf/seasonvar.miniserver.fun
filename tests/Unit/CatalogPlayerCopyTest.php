@@ -25,7 +25,9 @@ final class CatalogPlayerCopyTest extends TestCase
                 'playbackError', 'fatal', 'ended', 'captionsUnavailable',
                 'offline', 'stalled', 'sourceFallback', 'sourceChanged',
                 'authorizationRefreshed', 'fallbackUnavailable', 'finalEpisode',
-                'autoplayCancelled', 'restartFailed',
+                'restartFailed', 'loadingTransition',
+                'transitionUnavailable', 'transitionLimited',
+                'preferredTranslationUnavailable', 'playRequired',
             ], array_keys($payloads[$locale]['runtime']));
             $this->assertSame([
                 'restart', 'rewind', 'play', 'pause', 'fastForward', 'seek',
@@ -36,11 +38,33 @@ final class CatalogPlayerCopyTest extends TestCase
                 'quality', 'loop', 'start', 'end', 'all', 'reset', 'disabled',
                 'enabled', 'advertisement',
             ], array_keys($payloads[$locale]['controls']));
+            $this->assertSame([
+                'open', 'close', 'title', 'seasons', 'episodes', 'translations',
+                'back', 'previousPage', 'nextPage', 'page', 'seasonEmpty',
+                'loading', 'retry',
+            ], array_keys($payloads[$locale]['menu']));
             $this->assertNotContains('', Arr::flatten($payloads[$locale]));
         }
 
         $this->assertSame(array_keys(Arr::dot($payloads['ru'])), array_keys(Arr::dot($payloads['en'])));
         $this->assertNotSame($payloads['ru']['runtime']['expired'], $payloads['en']['runtime']['expired']);
+        $this->assertSame('Сезоны', $payloads['ru']['menu']['seasons']);
+        $this->assertSame('Серии', $payloads['ru']['menu']['episodes']);
+        $this->assertSame('Переводы', $payloads['ru']['menu']['translations']);
+        $this->assertSame('Назад', $payloads['ru']['menu']['back']);
+        $this->assertSame('Предыдущая страница', $payloads['ru']['menu']['previousPage']);
+        $this->assertSame('Следующая страница', $payloads['ru']['menu']['nextPage']);
+        $this->assertSame('Seasons', $payloads['en']['menu']['seasons']);
+        $this->assertSame('Episodes', $payloads['en']['menu']['episodes']);
+        $this->assertSame('Translations', $payloads['en']['menu']['translations']);
+
+        $placeholderPattern = '/:[A-Za-z_][A-Za-z0-9_]*/';
+
+        foreach (array_keys(Arr::dot($payloads['ru'])) as $key) {
+            preg_match_all($placeholderPattern, (string) data_get($payloads['ru'], $key), $ruMatches);
+            preg_match_all($placeholderPattern, (string) data_get($payloads['en'], $key), $enMatches);
+            self::assertSame($ruMatches[0], $enMatches[0], $key);
+        }
     }
 
     public function test_player_blade_uses_escaped_copy_and_a_separate_caption_status(): void

@@ -2307,6 +2307,242 @@ class CatalogPageTest extends TestCase
             ->assertSeeText('Смотреть сначала');
     }
 
+    public function test_catalog_title_player_returns_bounded_episode_pages_without_mutating_selection(): void
+    {
+        $catalogTitle = CatalogTitle::factory()->create();
+        $season = Season::factory()->create(['catalog_title_id' => $catalogTitle->id]);
+        $episodes = collect();
+
+        foreach (range(1, 25) as $number) {
+            $episode = Episode::factory()->create([
+                'season_id' => $season->id,
+                'number' => $number,
+                'sort_order' => $number,
+            ]);
+            LicensedMedia::factory()->create([
+                'catalog_title_id' => $catalogTitle->id,
+                'season_id' => $season->id,
+                'episode_id' => $episode->id,
+                'status' => 'published',
+                'published_at' => now(),
+            ]);
+            $episodes->push($episode);
+        }
+
+        $component = Livewire::test(CatalogTitlePlayer::class, ['catalogTitleId' => $catalogTitle->id])
+            ->call('selectEpisode', $episodes->first()->id);
+        $selection = [
+            'season' => $component->get('season'),
+            'episode' => $component->get('episode'),
+            'media' => $component->get('media'),
+            'authorizationVersion' => $component->get('authorizationVersion'),
+        ];
+
+        $component
+            ->call('playerEpisodePage', $season->id, 2)
+            ->assertReturned(function (array $payload) use ($episodes): bool {
+                self::assertSame('ready', $payload['status']);
+                self::assertSame([$episodes->last()->id], array_column($payload['episodes'], 'id'));
+
+                return true;
+            })
+            ->assertSet('season', $selection['season'])
+            ->assertSet('episode', $selection['episode'])
+            ->assertSet('media', $selection['media'])
+            ->assertSet('authorizationVersion', $selection['authorizationVersion']);
+
+        foreach ([[1], 0, -1, '999999999999999999999999999999'] as $invalidSeason) {
+            $component
+                ->call('playerEpisodePage', $invalidSeason, 1)
+                ->assertReturned(fn (array $payload): bool => in_array($payload['status'], ['empty', 'unavailable'], true))
+                ->assertSet('episode', $selection['episode'])
+                ->assertSet('media', $selection['media']);
+        }
+
+        $component
+            ->call('playerEpisodePage', $season->id, 1_000_001)
+            ->assertReturned(fn (array $payload): bool => in_array($payload['status'], ['empty', 'unavailable'], true))
+            ->assertSet('episode', $selection['episode']);
+    }
+
+    public function test_catalog_title_player_prepares_without_mutation_and_commits_only_a_valid_transition(): void
+    {
+        $catalogTitle = CatalogTitle::factory()->create();
+        $season = Season::factory()->create(['catalog_title_id' => $catalogTitle->id]);
+        $firstEpisode = Episode::factory()->create(['season_id' => $season->id, 'number' => 1]);
+        $secondEpisode = Episode::factory()->create(['season_id' => $season->id, 'number' => 2]);
+        $firstMedia = LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'season_id' => $season->id,
+            'episode_id' => $firstEpisode->id,
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+        $secondMedia = LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'season_id' => $season->id,
+            'episode_id' => $secondEpisode->id,
+            'status' => 'published',
+            'published_at' => now(),
+            'variant_key' => 'voiceover-studio',
+            'quality' => '1080p',
+            'format' => 'm3u8',
+        ]);
+        $component = Livewire::withQueryParams([
+            'season' => $season->id,
+            'episode' => $firstEpisode->id,
+            'media' => $firstMedia->id,
+            'marker' => 'intro',
+        ])->test(CatalogTitlePlayer::class, ['catalogTitleId' => $catalogTitle->id]);
+
+        $component
+            ->call('preparePlayerTransition', $secondEpisode->id, null)
+            ->assertReturned(function (array $payload) use ($secondEpisode): bool {
+                self::assertSame('ready', $payload['status']);
+                self::assertSame($secondEpisode->id, $payload['selection']['episodeId']);
+
+                return true;
+            })
+            ->assertSet('season', (string) $season->id)
+            ->assertSet('episode', (string) $firstEpisode->id)
+            ->assertSet('media', (string) $firstMedia->id)
+            ->assertNotDispatched('discussion-target-selected');
+
+        $component
+            ->call('commitPlayerTransition', $secondEpisode->id, $secondMedia->id)
+            ->assertReturned(function (array $payload) use ($secondEpisode, $secondMedia): bool {
+                self::assertSame('ready', $payload['status']);
+                self::assertSame((string) $secondEpisode->id, $payload['query']['episode']);
+                self::assertSame((string) $secondMedia->id, $payload['query']['media']);
+
+                return true;
+            })
+            ->assertSet('season', (string) $season->id)
+            ->assertSet('episode', (string) $secondEpisode->id)
+            ->assertSet('media', (string) $secondMedia->id)
+            ->assertSet('marker', '')
+            ->assertSet('failedMediaIds', [])
+            ->assertSet('authorizationVersion', 0)
+            ->assertDispatched('discussion-target-selected');
+
+        $component
+            ->call('commitPlayerTransition', $firstEpisode->id, $secondMedia->id)
+            ->assertReturned(fn (array $payload): bool => $payload === [
+                'status' => 'unavailable',
+                'message' => __('catalog.player.transition_unavailable'),
+            ])
+            ->assertSet('episode', (string) $secondEpisode->id)
+            ->assertSet('media', (string) $secondMedia->id);
+
+        Livewire::withQueryParams([
+            'season' => $season->id,
+            'episode' => $secondEpisode->id,
+            'media' => $secondMedia->id,
+        ])
+            ->test(CatalogTitlePlayer::class, ['catalogTitleId' => $catalogTitle->id])
+            ->call('commitPlayerTransition', $secondEpisode->id, $secondMedia->id)
+            ->assertReturned(fn (array $payload): bool => $payload['status'] === 'ready')
+            ->assertNotDispatched('discussion-target-selected');
+    }
+
+    public function test_player_menu_bootstrap_contains_only_authorized_bounded_display_data(): void
+    {
+        $catalogTitle = CatalogTitle::factory()->create();
+        $firstSeason = Season::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'number' => 1,
+        ]);
+        $secondSeason = Season::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'number' => 2,
+        ]);
+        $hiddenSeason = Season::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'number' => 3,
+            'publication_status' => 'hidden',
+        ]);
+        $selectedEpisode = Episode::factory()->create([
+            'season_id' => $firstSeason->id,
+            'number' => 1,
+        ]);
+        $otherEpisode = Episode::factory()->create([
+            'season_id' => $secondSeason->id,
+            'number' => 1,
+        ]);
+        $selectedMedia = LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'season_id' => $firstSeason->id,
+            'episode_id' => $selectedEpisode->id,
+            'playback_url' => 'https://data00-cdn.11cdn.org/provider-secret-marker.m3u8',
+            'path' => 'https://data00-cdn.11cdn.org/provider-secret-marker.m3u8',
+            'variant_name' => 'Студия А',
+            'variant_key' => 'voiceover-studio-a',
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+        $secondMedia = LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'season_id' => $firstSeason->id,
+            'episode_id' => $selectedEpisode->id,
+            'variant_name' => 'Студия Б',
+            'variant_key' => 'voiceover-studio-b',
+            'status' => 'published',
+            'published_at' => now()->subSecond(),
+        ]);
+        $otherMedia = LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'season_id' => $secondSeason->id,
+            'episode_id' => $otherEpisode->id,
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+        $hiddenEpisode = Episode::factory()->create(['season_id' => $hiddenSeason->id]);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'season_id' => $hiddenSeason->id,
+            'episode_id' => $hiddenEpisode->id,
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+
+        $response = $this->get(route('titles.show', [
+            'catalogTitle' => $catalogTitle,
+            'season' => $firstSeason->id,
+            'episode' => $selectedEpisode->id,
+            'media' => $selectedMedia->id,
+        ]));
+
+        $response
+            ->assertOk()
+            ->assertSee('data-player-menu-bootstrap=', false)
+            ->assertSee('data-player-transition-episode="'.$selectedEpisode->id.'"', false)
+            ->assertSee('data-player-transition-media="'.$selectedMedia->id.'"', false)
+            ->assertDontSee('provider-secret-marker', false);
+
+        $document = new \DOMDocument;
+        $document->loadHTML((string) $response->getContent(), LIBXML_NOERROR | LIBXML_NOWARNING);
+        $playerShell = (new \DOMXPath($document))->query('//*[@data-player-menu-bootstrap]')->item(0);
+        $bootstrap = json_decode(
+            (string) $playerShell?->attributes?->getNamedItem('data-player-menu-bootstrap')?->nodeValue,
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
+
+        self::assertSame(['seasons', 'current', 'translations'], array_keys($bootstrap));
+        self::assertSame([$firstSeason->id, $secondSeason->id], array_column($bootstrap['seasons'], 'id'));
+        self::assertNotContains($hiddenSeason->id, array_column($bootstrap['seasons'], 'id'));
+        self::assertSame([
+            'seasonId' => $firstSeason->id,
+            'episodeId' => $selectedEpisode->id,
+            'mediaId' => $selectedMedia->id,
+        ], $bootstrap['current']);
+        self::assertEqualsCanonicalizing(
+            [$selectedMedia->id, $secondMedia->id],
+            array_column($bootstrap['translations'], 'mediaId'),
+        );
+        self::assertNotContains($otherMedia->id, array_column($bootstrap['translations'], 'mediaId'));
+    }
+
     public function test_catalog_title_player_navigates_only_accessible_episodes_inside_the_current_release_lane(): void
     {
         $catalogTitle = CatalogTitle::factory()->create([
