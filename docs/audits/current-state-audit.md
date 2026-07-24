@@ -1,6 +1,17 @@
 # Аудит текущего состояния
 
-Проверено: 16.07.2026. Корень приложения: `/www/wwwroot/seasonvar.miniserver.fun`. Этот документ — текущий evidence snapshot; устойчивые контракты остаются в тематических владельцах из [`docs/README.md`](../README.md), а исполняемый backlog — в [`docs/plans/laravel-video-portal-modernization.md`](../plans/laravel-video-portal-modernization.md).
+Проверено: 16.07.2026; operational baseline повторно сверен 24.07.2026. Корень приложения: `/www/wwwroot/seasonvar.miniserver.fun`. Этот документ — датированный evidence snapshot; устойчивые контракты остаются в тематических владельцах из [`docs/README.md`](../README.md), а активное исполнение — в [`docs/plans/current-task-plan.md`](../plans/current-task-plan.md).
+
+## Read-only stabilization baseline — 24.07.2026
+
+- Runtime: PHP `8.5.8`, Laravel/vendor `13.21.1`, Livewire `4.3.3`, production/debug off, SQLite, Redis и Memcached reachable. `HEAD` lock ещё содержит Laravel `13.20.0`; параллельный unstaged package diff не принадлежит этому baseline.
+- Все 110 migrations `Ran`; config `NOT CACHED` в момент снимка, events/routes/views cached, maintenance off. Task 1 не меняла cache/runtime state.
+- `app:health` — `degraded`, `ready=true`; отсутствуют heartbeats `cache-warm-v2`, `seasonvar-import`, `seasonvar-title-refresh`.
+- Queue aggregate — `43105` pending, `29045` delayed, `0` reserved; global run `#1254` имеет `41043` selected/live claims и `0` parsed.
+- `failed_jobs=33597`; `12851` finalizers классифицированы как terminal `forget_candidate`. Read-only audit не retry/forget/clear/dispatch jobs.
+- Redis RDB child работает `105253` секунды при `rdb_bgsave_in_progress=1`; `10641008` changes не подтверждены новым save, AOF выключен. Process owner, safe restart и independent verified artifact отсутствуют.
+- SQLite main file `28154552320` bytes; same-volume backups около `48G`, off-host restore не доказан. Full integrity не запускался в этой партии: прошлый `PRAGMA quick_check` не уложился в 60-секундное observation window.
+- Runtime/application/data mutations отсутствуют. Следующий кодовый этап добавляет только allowlisted persistence observability; Redis recovery остаётся отдельным operational gate.
 
 ## Повторная operational-сверка Task 29 — 19.07.2026
 

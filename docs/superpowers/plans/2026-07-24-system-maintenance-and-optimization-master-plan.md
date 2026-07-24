@@ -141,20 +141,19 @@ Record exact dated states `verified`, `degraded`, `unknown`, `not_installed` or 
 
 - [ ] **Step 4: Add stable technical-debt records**
 
-Add:
+Reconcile the existing registry without renumbering or overwriting concurrent importer debt:
 
 ```text
 TD-014 Redis persistence child does not terminate after RDB write.
-TD-015 Intended Seasonvar/cache worker topology is installed but inactive.
-TD-016 Runtime permissions and in-place asset deployment permit ownership/manifest drift.
-TD-017 Demo/load-test corpus dominates SQLite and contains synthetic future timestamps.
-TD-018 Local same-volume backups lack approved retention and restore rehearsal.
-TD-019 Full deployment integrity check is unbounded for the current 28 GB SQLite file.
-TD-020 Scheduler has dual process ownership.
-TD-021 PHP-FPM/OPcache limits are not derived from measured workload.
+TD-015 Intended Seasonvar/cache worker topology is inactive and scheduler ownership is duplicated.
+TD-017 Local same-volume backups lack approved retention and restore rehearsal.
+TD-018 Demo/load-test corpus dominates SQLite and contains synthetic future timestamps.
+TD-019 Runtime permissions and in-place asset deployment permit ownership/manifest drift.
+TD-020 PHP-FPM/OPcache limits are not derived from measured workload.
+TD-025 Full deployment integrity check is unbounded for the current 28 GB SQLite file.
 ```
 
-Each row must use the existing registry columns and contain a measurable completion criterion.
+`TD-016` already owns failed-job/retention debt, while importer-specific work owns `TD-021`–`TD-024`; preserve those records. Each new or corrected row must use the existing registry columns and contain a measurable completion criterion.
 
 - [ ] **Step 5: Verify documentation**
 

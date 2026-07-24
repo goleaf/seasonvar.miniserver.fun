@@ -3,6 +3,80 @@
 Дата: 24.07.2026
 Статус: полный master implementation plan подготовлен по фактическому аудиту и закоммичен в существующей `main` как `535f4b8`; application/runtime/data changes этой planning-задачей не выполнялись, а push остаётся `unresolved` из-за отсутствующей HTTPS-аутентификации GitHub.
 
+## Активное исполнение — Batch 1: baseline и Redis persistence observability
+
+Статус: Task 1 и реализация Task 2 завершены; выполняются финальные documentation/verification/commit gates. Пользователь прямо разрешил начать программирование без дополнительных вопросов. Выполняются только Task 1 и Task 2 master plan; Task 3 не получает implicit authority на остановку producers, Redis restart, signal/kill, backup overwrite или любое изменение production state.
+
+### Проверенная подготовка
+
+- [x] Повторно прочитаны `AGENTS.md`, requirement index и все обязательные code/architecture/development/multilingual/security/performance/cache/UI/frontend/admin/auth/production/maintenance/system-integration owners.
+- [x] Повторно прочитаны master plan Tasks 1–3, documentation map, operations map и связанные health/cache/queue owners.
+- [x] Проверена существующая реализация `InfrastructureHealthCheck`, `QueueWorkerHeartbeat`, `SeasonvarQueueStatus`, health command/responder и соседние PHPUnit patterns.
+- [x] Laravel Boost подтвердил Laravel `13.21.1`, PHP `8.5`, SQLite и установленные package versions; официальная документация Laravel 13 подтверждает named Redis connections, constructor injection и размещение `env()` только в config.
+- [x] Skill worktree requirement разрешён в пользу более приоритетного project contract: работа ведётся только в существующей `main`, потому что `AGENTS.md` прямо запрещает новую branch/worktree без отдельного указания пользователя.
+- [x] Discovery shared-workspace учтён: importer roadmap уже занял `TD-021–TD-024`, поэтому master Task 1 сохраняет существующие IDs, объединяет scheduler ownership в `TD-015` и резервирует новый `TD-025` только для unbounded full integrity check.
+- [x] Обновить Task 1 evidence по свежим read-only probes.
+- [x] Выполнить обязательный RED → GREEN цикл Task 2.
+- [x] Завершить focused/wider verification и documentation.
+- [ ] Завершить commit и push evidence.
+
+### Выполненный evidence Task 1–2
+
+- Task 1 зафиксировал runtime Laravel `13.21.1`/PHP `8.5.8`, `110` применённых migrations, семь scheduler entries, degraded queue/worker state, `33597` failed jobs, active import run `#1254`, размеры SQLite/backup и Redis persistence без мутации приложения или сервисов.
+- RED `RedisPersistenceInspectorTest`: восемь ожидаемых ошибок `Class "App\Services\Operations\RedisPersistenceInspector" not found`. GREEN: `8` тестов, `27` утверждений.
+- RED integration test: `Undefined array key "redis_persistence"`. GREEN `InfrastructureHealthCheckTest`: `5` тестов, `21` утверждение.
+- Targeted Pint прошёл только task-owned PHP files, чтобы не менять concurrent player/importer work; PHPStan для inspector и health service завершился с `0` diagnostics.
+- Production-like read-only `app:health --json` после реализации вернул `redis_persistence=failed`, `current_save_seconds=106333`, `last_save_age_seconds=106394`, `changes_since_last_save=10671434`, `aof_enabled=false`; top-level остался `degraded`, `ready=true`.
+- README получил фактический operator contract без visitor-history записи; operations/environment owners, `.env.example` и русский `CHANGELOG.md` обновлены.
+- Focused verification прошёл `RedisPersistenceInspectorTest` (`8`/`27`), `InfrastructureHealthCheckTest` (`5`/`21`) и `CheckInfrastructureHealthCommandTest` (`1`/`9`); `bash scripts/ci-check.sh docs`, `project:docs-refresh --check` и `git diff --check` завершились успешно.
+
+### Expected files Batch 1
+
+- Task 1 evidence: `docs/environment.md`, `docs/queues.md`, `docs/audits/current-state-audit.md`, `docs/audits/environment-preflight.md`, `docs/operations/logging-and-health.md`, `docs/maintenance/runtime-compatibility.md`, `docs/maintenance/technical-debt.md`, этот current plan и `CHANGELOG.md`.
+- Task 2 code/config: новый `app/Services/Operations/RedisPersistenceInspector.php`, `app/Services/Operations/InfrastructureHealthCheck.php`, `config/cache-architecture.php`, `.env.example`.
+- Task 2 tests: новый `tests/Unit/RedisPersistenceInspectorTest.php`, существующий `tests/Unit/InfrastructureHealthCheckTest.php` и при затронутом CLI shape `tests/Feature/CheckInfrastructureHealthCommandTest.php`.
+- `README.md` меняется только если delivered operator/development behavior действительно должен быть отражён в обзоре; visitor-facing capability этой партии не создаётся.
+
+### Protected contracts Batch 1
+
+- `/health/ready` остаётся лёгким side-effect-free connectivity response только с `status`, `ready`, `checked_at`; Redis persistence metrics туда не добавляются.
+- `app:health --json` сохраняет существующий top-level shape и exit semantics: новый `redis_persistence` является только detailed component.
+- Redis connection `queues`, DB number, prefix, serializer, queue names, payloads, sessions, locks и cache identities не меняются.
+- Status identity остаётся стабильной machine-readable строкой; русские сообщения безопасны и не содержат host, path, endpoint, key, job payload или raw exception.
+- `redis_persistence=degraded|failed` ухудшает detailed health, но не делает `ready=false`, пока critical DB/session/queue/lock connectivity остаётся `ok`.
+- Task 2 выполняет только `PING`/`INFO persistence`; он не запускает `BGSAVE`, `SAVE`, `BGREWRITEAOF`, restart, retry, forget или flush.
+
+### Migrations, routes, translations, cache и compatibility risks Batch 1
+
+| Область | Статус | Решение |
+| --- | --- | --- |
+| Database/migrations | `not_applicable` | Schema/data не меняются; все probes read-only. |
+| Routes/API | `already_compliant` | Новых routes нет; public readiness shape сохраняется. |
+| Translations | `not_applicable` | Operational JSON использует stable status codes и существующий русский operator-message contract без нового UI. |
+| Cache keys/invalidation | `not_applicable` | Inspector ничего не кеширует и не инвалидирует. |
+| Redis state | `affected_read_only` | Один bounded `INFO persistence` на named `queues` connection; raw reply нормализуется до allowlisted integers/boolean/status/message. |
+| Permissions/storage | `not_applicable` | Файлы runtime, backup и Redis persistence artifacts не изменяются. |
+| Authentication/privacy | `already_compliant` | Component доступен через существующую CLI/admin diagnostic boundary; public readiness не расширяется. |
+| Queue/session/locks | `already_compliant` | Только наблюдаемость; connectivity/readiness и serialized state сохраняются. |
+| Deployment/rollback | `affected` | Новые config defaults additive; rollback — удалить inspector/config/env keys и component integration без data/cache cleanup. |
+| Dependencies | `not_applicable` | Composer/npm packages и lock files не меняются; pre-existing `composer.lock` исключён. |
+
+### Cross-feature и requirement compliance Batch 1
+
+| Требование / domain | Статус | Evidence / ограничение |
+| --- | --- | --- |
+| Canonical read order | `completed` | Все обязательные owners перечитаны до code edit. |
+| Existing implementation и version-specific guidance | `completed` | Соседние services/tests/config проверены; Laravel Boost использован до Laravel code. |
+| Security/privacy | `completed` | Allowlisted aggregate, safe messages и connection-failure regression не раскрывают raw Redis error/host/path/key/payload. |
+| Performance/cache | `completed` | Ровно один bounded `INFO persistence` только в detailed health; readiness не утяжеляется и cache state не меняется. |
+| Authentication/authorization | `already_compliant` | Новая route/action/write boundary отсутствует. |
+| Search/SEO/player/premium/payments/legal/advertising | `not_applicable` | Доменное и visitor behavior не меняется. |
+| Importer/queue operations | `affected_read_only` | `queues` Redis выбран как canonical persistence observation point; никакой job mutation. |
+| Production operations | `completed` для Task 1–2 | Data-safety/rollback/failure boundary записаны; новый health evidence получен read-only, Task 3 mutation authority не расширена. |
+| README | `completed` | Operator command/behavior обновлены; visitor-facing capability и история посетителей не изменялись. |
+| CHANGELOG/current docs | `completed` | Operations/environment owners и отдельная русская delivered entry обновлены по фактическому результату. |
+| Commit/push | `pending` | Только существующая `main`; внешний auth failure фиксируется `unresolved`. |
+
 ## Цель и главный документ исполнения
 
 - [x] Заново прочитать корневой `AGENTS.md`, `docs/requirements/index.md`, все обязательные canonical requirements и применимые тематические Markdown owners.

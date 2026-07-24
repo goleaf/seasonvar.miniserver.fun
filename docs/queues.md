@@ -1,8 +1,20 @@
 # Очереди и jobs
 
-Обновлено: 20.07.2026
+Обновлено: 24.07.2026
 
-Task 28 production verification: Redis queue reachable; активны 4 `seasonvar-import`, 8 `seasonvar-title-refresh` и 1 `cache-warm-v2` systemd worker. Cron реально вызывает scheduler каждую минуту, queued import dispatcher по расписанию и bounded queue monitor. Supervisor/Horizon отсутствуют. Взаимоисключающий `seasonvar-import-forever.service` отключён и не должен запускаться одновременно с queued profile. Redis process manager unit name не подтверждён, поэтому runbook не использует выдуманный `redis.service` restart.
+Историческая Task 28 verification подтверждала 4 `seasonvar-import`, 8 `seasonvar-title-refresh` и 1 `cache-warm-v2` systemd worker. Повторный read-only baseline 24.07.2026 больше не подтверждает активность этих consumers: heartbeat отсутствует для каждой очереди с работой. Историческое evidence сохраняется, но не является текущим process state. Supervisor/Horizon отсутствуют; Redis process manager unit name по-прежнему не подтверждён, поэтому runbook не использует выдуманный `redis.service` restart.
+
+## Operational queue baseline 24.07.2026
+
+- Detailed health: `43105` pending, `29045` delayed, `0` reserved.
+- `cache-warm-v2`: `1997` pending, `2074` delayed, oldest pending `142427` секунд, heartbeat отсутствует.
+- `seasonvar-import`: `41104` pending, `26971` delayed, oldest pending `80305` секунд, heartbeat отсутствует.
+- `seasonvar-title-refresh`: `4` pending, delayed `0`, oldest pending `68073` секунд, heartbeat отсутствует.
+- Global run `#1254`: execution mode `queue`, state `running`, `41043` selected/live claims, `0` parsed, persisted heartbeat `2026-07-23 13:51:55`.
+- Failed jobs: `33597`; parsed finalizers `12851`, все классифицированы как terminal `forget_candidate`. Audit сообщил `0` retries, forgets, clears и dispatches.
+- Scheduler source содержит семь bounded schedules, но host одновременно имеет historical evidence `schedule:work` и per-minute cron `schedule:run`; single owner не доказан.
+
+Task 1 не запускала workers, не останавливала scheduler/producers, не retry/forget/clear jobs и не меняла queue payload. До Redis persistence recovery запрещено поднимать весь заявленный pool одним шагом; Task 5 master plan требует staged ramp с queue/SQLite/load evidence.
 
 ## Конфигурация
 

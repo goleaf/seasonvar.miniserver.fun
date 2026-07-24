@@ -54,6 +54,13 @@ return [
         'health_probe_seconds' => (int) env('CACHE_HEALTH_PROBE_SECONDS', 10),
     ],
 
+    'redis_persistence' => [
+        'connection' => 'queues',
+        'running_warning_seconds' => (int) env('REDIS_RDB_RUNNING_WARNING_SECONDS', 120),
+        'running_failure_seconds' => (int) env('REDIS_RDB_RUNNING_FAILURE_SECONDS', 900),
+        'last_save_warning_seconds' => (int) env('REDIS_RDB_LAST_SAVE_WARNING_SECONDS', 3_600),
+    ],
+
     'framework_events' => [
         'enabled' => env('CACHE_FRAMEWORK_EVENT_METRICS', true),
         'connection' => env('CACHE_FRAMEWORK_EVENT_REDIS_CONNECTION', 'cache'),

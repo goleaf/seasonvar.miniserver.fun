@@ -1,6 +1,20 @@
 # Environment preflight
 
-Проверено: 13.07.2026. Команды выполнялись из `/www/wwwroot/seasonvar.miniserver.fun`; secrets и значения `.env` не выводились.
+Проверено: 13.07.2026; bounded operational probes повторены 24.07.2026. Команды выполнялись из `/www/wwwroot/seasonvar.miniserver.fun`; secrets и значения `.env` не выводились.
+
+## Повторный preflight 24.07.2026
+
+| Проверка | Read-only результат |
+| --- | --- |
+| `php artisan about` | PHP `8.5.8`, Laravel runtime `13.21.1`, production/debug off, SQLite/Redis, config `NOT CACHED`, events/routes/views cached |
+| `php artisan migrate:status` | Все 110 migrations `Ran`; DDL не выполнялся |
+| `php artisan schedule:list` | Семь bounded schedules; host-level single scheduler owner всё ещё не доказан |
+| `php artisan app:health --json` | `degraded`, `ready=true`; DB/Redis/Memcached `ok`, worker heartbeat отсутствует |
+| `php artisan app:failed-job-audit --json --samples=0` | `33597` failed, `12851` terminal finalizer candidates, mutations `0` |
+| `php artisan seasonvar:import --status` | `41104` import pending, `26971` delayed, run `#1254`, `41043` live claims, parsed `0` |
+| `redis-cli INFO persistence` | RDB child `105253` seconds, `10641008` changes since acknowledged save, AOF disabled |
+
+Working tree содержит параллельные importer/player и package changes; они не считаются результатом stabilization Batch 1 и исключаются из его staging. Redis/process/queue/data state не изменялся.
 
 ## Версии и совместимость
 

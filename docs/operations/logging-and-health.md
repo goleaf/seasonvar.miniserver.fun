@@ -1,6 +1,6 @@
 # Logging and health
 
-Проверено: 20.07.2026.
+Проверено: 24.07.2026.
 
 ## Actual logging
 
@@ -24,9 +24,13 @@ It returns 503 when unavailable, `Cache-Control: no-store, private` and `X-Robot
 
 ## Operator diagnostics
 
-- `php artisan app:health --json` is detailed CLI-only evidence for database, Redis roles, Memcached, workers and cache warming.
+- `php artisan app:health --json` is detailed CLI-only evidence for database, Redis roles, Redis persistence, Memcached, workers and cache warming.
 - `php artisan app:deployment-check --json` is a heavier preflight. On the current large active SQLite database it must run outside writer load with an explicit time budget; it was not run during Task 28 production import.
 - `php artisan seasonvar:import --status`, `queue:monitor` and `app:failed-job-audit` provide bounded importer/queue state.
+
+Read-only stabilization baseline 24.07.2026: detailed health returned `degraded`, `ready=true`; database, Redis cache/session/queue/locks and Memcached were reachable. Queue workers reported `failed` because `43105` pending and `29045` delayed jobs existed without heartbeat for `cache-warm-v2`, `seasonvar-import` and `seasonvar-title-refresh`. Redis `INFO persistence` separately showed a `105253`-second active RDB child, `10641008` changes since the last acknowledged save and AOF disabled. The public readiness shape remained unchanged and no retry, forget, flush, save or restart was performed.
+
+После внедрения отдельного `RedisPersistenceInspector` тот же bounded `INFO persistence` входит в detailed health как `redis_persistence`, но не в публичный `/health/ready`. Снимок `2026-07-24T09:45:35Z` вернул для компонента `failed`: активное сохранение выполнялось `106333` секунды, возраст последнего подтверждённого сохранения составлял `106394` секунды, несохранённых изменений — `10671434`, AOF выключен. Общий ответ сохранил `degraded`, `ready=true`. Порог предупреждения активного сохранения по умолчанию равен `120` секундам, отказа — `900`, а несохранённых изменений после последнего сохранения — `3600`; они настраиваются через `REDIS_RDB_RUNNING_WARNING_SECONDS`, `REDIS_RDB_RUNNING_FAILURE_SECONDS` и `REDIS_RDB_LAST_SAVE_WARNING_SECONDS`. Диагностика возвращает только ограниченные числа, boolean, stable status и безопасное русское сообщение; Redis host, path, key, payload и raw exception не выводятся. Проверка не запускает `SAVE`, `BGSAVE`, `BGREWRITEAOF`, restart, retry, forget или flush.
 
 Actual Task 28 result after the bounded worker refresh: database and critical Redis roles were reachable; the import, title-refresh and cache-warm pools reported current heartbeats; full warming was idle. The latest bounded critical warming pass completed with 74 public-target failures and therefore reported `degraded`; Memcached was configured but unavailable. The application remained ready while detailed health honestly remained degraded. Queue history and failed work were preserved for normal review; they were not flushed, retried in bulk or presented as healthy.
 

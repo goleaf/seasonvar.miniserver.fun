@@ -342,6 +342,7 @@ HDREZKA_COLLECTION_SYNC_ENABLED=1 php artisan catalog-collections:sync-hdrezka
 ```bash
 php artisan integrations:doctor
 php artisan app:health
+php artisan app:health --json
 php artisan cache:warm-catalog
 php artisan cache:warm-catalog --scope=all-public --dry-run
 php artisan cache:warm-catalog --scope=all-public --queue
@@ -356,6 +357,8 @@ php artisan project:docs-refresh
 ```
 
 Eloquent AutoCache включён только для явно отмеченных публичных справочников стран и жанров в фильтрах Top 100. Его можно экстренно отключить через `AUTOCACHE_ENABLED=false`, после чего необходимо пересобрать config cache и выполнить graceful reload PHP-процессов; личные и закрытые данные этот кеш не использует.
+
+Подробный JSON-режим `app:health` дополнительно показывает безопасные агрегаты Redis persistence: длительность активного сохранения, возраст последнего подтверждённого сохранения, число несохранённых изменений и состояние AOF. Неисправность этого компонента переводит операторскую диагностику в `degraded`/`failed`, но не меняет лёгкий публичный `/health/ready`, пока database и критические Redis session/queue/lock connections доступны. Пороги находятся в `.env.example`; команда ничего не сохраняет, не очищает и не перезапускает.
 
 Для быстрого критического прохода `PUBLIC_PAGE_CACHE_WARM_BUDGET_SECONDS=240` ограничивает только общий этап внутренних HTTP-запросов. `CACHE_WARM_TIMEOUT=600` согласован с отдельным обработчиком очереди; его heartbeat lease включает 60-секундный запас, поэтому штатный долгий прогрев не отображается как остановленный worker. Возобновляемый `--scope=all-public` продолжает работать короткими пакетами и не включает личные, авторизованные, административные, подписанные или связанные с видео страницы.
 

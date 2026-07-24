@@ -24,6 +24,7 @@ final class InfrastructureHealthCheck
         private readonly PublicCatalogWarmStateStore $fullWarming,
         private readonly QueueWorkerHeartbeat $workers,
         private readonly CacheKeyFactory $keys,
+        private readonly RedisPersistenceInspector $redisPersistence,
     ) {}
 
     /** @return array{status: string, ready: bool, checked_at: string, components: array<string, array<string, mixed>>} */
@@ -35,6 +36,7 @@ final class InfrastructureHealthCheck
             'redis_sessions' => $this->redis('sessions'),
             'redis_queues' => $this->redis('queues'),
             'redis_locks' => $this->redis('locks'),
+            'redis_persistence' => $this->redisPersistence->inspect(),
             'memcached' => $this->memcached(),
             'queue_workers' => $this->workers->status(),
             'horizon' => class_exists(Horizon::class)
@@ -45,7 +47,7 @@ final class InfrastructureHealthCheck
         ];
         $critical = ['database', 'redis_sessions', 'redis_queues', 'redis_locks'];
         $ready = collect($critical)->every(fn (string $component): bool => $components[$component]['status'] === 'ok');
-        $degraded = collect(['redis_cache', 'memcached', 'queue_workers', 'cache_warming', 'full_cache_warming'])
+        $degraded = collect(['redis_cache', 'redis_persistence', 'memcached', 'queue_workers', 'cache_warming', 'full_cache_warming'])
             ->contains(fn (string $component): bool => in_array(
                 $components[$component]['status'],
                 $component === 'queue_workers'

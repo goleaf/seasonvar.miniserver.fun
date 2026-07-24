@@ -1,6 +1,15 @@
 # Матрица runtime-совместимости
 
-Аудит: 18.07.2026; повторная maintenance-сверка 20.07.2026. Матрица разделяет локально установленное, проверенное инструментами, требуемое проектом и внешнее production-состояние. Статус `verified` относится только к перечисленной проверке и не означает поддержку любого будущего patch release.
+Аудит: 18.07.2026; повторные maintenance/operational-сверки 20.07.2026 и 24.07.2026. Матрица разделяет локально установленное, проверенное инструментами, требуемое проектом и внешнее production-состояние. Статус `verified` относится только к перечисленной проверке и не означает поддержку любого будущего patch release.
+
+## Operational compatibility delta 24.07.2026
+
+- Running vendor и working lock сообщают Laravel `13.21.1`, Sanctum `4.3.3`; `HEAD` всё ещё фиксирует `13.20.0`/`4.3.2`. Пока параллельный lock change не прошёл собственные decision/verification/commit gates, canonical committed package state остаётся прежним.
+- PHP `8.5.8`, Livewire `4.3.3`, Node `26.4.0`, npm `12.0.1`, Vite `8.1.4`, Tailwind `4.3.2`, Redis `8.6.4`, Memcached `1.6.39` и SQLite `3.46.1` подтверждены текущим host/runtime evidence.
+- Redis connectivity verified, но persistence degraded: RDB child active `105253` seconds, AOF disabled, `10641008` unacknowledged changes; process ownership/restart/restore remain `unknown`/`unresolved`.
+- Memcached transport теперь reachable и detailed health `ok`; sustained cache-warm capacity остаётся unverified из-за отсутствующих worker heartbeats.
+- Queue transport reachable, но worker topology not operationally verified: `43105` pending/`29045` delayed/`0` reserved, heartbeat отсутствует у трёх специализированных pools.
+- Config state в момент снимка — `NOT CACHED`, хотя historical 19.07 evidence было cached. Это production drift evidence; Task 1 не перестраивала config и не перезагружала processes.
 
 ## Значения статусов
 

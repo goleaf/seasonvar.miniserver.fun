@@ -7,6 +7,10 @@ namespace Tests\Unit;
 use App\DTOs\PublicCacheWarmBatch;
 use App\Services\Catalog\PublicCatalogWarmStateStore;
 use App\Services\Operations\InfrastructureHealthCheck;
+use App\Services\Operations\RedisPersistenceInspector;
+use Illuminate\Redis\RedisManager;
+use Mockery;
+use RuntimeException;
 use Tests\TestCase;
 
 final class InfrastructureHealthCheckTest extends TestCase
@@ -61,6 +65,28 @@ final class InfrastructureHealthCheckTest extends TestCase
         $this->assertSame('failed', $result['components']['queue_workers']['status']);
         $this->assertSame('degraded', $result['status']);
         $this->assertTrue($result['ready']);
+    }
+
+    public function test_failed_redis_persistence_degrades_detailed_health_without_changing_readiness(): void
+    {
+        $manager = Mockery::mock(RedisManager::class);
+        $manager->shouldReceive('connection')
+            ->once()
+            ->with('queues')
+            ->andThrow(new RuntimeException('private Redis endpoint'));
+
+        $this->app->instance(
+            RedisPersistenceInspector::class,
+            new RedisPersistenceInspector($manager),
+        );
+
+        $health = app(InfrastructureHealthCheck::class);
+        $result = $health->run();
+
+        $this->assertSame('failed', $result['components']['redis_persistence']['status']);
+        $this->assertSame('degraded', $result['status']);
+        $this->assertTrue($result['ready']);
+        $this->assertTrue($health->readiness()['ready']);
     }
 
     public function test_full_public_cache_warming_has_an_independent_non_blocking_health_state(): void

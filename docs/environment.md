@@ -1,8 +1,22 @@
 # Переменные окружения
 
-Обновлено: 19.07.2026
+Обновлено: 24.07.2026
 
 Полный безопасный шаблон находится в `.env.example`. Реальный `.env` не изменяется deployment-кодом и не коммитится.
+
+## Read-only operational baseline 24.07.2026
+
+- `php artisan about` подтвердил PHP `8.5.8`, Laravel runtime `13.21.1`, Livewire `4.3.3`, production/debug off, SQLite, Redis cache/session/queue и locale `ru`. Working checkout/vendor и незакоммиченный lock diff содержат Laravel `13.21.1`/Sanctum `4.3.3`, тогда как `HEAD` всё ещё фиксирует `13.20.0`/`4.3.2`; это параллельное package change не принадлежит stabilization Batch 1 и не объявляется завершённым update.
+- Config cache в момент снимка имел состояние `NOT CACHED`; events, routes и views были cached, maintenance mode выключен. Это расходится с историческим состоянием 19.07.2026 и остаётся deployment evidence, а не основанием для `optimize:clear` или mutation из read-only задачи.
+- Все 110 migrations имеют состояние `Ran`; расписание содержит семь bounded задач. Task 1 не применяла migration и не меняла scheduler.
+- Detailed `app:health --json` вернул `degraded`, `ready=true`: database, четыре Redis roles и Memcached `1.6.39` доступны; `queue_workers` и critical warming имеют `failed` из-за отсутствующих heartbeat при накопленной работе.
+- Redis persistence имеет `rdb_bgsave_in_progress=1` уже `105253` секунды, `rdb_changes_since_last_save=10641008`, `rdb_last_bgsave_status=ok`, AOF выключен. Последний acknowledged save — `2026-07-23T04:12:21Z`; restart/process owner и пригодный independent artifact не подтверждены, поэтому Task 1 не сигналит процессы и не запускает новый save.
+- После Task 2 подробная диагностика содержит отдельный не блокирующий readiness компонент `redis_persistence`. Повторный снимок `2026-07-24T09:45:35Z` безопасно нормализовал состояние как `failed`: `current_save_seconds=106333`, `last_save_age_seconds=106394`, `changes_since_last_save=10671434`, `aof_enabled=false`; общий ответ остался `degraded`, `ready=true`.
+- Redis queues содержат `43105` pending и `29045` delayed jobs без reserved: `cache-warm-v2` `1997/2074`, `seasonvar-import` `41104/26971`, `seasonvar-title-refresh` `4/0`. Active global run `#1254` хранит `41043` selected/live claims и `0` parsed.
+- Failed-job audit остаётся read-only: `33597` total, из них `12851` finalizers имеют terminal `forget_candidate`; ни один job не retried/forgotten/cleared/dispatched.
+- SQLite main file — `28154552320` bytes; `database/` около `31G`, same-volume backups около `48G`, logs около `956M`. Off-host copy и isolated restore rehearsal не подтверждены.
+
+Снимок не доказывает Redis recoverability, off-host backup, restore, alert delivery, HA/failover или штатный worker ownership. Эти состояния остаются `unresolved`; следующий mutation gate — отдельный Task 3 с verified private artifact и process owner.
 
 ## Verified production snapshot 18.07.2026
 
@@ -54,7 +68,7 @@ Production также обязан включить HTTPS-only session cookie, �
 
 ## PHP extensions
 
-`composer check-platform-reqs --no-dev` на текущем runtime подтвердил PHP `8.5.8` и mandatory Composer platform extensions `dom`, `fileinfo`, `filter`, `hash`, `iconv`, `json`, `libxml`, `openssl`, `pcre`, `session`, `tokenizer`; `ctype`/`mbstring` также реально загружены, хотя dependencies умеют polyfill. Для фактической архитектуры дополнительно required: `pdo_sqlite`/`sqlite3` (production database), `redis` (sessions/queues/locks/cache), `curl` (outbound provider HTTP), `intl` (locale dates/numbers), `fileinfo` (uploads), `openssl`/`sodium` (crypto) и `opcache` для FPM. `gd` и `imagick` поддерживают current raster upload/image flows. `memcached` client загружен, но server optional/unavailable; `pdo_mysql` — optional driver evidence, не production-engine proof; `zip` нужен для approved archive workflows. FFmpeg/transcoding не требуется и не подтверждено.
+`composer check-platform-reqs --no-dev` на текущем runtime подтвердил PHP `8.5.8` и mandatory Composer platform extensions `dom`, `fileinfo`, `filter`, `hash`, `iconv`, `json`, `libxml`, `openssl`, `pcre`, `session`, `tokenizer`; `ctype`/`mbstring` также реально загружены, хотя dependencies умеют polyfill. Для фактической архитектуры дополнительно required: `pdo_sqlite`/`sqlite3` (production database), `redis` (sessions/queues/locks/cache), `curl` (outbound provider HTTP), `intl` (locale dates/numbers), `fileinfo` (uploads), `openssl`/`sodium` (crypto) и `opcache` для FPM. `gd` и `imagick` поддерживают current raster upload/image flows. `memcached` client загружен, а повторный health snapshot 24.07.2026 подтвердил доступный server `1.6.39`; sustained warming/capacity всё ещё требует штатных workers. `pdo_mysql` — optional driver evidence, не production-engine proof; `zip` нужен для approved archive workflows. FFmpeg/transcoding не требуется и не подтверждено.
 
 `RELEASE_CALENDAR_TIMEZONE=UTC` задаёт валидный IANA timezone публичного календаря для гостя. Вошедший пользователь использует собственный timezone из настроек аккаунта; произвольный request parameter не переопределяет эту границу. Изменение значения требует `config:cache` и graceful reload web workers, но не миграции или нового scheduler.
 
@@ -71,6 +85,8 @@ Versioned-профиль `deploy/logrotate/seasonvar` ежедневно рот�
 Shared defaults задают `REDIS_URL` либо `REDIS_HOST`, `REDIS_PORT`, `REDIS_USERNAME`, `REDIS_PASSWORD`. Workload-specific overrides используют префиксы `REDIS_CACHE_*`, `REDIS_QUEUE_*`, `REDIS_SESSION_*`, `REDIS_LOCK_*`, `REDIS_BROADCAST_*` и поддерживают `URL/HOST/PORT/USERNAME/PASSWORD/PREFIX/CLIENT_NAME/TIMEOUT/READ_TIMEOUT/RETRY_INTERVAL/MAX_RETRIES/BACKOFF_ALGORITHM/BACKOFF_BASE/BACKOFF_CAP/PERSISTENT/PERSISTENT_ID/TCP_KEEPALIVE`.
 
 Standalone default DBs: cache 1, queues 2, sessions 3, locks 5, broadcasting 6. При managed Redis/Cluster используйте отдельные endpoints и prefixes; DB numbers не считаются HA boundary.
+
+`REDIS_RDB_RUNNING_WARNING_SECONDS=120`, `REDIS_RDB_RUNNING_FAILURE_SECONDS=900` и `REDIS_RDB_LAST_SAVE_WARNING_SECONDS=3600` задают только пороги CLI-компонента `redis_persistence`. Inspector использует named connection `queues`, выполняет один `INFO persistence`, не меняет публичный readiness и не инициирует сохранение или перезапуск Redis. После изменения порогов требуется обычная пересборка config cache и graceful reload длительно работающих PHP-процессов; очистка application cache не нужна.
 
 `SEASONVAR_TITLE_REFRESH_FRESH_MINUTES` задаёт successful-only окно targeted refresh (по умолчанию 15 минут), а `SEASONVAR_TITLE_REFRESH_QUEUE` — отдельную приоритетную очередь `seasonvar-title-refresh`. `SEASONVAR_TITLE_REFRESH_FINALIZER_DELAY_SECONDS` задаёт короткую задержку повторной проверки незавершённой группы; `SEASONVAR_TITLE_REFRESH_STATE_TTL_SECONDS`, `SEASONVAR_TITLE_REFRESH_ACTIVE_SECONDS` и `SEASONVAR_TITLE_REFRESH_DISPATCH_LOCK_SECONDS` ограничивают operational state, stale-active recovery и atomic dispatch lock. `SEASONVAR_IMPORT_PREPARED_RETENTION_DAYS` управляет bounded очисткой старых terminal groups вместе с подготовленными payload. Connection и critical lock store остаются общими `SEASONVAR_QUEUE_*` настройками; лимита числа страниц или конкурентности в application config намеренно нет.
 
