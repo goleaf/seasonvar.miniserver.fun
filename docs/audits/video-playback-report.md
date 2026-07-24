@@ -1,6 +1,6 @@
 # Каноническая архитектура video playback
 
-Проверено: 19.07.2026. Этот документ — владелец фактического playback-контракта Task 07. Живой чек-лист реализации и отката находится в `docs/plans/laravel-video-portal-modernization.md`. Портал воспроизводит только разрешённые проекту источники и не реализует обход DRM, подписи, оплаты, региона или ограничений поставщика.
+Проверено: 24.07.2026. Этот документ — владелец фактического playback-контракта Task 07 и явно помеченных согласованных будущих изменений. Живой чек-лист реализации и отката находится в `docs/plans/laravel-video-portal-modernization.md`. Портал воспроизводит только разрешённые проекту источники и не реализует обход DRM, подписи, оплаты, региона или ограничений поставщика.
 
 ## Итог аудита
 
@@ -145,6 +145,14 @@ Resume выполняется после `loadedmetadata`, clamp-ится и н�
 Authenticated changes проходят existing `AccountSettingsService`, CSRF/Livewire session и bounded player action; anonymous changes остаются local. Slider/rate changes debounce-ятся, fingerprint-deduplicate-ятся и не создают write на каждый movement. При выключенном remember-volume server/device volume/mute не обновляются, speed сохраняется независимо.
 
 После `ended` autoplay использует только server-resolved next playable link. Client запускает configurable countdown `3..30` секунд (default 8), показывает название следующей серии, Play now и Cancel, объявляет состояние screen reader и не poll-ит сервер. Escape/play/restart/navigation/destroy отменяют единственный timer. Preference `off` предотвращает переход. Последняя серия показывает final state без loop и без unrelated recommendation autoplay. Browser policy всё равно может запретить начальный autoplay со звуком.
+
+### Согласованный целевой контракт 24.07.2026 — implementation pending
+
+Пользователь явно изменил постоянное правило countdown: после реализации [`2026-07-24-player-seamless-episode-switching-design.md`](../superpowers/specs/2026-07-24-player-seamless-episode-switching-design.md) `ended` обязан немедленно применять заранее подготовленный server-authorized next transition без countdown, кнопок Play now/Cancel и искусственного timeout. Preference `off`, final state, browser autoplay policy и запрет unrelated recommendation autoplay сохраняются. До implementation commit предыдущий абзац честно описывает фактически работающий runtime.
+
+Тот же согласованный дизайн добавляет player-owned меню `Сезон → Серия → Перевод` и in-place source transition: существующие `<video>`, Plyr root, `document.fullscreenElement` стандартного Fullscreen API и одна `CatalogPlayerSession` не заменяются. Меню является JavaScript-owned потомком уже разрешённого `wire:ignore` media shell, а server-owned hierarchy/access/source decisions возвращаются последовательными bounded Livewire `#[Json]` actions. Browser получает только один короткоживущий same-origin grant; raw provider URL и полный catalog graph в JSON не попадают.
+
+Нативный iOS video fullscreen остаётся browser-governed: WebKit не гарантирует показ custom HTML поверх системного player UI или сохранение native fullscreen при source swap. Fake fullscreen не создаётся; реальная iOS-проверка до delivery остаётся обязательным evidence либо честным `unresolved`.
 
 ## Player JavaScript и Livewire lifecycle
 
