@@ -2299,7 +2299,7 @@ Stage only files that actually changed. Verify the final remote ref again. If no
 
 ### Task 30: Serialize Shared-`main` Delivery Ownership
 
-**Status:** `preparation_completed_pending_delivery`; Steps 1–3 prepared and verified the new isolated script and its dedicated test without touching live hooks. Steps 4–7 remain blocked until current importer/player owners finish or commit their exact work, because hook integration and shared documentation must not overwrite or interrupt their delivery.
+**Status:** `preparation_completed_local`; Steps 1–3 were prepared, verified and committed in `main` as `ad5c13c` without touching live hooks. The configured remote rejected HTTPS authentication, so remote delivery remains `unresolved`. Steps 4–7 remain blocked until current importer/player owners finish or commit their exact work, because hook integration and shared documentation must not overwrite or interrupt their delivery.
 
 **Reason:** Multiple independent tasks currently edit one checkout while project policy forbids branches and worktrees. The existing clean-tree guard prevents accidental partial commits but has no cooperative task-owner lease, leading to repeated guard bypass pressure and overlapping owner documents.
 
