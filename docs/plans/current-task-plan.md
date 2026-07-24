@@ -1,7 +1,7 @@
 # Текущая задача — безлимитная программа стабилизации, обновления и оптимизации
 
 Дата: 24.07.2026
-Статус: полный master implementation plan подготовлен по фактическому аудиту; application/runtime/data changes этой planning-задачей не выполнялись.
+Статус: полный master implementation plan подготовлен по фактическому аудиту и закоммичен в существующей `main` как `535f4b8`; application/runtime/data changes этой planning-задачей не выполнялись, push ещё требует фактической попытки.
 
 ## Цель и главный документ исполнения
 
@@ -106,7 +106,7 @@ Master plan является единственным подробным executi
 | Task-specific expected files/contracts/risks | `completed` | Planning files перечислены выше; implementation files и public contracts перечислены внутри каждого из 28 workstreams. |
 | README актуальность | `already_compliant` | Runtime/product/development/deployment не изменились; фиктивная visitor history entry не добавляется. |
 | CHANGELOG | `completed` | Добавлена отдельная русская planning-only запись, прямо подтверждающая отсутствие operational/runtime/data delivery. |
-| Commit только в `main` | `pending` | Перед commit требуется повторный status/staged-scope review; parallel/unrelated files нельзя поглощать. |
+| Commit только в `main` | `completed` | Commit `535f4b8` содержит только master plan, current plan, technical-debt update и planning-only changelog; pre-existing `composer.lock` исключён. |
 | Push configured remote | `unresolved` до попытки | Предыдущие попытки HTTPS push блокировались отсутствующей GitHub-аутентификацией; итог фиксирует фактический результат новой попытки. |
 
 ## Verification этой planning-задачи
@@ -117,8 +117,15 @@ Master plan является единственным подробным executi
 - [x] Перечитать `AGENTS.md`, applicable canonical requirements, master/current plans и compliance matrix.
 - [x] Проверить `README.md` и не создавать фиктивное изменение.
 - [x] Добавить русскую planning-only запись в `CHANGELOG.md`.
-- [ ] Закоммитить только task-owned planning docs в существующей `main`.
+- [x] Закоммитить только task-owned planning docs в существующей `main`.
 - [ ] Выполнить `git push origin main`; внешний отказ записать как `unresolved`.
+
+## Planning delivery evidence
+
+- Commit `535f4b8` (`docs: add system optimization master plan`) создан в существующей `main`.
+- Первоначальный обычный commit был корректно остановлен pre-commit guard из-за pre-existing unstaged `composer.lock`.
+- Staged scope, `git diff --cached --check`, local links и documentation gate проверены вручную; предусмотренный проектом `SEASONVAR_SKIP_GIT_GUARD=1` применён только к commit, не к push.
+- Пользовательский `composer.lock` не staged, не изменён и не включён в commit этой программы.
 
 ---
 
