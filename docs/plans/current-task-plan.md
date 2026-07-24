@@ -122,7 +122,7 @@ Rollback будущей реализации: вернуть countdown/обыч�
 | Maintenance/production/rollback | `completed` | Причина browser behavior change зафиксирована; dependency update отсутствует; code/assets rollback и failure boundary описаны. |
 | README актуальность | `already_compliant` | На design-only стадии visitor/product runtime не изменился; фиктивная visitor history entry запрещена и не добавляется. |
 | CHANGELOG | `completed` | Добавлены отдельные русские design/plan-only записи, явно подтверждающие отсутствие runtime/schema/route/cache/dependency changes. |
-| Git `main`, commit и push | `unresolved` | Design docs закоммичены в существующей `main`; новый implementation plan ожидает task commit. Pre-existing `composer.lock` исключён. Предыдущий `git push origin main` вернул `could not read Username for 'https://github.com'`, поэтому remote delivery не заявляется. |
+| Git `main`, commit и push | `unresolved` | Полный implementation plan и task-owned corrections закоммичены в существующей `main` как `d5aaad7`; pre-existing `composer.lock` и параллельный master-plan исключены. Новая попытка `git push origin main` вернула `could not read Username for 'https://github.com'`, поэтому remote delivery не заявляется. |
 
 ## Design verification checklist
 
@@ -137,6 +137,8 @@ Rollback будущей реализации: вернуть countdown/обыч�
 - [x] Передать пользователю spec на отдельный review.
 - [x] Получить пользовательское подтверждение design.
 - [x] Записать полный implementation plan из 15 TDD-задач и выполнить self-review без application edits.
+- [x] Закоммитить полный implementation plan в существующей `main` как `d5aaad7`, исключив параллельные файлы и `composer.lock`.
+- [x] Повторить `git push origin main`; внешний HTTPS auth failure зафиксирован как `unresolved`.
 
 ## Design evidence
 
@@ -145,6 +147,7 @@ Rollback будущей реализации: вернуть countdown/обыч�
 - README проверен без изменения: design-only commit не меняет фактическую visitor capability и не создаёт фиктивную запись истории.
 - Application PHP/Blade/JavaScript/CSS, routes, schema, data, cache, packages и built assets не менялись; runtime countdown остаётся фактическим до будущего implementation commit.
 - Полный execution plan зафиксировал точные payload shapes, три последовательных `#[Renderless]` actions, отдельные prepare/commit границы, bounded pagination, hot-swap/progress/auto-next sequence, PHPUnit/Playwright matrix, production rollback и Git delivery.
+- Task-owned план и corrections находятся в `d5aaad7`; новая отправка в `origin/main` не состоялась из-за отсутствующей HTTPS-аутентификации GitHub.
 - Project pre-commit guard обнаружил pre-existing unstaged `composer.lock`; task-owned diff прошёл его read-only checks вручную, после чего предусмотренный `SEASONVAR_SKIP_GIT_GUARD=1` применён только к commit. Пользовательский lock diff не добавлен и не изменён этой задачей.
 - `git push origin main` завершился внешним отказом HTTPS credential lookup; commit существует только локально и push остаётся `unresolved`.
 
