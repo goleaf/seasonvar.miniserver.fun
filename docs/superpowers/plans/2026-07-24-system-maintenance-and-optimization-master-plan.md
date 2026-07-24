@@ -2611,7 +2611,7 @@ Stage `README.md` only for an actual contributor-workflow change. Never include 
 
 ### Task 33: Enforce One Active Current-Plan Registry after Archival
 
-**Status:** `planned_after_tasks_27_and_31`. Task 27 performs the one-time lossless archive; Task 31 reconciles registered workstream status; this task prevents the now 3,435-line, 41-H1 multi-owner current plan from growing back.
+**Status:** `standalone_preparation_implemented_before_tasks_27_and_31`. Steps 1–3 are complete: fixture-driven tests, the read-only PHP parser and its shell wrapper. Task 27 still owns the one-time lossless archive, Task 31 still owns workstream reconciliation, and Steps 4–7 remain blocked until those prerequisites are complete. The standalone parser is not wired into CI/hooks and is not an acceptance gate against the unmigrated repository current plan.
 
 **Reason:** The current plan contains several historical and parallel full task bodies and multiple headings that claim to be current. Manual discipline has not preserved a single active owner, while the unlimited rolling protocol requires history to grow through linked archives and monotonic task IDs rather than one unbounded working file.
 
@@ -2637,7 +2637,7 @@ Stage `README.md` only for an actual contributor-workflow change. Never include 
 - The policy has no line-count ceiling and no maximum task ID: “безлимитный” remains evidence-driven and monotonic. It validates ownership/structure, not an artificial number of tasks.
 - Allowed machine statuses are exactly `planned`, `in_progress`, `completed`, `already_compliant`, `not_applicable` and `unresolved`, with optional documented qualifiers after `:`; unknown optimistic status text fails.
 
-- [ ] **Step 1: Write failing policy tests**
+- [x] **Step 1: Write failing policy tests**
 
 Create temporary Markdown fixtures covering:
 
@@ -2653,7 +2653,7 @@ large but structurally valid active evidence passes without a line ceiling;
 the repository current plan passes only after Task 27/31 migration.
 ```
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```bash
 php artisan test --filter=CurrentPlanPolicyScriptTest
@@ -2661,7 +2661,7 @@ php artisan test --filter=CurrentPlanPolicyScriptTest
 
 Expected: FAIL because the policy scripts do not exist.
 
-- [ ] **Step 3: Implement the read-only parser**
+- [x] **Step 3: Implement the read-only parser**
 
 `scripts/check-current-plan-policy.php` must:
 
@@ -2677,6 +2677,20 @@ never print file contents, secrets or absolute private paths.
 ```
 
 The shell wrapper resolves the repository root and invokes the PHP policy exactly as the existing README/CHANGELOG policy wrappers do.
+
+Standalone preparation boundary:
+
+```text
+Tests use temporary isolated fixtures and never rewrite project Markdown.
+The parser accepts a target file outside docs/plans only for isolated fixture verification.
+Archive links are resolved relative to the checked Markdown file, must remain below a sibling archive directory and must name an existing regular Markdown file.
+Registry tables use columns Workstream, Status and Evidence; the blocked/unresolved registry may be empty, but every present row still requires a supported status and non-empty evidence.
+The canonical H2 owners are exactly `## Реестр активных workstreams`, `## Реестр blocked/unresolved`, `## Task-specific compliance matrix` and `## Последнее подтверждённое evidence`; each appears once, while unrelated lower-level evidence headings remain allowed.
+The active registry and compliance matrix each contain at least one data row. The latest-evidence section contains at least one valid relative archive link.
+Until Tasks 27/31 migrate the real file, scripts/ci-check.sh, hooks, docs/development.md, docs/README.md and docs/plans/archive remain unchanged.
+```
+
+Standalone evidence: initial RED produced `15` expected failures because both scripts were absent; the first GREEN passed `15` tests / `31` assertions. Security review then reproduced two focused failures for an inline-code archive example and an encoded control character; final focused GREEN passed `17` tests / `36` assertions. The complete Unit suite passed `489` tests / `107453` assertions; targeted Pint, PHP syntax, shell syntax, PHPStan, Rector, managed-doc checks and the docs profile also passed. The repository current plan remains intentionally rejected until Steps 4–5.
 
 - [ ] **Step 4: Migrate the current file through Tasks 27 and 31**
 

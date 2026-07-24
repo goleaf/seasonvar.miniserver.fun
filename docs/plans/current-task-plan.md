@@ -3,6 +3,67 @@
 Дата: 24.07.2026
 Статус: master implementation plan актуализирован после выполнения Tasks 1–2: Task 3 остаётся безопасно остановлен перед production mutation gate, а измеренные delivery/concurrency/cross-plan discoveries добавлены как Tasks 29–31 и безлимитный rolling extension protocol. Application/runtime/data этой planning-актуализацией не меняются.
 
+## Параллельная безопасная подготовка — System Task 33: read-only current-plan policy
+
+Статус: `completed: standalone_preparation`; тесты временных fixtures, read-only PHP parser и shell wrapper реализованы и проверены. Lossless archive, reconciliation реестра, проверка реального `current-task-plan.md`, подключение к `scripts/ci-check.sh` и hooks остаются заблокированы Tasks 27/31 и не входят в этот change set.
+
+### Причина и границы
+
+- Существующий current plan ещё не мигрирован: в нём несколько исторических H1 и параллельных полных тел, поэтому преждевременная активация нового gate заведомо остановит документационный workflow.
+- Master Task 33 уже определяет утверждённый контракт. Безопасная автономная часть Steps 1–3 может быть реализована через temporary fixtures без изменения application/runtime/production state.
+- Parser обязан только читать Markdown, выдавать русские относительные path/line diagnostics без содержимого файла и принимать большие корректные документы и произвольно высокие monotonic Task ID без искусственного лимита.
+- Canonical fixture structure использует ровно по одному H2 `Реестр активных workstreams`, `Реестр blocked/unresolved`, `Task-specific compliance matrix` и `Последнее подтверждённое evidence`; registry tables имеют `Workstream|Requirement`, `Status`, `Evidence`.
+- Совместимый rollback удаляет только два новых script-файла и их unit test; архивы, current plan history, CI, hooks и application state не меняются.
+
+### Ожидаемые файлы
+
+- Create: `scripts/check-current-plan-policy.php`
+- Create: `scripts/check-current-plan-policy.sh`
+- Create: `tests/Unit/CurrentPlanPolicyScriptTest.php`
+- Modify: `docs/superpowers/plans/2026-07-24-system-maintenance-and-optimization-master-plan.md`
+- Modify: `docs/plans/current-task-plan.md`
+- Modify after GREEN: `CHANGELOG.md`
+- Preserve unchanged: `scripts/ci-check.sh`, `.githooks/*`, `tests/Unit/CiQualityGateContractTest.php`, `docs/plans/archive/*`, `docs/development.md`, `docs/README.md`, application/config/routes/schema/dependencies/assets.
+
+### Requirement-compliance matrix
+
+| Requirement | Status | Evidence / boundary |
+| --- | --- | --- |
+| Root/index/canonical read order | `completed` | Root instructions, index, code, architecture, development, multilingual, security, production, maintenance, integration и docs map перечитаны 24.07.2026 |
+| Installed versions | `completed` | Boost подтвердил PHP `8.5`, Laravel `13.21.1`, SQLite, Livewire `4.3.3`, Boost `2.4.13`, Pint `1.29.3`, PHPUnit `12.5.31`, Tailwind CSS `4.3.2` |
+| Existing implementation | `completed` | Task 33 master contract и existing README/CHANGELOG wrappers/tests проверены до code |
+| Plan before code | `completed` | Scope, expected/protected files, compatibility, TDD, rollback и activation blocker записаны здесь и в master |
+| TDD | `completed` | Initial RED: `15/15` failed из-за отсутствующих scripts; GREEN: `15/15`; security review RED: `2` targeted failures; final focused GREEN: `17` tests / `36` assertions |
+| Security/privacy | `completed` | Parser не исполняет Markdown, не печатает body/absolute paths и fail closed на invalid/missing archive targets |
+| Routes/API/auth/translations/cache/search/SEO/UI | `not_applicable` | Standalone repository tooling не меняет application/public contracts |
+| Database/migrations/queues/storage/import/player | `not_applicable` | Нет DDL/DML, provider HTTP, runtime command, queue/cache/storage mutation |
+| Dependencies/build/runtime | `not_applicable` | Manifests/locks/assets/runtime requirements не меняются |
+| Production/rollback | `completed` | Production activation отсутствует; rollback file-only, без data/cache/worker impact |
+| Tasks 27/31 and live gate | `unresolved` | Реальный plan migration/reconciliation и CI/hook activation выполняются только после prerequisite commits |
+| README | `already_compliant` | Повторная проверка подтвердила уже существующий roadmap пункт единого краткого реестра; visitor/product workflow не меняется, фиктивная history entry не нужна |
+| Verification | `completed` | Focused `17/36`, policy matrix `26/51`, полный Unit `489/107453`, Pint, PHP/shell syntax, PHPStan, Rector, managed docs, docs profile и whitespace прошли |
+| Commit/push | `in_progress: pending_verification` | Commit разрешён только exact standalone manifest в `main`; foreign dirty scopes не stage/reset/stash/delete |
+
+### RED → GREEN checklist
+
+- [x] Добавить fixtures для valid registry, duplicate/embedded H1, missing/outside archive, unknown status, unresolved без evidence, high Task ID, large valid evidence и read-only behavior.
+- [x] Получить RED из-за отсутствующих scripts: `15` tests failed, `0` passed, причина — отсутствующий wrapper и ожидаемые diagnostics.
+- [x] Реализовать минимальный fail-closed parser и root-resolving wrapper.
+- [x] Получить focused GREEN, PHP/shell syntax, broader unit/docs-safe verification и whitespace checks.
+- [x] Повторно перечитать применимые requirements, проверить legacy/duplicate/unfinished paths и README.
+- [ ] Обновить русский `CHANGELOG.md`, финальное evidence, exact-stage commit и normal push.
+
+### Verification evidence
+
+- Initial RED: `15` tests / `0` passed из-за отсутствующих script-файлов.
+- First GREEN: `15` tests / `31` assertions.
+- Security-review RED: два targeted failure для inline-code archive example и `%00` path.
+- Final focused GREEN: `17` tests / `36` assertions; README/CHANGELOG/current-plan policy matrix: `26` / `51`.
+- Full Unit suite: `489` tests / `107453` assertions.
+- Targeted `Pint`, `php -l`, `bash -n`, `PHPStan`, `Rector`, `project:docs-refresh --check`, `scripts/ci-check.sh docs` и `git diff --check` завершились успешно.
+- Default repository target возвращает ожидаемый exit `1` на дополнительном H1 до Tasks 27/31; тест фиксирует это как prerequisite, а не как активированный gate.
+- Working-copy `CHANGELOG.md` policy отдельно видит foreign importer-строку с обычным `network-free`; Task 33 её не переписывает. Перед commit проверяется exact staged версия с русским Task 33 entry.
+
 ## Параллельное активное исполнение — Player Task 20: границы Shift+E
 
 Статус: `completed_local`; commit `d781661` создан в существующей `main`,
