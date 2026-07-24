@@ -2500,17 +2500,35 @@ evidence, security requirement, совместимое изменение provid
 | Native iOS fullscreen evidence | `not_applicable_to_code` | `unresolved_device` | `not_applicable` | `not_applicable` | `unresolved_device` |
 | Rolling roadmap update | `not_applicable_to_runtime` | `completed` | `a14cdf5` | `unresolved_auth` | `not_applicable` |
 | Task 20: Shift+E interaction boundaries | `completed_local` | `completed` | `d781661` | `unresolved_auth` | `not_claimed` |
+| Task 21: centered touch controls | `in_progress` | `red_pending` | `unresolved_shared_worktree` | `unresolved_shared_worktree` | `not_claimed` |
 
 Статусы независимы. `completed` code не означает published remote, deployed
 production или проверенный native iOS. Отсутствующий внешний evidence никогда
 не понижает уже проверенный локальный runtime, но остаётся видимым gate.
+
+### Текущий указатель безлимитного intake
+
+- `Task 21` остаётся единственной активной player-задачей и имеет отдельный
+  конечный TDD-план центральных touch-controls.
+- Следующий свободный указатель — `Task 22+`. Это не созданная заранее задача
+  и не обещание конкретной функции: номер получает только новый work item,
+  прошедший `Definition of Ready` по датированному evidence.
+- Верхнего номера и конечной даты roadmap нет. Одновременно каждая принятая
+  задача остаётся bounded, тестируемой, обратимой и получает независимые
+  статусы code, verification, local delivery, remote delivery, production и
+  real-device/provider evidence.
+- Tasks 16–19 сохраняют внешние prerequisites; они не перенумеровываются и не
+  маскируются локальным выполнением Tasks 20–21.
+- Пока `Task 21` меняет общие player JS/CSS/tests, новый implementation Task с
+  пересекающимися файлами не переводится в `in_progress`. Read-only discovery
+  может лишь добавить датированный candidate evidence без application edits.
 
 ### Монотонная нумерация и intake
 
 - Tasks 1–15 никогда не перенумеровываются и не переписываются под новый scope.
 - Следующий принятый work item получает первый свободный номер начиная с
   `Task 16`; удалённый кандидат не освобождает и не переиспользует номер.
-- `Task 20+` создаётся только после датированного evidence. Линия roadmap может
+- `Task 22+` создаётся только после датированного evidence. Линия roadmap может
   быть без верхнего предела, но в `in_progress` находится не более одной
   player-задачи, если две задачи меняют общие PHP/JavaScript/Blade/CSS contracts.
 - Независимый read-only browser/provider audit может идти рядом только когда он
@@ -3033,6 +3051,42 @@ cache, queues, provider state и `.env` не затрагиваются.
 
 ---
 
+### Task 21: Центральные touch-controls `−10 / play·pause / +10`
+
+**Status:** `in_progress`.
+
+**Dated evidence (24.07.2026):** пользователь прямо запросил увеличить
+основные player buttons примерно втрое для удобного нажатия на телефоне и
+планшете и разместить строго по центру видео один горизонтальный ряд:
+перемотка на 10 секунд назад, play/pause, перемотка на 10 секунд вперёд.
+Текущий Plyr показывает только одиночный `play-large` в центре, а rewind и
+forward находятся в компактной нижней панели; существующий CSS увеличивает
+coarse-pointer controls только до `44×44`.
+
+Approved design:
+[`2026-07-24-player-centered-touch-controls-design.md`](../specs/2026-07-24-player-centered-touch-controls-design.md).
+
+Executable TDD plan:
+[`2026-07-24-player-centered-touch-controls.md`](2026-07-24-player-centered-touch-controls.md).
+
+**Scope:** только существующие `CatalogPlayerSession`, `app.css`, player
+browser/static contracts и тематическая документация. Side targets —
+`56..80 px`, center target — `68..96 px`; три native buttons центрируются
+flex-layout по обеим осям player container и используют существующие RU/EN
+Plyr labels и canonical `seekMediaBy(-10/+10)`/`togglePlay()`.
+
+**Protected:** один video/Plyr/HLS/session, full keyed `wire:ignore`,
+server-owned entitlement/grants/progress, hot swap/fullscreen/history/menu,
+existing translations/routes/schema/cache/queues/dependencies. Старый
+`play-large` скрывается только после успешной установки нового control cluster.
+
+**Delivery:** matching Vite code/manifest/assets обязательны. Активные
+посторонние importer/collection/system изменения не stage/reset/stash/delete;
+commit/push остаются `unresolved_shared_worktree`, пока canonical hook не
+получит чистое дерево.
+
+---
+
 ## Rolling plan self-review
 
 - [x] Existing Tasks 1–15 remain in the same document and retain historical
@@ -3041,7 +3095,7 @@ cache, queues, provider state и `.env` не затрагиваются.
   evidence are separate statuses.
 - [x] Initial Tasks 16–19 are finite, ordered and blocked honestly where
   external prerequisites are absent.
-- [x] `Task 20+` has no artificial ceiling and is created only from dated
+- [x] `Task 22+` has no artificial ceiling and is created only from dated
   evidence through Definition of Ready.
 - [x] Permanent lanes cover correctness, security/privacy, browser/platform,
   media capabilities, progress, UX/a11y/localization, performance, provider

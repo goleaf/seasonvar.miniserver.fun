@@ -3226,3 +3226,157 @@ Rollback: code-only возврат `withCount($cardCounts)` и удаление 
 | Mobile/UI/SEO/admin/premium/region/legal | `not_applicable` | HTML/controls/routes/canonical URLs/access decisions не меняются; оптимизируется server-side card hydration. |
 | Documentation/README/CHANGELOG | `completed` | Performance/cache/debt owners, русский CHANGELOG и visitor history фиксируют подтверждённое ускорение без SLA claim; current plan содержит rollback и остаточный count-sort/contention risk. |
 | Verification/Git delivery | `completed` | Pint scoped к затронутым PHP, Larastan 0 errors, Rector 0 diffs, Composer/npm audits 0 advisories/vulnerabilities, managed docs/diff, Vite 23 modules, affected 113/1 045 и full PHPUnit 1 444/1 433/11/123 046 прошли. Managed Chromium desktop/mobile catalog/search: 4×`200`, no overflow/console/page/request/first-party failures. Реализация и документация вошли в `7005a244571bf19f8d967be9b262fef6f0c18243`, опубликованный fast-forward из существующей `main`; local/origin/GitHub SHA и remote commit read-back совпали, force push не применялся. |
+
+# Активная задача — центральные touch-controls проигрывателя
+
+Дата: 24.07.2026
+Статус: `planning_complete`, implementation начинается только после
+подтверждённого browser/static RED. Безлимитный player master получает
+монотонный `Task 21`; верхний предел будущих evidence-driven tasks отсутствует.
+
+Design:
+[`2026-07-24-player-centered-touch-controls-design.md`](../superpowers/specs/2026-07-24-player-centered-touch-controls-design.md).
+
+Implementation:
+[`2026-07-24-player-centered-touch-controls.md`](../superpowers/plans/2026-07-24-player-centered-touch-controls.md).
+
+## Scope и решение
+
+- Один JS-owned горизонтальный кластер `−10 / play·pause / +10` создаётся в
+  центре текущего Plyr container внутри единственного `wire:ignore`.
+- Side touch targets имеют `56..80 px`, central — `68..96 px`; оси и player
+  center проверяются браузером, а документ не получает horizontal overflow.
+- Actions переиспользуют `CatalogPlayerSession.seekMediaBy()` и
+  `Plyr.togglePlay()`, labels — текущий `CatalogPlayerCopy.controls`.
+- Стандартный `play-large` остаётся fallback и скрывается только после marker
+  успешной инициализации custom cluster.
+- Routes, schema, data, cache, queue, importer, admin, access, progress,
+  translations, dependencies и environment не меняются.
+
+## Expected files
+
+- Create: player centered-controls design и implementation plan.
+- Modify: `resources/js/player.js`, `resources/css/app.css`.
+- Modify: `tests/browser/player-lifecycle.spec.js`,
+  `tests/Unit/FrontendAssetContractTest.php`.
+- Modify: playback/frontend/UI owners, existing unlimited player master,
+  this current plan, `README.md`, `CHANGELOG.md`.
+- Preserve unchanged: player Blade/Livewire PHP, RU/EN catalogs, routes,
+  migrations, config, Composer/npm manifests and lock files.
+
+## Public и persisted compatibility
+
+- `titles.show`, signed web/mobile playback, API resources and canonical URLs.
+- `CatalogTitle → Season → Episode → LicensedMedia` identity and entitlement.
+- One `<video>`, Plyr, optional HLS.js, session/AbortController and full
+  `wire:ignore`.
+- In-place source switching, fullscreen/PiP, menu, history, Media Session,
+  keyboard, progress/resume/completion/preferences.
+- Existing RU/EN translation keys/placeholders.
+- Cache identities, service-worker exclusions, import/admin behavior and
+  production data.
+
+## Risks, production и rollback
+
+- Duplicate toggle is prevented by direct click propagation stop and browser
+  action regression.
+- Duplicate cluster is prevented by session-local lookup and one ready marker.
+- Hidden controls become non-interactive with Plyr control lifecycle; keyboard
+  focus keeps them visible.
+- Narrow player sizing is bounded by `clamp()` and verified at phone/tablet.
+- Production activation requires matching Vite manifest/assets; partial asset
+  deployment is invalid.
+- Rollback reverts only JS/CSS/tests/docs plus matching assets. Backup,
+  migration, data repair, cache flush, queue action and `.env` edit are
+  `not_applicable`.
+
+## Task-specific requirement-compliance matrix
+
+| Requirement/domain | Status | Evidence / decision |
+| --- | --- | --- |
+| Root/index/canonical order | `completed` | Requirements reread 24.07.2026 before plan/runtime edit |
+| Applicable Markdown owners | `completed` | UI, frontend, views, playback, security, performance/cache, production/maintenance and unlimited master inspected |
+| Installed versions/docs | `completed` | Boost/npm verified exact versions; Tailwind 4 pointer guidance and official Plyr API/control docs inspected |
+| Existing implementation/diff | `completed` | Current clean player JS/CSS/test files and dirty unrelated scopes inspected |
+| One player lifecycle | `completed_for_plan` | Extend only `CatalogPlayerSession`; no second initializer/controller |
+| Mobile/touch/a11y | `completed_for_plan` | Exact sizes, center geometry, native buttons, dynamic labels/focus defined |
+| Localization | `already_compliant` | Existing complete RU/EN control copy reused; no key addition |
+| Auth/source/privacy/progress | `already_compliant` | New controls receive no source/access/token data and reuse canonical media actions |
+| Routes/API/SEO/schema/cache/queues | `not_applicable` | No server or persistent contract changes |
+| Dependency/maintenance | `not_applicable` | No package/runtime/lock update |
+| Production assets/rollback | `completed_for_plan` | Matching build required; code/assets rollback documented |
+| RED/GREEN | `pending` | Browser and static RED must precede application code |
+| README/CHANGELOG/owners | `pending` | Update only after factual GREEN |
+| Commit/push | `unresolved_shared_worktree` | `main` ahead 28; foreign tracked/untracked files make canonical hook reject commit |
+
+## Cross-feature impact
+
+Affected: player presentation/lifecycle, mobile/tablet/desktop accessibility,
+Vite build and visitor documentation. Unaffected by design: authentication,
+authorization, source grants, progress/history/preferences persistence,
+search, SEO, sitemap, recommendations, notifications, administration,
+imports, Premium, payments, region/legal, API, schema, cache, queue, storage
+and service worker.
+
+## Безлимитное продолжение после Task 21
+
+Дата: 24.07.2026
+Статус: `planning_complete`; существующий player master обновляется без
+создания второго roadmap и без вмешательства в активный Task 21.
+
+### Решение
+
+- `Task 21` сохраняет текущий finite scope центральных touch-controls и
+  остаётся единственной player-задачей, меняющей общие JS/CSS/test files.
+- Следующий свободный указатель — `Task 22+`; верхний номер и конечная дата
+  отсутствуют.
+- `Task 22` не считается созданным, пока новый датированный defect, platform,
+  security, accessibility, provider, performance или maintenance evidence не
+  пройдёт `Definition of Ready`.
+- Tasks 16–19 остаются честно заблокированными внешними prerequisites и не
+  перенумеровываются.
+- Каждый будущий Task получает exact files/interfaces, protected contracts,
+  cross-feature matrix, RED/verification, rollback и отдельные статусы code,
+  local/remote delivery, production activation и real-device/provider
+  evidence.
+
+### Expected files этой planning-актуализации
+
+- Create:
+  `docs/superpowers/specs/2026-07-24-player-centered-touch-controls-design.md`.
+- Create/update:
+  `docs/superpowers/plans/2026-07-24-player-centered-touch-controls.md` с
+  обязательным agentic header, global constraints, checkbox-шагами и
+  self-review.
+- Modify:
+  `docs/superpowers/plans/2026-07-24-player-seamless-episode-switching.md`.
+- Modify: `docs/plans/current-task-plan.md`.
+- Modify: `CHANGELOG.md`.
+- Preserve unchanged: `README.md`, потому что существующий roadmap-пункт уже
+  описывает постоянное evidence-driven развитие проигрывателя.
+- Preserve all active Task 21 application/test files and all foreign
+  importer/collection/system files.
+
+### Task-specific requirement-compliance matrix
+
+| Requirement/domain | Status | Evidence / решение |
+| --- | --- | --- |
+| Root/index/canonical read order | `completed` | Root, registry и обязательные owners заново прочитаны 24.07.2026 |
+| Player/UI feature owners | `completed` | UI, frontend, views, playback audit, data relations, master/current/Task 21 design и plan проверены |
+| Installed versions | `completed` | Boost: PHP `8.5`, Laravel `13.21.1`, Livewire `4.3.3`, Tailwind `4.3.2`; npm: Node `26.4.0`, Plyr `3.8.4`, HLS.js `1.6.16`, Vite `8.1.4`, Playwright `1.61.1` |
+| Existing implementation/worktree | `completed` | Active Task 21 JS/CSS/tests и foreign importer/collection/system scope обнаружены и не поглощаются |
+| Single unlimited roadmap | `completed` | Тот же master получает `Task 22+`; параллельный roadmap не создаётся |
+| Finite task/monotonic identity | `completed` | Task 21 не расширяется; Tasks 1–21 не перенумеровываются |
+| Auth/privacy/progress/routes/schema/cache/queues | `not_applicable` | Planning-only diff не меняет application/public/persisted contracts |
+| Localization/mobile/SEO/admin/import/premium/legal | `not_applicable` | Runtime и user-facing copy не меняются |
+| Dependencies/production | `not_applicable` | Package/runtime/assets/services/data не меняются и production не активируется |
+| README | `already_compliant` | Существующий пункт «Продолжать проверять проигрыватель…» уже отражает rolling roadmap; visitor history не получает фиктивную запись |
+| CHANGELOG/docs | `completed_local` | Добавляется отдельная русская planning-only запись и обновляются два plan owners |
+| Verification | `completed_with_concurrent_limitation` | Placeholder/intake/duplicate-plan scan, managed docs, docs CI, README policy и whitespace прошли; общий CHANGELOG policy дошёл до foreign importer-строки с обычным `network-free`, task-owned staged snapshot проверяется отдельно |
+| Commit/push | `unresolved_shared_worktree` | Commit возможен только из exact documentation snapshot после освобождения/проверки общего index; внешний отказ push фиксируется честно |
+
+### Rollback
+
+Вернуть только этот intake-pointer/compliance/CHANGELOG diff. Task 21 design,
+application code, tests, Vite assets, schema, data, cache, queues, environment
+и production services не требуют rollback.
