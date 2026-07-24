@@ -467,7 +467,7 @@ staged README/CHANGELOG policies и whitespace прошли. Commit `d781661` с
 | README/CHANGELOG/docs | `completed_with_foreign_working_copy_limitation` | README policy, managed docs и docs CI прошли; README не меняется до supported hook workflow; task-owned русский CHANGELOG entry проходит, full working copy останавливается на foreign importer строке `network-free` |
 | Verification | `completed_for_preparation` | Lease `44`/`256`, hook contract `17`/`95`, Unit `472`/`107410`, Pint, `bash -n`, README policy, managed docs, docs CI и `git diff --check` прошли |
 | Commit granularity | `unresolved_shared_index_race` | Script/test/master/CHANGELOG были уже staged этой задачей, но concurrent player owner добавил свои evidence hunks и создал `331b0c3` до отдельного Task 34 commit; safe history rewrite запрещён |
-| Commit/push | `partially_completed` | Task 34 implementation сохранена в существующей `main` как часть `331b0c3`; follow-up compliance evidence и normal push ещё выполняются |
+| Commit/push | `completed_local_unresolved_remote` | Task 34 implementation сохранена в `331b0c3`, отдельный compliance follow-up — `137cff0`; обычный `git push --porcelain origin main` достиг configured remote и вернул отсутствие HTTPS credentials, local `main` остаётся ahead `30` |
 
 ### TDD и verification checklist
 
@@ -477,7 +477,7 @@ staged README/CHANGELOG policies и whitespace прошли. Commit `d781661` с
 - [x] Выполнить GREEN и regression: lease suite `44`/`256`, `CiQualityGateContractTest` `17`/`95`, `bash -n` и Pint.
 - [x] Выполнить Pint после PHP test changes, managed docs check, docs CI, README policy и task-owned/full diff checks; full working CHANGELOG limitation относится только к foreign строке `network-free`.
 - [x] Перечитать applicable requirements, обновить эту matrix/master status/CHANGELOG, проверить repository-wide legacy/duplicate/unfinished Task 34 paths.
-- [ ] Commit-ить отдельный follow-up compliance evidence в существующей `main`, не переписывая mixed `331b0c3`, затем выполнить обычный push.
+- [x] Commit-ить отдельный follow-up compliance evidence в существующей `main` как `137cff0`, не переписывая mixed `331b0c3`; обычный push выполнен и оставлен `unresolved_remote` после отказа HTTPS-аутентификации.
 
 ## Активная реализация — Task 32, изолированная подготовка reviewed-index boundary
 
