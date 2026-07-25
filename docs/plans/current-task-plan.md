@@ -7333,7 +7333,7 @@ production DML не ожидаются.
 
 ## Task 54 — нормальный частичный Git commit
 
-Статус: `reverified_ready_for_followup_delivery`.
+Статус: `completed_local_commit_push_unresolved_authentication`.
 
 Дата начала: 25.07.2026.
 
@@ -7449,7 +7449,7 @@ gate.
 | Focused/docs/hook verification | `completed` | После повторного восстановления fresh run: 32 tests / 143 assertions, Pint, shell syntax, README/CHANGELOG policies, docs refresh/CI, diff check и staged real-hook run при чужом unstaged-файле прошли |
 | README actuality | `completed` | Git section updated; visitor history unchanged because product behavior did not change |
 | Final requirement/legacy reread | `completed` | Applicable canonical owners reread; removed helpers remain only in negative tests |
-| Commit/push in `main` | `in_progress` | `4b78b33` уже входит в `origin/main`; после повторного удаления hooks требуются fresh verification, отдельный path-limited commit и configured push |
+| Commit/push in `main` | `unresolved` | Восстановление зафиксировано path-limited commit `6045eec` в `main`; configured push отклонён до передачи данных: `could not read Username for 'https://github.com'`. `origin/main` остаётся на `3c52345` |
 
 ### Verification evidence Task 54
 
@@ -7481,3 +7481,10 @@ gate.
   path-limited index завершился кодом 0, пока чужой файл
   `docs/superpowers/plans/2026-07-25-collection-classification-cockpit.md`
   оставался unstaged; основной index не изменился.
+- Path-limited commit `6045eec` содержит только четыре `.githooks`, русский
+  `CHANGELOG.md`, Git-раздел `README.md` и Task 54 hunks этого плана. После
+  синхронизации основного index чужими остались только Task 52 plan/spec
+  изменения. Настроенная отправка `git push origin main` отклонена Git до
+  запуска remote update с сообщением
+  `could not read Username for 'https://github.com': No such device or
+  address`; push честно остаётся `unresolved`.
