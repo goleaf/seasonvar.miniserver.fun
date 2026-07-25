@@ -5,7 +5,7 @@
 
 ## Task 56 — collection-first discovery и classification sprint
 
-Статус: `implementation_verified_documented_delivery_pending`.
+Статус: `implementation_committed_push_unresolved_auth`.
 
 Дата начала: 25.07.2026.
 
@@ -107,7 +107,7 @@ scope до implementation.
 | Focused/query/static/build/browser verification | `completed_with_independent_full_suite_blockers` | Fresh focused 88 tests / 2 482 assertions и wider 128 / 2 750 GREEN; Pint, Vite build, docs gates, SQLite covering-index plan и Playwright Desktop/Mobile/Tablet 3/3 GREEN с визуальной проверкой. Штатный full suite остановлен независимым GD memory exhaustion при 256 MB; запуск без этого теста дал 1 758 passed / 11 skipped и два независимых результата: stale session flash assertion и отсутствующий importer-класс `SeasonvarImportDispatchBatcher` |
 | Canonical docs/README/CHANGELOG | `completed` | Architecture/data/performance/frontend/views/UI/admin owners, docs map, README visitor history и отдельная русская CHANGELOG entry обновлены; managed docs/policy/docs gates GREEN |
 | Final requirements/legacy scan | `completed` | Requirements/spec/plan перечитаны; duplicate routes/services, automatic writes, dead controls, Blade queries/scripts/styles и collection images проверены; deprecated API `cover_url=null`, purge boundary и датированные старые 404 evidence сохранены как совместимость/история |
-| Commit/push main | `pending` | Path-limited commit only after fresh full-suite/diff verification; push result будет зафиксирован честно |
+| Commit/push main | `unresolved_external_auth` | Task56 path-limited commit `ab55891` создан в `main` после hooks; `GIT_TERMINAL_PROMPT=0 git push origin main` отклонён настроенным HTTPS remote: `could not read Username for 'https://github.com': terminal prompts disabled`. Посторонний homepage scope не включён |
 
 ### Безлимитный execution order
 
