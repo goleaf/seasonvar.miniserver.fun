@@ -20,6 +20,9 @@
   отзывает ссылки. `Focused PHP matrix` прошла 36 тестов с 614 проверками,
   `Vite build` — успешно, Playwright — 6 `desktop/mobile/tablet` сценариев без
   `console/page/local-response` ошибок и горизонтального переполнения.
+  Изменение зафиксировано в `main` как `413aefc`; обычный
+  `git push origin main` отклонён до передачи данных из-за отсутствия
+  учётных данных GitHub.
 - Добавлен отдельный безопасный во время импорта прогрев кеша ответа главной
   страницы.
   `PublicPageCacheWarmer::warmHomepages()` обращается только к `/` и

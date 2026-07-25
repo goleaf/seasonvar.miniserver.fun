@@ -8166,7 +8166,7 @@ environment, queue, scheduler, JavaScript/CSS и production DML не плани�
 
 ## Task 60 — приватные iCalendar-подписки календаря релизов
 
-Статус: `implementation_verified_pending_delivery_with_preexisting_suite_blockers`.
+Статус: `implementation_verified_committed_push_unresolved_authentication`.
 
 Дата начала: 26.07.2026.
 
@@ -8285,7 +8285,7 @@ regenerate/delete без второго schedule source, shared cache или н�
 | Security/performance/EXPLAIN | `completed` | Token secrecy/IDOR/restriction/rate headers tested; disposable SQLite selected feed/token indexes |
 | Focused/full/static/build/browser | `completed_with_preexisting_global_blockers` | Task 60 focused PHP/Pint/PHPStan/Rector/Vite/Playwright/cache/docs gates pass; broad suite exposed one existing auth failure and one missing importer class, broad Rector only foreign collection files |
 | README/CHANGELOG/final requirement reread | `completed` | Canonical owners, README and dated CHANGELOG updated; applicable requirements and matrix re-read |
-| Commit/push in main | `pending_shared_index_guard` | Exact Task 60 commit; external push failure honest |
+| Commit/push in main | `completed_with_unresolved_push` | Exact Task 60 commit `413aefc`; `git push origin main` вернул `could not read Username for 'https://github.com': No such device or address` |
 
 ### Живой execution checklist
 
@@ -8301,8 +8301,11 @@ regenerate/delete без второго schedule source, shared cache или н�
    unrelated repository-suite blockers are recorded below.
 9. `[completed]` Browser/mobile/a11y/security/performance/EXPLAIN review.
 10. `[completed]` Canonical docs/README/CHANGELOG/compliance and legacy scan.
-11. `[pending]` Exact isolated commit(s) in `main`.
-12. `[pending]` Configured non-force push or exact unresolved external error.
+11. `[completed]` Exact isolated commit `413aefc` создан в `main`; foreign
+    staged/worktree scope восстановлен и не вошёл в commit.
+12. `[completed_with_unresolved_push]` Обычный `git push origin main`
+    отклонён настроенным HTTPS remote до передачи данных:
+    `could not read Username for 'https://github.com': No such device or address`.
 
 ### Verification evidence Task 60
 
@@ -8344,4 +8347,8 @@ regenerate/delete без второго schedule source, shared cache или н�
   `SeasonvarImportDispatchBatcher`. Calendar-focused matrix остаётся зелёной.
 - `composer validate`, Composer audit и production npm audit прошли; найдено
   0 advisory/vulnerability. Changelog policy и docs CI прошли.
+- Exact implementation/docs commit `413aefc` создан в `main` после успешного
+  pre-commit. Configured non-force HTTPS push фактически выполнен и
+  завершился кодом `128`: GitHub credentials в окружении отсутствуют; commit
+  сохранён локально, force/rebase/hook bypass не использовались.
 

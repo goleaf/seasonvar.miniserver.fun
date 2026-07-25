@@ -2,7 +2,7 @@
 
 Дата: 26.07.2026.
 
-Статус: implementation_verified_pending_delivery.
+Статус: implementation_verified_committed_push_unresolved_authentication.
 
 Design:
 [`../specs/2026-07-26-private-release-calendar-feeds-design.md`](../specs/2026-07-26-private-release-calendar-feeds-design.md).
@@ -157,10 +157,15 @@ Design:
     routes/services, stale cache/SEO controls, TODO/debug/secrets and dead UI
     по repository; competing feed route/service и task-scope debug/secret
     material не найдены.
-41. `[pending]` Проверить `git status`, branch, remotes, staged/unstaged/
-    untracked, diff/stat/cached, secrets/debug/formating/unrelated.
-42. `[pending]` Собрать exact-path/hunk commits в `main` без `git add .`,
-    сохранив foreign Tasks 57–59 index/worktree.
-43. `[pending]` Выполнить обычный push current `main`; force/rebase/new branch
-    запрещены. При auth/clean-tree external block сохранить commits и точную
-    ошибку.
+41. `[completed]` Проверить `git status`, branch, remotes, staged/unstaged/
+    untracked, diff/stat/cached, secrets/debug/formating/unrelated; branch
+    `main`, task staged manifest — 45 файлов, foreign collection scope
+    исключён.
+42. `[completed]` Собрать exact-path/hunk commit `413aefc` в `main` без
+    `git add .`; foreign staged patch восстановлен после alternate-index
+    commit и не изменён.
+43. `[completed_with_unresolved_push]` Выполнить обычный
+    `git push origin main`; команда завершилась кодом `128` с
+    `fatal: could not read Username for 'https://github.com': No such device or address`.
+    Commit сохранён локально; force/rebase/new branch/hook bypass не
+    использовались.
