@@ -7886,7 +7886,7 @@ public domains из release observation/episode/media observers на каждо�
 
 ## Task 58 — объяснимость рекомендаций и двусторонний feedback
 
-Статус: `approved_plan_reread_ready_for_tdd`.
+Статус: `implementation_committed_push_unresolved_authentication`.
 
 Дата начала: 26.07.2026.
 
@@ -8033,7 +8033,7 @@ intent «Больше похожего» рядом с двумя существ
 | Focused/full/static/build/browser verification | `unresolved` | Focused 78/446 and adjacent 32/260 green; PHPStan/Pint/task Rector/docs/build/cache/browser green. Full 1808-test run has 1795 pass/11 skip plus two known unrelated failures; full Rector has only unrelated collection `never` diffs |
 | Canonical docs/OpenAPI/README/CHANGELOG | `completed` | Owners, architecture, data, performance, API, deployment, security, visitor history and changelog updated |
 | Final requirements reread/legacy scan | `completed` | Index, system-wide, maintenance, production, multilingual and three recommendation owners reread; stale two-value/generic-null/duplicate/debug scans resolved |
-| Commit/push in `main` | `pending_shared_index_guard` | Foreign Task 57 scope must not enter Task 58 commit |
+| Commit/push in `main` | `completed_commit_unresolved_push_authentication` | Exact 53-file Task 58 commit `d317f41` создан в `main` штатным pre-commit через alternate index; прежний staged snapshot сохранён трёхсторонним reconcile. `git push origin main` отклонён настроенным HTTPS remote до передачи данных: `fatal: could not read Username for 'https://github.com': No such device or address` |
 
 ### Живой execution checklist
 
@@ -8053,9 +8053,13 @@ intent «Больше похожего» рядом с двумя существ
 9. `[completed]` Перечитать requirements/spec/plan и выполнить repository-wide
    legacy/duplicate/debug/secret scan; stale two-value statements and generic
    null predicates устранены, owner requirements перечитаны.
-10. `[pending]` Exact task stage/commit в `main`; сохранить foreign index.
-11. `[pending]` Push только при пройденном clean-tree/pre-push gate; иначе
-    exact unresolved blocker без ложного success.
+10. `[completed]` Exact Task 58 scope зафиксирован commit `d317f41` в `main`;
+    foreign staged snapshot сохранён и согласован с новым `HEAD`.
+11. `[completed_with_unresolved_push]` Обычный `git push origin main`
+    отклонён HTTPS-аутентификацией до передачи данных:
+    `fatal: could not read Username for 'https://github.com': No such device
+    or address`; force/bypass не применялись.
+
 ## Task 59 — grouped summary public-каталога подборок
 
 Статус: `implementation_committed_push_unresolved_authentication`.

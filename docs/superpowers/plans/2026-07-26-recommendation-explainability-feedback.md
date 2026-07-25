@@ -261,18 +261,22 @@ Design:
 55. `[completed]` Обновить русский `README.md` visitor capability/history.
     - Preserve managed block and last H2 history contract.
 56. `[completed]` Добавить отдельный русский dated `CHANGELOG.md` item.
-57. `[pending]` Проверить `git status`, branch/remote/upstream, unstaged,
+57. `[completed]` Проверить `git status`, branch/remote/upstream, unstaged,
     staged, untracked, diff/stat and secret/debug/mass-format scan.
-58. `[pending]` Отделить task scope от pre-existing Task 57 staged work.
+58. `[completed]` Отделить task scope от pre-existing Task 57 staged work.
     - Запрещено: reset/stash/unstage/overwrite foreign changes.
-    - Если foreign index остаётся, exact blocker записывается; чужой scope не
-      включается ради чистого дерева.
-59. `[pending]` Stage only task hunks/files, inspect `git diff --cached`.
-60. `[pending]` Commit in existing `main`:
+    - Task scope зафиксирован через alternate index; прежний staged snapshot
+      сохранён и согласован с новым `HEAD` трёхсторонним merge.
+59. `[completed]` Stage only task hunks/files, inspect `git diff --cached`.
+60. `[completed]` Commit in existing `main`:
     `feat: improve recommendation explanations and feedback`.
-61. `[pending]` Перед push повторить clean-tree/secret/branch/upstream checks.
-62. `[pending]` Push current `main` without force.
-63. `[pending]` Записать exact branch, commit hash, command/output or exact
+    - Evidence: `d317f41`, 53 файла, 1 698 добавлений и 101 удаление.
+61. `[completed]` Перед push повторить clean-tree/secret/branch/upstream checks.
+62. `[unresolved]` Push current `main` without force.
+    - `git push origin main` отклонён HTTPS-аутентификацией до передачи
+      данных: `fatal: could not read Username for 'https://github.com': No
+      such device or address`.
+63. `[completed]` Записать exact branch, commit hash, command/output or exact
     external/shared-tree blocker.
 
 ## Expected changed files
