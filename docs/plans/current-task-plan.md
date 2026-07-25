@@ -7488,9 +7488,10 @@ gate.
   запуска remote update с сообщением
   `could not read Username for 'https://github.com': No such device or
   address`; push честно остаётся `unresolved`.
+
 ## Task 55 — нативный Git через repository-scoped SSH и doctor
 
-Статус: `repository_implementation_green`.
+Статус: `awaiting_github_deploy_key_registration`.
 
 Дата начала: 25.07.2026.
 
@@ -7525,10 +7526,10 @@ Git process. Выбран отдельный Ed25519 deploy key только д�
 - `README.md`;
 - `CHANGELOG.md`.
 
-User-level SSH private/public key, host alias и local `origin` config не
-являются tracked files. Другие application, migration, route, translation,
-cache, permission, queue, environment, frontend и production-runtime files
-не входят в Task 55.
+User-level SSH private/public key, repository-local `core.sshCommand` и local
+`origin` config не являются tracked files. Другие application, migration,
+route, translation, cache, permission, queue, environment, frontend и
+production-runtime files не входят в Task 55.
 
 ### Сохраняемые contracts
 
@@ -7558,7 +7559,7 @@ cache, permission, queue, environment, frontend и production-runtime files
 | Translations/cache/permissions/queues | `not_applicable` | Нет domain/runtime state |
 | Visitor/mobile/SEO/browser | `not_applicable` | Product UI/behavior не меняется |
 | Production runtime | `not_applicable` | Меняется developer Git transport, не application deployment/runtime |
-| Rollback | `completed_preliminary` | HTTPS remote → revoke deploy key → exact local alias/key removal → code revert commit |
+| Rollback | `completed_preliminary` | HTTPS remote → revoke deploy key → exact local `core.sshCommand`/key removal → code revert commit |
 
 ### Task-specific requirement-compliance matrix
 
@@ -7577,8 +7578,8 @@ cache, permission, queue, environment, frontend и production-runtime files
 | Design spec/self-review | `completed` | Placeholder scan clean; architecture, errors, TDD, security, rollout, rollback and acceptance are internally consistent; docs/link/policy/diff checks pass; isolated commit `aedbd00` |
 | Written implementation plan | `completed` | Six-task inline plan contains exact files, interfaces, RED/GREEN code, SSH rollout, rollback, verification and remote evidence; placeholder/consistency/scope checks pass |
 | TDD RED/GREEN | `completed` | RED: 27 tests, 19 passed, 8 expected failures only because script/alias were absent. GREEN: те же 27 tests, 27 passed, 139 assertions; real local doctor passed branch/hooks/conflicts/privacy counts and failed only on the proven missing HTTPS credential helper |
-| SSH key/deploy-key/remote rollout | `pending` | Public-key owner action and bounded verification required |
-| Verification/docs/README/CHANGELOG | `in_progress` | Development/CI/MCP owners, developer README flow и русский CHANGELOG updated; focused GREEN passed, remaining static/docs/wide gates follow |
-| Final requirement/legacy reread | `pending` | Required before completion |
-| Commit/push in `main` | `in_progress` | Spec `aedbd00` and implementation plan `d8db224` committed path-limited in `main`; implementation commit and configured push remain |
+| SSH key/deploy-key/remote rollout | `unresolved` | Unique Ed25519 pair created outside Git with `0600/0644`; private material was neither read nor printed. Repeated exact repository check on 25.07.2026 still returns `Permission denied (publickey)`. Tool discovery exposes no Deploy keys or generic GitHub REST mutation, while `GITHUB_TOKEN`, `GH_TOKEN`, `CODEX_GITHUB_TOKEN` and `gh` are absent; owner must add the public key as one-repository deploy key with write access |
+| Verification/docs/README/CHANGELOG | `completed` | Development/CI/MCP owners, developer README flow и русский CHANGELOG updated. Fresh 40 tests / 171 assertions, Pint, five independent Bash syntax checks, strict Composer validation, README/CHANGELOG policy, managed docs, docs gate, diff check и secret scan outside explicit synthetic fixtures are GREEN; credential-dependent remote/pre-push evidence belongs to the unresolved rollout row |
+| Final requirement/legacy reread | `completed` | Root/index, code/architecture/development, multilingual/security, maintenance, production operations, system integration, approved spec, execution plan и Task 55 reread after implementation; legacy/duplicate/self-referential secret scans reviewed |
+| Commit/push in `main` | `unresolved` | Spec `aedbd00`, plan `d8db224`, implementation `288e3d7` и final plan/spec alignment `caa0bc8` committed path-limited in `main`; real pre-commit passed on exact alternate index, then the two foreign staged diffs were reapplied unchanged by scope. Push awaits registered deploy key and a clean tree after unrelated Task 52/56 work |
 
