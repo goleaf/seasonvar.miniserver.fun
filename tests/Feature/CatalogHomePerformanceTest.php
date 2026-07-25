@@ -37,6 +37,75 @@ final class CatalogHomePerformanceTest extends TestCase
         );
     }
 
+    public function test_home_release_hydration_uses_primary_key_lookups_for_bounded_episode_ids(): void
+    {
+        $catalogTitle = CatalogTitle::factory()->create([
+            'indexed_at' => now(),
+        ]);
+        $season = Season::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+        ]);
+        $episode = Episode::factory()->create([
+            'season_id' => $season->id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $media = LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'season_id' => $season->id,
+            'episode_id' => $episode->id,
+            'status' => 'published',
+            'published_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $contentAdditions = app(CatalogHomeContentAdditionQuery::class);
+        $updates = $contentAdditions->latestTitleUpdates();
+        $queries = [];
+        DB::listen(function (QueryExecuted $query) use (&$queries): void {
+            $queries[] = str($query->sql)
+                ->replace(['`', '"'], '')
+                ->lower()
+                ->squish()
+                ->toString();
+        });
+
+        $groups = $contentAdditions->latestReleaseGroups(
+            collect([$catalogTitle]),
+            $updates,
+        );
+        $group = $groups->sole();
+        $primaryKeyHydrations = collect($queries)
+            ->filter(fn (string $sql): bool => str_contains(
+                $sql,
+                'from episodes not indexed',
+            ))
+            ->values();
+
+        $this->assertSame([$episode->id], $group['episodes']->pluck('id')->all());
+        $this->assertSame([$media->id], $group['media']->pluck('id')->all());
+        $this->assertSame($episode->id, $group['media']->sole()->episode?->id);
+        $this->assertCount(2, $primaryKeyHydrations, implode("\n", $queries));
+        $this->assertTrue(
+            $primaryKeyHydrations->contains(
+                fn (string $sql): bool => str_contains(
+                    $sql,
+                    'row_number() over (partition by seasons.catalog_title_id',
+                ),
+            ),
+            implode("\n", $primaryKeyHydrations->all()),
+        );
+        $this->assertTrue(
+            $primaryKeyHydrations->contains(
+                fn (string $sql): bool => str_contains(
+                    $sql,
+                    'select id, season_id, number, kind, sort_order, title, released_at, created_at',
+                ),
+            ),
+            implode("\n", $primaryKeyHydrations->all()),
+        );
+    }
+
     public function test_latest_update_snapshot_uses_the_existing_created_at_indexes(): void
     {
         $catalogTitle = CatalogTitle::factory()->create();

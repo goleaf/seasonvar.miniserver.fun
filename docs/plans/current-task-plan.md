@@ -8494,12 +8494,15 @@ importer command и production DML не планируются.
 
 ## Task 62 — primary-key hydration эпизодов главной
 
-Статус: `design_approved_plan_preparation`.
+Статус: `verification_complete_delivery_pending`.
 
 Дата начала: 26.07.2026.
 
 Approved design:
 [`2026-07-26-homepage-episode-hydration-primary-key-design.md`](../superpowers/specs/2026-07-26-homepage-episode-hydration-primary-key-design.md).
+
+Detailed implementation plan:
+[`2026-07-26-homepage-episode-hydration-primary-key.md`](../superpowers/plans/2026-07-26-homepage-episode-hydration-primary-key.md).
 
 ### Цель и root cause
 
@@ -8518,13 +8521,24 @@ Same-snapshot hypothesis check с локальным `NOT INDEXED` сохран�
 и identity строк и изменил медианы `85,89 → 0,92 ms` и
 `89,60 → 0,07 ms`; оба плана стали `INTEGER PRIMARY KEY (rowid=?)`.
 
+Implementation discovery: constrained eager-load callback в установленном
+Laravel 13 получает `BelongsTo`, а fluent proxy намеренно возвращает relation,
+не голый Eloquent builder. Три проверенных адаптации дали либо runtime
+`TypeError`, либо потерю точного `Builder<Episode>` в Larastan. После
+architecture review выбран явный bounded `Episode` query по уже полученным
+уникальным `episode_id` с последующим `setRelation()`. Он заменяет, а не
+добавляет прежний eager query, сохраняет relation-loaded semantics и точный
+visibility scope.
+
 ### Выбранное решение
 
 Переиспользовать существующий SQLite-only
 `CatalogHomeContentAdditionQuery::withoutSecondaryIndexes()` в двух наружных
-bounded episode hydration queries. Inner ranking/visibility queries сохраняют
-текущие специализированные индексы. Для других database drivers helper
-остаётся no-op.
+bounded episode hydration queries. Для media path заменить только один
+episode relation-proxy query на один явный typed `Episode` query и присоединить
+найденные модели через `setRelation()`. Inner ranking/visibility queries
+сохраняют текущие специализированные индексы. Для других database drivers
+helper остаётся no-op.
 
 Новый composite index отклонён как избыточный write/storage cost без
 гарантии planner. Новый snapshot отклонён из-за ненужного cache
@@ -8570,7 +8584,7 @@ key/version/invalidation lifecycle.
 | Migration/schema/data | `not_applicable` | DDL/DML/backfill отсутствуют |
 | Routes/API/translations | `not_applicable` | Public identity/text не меняются |
 | Dependencies/env/config | `not_applicable` | Package/config/environment не меняются |
-| Rollback | `completed_preliminary` | Code/docs revert; data/cache restore не нужен |
+| Rollback | `completed` | Code/docs revert; data/cache restore не нужен |
 | Shared Git state | `critical_risk_recorded` | Exact alternate index; foreign scope не трогать |
 
 ### Task-specific requirement-compliance matrix
@@ -8585,13 +8599,14 @@ key/version/invalidation lifecycle.
 | Read-only reproducible root cause | `completed` | Direct builder, slow SQL, EXPLAIN и five-sample A/B comparison |
 | Alternatives and authorization | `completed` | Three approaches compared; user explicitly preauthorized recommended implementation |
 | Design/files/contracts/risks | `completed` | Linked approved design and matrices above |
-| Detailed unlimited TDD plan | `pending` | Required before RED |
-| Production/rollback/data safety | `completed_preliminary` | No DDL/DML/cache mutation; code-only rollback |
-| TDD RED | `pending` | Exact two hydration hints must fail first |
-| Minimal GREEN | `pending` | No implementation before RED |
-| Focused/static/broad/live verification | `pending` | Defined in design; evidence required |
-| Canonical docs/README/CHANGELOG | `pending` | Update after confirmed GREEN measurement |
-| Final requirements/legacy scan | `pending` | Required before completion |
+| Detailed unlimited TDD plan | `completed` | Exact RED/GREEN, profiling, verification, docs and alternate-index delivery gates recorded and self-reviewed |
+| Production/rollback/data safety | `completed` | No DDL/DML/cache mutation; code-only rollback |
+| TDD RED | `completed` | Exact regression passed identity/relation assertions, then failed with 0 expected SQLite primary-key hydration statements instead of 2 |
+| Minimal GREEN | `completed` | Relation-proxy approach отклонён после трёх runtime/static adaptations; explicit bounded hydration заменяет прежний eager query без нового round trip. Exact GREEN: 1 test / 6 assertions; focused matrix после Pint: 14 / 78 |
+| Focused/static/broad/live verification | `completed` | Exact 1/6; nearest 14/78; adjacent 131/1 075; PHPStan 0; Pint passed; primary-key EXPLAIN confirmed; live MISS 0,414 s + four HIT 0,093–0,109 s. Full run hit known GD memory; exact GD 1/12 passed; widest exclusion: 1 840 total, 1 823 passed, 11 skipped, 4 unrelated failures + 2 unrelated errors in parallel Task 63/demo/deployment/account/importer scope |
+| Repository-wide docs/hook baseline | `unresolved` | Task-scoped staged README/CHANGELOG policies and diff checks pass. Full managed-docs/pre-commit stops only on foreign uncommitted `docs/MAINTENANCE_LOG.md`; standalone current-plan policy also finds an extra historical H1 already present in `HEAD`. Task 62 does not rewrite or stage either foreign baseline |
+| Canonical docs/README/CHANGELOG | `completed` | Performance owner records diagnostic evidence; README visitor history and separate Russian implementation changelog item updated |
+| Final requirements/legacy scan | `completed` | Root/index/applicable canonical owners, approved design, detailed plan and Task 62 section re-read. Repository scan found one canonical query service/caller/view chain, the intentional recommendation index owner/migration, no related TODO/FIXME and no duplicate route/cache/service implementation |
 | Commit/push in `main` | `pending` | Exact Task 62 scope only |
 
 ### Безлимитный execution order

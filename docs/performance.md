@@ -389,6 +389,30 @@ Follow-up 25.07.2026 устранил повторный `BYPASS` full-response 
 
 В том же follow-up full-history `UNION ALL → MAX/GROUP BY` заменён adaptive newest-event window с exact visibility revalidation и существующими `episodes_created_at_idx`/`licensed_media_created_at_idx`. Same-snapshot сравнение вернуло одинаковые 48 ID/timestamp rows и SHA-256, но изменило query с `3 235,54 ms` до `146,16 ms`; correlated `EXISTS` для восьми video title IDs занял `5,34 ms` вместо materialization всех public media около `2 129 ms`. Обычный cold generation с сохранённым exact metrics snapshot дал builder `635,38 ms`, 67 queries/`394,72 ms` SQL; первый в истории exact metrics build остаётся отдельной дорогой операцией около `3,37 s` и выполняется warmer/explicit refresh boundary, а не после каждого content invalidation. Это локальные диагностические observations на текущей SQLite, не p95/SLA; schema, route, visibility и API snapshot не менялись.
 
+Follow-up 26.07.2026 локализовал ещё две наружные episode hydration
+операции: после bounded ranking SQLite повторно выбирал широкий
+`episodes_recommendation_release_events_idx` вместо уже известных primary
+keys. Существующий SQLite-only `withoutSecondaryIndexes()` теперь применяется
+только к этим наружным lookup. Для media path один relation-proxy eager query
+заменён одним typed `Episode` query по уникальным `episode_id` с прежним
+`availableTo(null)` и последующим `setRelation()`; число round trips,
+проекции, порядок, видимость и результаты не изменились. Оба
+`EXPLAIN QUERY PLAN` теперь начинаются с
+`SEARCH episodes USING INTEGER PRIMARY KEY (rowid=?)`, а внутренний ranking
+сохраняет `episodes_publication_lookup_idx` и
+`seasons_publication_lookup_idx`.
+
+До изменения direct builder занимал `358,53 ms`, 57 запросов и `219,69 ms`
+SQL; медианы двух целевых lookup составляли `85,89` и `89,60 ms`. После
+изменения пять последовательных samples сохранили наборы
+latest/featured/video/latest-media `48/12/8/12` и `60` уникальных тайтлов:
+медиана builder составила `175,56 ms`, первый сопоставимый проход сохранил
+57 запросов при `65,89 ms` SQL, а медианы lookup стали `1,86` и `0,16 ms`.
+Пять анонимных HTTPS-проверок вернули `200` и одинаковые `740 136` байт:
+первый `MISS` занял `0,414 s`, четыре `HIT` — `0,093–0,109 s`. Это
+read-only diagnostic evidence текущего снимка, не p95/SLA; migration, index,
+cache key/version/TTL, route, translation, queue или dependency не добавлены.
+
 Следующий cache/import contention audit показал, что рабочий homepage уже
 даёт `MISS` за `1,32 s` и повторные `HIT` за `0,07–0,08 s`, но background
 metrics фиксировали средний `CatalogStats` rebuild `54,16 s`, homepage

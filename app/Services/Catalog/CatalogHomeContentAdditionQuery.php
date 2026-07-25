@@ -252,12 +252,12 @@ final class CatalogHomeContentAdditionQuery
 
     /**
      * @param  Collection<int, int>  $eventIds
-     * @return Collection<int, true>
+     * @return Collection<int, bool>
      */
     private function availableEpisodeIds(Collection $eventIds): Collection
     {
         $ids = $eventIds
-            ->filter(fn (mixed $id): bool => is_int($id) && $id > 0)
+            ->filter(fn (int $id): bool => $id > 0)
             ->unique()
             ->values();
 
@@ -279,12 +279,12 @@ final class CatalogHomeContentAdditionQuery
 
     /**
      * @param  Collection<int, int>  $eventIds
-     * @return Collection<int, true>
+     * @return Collection<int, bool>
      */
     private function availableMediaIds(Collection $eventIds): Collection
     {
         $ids = $eventIds
-            ->filter(fn (mixed $id): bool => is_int($id) && $id > 0)
+            ->filter(fn (int $id): bool => $id > 0)
             ->unique()
             ->values();
 
@@ -323,12 +323,12 @@ final class CatalogHomeContentAdditionQuery
 
     /**
      * @param  Collection<int, int>  $titleIds
-     * @return Collection<int, true>
+     * @return Collection<int, bool>
      */
     private function visibleTitleIds(Collection $titleIds): Collection
     {
         return $titleIds
-            ->filter(fn (mixed $id): bool => is_int($id) && $id > 0)
+            ->filter(fn (int $id): bool => $id > 0)
             ->unique()
             ->chunk(500)
             ->flatMap(fn (Collection $ids): Collection => $this->titles
@@ -402,7 +402,12 @@ final class CatalogHomeContentAdditionQuery
             'catalog_home_episode_ids',
         );
 
-        return Episode::query()
+        $episodes = $this->withoutSecondaryIndexes(
+            Episode::query(),
+            $episodeTable,
+        );
+
+        return $episodes
             ->select($episodeTable.'.*')
             ->availableTo(null)
             ->whereIn($episodeTable.'.id', $rankedIds)
@@ -424,6 +429,7 @@ final class CatalogHomeContentAdditionQuery
     {
         $media = new LicensedMedia;
         $mediaTable = $media->getTable();
+        $episodeTable = (new Episode)->getTable();
         $ranked = LicensedMedia::query()
             ->published()
             ->forAvailableReleases(null);
@@ -443,7 +449,7 @@ final class CatalogHomeContentAdditionQuery
             'catalog_home_media_ids',
         );
 
-        return LicensedMedia::query()
+        $media = LicensedMedia::query()
             ->published()
             ->forAvailableReleases(null)
             ->whereIn($media->qualifyColumn('id'), $rankedIds)
@@ -463,13 +469,33 @@ final class CatalogHomeContentAdditionQuery
                 'season' => fn ($query) => $query
                     ->availableTo(null)
                     ->select(['id', 'catalog_title_id', 'number', 'kind', 'sort_order', 'title']),
-                'episode' => fn ($query) => $query
-                    ->availableTo(null)
-                    ->select(['id', 'season_id', 'number', 'kind', 'sort_order', 'title', 'released_at', 'created_at']),
             ])
             ->orderByDesc($mediaTable.'.created_at')
             ->orderByDesc($mediaTable.'.id')
             ->get();
+
+        $episodeIds = $media
+            ->pluck('episode_id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+        $episodes = $episodeIds === []
+            ? collect()
+            : $this->withoutSecondaryIndexes(Episode::query(), $episodeTable)
+                ->availableTo(null)
+                ->whereKey($episodeIds)
+                ->select(['id', 'season_id', 'number', 'kind', 'sort_order', 'title', 'released_at', 'created_at'])
+                ->get()
+                ->keyBy(fn (Episode $episode): int => (int) $episode->id);
+
+        return $media->each(function (LicensedMedia $media) use ($episodes): void {
+            $media->setRelation(
+                'episode',
+                $episodes->get((int) $media->episode_id),
+            );
+        });
     }
 
     /**
@@ -517,7 +543,10 @@ final class CatalogHomeContentAdditionQuery
         });
     }
 
-    /** @return Builder<Season> */
+    /**
+     * @param  list<int>  $titleIds
+     * @return Builder<Season>
+     */
     private function visibleSeasonIds(array $titleIds = []): Builder
     {
         $seasonTable = (new Season)->getTable();

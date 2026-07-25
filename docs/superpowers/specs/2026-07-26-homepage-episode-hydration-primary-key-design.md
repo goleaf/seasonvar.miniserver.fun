@@ -77,10 +77,21 @@ episodes_recommendation_release_events_idx`. Same-snapshot read-only
 2. Наружный `episodesFor()` query получает `Episode::query()` через
    `withoutSecondaryIndexes()`, затем выполняет прежние `availableTo`,
    `whereIn`, eager load сезона и deterministic ordering.
-3. Eager-load `episode` внутри `mediaFor()` получает тот же helper до
-   `availableTo()` и прежней ограниченной projection.
+3. `mediaFor()` сохраняет bounded media query и eager load сезона, затем
+   собирает уникальные ненулевые `episode_id`. Один явный typed
+   `Episode::query()` получает тот же helper, прежние `availableTo()` и
+   ограниченную projection; найденная модель или `null` присоединяется к
+   каждой media row через `setRelation('episode', ...)`.
 4. Helper изменяет `FROM` только на SQLite. MySQL/PostgreSQL и остальные
    drivers получают исходный Eloquent builder без изменения SQL.
+
+Явная вторая hydration boundary выбрана после implementation discovery:
+Laravel 13 передаёт constrained eager-load callback как relation proxy и
+сохраняет `BelongsTo` при fluent forwarding. Три адаптации либо нарушали
+runtime тип helper, либо теряли `Builder<Episode>` в Larastan. Явный bounded
+query заменяет прежний eager query один к одному, поэтому не добавляет
+round trip и сохраняет relation-loaded semantics без framework-proxy
+зависимости.
 
 Новый service, repository, cache, event, queue или configuration option не
 создаётся.
