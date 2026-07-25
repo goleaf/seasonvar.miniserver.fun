@@ -7720,7 +7720,7 @@ production-runtime files не входят в Task 55.
 
 ## Task 57 — import-safe response warm главной страницы
 
-Статус: `implementation_verified_delivery_pending`.
+Статус: `implementation_verified_committed_push_unresolved`.
 
 Дата начала: 26.07.2026.
 
@@ -7854,7 +7854,7 @@ public domains из release observation/episode/media observers на каждо�
 | Focused/broad/static/live verification | `completed` | 112 tests/642 assertions, PHPStan 0 errors; full minus exact GD: 1811/1798 passed/11 skipped и два known unrelated blockers; 233 imported pages без version churn |
 | Canonical docs/README/CHANGELOG | `completed` | Cache/performance/import/queue/calendar owners, visitor history и датированный changelog обновлены |
 | Final requirements/legacy scan | `completed` | Requirements/spec/plan/Task 57 перечитаны; callers calendar/catalog invalidation, warm URL ownership, scheduler refresh, stale config/key, Blade/inline и unfinished markers repository-wide классифицированы |
-| Commit/push in `main` | `pending` | Exact task scope; внешний auth/blocker фиксируется честно |
+| Commit/push in `main` | `completed_commit_unresolved_push_authentication` | Exact 23-file/hunk commit `7cc9603` создан штатным pre-commit; `git push origin main` отклонён до передачи данных: HTTPS remote не имеет credential helper и не может прочитать GitHub username |
 
 ### Безлимитный execution order
 

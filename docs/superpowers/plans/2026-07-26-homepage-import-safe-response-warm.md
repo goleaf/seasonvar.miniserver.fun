@@ -5,7 +5,7 @@
 
 Дата: 26.07.2026.
 
-Статус: `implementation_verified_delivery_pending`.
+Статус: `implementation_verified_committed_push_unresolved`.
 
 План без искусственного лимита: после minimal implementation он обязательно
 продолжается worker activation, live measurement, requirement reread,
@@ -453,16 +453,22 @@ config/key paths не найдены.
 
 ## Task 9 — exact delivery
 
-- [ ] Проверить `git status --short --branch`; branch только `main`.
-- [ ] Не reset/stash/unstage/overwrite foreign collection task.
-- [ ] Stage только Task 57 files/hunks; README и CHANGELOG должны содержать
+- [x] Проверить `git status --short --branch`; branch только `main`.
+- [x] Не reset/stash/unstage/overwrite foreign collection task.
+- [x] Stage только Task 57 files/hunks; README и CHANGELOG должны содержать
   осмысленные Task 57 изменения.
-- [ ] Запустить pre-commit на exact staged scope.
-- [ ] Commit завершённого разрешённого scope в `main`.
-- [ ] Выполнить configured push; auth/clean-tree/remote отказ записать
+- [x] Запустить pre-commit на exact staged scope.
+- [x] Commit завершённого разрешённого scope в `main`.
+- [x] Выполнить configured push; auth/clean-tree/remote отказ записать
   `unresolved`, не маскировать успешной отправкой.
-- [ ] После commit проверить, что Task 57 files clean, а оставшийся dirty
+- [x] После commit проверить, что Task 57 files clean, а оставшийся dirty
   scope принадлежит только явно классифицированной параллельной работе.
+
+Exact alternate-index commit `7cc9603` содержит только 23 Task 57
+files/hunks и прошёл штатный `pre-commit`. `git push origin main` отклонён
+до передачи данных: HTTPS remote не имеет credential helper и не может
+прочитать GitHub username. Общий рабочий index остаётся mixed из-за
+параллельных Tasks 60/61; он не reset/stash/unstage и не входил в commit.
 
 ## Task-specific compliance exit gate
 
