@@ -8,6 +8,7 @@ use App\Enums\ReleaseScheduleStatus;
 use App\Models\CatalogTitle;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
+use App\Models\ReleaseCalendarFeed;
 use App\Models\ReleaseCalendarSubscription;
 use App\Models\ReleaseScheduleCorrection;
 use App\Models\ReleaseScheduleEntry;
@@ -71,6 +72,13 @@ final readonly class ReleaseCalendarTargetMergeService
                     $subscription->delete();
                 }
             });
+
+        if ($this->schema->feedsReady()) {
+            ReleaseCalendarFeed::query()
+                ->where('catalog_title_id', $source->id)
+                ->update(['catalog_title_id' => $target->id]);
+        }
+
         $this->cache->scheduleChanged($target->id);
     }
 

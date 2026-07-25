@@ -215,10 +215,12 @@ Discovery type route ограничен implemented enum cases; similar/related 
 | Публичный календарь | да, только public visible | да, через ту же visibility boundary | да |
 | Личный календарь | нет | только текущий пользователь | собственный calendar без impersonation |
 | Подписка и настройки | нет | только текущий пользователь, idempotent/rate-limited | те же owner rules |
+| Создать/regenerate/delete private ICS feed | нет | только текущий пользователь, policy + owner requery + limiter | те же owner rules, без impersonation |
+| Прочитать private ICS capability URL | только со знанием действующего token и при доступном owner/target | те же capability rules, session не повышает доступ | те же capability rules |
 | Создать/исправить/отложить/отменить | нет | нет | route gate + hydration gate + service validation |
 | Private correction history | нет | нет | да |
 
-Client не выбирает user, logical key, revision, actor или notification recipient; target ancestry, enum, IANA timezone и status transition повторно проверяются. Полный contract: [`release-calendar.md`](release-calendar.md).
+Client не выбирает user, logical key, revision, actor или notification recipient; target ancestry, enum, IANA timezone и status transition повторно проверяются. Feed management принимает только UUID/ID target, затем заново ограничивает collection текущим owner и title canonical availability. Private route использует token как единственное capability, но account restriction, удаление owner/target, token rotation и canonical visibility остаются server-side fail-closed boundaries. Полный contract: [`release-calendar.md`](release-calendar.md).
 
 ## Mobile presentation authorization Task 23
 

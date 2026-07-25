@@ -244,6 +244,12 @@ class CatalogTitle extends Model
         return $this->hasMany(ReleaseCalendarSubscription::class);
     }
 
+    /** @return HasMany<ReleaseCalendarFeed, $this> */
+    public function releaseCalendarFeeds(): HasMany
+    {
+        return $this->hasMany(ReleaseCalendarFeed::class);
+    }
+
     /** @return HasMany<Comment, $this> */
     public function titleComments(): HasMany
     {

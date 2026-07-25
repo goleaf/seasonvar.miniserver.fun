@@ -148,6 +148,31 @@ class AppServiceProvider extends ServiceProvider
             max(1, (int) config('premium.rate_limits.webhook_per_minute', 120)),
         )->by(hash('sha256', (string) $request->ip())));
 
+        RateLimiter::for('calendar-feeds', function (Request $request): array {
+            $tokenHash = hash('sha256', (string) $request->route('privateToken'));
+            $ipHash = hash('sha256', (string) $request->ip());
+            $response = static fn (Request $request, array $headers) => response(
+                __('calendar.feeds.errors.rate_limited'),
+                429,
+                [
+                    ...$headers,
+                    'Cache-Control' => 'private, no-store, max-age=0',
+                    'X-Robots-Tag' => 'noindex, nofollow, noarchive',
+                    'Referrer-Policy' => 'no-referrer',
+                    'X-Content-Type-Options' => 'nosniff',
+                ],
+            );
+
+            return [
+                Limit::perMinute(max(1, (int) config('release-calendar.rate_limits.feed_requests_per_minute', 60)))
+                    ->by('calendar-feed:'.$tokenHash)
+                    ->response($response),
+                Limit::perMinute(max(1, (int) config('release-calendar.rate_limits.feed_requests_per_ip_per_minute', 20)))
+                    ->by('calendar-feed:'.$tokenHash.'|'.$ipHash)
+                    ->response($response),
+            ];
+        });
+
         RateLimiter::for('administration', function (Request $request): Limit {
             $identity = (string) ($request->user()?->getAuthIdentifier() ?? 'guest');
 

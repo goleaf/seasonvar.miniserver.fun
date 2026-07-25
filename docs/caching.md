@@ -363,6 +363,7 @@ Private ticket/list/detail/messages/attachments/diagnostics/internal notes/assig
 
 `CacheDomain::ReleaseCalendar` версионирует только public schedule data/response. Public profile ограничивает `type`, `status`, `sort`, stable title ID и page; locale и canonical public timezone разделены. Произвольный пользовательский timezone группируется request-side и не размножает shared keys. Personal calendar, subscription, notification preferences/read state, library, premium/region context никогда не кэшируются глобально. Обычная material schedule mutation after commit повышает календарь, homepage, sitemap и affected title generation без flush или wildcard scan. Внутри full/global Seasonvar apply тот же material event сохраняется, но record-level public bump coalesced hidden `Context` до terminal catalog invalidation; targeted/visitor/admin paths остаются immediate. Полный key/invalidation contract — в [`release-calendar.md`](release-calendar.md).
 
+Приватные ICS feeds не получают application/shared cache key: capability token, owner targets и rendered body читаются заново через bounded canonical visibility, поэтому revoke, account restriction, soft delete и entitlement change действуют на следующий запрос. HTTP response и limiter error имеют `private, no-store, max-age=0`; token/URL не записываются в cache metrics, session или service worker. Schedule cache invalidation не меняется, поскольку feed является read-only projection, а не вторым источником событий.
 
 ## Browser cache и service-worker boundary Task 23
 

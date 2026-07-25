@@ -107,6 +107,12 @@ final class CatalogCollection extends Model
         return $this->hasMany(CatalogCollectionReport::class);
     }
 
+    /** @return HasMany<ReleaseCalendarFeed, $this> */
+    public function releaseCalendarFeeds(): HasMany
+    {
+        return $this->hasMany(ReleaseCalendarFeed::class);
+    }
+
     /** @return HasMany<Comment, $this> */
     public function comments(): HasMany
     {

@@ -78,6 +78,7 @@ use App\Services\Media\LicensedMediaDownloadResponder;
 use App\Services\Operations\InfrastructureHealthResponder;
 use App\Services\Premium\PremiumWebhookResponder;
 use App\Services\Profiles\UserProfileMediaResponder;
+use App\Services\ReleaseCalendar\ReleaseCalendarFeedResponder;
 use App\Services\Reviews\ReviewDirectLinkResponder;
 use App\Services\TechnicalIssues\TechnicalIssueAttachmentResponder;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
@@ -301,6 +302,15 @@ $publicDocumentMiddleware = [
     ShareErrorsFromSession::class,
     PreventRequestForgery::class,
 ];
+
+Route::get(
+    '/calendar/feed/{privateToken}.ics',
+    fn (string $privateToken, ReleaseCalendarFeedResponder $feeds) => $feeds->response($privateToken),
+)
+    ->where('privateToken', '[A-Za-z0-9_-]{64}')
+    ->middleware('throttle:calendar-feeds')
+    ->withoutMiddleware($publicDocumentMiddleware)
+    ->name('calendar.feed');
 
 Route::middleware('public.cache:documents')
     ->withoutMiddleware($publicDocumentMiddleware)

@@ -23,6 +23,10 @@
         <div class="rounded-control border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-800" role="status" aria-live="polite">{{ $notice }}</div>
     @endif
 
+    @if ($calendarView->value === 'personal')
+        <livewire:release-calendar.release-calendar-feed-manager :locale="$interfaceLocale" />
+    @endif
+
     <section aria-labelledby="calendar-period-title" class="rounded-panel border border-slate-200 bg-white p-4 shadow-panel sm:p-5">
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div class="flex items-center gap-2">

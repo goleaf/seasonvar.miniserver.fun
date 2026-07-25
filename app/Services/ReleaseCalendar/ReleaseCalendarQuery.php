@@ -191,7 +191,7 @@ final readonly class ReleaseCalendarQuery
     }
 
     /** @param Builder<ReleaseScheduleEntry> $query */
-    private function constrainPersonal(Builder $query, User $user): void
+    public function constrainPersonal(Builder $query, User $user): void
     {
         $query->where(function (Builder $query) use ($user): void {
             $query->whereExists(

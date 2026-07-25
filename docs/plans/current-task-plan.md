@@ -8164,3 +8164,184 @@ environment, queue, scheduler, JavaScript/CSS и production DML не плани�
     создан в `main`; configured HTTPS push отклонён из-за отсутствующих
     credentials, без обхода hooks и без передачи данных.
 
+## Task 60 — приватные iCalendar-подписки календаря релизов
+
+Статус: `implementation_verified_pending_delivery_with_preexisting_suite_blockers`.
+
+Дата начала: 26.07.2026.
+
+Approved design:
+[`2026-07-26-private-release-calendar-feeds-design.md`](../superpowers/specs/2026-07-26-private-release-calendar-feeds-design.md).
+
+Detailed implementation plan:
+[`2026-07-26-private-release-calendar-feeds.md`](../superpowers/plans/2026-07-26-private-release-calendar-feeds.md).
+
+### Цель
+
+Добавить независимо отзываемые private ICS feed'ы для всего личного
+календаря, собственной подборки, новых серий, премьер сезонов, одного сериала,
+конкретного перевода и языка субтитров; дать owner UI Google/Apple/copy/
+regenerate/delete без второго schedule source, shared cache или новой
+инфраструктуры.
+
+### Подтверждённый baseline
+
+- PHP 8.5.8, Laravel 13.22.0, Boost 2.4.13, Livewire 4.3.3,
+  PHPUnit 12.5.32, Tailwind 4.3.2, Vite 8.1.4; SQLite default/in-memory tests.
+- Full-page Livewire + Blade/Tailwind; optional Vite calendar module уже есть.
+- Canonical calendar tables, visibility, page query, personal eligibility,
+  notification preferences, account export and target merge already exist.
+- `docs/release-calendar.md` раньше явно запрещал iCalendar без token/revocation
+  architecture; user request является новым permanent requirement, поэтому
+  owner обновлён до PHP edits.
+- Google official flow для external ICS — desktop «Добавить календарь → По
+  URL»; документированный arbitrary-feed one-click prefill отсутствует.
+  Apple поддерживает subscription по `.ics` URL/link.
+- Current production SQLite EXPLAIN status-free exact feed query выбирает
+  `release_schedule_public_partial_idx (is_public=?)` и temp B-tree; scope
+  включает measured review двух targeted time/date indexes.
+- Branch `main`, origin configured, local branch ahead 13 at start. HTTPS
+  credentials и canonical SSH deploy key ранее не дали push.
+- Shared working tree/index содержит незавершённые Tasks 57–59, включая
+  foreign Task 58 hunks в трёх calendar query/notification files. Они не
+  reset/stash/unstage/overwrite и не входят в Task 60 commit.
+
+### Выбранное решение
+
+1. Несколько rows `release_calendar_feeds`, а не один token/query parameters.
+2. Unique SHA-256 lookup hash + encrypted secret cast, оба hidden/export
+   excluded.
+3. Seven stable scopes с conditional target/track validation.
+4. Stateless capability route с no-session/no-store/noindex и hashed limiter.
+5. Existing schedule visibility/personal eligibility; bounded exact-date ICS
+   projection, RFC 5545 renderer and no fake partial date.
+6. Child Livewire management component only on `/calendar/mine`.
+7. Apple direct `webcal://`; Google copies URL and opens official add-by-URL
+   settings; copy uses safe optional Vite module.
+
+### Expected changed files/modules
+
+- new migration/model/enum/policy and User/Title relations;
+- feed token/lifecycle/query/renderer/responder/presenter services;
+- personal eligibility extraction and minimal existing query integration;
+- `ReleaseCalendarSchema`, target merge, account export;
+- named rate limiter, stateless route, release-calendar config;
+- child Livewire class/view, parent personal view integration;
+- RU/EN calendar translations and optional calendar JS;
+- focused unit/feature/Livewire/browser tests;
+- canonical calendar/data/security/auth/performance/cache/frontend docs,
+  README, CHANGELOG, design/plan/compliance evidence.
+
+### Protected contracts
+
+- every existing calendar/public/localized/admin/legacy route and route name;
+- `ReleaseCalendarQuery::entries`, filters/sorts/pagination/query string;
+- stable schedule type/status/precision/source/logical identity and imports;
+- title/season/episode/media visibility, Premium/region/legal future boundary;
+- title subscription/notification preference/category behavior;
+- account export outer shape (additive metadata only, never secret);
+- public cache domains/keys/invalidation, SEO/sitemap/structured data;
+- JSON API shapes/routes, queue/scheduler, player/media URLs;
+- all foreign Tasks 57–59 worktree/index changes and `main` history.
+
+### Cross-feature/risk matrix
+
+| Domain | Статус | Решение / verification |
+| --- | --- | --- |
+| Authentication/account access | `affected` | Owner UI existing middleware; token route rechecks blocking restriction |
+| Authorization/IDOR | `critical_affected` | Policy + owner requery; collection owner/title visibility; fail-closed 404 |
+| Token/privacy | `critical_affected` | CSPRNG, unique hash, encrypted hidden secret, no export/log/cache/storage |
+| Validation | `critical_affected` | Enum + required/prohibited cross-field matrix and normalization |
+| Calendar visibility | `critical_affected` | Existing canonical scopes/personal negative exclusions |
+| Collections | `affected` | Own active collection only; soft delete closed, hard delete cascade |
+| Titles/merge/delete | `affected` | Optional/exact target visibility; merge transfer; hard delete cascade |
+| Account export/delete | `affected` | Non-secret metadata additive; user cascade revokes feeds |
+| ICS/date correctness | `critical_affected` | Exact datetime/date/range only; partial/unknown omitted |
+| Google/Apple/clipboard | `affected` | Documented Google flow, Apple webcal, no third-party server call/storage |
+| Cache/SEO/sitemap | `compatible_private` | No shared cache/index/sitemap; explicit response headers |
+| Notifications/import/admin/API | `unchanged` | Read-only projection, no second events or delivery |
+| SQL/performance | `affected_bounded` | Hard window/limit/projection/eager load; EXPLAIN-justified indexes |
+| Migration/data | `affected_additive` | New table/indexes, no backfill/DML; reversible SQLite-compatible |
+| Dependency/env/queue | `not_applicable` | No package/env/queue/Redis infrastructure |
+| Production/rollback | `documented` | Backup, schema guard, rolling deploy, rollback revokes only new URLs |
+| Shared Git index | `critical_risk_recorded` | Exact-path/hunk alternate index, no broad staging |
+
+### Task-specific requirement-compliance matrix
+
+| Requirement/domain | Статус | Evidence / следующий gate |
+| --- | --- | --- |
+| Root/index/canonical requirements fresh read | `completed` | 26.07.2026 before PHP edits |
+| Related Markdown and owners | `completed` | Calendar/data/security/auth/cache/perf/UI/frontend/ops traced |
+| Installed versions and DB | `completed` | Boost + CLI + schema evidence above |
+| Official Laravel/Livewire behavior | `completed` | Boost Laravel 13 encryption/rate/response/migration/Livewire docs |
+| Official calendar provider behavior | `completed` | Google/Apple current official support documentation checked |
+| Existing implementation first | `completed` | Route/Livewire/query/model/migration/account/merge lifecycle traced |
+| Alternatives and explicit authorization | `completed` | Three approaches compared; user preauthorized recommended execution |
+| Canonical requirement first | `completed` | `docs/release-calendar.md` updated before production PHP |
+| Design/detailed plan/files/contracts/risks | `completed` | Linked documents and matrices |
+| Maintenance/production plan | `completed` | Reason, compatibility, additive DDL, rollback and failure recovery documented |
+| TDD RED before PHP | `completed` | Missing service, regeneration/delete and owner/export/merge behavior failed before each implementation |
+| Implementation | `completed` | Migration, backend, stateless route, Livewire/Blade/JS and lifecycle integration implemented |
+| Security/performance/EXPLAIN | `completed` | Token secrecy/IDOR/restriction/rate headers tested; disposable SQLite selected feed/token indexes |
+| Focused/full/static/build/browser | `completed_with_preexisting_global_blockers` | Task 60 focused PHP/Pint/PHPStan/Rector/Vite/Playwright/cache/docs gates pass; broad suite exposed one existing auth failure and one missing importer class, broad Rector only foreign collection files |
+| README/CHANGELOG/final requirement reread | `completed` | Canonical owners, README and dated CHANGELOG updated; applicable requirements and matrix re-read |
+| Commit/push in main | `pending_shared_index_guard` | Exact Task 60 commit; external push failure honest |
+
+### Живой execution checklist
+
+1. `[completed]` Requirements/versions/Git/code/schema/provider discovery.
+2. `[completed]` Compare architecture and update canonical owner/design/plan.
+3. `[completed]` Re-read prepared plan and create RED tests.
+4. `[completed]` Additive migration/model/enum/policy/token lifecycle.
+5. `[completed]` Visibility-safe bounded query and RFC 5545 responder.
+6. `[completed]` Stateless route/rate headers/account/merge lifecycle.
+7. `[completed]` Livewire owner UI, translations, Google/Apple/copy JS.
+8. `[completed_with_preexisting_global_blockers]` Focused then broad verification
+   and systematic fixes; calendar scope is green, while two reproducible
+   unrelated repository-suite blockers are recorded below.
+9. `[completed]` Browser/mobile/a11y/security/performance/EXPLAIN review.
+10. `[completed]` Canonical docs/README/CHANGELOG/compliance and legacy scan.
+11. `[pending]` Exact isolated commit(s) in `main`.
+12. `[pending]` Configured non-force push or exact unresolved external error.
+
+### Verification evidence Task 60
+
+- TDD RED зафиксировал отсутствующий `ReleaseCalendarFeedService`, затем
+  отсутствующие `regenerate()`/`delete()`, export `feeds` и title-merge
+  retarget; explicit title-track без personal subscription сначала вернул
+  пустой VCALENDAR. Все причины исправлены отдельно.
+- Focused feature/Livewire/calendar/frontend matrix прошла 36 тестов с 614
+  проверками. Token hash/encryption/hidden serialization, invalid scopes,
+  owner IDOR, account restriction/delete/export, merge, limiter, exact
+  datetime/date/range, UTF-8 folding и seven scopes покрыты поведением.
+- Disposable SQLite migration создала owner/token/schedule indexes и
+  корректные cascade FK. `EXPLAIN QUERY PLAN` выбрал covering
+  `release_schedule_feed_time_idx` и unique
+  `release_calendar_feeds_token_hash_unique`; production schema не менялась.
+- `npm run build` завершился успешно: optional release-calendar chunk
+  `2,33 kB` (`1,13 kB` gzip), локальный FontAwesome brands asset без CDN.
+- Playwright выполнил 6/6 сценариев на `1440×1200`, `390×844` и `768×1024`:
+  login, create, copy clipboard, Google/Apple URL, local response/console/page
+  errors и horizontal overflow. Screenshots находятся только в ignored
+  `output/playwright/`.
+- Process-scoped `config:cache`, `route:cache` и `view:cache` прошли; route
+  list из собранного временного кеша подтвердил exact `calendar.feed` и
+  `throttle:calendar-feeds`. Production cache не изменялся; deployment обязан
+  выполнить обычный согласованный rebuild, не store-wide flush.
+- Task-scoped `PHPStan` завершился без ошибок, целевой `Rector` — без
+  изменений, exact-path `Pint --test` прошёл. Глобальный `composer analyse`
+  также прошёл. Глобальный `composer rector:check` остановлен только
+  незакоммиченными foreign collection-файлами: он предлагает `void` → `never`
+  в `CatalogCollectionCategoryManager` и
+  `CatalogCollectionCategoryService`; Task 60 эти файлы не меняет.
+- Полный `php artisan test` при лимите PHP 256 MiB сначала завершился на
+  GD-тесте `UserProfileMediaProcessingTest`; тот же exact test в свежем
+  процессе прошёл (1 тест, 12 проверок). Повтор полного набора без уже
+  доказанного memory-накопительного теста завершил 1 832 теста: 1 819
+  успешных, 11 пропущенных, одна воспроизводимая посторонняя ошибка
+  `WebAccountManagementTest::test_logout_other_browser_sessions_preserves_current_session`
+  и одна посторонняя ошибка отсутствующего tracked-классом теста
+  `SeasonvarImportDispatchBatcher`. Calendar-focused matrix остаётся зелёной.
+- `composer validate`, Composer audit и production npm audit прошли; найдено
+  0 advisory/vulnerability. Changelog policy и docs CI прошли.
+

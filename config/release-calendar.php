@@ -13,5 +13,14 @@ return [
     'rate_limits' => [
         'subscription_per_minute' => 30,
         'administration_per_minute' => 60,
+        'feed_requests_per_minute' => 60,
+        'feed_requests_per_ip_per_minute' => 20,
+        'feed_mutations_per_minute' => 15,
+    ],
+    'feeds' => [
+        'max_per_user' => 10,
+        'past_days' => 60,
+        'future_days' => 400,
+        'max_events' => 1000,
     ],
 ];

@@ -2,6 +2,24 @@
 
 ## 2026-07-26
 
+- Добавлены независимо отзываемые приватные `iCalendar`-подписки календаря
+  релизов. Новая `additive migration` создаёт `release_calendar_feeds` с
+  `owner UUID`, `unique SHA-256 lookup`, `encrypted/hidden secret` и семью
+  `server-validated scopes`; два `status-free schedule index` обслуживают
+  `bounded datetime/date-range export` без изменения существующих событий.
+  `/calendar/feed/{private-token}.ics` работает без `session/cookie`, повторно
+  применяет `account restriction` и `canonical catalog/media visibility`,
+  ограничивает окно и размер ответа, корректно формирует RFC 5545
+  `datetime/date/range`, CRLF, `escaping` и `UTF-8 folding`, а `partial` даты не
+  выдумывает. Ответ и `429` имеют `private/no-store/noindex/nosniff/no-referrer`.
+  В `/calendar/mine` добавлен `owner-only Livewire manager` для всего личного
+  календаря, подборки, новых серий, премьер сезонов, одного сериала,
+  перевода и субтитров с `copy`, `Apple webcal://`, официальным Google
+  `add-by-URL flow`, `token regeneration` и `delete`. `Account export` не содержит
+  `token material`, `title merge` переносит `feed target`, `hard owner/target delete`
+  отзывает ссылки. `Focused PHP matrix` прошла 36 тестов с 614 проверками,
+  `Vite build` — успешно, Playwright — 6 `desktop/mobile/tablet` сценариев без
+  `console/page/local-response` ошибок и горизонтального переполнения.
 - Добавлен отдельный безопасный во время импорта прогрев кеша ответа главной
   страницы.
   `PublicPageCacheWarmer::warmHomepages()` обращается только к `/` и

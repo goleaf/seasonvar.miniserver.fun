@@ -180,6 +180,7 @@ final class ReleaseCalendarPage extends Component
             'entryGroups' => $entries->getCollection()->groupBy(fn ($entry): string => $entry->groupLabel),
             'schemaReady' => $schema->ready(),
             'calendarView' => $calendarView,
+            'interfaceLocale' => $locale,
             'timezone' => $timezone,
             'periodLabel' => $this->periodLabel($calendarView, $period, $locale, $timezone),
             'typeOptions' => $this->enumOptions(ReleaseScheduleEntryType::cases()),

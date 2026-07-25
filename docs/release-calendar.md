@@ -20,7 +20,7 @@
 
 ### Таблицы и identity
 
-Migration `2026_07_17_170000_create_release_calendar_domain.php` добавляет четыре обратимые таблицы:
+Migration `2026_07_17_170000_create_release_calendar_domain.php` добавляет четыре обратимые таблицы, а отдельная additive migration приватных календарных feed'ов — пятую:
 
 | Таблица | Назначение |
 | --- | --- |
@@ -28,6 +28,7 @@ Migration `2026_07_17_170000_create_release_calendar_domain.php` добавля�
 | `release_schedule_corrections` | Последовательная история содержательных изменений даты, точности и статуса. |
 | `release_calendar_subscriptions` | Одна пользовательская подписка на один тайтл с отдельными категориями событий. |
 | `release_calendar_notification_preferences` | Общие предпочтения категорий уведомлений пользователя. |
+| `release_calendar_feeds` | Независимые приватные iCalendar-подписки пользователя с типизированной областью, отзываемым token hash и зашифрованным секретом. |
 
 Каждое событие имеет случайный `public_id` UUID и уникальный серверный `logical_key`. Identity не зависит от названия, locale, даты, slug, номера группы календаря или отображаемой студии. `ReleaseScheduleIdentity` строит type-specific key из стабильной цели: премьера сериала — тайтл, сезона — сезон, серии/special — серия, публикация портала — серия, перевод/субтитры — серия плюс допустимые язык/студия, quality upgrade — конкретное media. Ручной редактор, observers и merge используют один builder; клиент не может передать key самостоятельно. Nullable внешние ключи на тайтл, сезон, серию и медиа позволяют сохранить историю при удалении цели. При слиянии `ReleaseCalendarTargetMergeService` пересчитывает key под canonical target, переносит подписки с точным сохранением/объединением категорий и сохраняет конфликтующее событие как отменённую скрытую историю вместо удаления.
 
@@ -82,7 +83,7 @@ Migration `2026_07_17_170000_create_release_calendar_domain.php` добавля�
 
 ## Запросы и видимость
 
-`ReleaseCalendarQuery` — единственная query boundary. Она применяет существующие publication/availability scopes тайтла, сезона и серии, eager loading, bounded окна, allowlisted filters/sorts и детерминированный `id` tie-break. Скрытые, неопубликованные, удалённые или недоступные записи не попадают в public/personal output. Текущая модель портала не имеет самостоятельных таблиц premium entitlement и region grant; календарь честно переиспользует каноническую audience/availability boundary и автоматически наследует будущую проверку из неё, не симулируя отсутствующие лицензии.
+`ReleaseCalendarQuery` остаётся канонической page query boundary. Она применяет существующие publication/availability scopes тайтла, сезона и серии, eager loading, bounded окна, allowlisted filters/sorts и детерминированный `id` tie-break. `ReleaseCalendarFeedQuery` является отдельной bounded projection boundary только для iCalendar и переиспользует те же `ReleaseScheduleVisibility` и personal-eligibility constraints; он не создаёт второй источник расписания. Скрытые, неопубликованные, удалённые или недоступные записи не попадают в public/personal/feed output. Текущая модель портала не имеет самостоятельных таблиц premium entitlement и region grant; календарь честно переиспользует каноническую audience/availability boundary и автоматически наследует будущую проверку из неё, не симулируя отсутствующие лицензии.
 
 Поддерживаются тип, статус и стабильный ID тайтла как фильтры, а также хронологическая сортировка в обоих направлениях и сортировка по названию. Произвольные SQL columns, ranges и timezone не принимаются. Окна ограничены `release-calendar.maximum_window_days`; date range выбирается по пересечению с окном, а не только по первому дню.
 
@@ -107,6 +108,7 @@ action и сбрасывает только calendar paginator. Хронолог
 - `/calendar/month/{YYYY-MM}` — месяц;
 - `/calendar/recent` — постоянное совместимое перенаправление на `/calendar`;
 - `/calendar/mine` — закрытый личный календарь;
+- `/calendar/feed/{private-token}.ics` — stateless read-only iCalendar feed по случайному приватному token;
 - `/{locale}/calendar...` — те же публичные интерфейсы RU/EN;
 - `/admin/calendar` — редакционная панель.
 
@@ -123,6 +125,28 @@ Legacy `/schedule` и `/release-calendar` перенаправляются на 
 Личный календарь требует текущего пользователя, возвращает `private, no-store`/`noindex` и не использует общий кеш. Eligibility включает явную calendar subscription и существующие релевантные состояния библиотеки; `not_interested` и `blacklisted` исключаются. История одного открытия карточки не включает уведомления автоматически.
 
 Подписка одна на пару `(user_id, catalog_title_id)` и содержит независимые флаги премьеры сериала, сезона, серии, перевода, субтитров и публикации портала. `SetReleaseCalendarSubscription` авторизует владельца, под блокировкой транзакции идемпотентно создаёт либо удаляет unique-строку, применяет ограничитель частоты и персональную инвалидацию. Bookmark, прогресс и подписка остаются независимыми.
+
+## Приватные iCalendar-подписки
+
+Владелец управляет независимыми feed'ами на `/calendar/mine`. Один feed имеет собственный `public_id`, scope и secret token, поэтому его можно регенерировать или удалить без отзыва остальных подписок. Поддерживаются стабильные scopes:
+
+- `all` — весь личный календарь по тем же subscription/library eligibility и negative exclusions;
+- `collection` — события тайтлов одной собственной активной подборки;
+- `new_episodes` — только `episode_release` личного календаря;
+- `season_premieres` — только `season_premiere` личного календаря;
+- `title` — все доступные события одного тайтла;
+- `translation` — конкретный `translation_release` по обязательному названию варианта перевода и необязательному языку; можно дополнительно ограничить одним тайтлом;
+- `subtitles` — `subtitle_release` по обязательному коду языка; можно дополнительно ограничить одним тайтлом.
+
+Scope, target и track-поля валидируются совместно server-side. Невозможные сочетания запрещены, пустые строки нормализуются, target повторно разрешается через owner/visibility boundary. Коллекционный feed можно создать только для собственной неудалённой подборки. Title и optional track target должны быть доступны пользователю на момент создания и повторно проходят canonical visibility при каждом чтении.
+
+Token генерируется CSPRNG, имеет не менее 256 бит энтропии и никогда не хранится как единственное открытое значение. `token_hash` SHA-256 обслуживает unique indexed lookup, а зашифрованная Laravel cast-копия нужна только для повторного показа URL владельцу. Оба поля скрыты от сериализации и account export. Регенерация под row lock атомарно заменяет hash и encrypted secret, повышает version и немедленно превращает старый URL в `404`; удаление feed'а окончательно отзывает URL. В интерфейсе и логах token не маскируется как идентификатор пользователя, не записывается в browser storage и не отправляется сторонним analytics.
+
+Feed route не требует session cookie и является capability URL: знание полного token даёт read-only доступ ровно к одному feed. Invalid, revoked, deleted-target и blocked-account состояния fail closed одинаковым `404`. Ответ всегда имеет `text/calendar; charset=utf-8`, inline filename, `private, no-store`, `noindex,nofollow,noarchive`, `nosniff` и `no-referrer`; общий page/document cache и sitemap исключены. Named limiter использует только hashes token/IP, не сохраняет secret в cache key и возвращает приватный `429`.
+
+iCalendar renderer выдаёт RFC 5545 `VCALENDAR`/`VEVENT`, CRLF и UTF-8 line folding, escaped text, stable UID из schedule UUID, revision `SEQUENCE`, безопасный canonical title URL и корректные UTC/exact-date/date-range boundaries. Partial month/quarter/year и unknown events пропускаются, потому что форматирование их первым днём периода было бы ложной точностью. Окно прошлого/будущего и максимум событий hard-bounded config; query выбирает только нужные колонки, eager-loads только title и не выполняет запросы из Blade.
+
+Apple Calendar получает прямую `webcal://` ссылку. Официальный Google Calendar flow для стороннего ICS использует «Добавить календарь → По URL» и не предоставляет документированный стабильный one-click prefill: кнопка Google копирует HTTPS feed URL и открывает страницу добавления по URL с понятной инструкцией. Кнопка копирования использует Clipboard API с локальным fallback, не сохраняет token в `localStorage`/`sessionStorage`; regeneration и deletion имеют явное подтверждение и loading/disabled state.
 
 ## Уведомления
 
@@ -152,15 +176,15 @@ Correction хранит предыдущие и новые точный моме
 
 `/admin/calendar` защищён `auth`, `auth.session`, `account.private` и gate `manage-release-calendar`. Сотрудник ищет каноническую цель, выбирает тип, точность, IANA timezone, источник и статус, может заблокировать ручное значение, управлять public visibility/notification eligibility и просматривать историю. Target ancestry повторно проверяется на сервере. Создание, правка, postponement/cancellation и publication используют один `ReleaseScheduleService`; destructive GET и прямой mass assignment отсутствуют.
 
-Bulk editing и iCalendar export намеренно не добавлены: существующий продукт не имел подтверждённой потребности, feed-token/revocation архитектуры или безопасной административной bulk UX. Это предотвращает мёртвые controls и не создаёт второй calendar feed.
+Bulk editing намеренно не добавлен: пользовательская задача не требует административной массовой mutation, а безопасной bulk UX в продукте нет. Приватный iCalendar export реализован отдельной read-only capability boundary и не расширяет административные права.
 
 ## Кеш и производительность
 
 `CacheDomain::ReleaseCalendar` хранит версии только публичных scalar/response данных. Public page profile допускает allowlisted `type`, `status`, `sort`, `title` и page; locale и canonical public timezone входят в boundary. Публичные index, upcoming, day, week и month route names для обычных и локализованных адресов входят в общий кеш только через явный route-safety allowlist; personal/admin routes в нём отсутствуют. Произвольные timezone пользователя не создают неограниченный shared key: точное grouping выполняется request-side, а личная страница bypass-ит общий кеш.
 
-Mutation повышает release-calendar, home, sitemap и affected title generations после commit; store-wide flush и wildcard scan отсутствуют. Исключение — только record-level изменения внутри full/global Seasonvar apply: authoritative rows сохраняются, а public version bump выполняет один terminal `CatalogCacheInvalidator::catalogChanged()` после завершения run. Targeted/visitor/admin mutations сохраняют immediate semantics. Личный state, subscription, preference, entitlement и notification read state не входят в global value.
+Mutation повышает release-calendar, home, sitemap и affected title generations после commit; store-wide flush и wildcard scan отсутствуют. Исключение — только record-level изменения внутри full/global Seasonvar apply: authoritative rows сохраняются, а public version bump выполняет один terminal `CatalogCacheInvalidator::catalogChanged()` после завершения run. Targeted/visitor/admin mutations сохраняют immediate semantics. Личный state, subscription, preference, entitlement, feed secret/scope и notification read state не входят в global value. iCalendar response не кэшируется приложением, reverse proxy или browser; новый cache domain и invalidation fan-out не создаются.
 
-Основные индексы соответствуют запросам диапазона/статуса/типа/цели, correction timeline, subscription owner и notification preference lookup. Logical key и user/title subscription защищены unique constraints. Query использует eager loading, ограниченное окно и paginator; month summary читает только bounded scalar projection и группирует её в пользовательском timezone. Полный каталог или все будущие годы в PHP не сравниваются.
+Основные индексы соответствуют запросам диапазона/статуса/типа/цели, correction timeline, subscription owner и notification preference lookup. Logical key и user/title subscription защищены unique constraints. Feed migration добавляет только индексы, соответствующие token lookup, owner listing и точным public time/date feed windows; duplicate indexes не создаются. Page query использует eager loading, ограниченное окно и paginator; month summary читает только bounded scalar projection и группирует её в пользовательском timezone. Feed query имеет hard limit и deterministic date/ID order. Полный каталог или все будущие годы в PHP не сравниваются.
 
 ## SEO
 
@@ -175,11 +199,12 @@ Structured data — ограниченный public `ItemList`; estimated/unknow
 - Schema guards позволяют развернуть код до migration без fatal error: пользователь получает локализованное unavailable состояние.
 - Cache/notification failures не откатывают уже подтверждённую доменную транзакцию; ошибки report-ятся без provider payload.
 - Account export содержит собственные subscription codes/preferences, но не других подписчиков или внутренние correction notes. Удаление пользователя каскадно удаляет его подписки и preferences, не удаляя общественно значимое расписание.
+- Account export содержит scope/targets/locale/version собственных feed'ов, но никогда не содержит `token_hash`, encrypted secret или готовый private URL. Удаление пользователя каскадно отзывает все его feed'ы. Soft-deleted target делает feed недоступным, force delete каскадно удаляет его; title merge переносит feed target на canonical тайтл.
 - Calendar correctness не зависит от новой queue: текущий статус и delayed presentation вычисляются из сохранённого состояния и текущего времени.
 
 ## Развёртывание и rollback
 
-Migration расширяющая и SQLite-compatible. Перед production migration нужна обычная резервная копия; старые поля и маршруты не меняются. Rollback удаляет только четыре новые таблицы. Код защищён schema guard, поэтому временно работает с unavailable state, но полноценный календарь требует migration. Исторические записи не заполняются из неоднозначных данных автоматически; редактор может добавить проверенные события после развёртывания.
+Обе migrations расширяющие, обратимые и SQLite-compatible. Перед production migration нужна обычная резервная копия; старые поля и маршруты не меняются. Feed migration создаёт только `release_calendar_feeds` и два feed-window индекса, не backfill-ит пользователей и не создаёт secrets на GET. Rolling deploy защищён отдельным `feedsReady()` schema guard: старый calendar продолжает работать, а management/feed route fail closed до DDL. Rollback удаляет feed table/indexes и тем самым отзывает новые URL, не затрагивая расписание, личные title subscriptions или public routes. Исторические записи не заполняются из неоднозначных данных автоматически; редактор может добавить проверенные события после развёртывания.
 
 ## Ручная проверка
 
@@ -188,6 +213,9 @@ Migration расширяющая и SQLite-compatible. Перед production mig
 - Проверить отсутствие hidden/deleted/unpublished целей, дублей от media/translation и отрицательного countdown.
 - Проверить narrow phone agenda, desktop month grid, zoom, keyboard focus, loading/empty/error live regions и cleanup countdown после Livewire navigation.
 - Проверить личный calendar/noindex/no-store, подписку/отписку, независимые категории и suppression blacklist/not-interested.
+- Проверить все семь feed scopes, translation/subtitle + optional title combination, empty/invalid combinations, owner collection/title authorization, exact/date/range ICS, partial-date omission и hard event/window limits.
+- Проверить stateless invalid/old/deleted/blocked token `404`, regeneration/delete, hash/encrypted storage, account export/deletion, title merge и no-store/noindex/nosniff/no-referrer headers.
+- Проверить Google copy + add-by-URL flow, Apple `webcal://`, direct copy fallback, desktop/mobile layout, keyboard/focus, loading/error/status и отсутствие token в browser storage/logs.
 - Проверить admin gate, invalid target ancestry, locked override, correction history, postpone/cancel/release и private note.
 - Проверить repeated observer/import, deterministic notification UUID, preference suppression и отсутствие source URL/private text.
 - Проверить public cache locale/time boundary, targeted version bump, sitemap eligibility, canonical/`hreflang` и public-only ItemList.
@@ -196,7 +224,7 @@ Migration расширяющая и SQLite-compatible. Перед production mig
 ## Известные ограничения
 
 - Рабочие данные пока не содержат подтверждённых `episodes.released_at`; календарь не выдумывает историю и заполнится редактором или будущими проверенными импортными датами.
-- Автоматический прогноз перевода, recurrence generation, гарантированный pre-release scheduler, iCalendar feed и bulk editor отсутствуют.
+- Автоматический прогноз перевода, recurrence generation, гарантированный pre-release scheduler и bulk editor отсутствуют.
 - Отдельные premium/region entitlement tables и provider market timezone отсутствуют; применяется существующая publication/audience/availability boundary.
 - Доступные интерфейсные locale — RU и EN; пользовательский текст и provider labels автоматически не переводятся.
 

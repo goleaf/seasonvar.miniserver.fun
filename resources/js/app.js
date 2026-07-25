@@ -1,6 +1,7 @@
 import '@fortawesome/fontawesome-free/css/fontawesome.min.css';
 import '@fortawesome/fontawesome-free/css/solid.min.css';
 import '@fortawesome/fontawesome-free/css/regular.min.css';
+import '@fortawesome/fontawesome-free/css/brands.min.css';
 import '../css/app.css';
 import { initializeHeaderSearchInterfaces } from './header-search.js';
 import { initializeMobileRuntime } from './mobile-runtime.js';
@@ -595,9 +596,9 @@ const loadCatalogInterfaces = () => {
     loadOptionalModule('issues', '[data-technical-issue-form], [data-player-issue-link]',
         () => import('./issues.js'),
         (module) => module.initializeTechnicalIssueInterfaces(document));
-    loadOptionalModule('release-calendar', '[data-release-countdown]',
+    loadOptionalModule('release-calendar', '[data-release-countdown], [data-calendar-copy], [data-calendar-google]',
         () => import('./release-calendar.js'),
-        (module) => module.initializeReleaseCountdowns(document));
+        (module) => module.initializeReleaseCalendarInterfaces(document));
     loadOptionalModule('help-center', '[data-help-search]',
         () => import('./help-center.js'),
         (module) => module.initializeHelpCenterInterfaces(document));

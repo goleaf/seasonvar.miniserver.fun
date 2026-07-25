@@ -230,6 +230,12 @@ class User extends Authenticatable implements HasLocalePreference, MustVerifyEma
         return $this->hasMany(ReleaseCalendarSubscription::class);
     }
 
+    /** @return HasMany<ReleaseCalendarFeed, $this> */
+    public function releaseCalendarFeeds(): HasMany
+    {
+        return $this->hasMany(ReleaseCalendarFeed::class);
+    }
+
     /** @return HasOne<ReleaseCalendarNotificationPreference, $this> */
     public function releaseCalendarNotificationPreference(): HasOne
     {
