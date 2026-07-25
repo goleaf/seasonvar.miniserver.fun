@@ -280,7 +280,13 @@ final class CatalogDiscoveryPage extends Component
             canDismiss: $this->user() !== null,
         ));
         $hasFilters = $this->hasFilters();
-        $collectionStatefulVariant = request()->hasAny(['collections_q', 'collections_sort', 'collectionsPage']);
+        $collectionStatefulVariant = request()->hasAny([
+            'collections_q',
+            'collections_sort',
+            'collections_category',
+            'collections_subcategory',
+            'collectionsPage',
+        ]);
         $seo = $this->seo->discovery($type, $result, $result->items, $hasFilters || $collectionStatefulVariant);
 
         return view('livewire.catalog-discovery-page', [
@@ -300,6 +306,12 @@ final class CatalogDiscoveryPage extends Component
             'hasFilters' => $hasFilters,
             'isAuthenticated' => $this->user() !== null,
             'popularUrl' => $this->discoveryUrl(CatalogRecommendationType::Popular),
+            'discoverySectionNavigation' => $type === CatalogRecommendationType::Popular
+                ? [
+                    ['url' => '#collections', 'label' => __('collections.navigation.collections')],
+                    ['url' => '#popular-titles', 'label' => __('recommendations.page.popular_series')],
+                ]
+                : [],
             'collectionExplorerKey' => 'discovery-collections-'.app()->currentLocale(),
             'seo' => $seo,
         ])->extends('layouts.app', [

@@ -39,10 +39,15 @@ final class CatalogCollectionExplorerCategoryTest extends TestCase
             ->assertSeeHtml('name="collections_subcategory"')
             ->assertSeeText('Темы и жанры')
             ->assertSeeText('Детективы и криминал')
+            ->assertDontSeeText('Долгие истории')
+            ->assertDontSeeText('Формат')
+            ->assertSeeText(__('collections.directory.uncategorized'))
             ->assertSeeText('Дочерняя')
             ->assertDontSeeText('Корневая')
             ->set('category', $otherRoot->slug)
             ->assertSet('subcategory', '')
+            ->assertSeeText('Формат')
+            ->assertSeeText(__('collections.directory.category_empty'))
             ->call('resetFilters')
             ->assertSet('category', '')
             ->assertSet('subcategory', '')
@@ -68,6 +73,27 @@ final class CatalogCollectionExplorerCategoryTest extends TestCase
     {
         Livewire::withQueryParams(['collections_category' => 'themes-and-genres'])
             ->test(CatalogCollectionExplorer::class)
+            ->assertSeeText(__('collections.directory.category_empty'))
+            ->assertSeeText(__('collections.directory.reset_all'));
+    }
+
+    public function test_uncategorized_control_is_hidden_when_it_cannot_return_results(): void
+    {
+        $root = CatalogCollectionCategory::query()->where('slug', 'themes-and-genres')->firstOrFail();
+        $this->collection('Только распределённая подборка', $root);
+
+        Livewire::test(CatalogCollectionExplorer::class)
+            ->assertSeeText('Темы и жанры')
+            ->assertDontSeeText('Формат')
+            ->assertDontSeeText(__('collections.directory.uncategorized'));
+    }
+
+    public function test_selected_zero_count_category_remains_available_for_bookmarked_urls(): void
+    {
+        Livewire::withQueryParams(['collections_category' => 'format'])
+            ->test(CatalogCollectionExplorer::class)
+            ->assertSet('category', 'format')
+            ->assertSeeText('Формат')
             ->assertSeeText(__('collections.directory.category_empty'))
             ->assertSeeText(__('collections.directory.reset_all'));
     }

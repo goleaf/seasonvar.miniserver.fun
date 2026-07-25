@@ -49,6 +49,35 @@ final class CatalogCollectionClassificationQueryTest extends TestCase
         $this->assertSame([$public->public_id], $page->pluck('public_id')->all());
     }
 
+    public function test_queue_can_filter_visibility_and_moderation_without_changing_unfiltered_defaults(): void
+    {
+        $approved = $this->collection('Публичная одобренная');
+        $pending = $this->collection('Публичная на проверке', [
+            'moderation_status' => CatalogCollectionModerationStatus::Pending,
+        ]);
+        $private = $this->collection('Личная одобренная', [
+            'visibility' => CatalogCollectionVisibility::Private,
+        ]);
+        $this->collection('Уже распределённая', [
+            'catalog_collection_category_id' => CatalogCollectionCategory::query()
+                ->where('slug', 'detective-and-crime')
+                ->valueOrFail('id'),
+        ]);
+        $query = app(CatalogCollectionClassificationQuery::class);
+
+        $filtered = $query->paginateUncategorized(
+            visibility: CatalogCollectionVisibility::Public->value,
+            moderationStatus: CatalogCollectionModerationStatus::Approved->value,
+        );
+        $invalidStatus = $query->paginateUncategorized(moderationStatus: 'forged');
+
+        $this->assertSame([$approved->public_id], $filtered->pluck('public_id')->all());
+        $this->assertEqualsCanonicalizing(
+            [$approved->public_id, $pending->public_id, $private->public_id],
+            $invalidStatus->pluck('public_id')->all(),
+        );
+    }
+
     public function test_evidence_is_limited_to_the_current_page_and_query_budget_is_bounded(): void
     {
         $owner = User::factory()->create();

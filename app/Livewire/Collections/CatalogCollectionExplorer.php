@@ -87,11 +87,15 @@ final class CatalogCollectionExplorer extends Component
         $directory = $categories->publicDirectoryTree();
         $selectedRoot = $directory['tree']->firstWhere('slug', $this->category);
         $categoryNavigation = $directory['tree']
+            ->filter(fn (CatalogCollectionCategory $root): bool => (int) $root->getAttribute('public_branch_collections_count') > 0
+                || $root->slug === $this->category)
             ->map(fn (CatalogCollectionCategory $root): array => [
                 'slug' => $root->slug,
                 'label' => $root->display_name,
                 'count' => (int) $root->getAttribute('public_branch_collections_count'),
                 'children' => $root->children
+                    ->filter(fn (CatalogCollectionCategory $child): bool => (int) $child->getAttribute('public_collections_count') > 0
+                        || $child->slug === $this->subcategory)
                     ->map(fn (CatalogCollectionCategory $child): array => [
                         'slug' => $child->slug,
                         'label' => $child->display_name,
@@ -114,6 +118,8 @@ final class CatalogCollectionExplorer extends Component
             'categoryNavigation' => $categoryNavigation,
             'subcategoryOptions' => $selectedRoot instanceof CatalogCollectionCategory
                 ? $selectedRoot->children
+                    ->filter(fn (CatalogCollectionCategory $child): bool => (int) $child->getAttribute('public_collections_count') > 0
+                        || $child->slug === $this->subcategory)
                     ->map(fn (CatalogCollectionCategory $child): array => [
                         'slug' => $child->slug,
                         'label' => $child->display_name,
@@ -123,6 +129,8 @@ final class CatalogCollectionExplorer extends Component
                     ->all()
                 : [],
             'uncategorizedCount' => $directory['uncategorized'],
+            'showUncategorizedFilter' => $directory['uncategorized'] > 0
+                || $this->category === 'uncategorized',
             'totalCount' => $directory['total'],
             'hasActiveFilters' => $this->search !== ''
                 || $this->sort !== 'featured'

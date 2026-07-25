@@ -1,4 +1,6 @@
 <section class="space-y-5" aria-labelledby="collection-category-admin-title">
+    @island(name: 'collection-classification-pagination', always: true, with: $this->paginationIslandPage)
+    <div class="space-y-5">
     @if ($notice)
         <div role="status" aria-live="polite"><x-form.status-message :message="$notice" /></div>
     @endif
@@ -55,7 +57,7 @@
                     </div>
                 </dl>
 
-                <div class="grid gap-4 rounded-control border border-slate-200 bg-slate-50 p-4 md:grid-cols-2 xl:grid-cols-4">
+                <div class="grid gap-4 rounded-control border border-slate-200 bg-slate-50 p-4 md:grid-cols-2 xl:grid-cols-5">
                     <x-form.field
                         :label="__('collections.classification.search')"
                         for="classification-search"
@@ -69,6 +71,17 @@
                         <select id="classification-visibility" wire:model.live="classificationVisibility" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100">
                             <option value="">{{ __('collections.classification.all_values') }}</option>
                             @foreach ($classificationVisibilityOptions as $option)
+                                <option value="{{ $option['value'] }}">{{ $option['label'] }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label for="classification-moderation" class="block text-sm font-bold text-slate-700">
+                            {{ __('collections.classification.moderation_filter') }}
+                        </label>
+                        <select id="classification-moderation" wire:model.live="classificationModerationStatus" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100">
+                            <option value="">{{ __('collections.classification.all_values') }}</option>
+                            @foreach ($classificationModerationOptions as $option)
                                 <option value="{{ $option['value'] }}">{{ $option['label'] }}</option>
                             @endforeach
                         </select>
@@ -105,7 +118,17 @@
                             {{ __('collections.classification.selection_hint') }}
                         </p>
                     </div>
-                    <div class="flex flex-col gap-2 sm:flex-row">
+                    <div class="flex flex-wrap gap-2">
+                        <button
+                            type="button"
+                            wire:click="selectCurrentClassificationPage"
+                            wire:loading.attr="disabled"
+                            wire:target="selectCurrentClassificationPage"
+                            class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-100 disabled:cursor-wait disabled:opacity-60"
+                        >
+                            <x-ui.icon name="fa-solid fa-list-check" />
+                            <span>{{ __('collections.classification.select_current_page') }}</span>
+                        </button>
                         <button
                             type="button"
                             wire:click="selectHighConfidence"
@@ -115,6 +138,17 @@
                         >
                             <x-ui.icon name="fa-solid fa-wand-magic-sparkles" />
                             <span>{{ __('collections.classification.select_high_confidence') }}</span>
+                        </button>
+                        <button
+                            type="button"
+                            wire:click="clearClassificationSelection"
+                            wire:loading.attr="disabled"
+                            wire:target="clearClassificationSelection"
+                            @disabled($selectedClassificationPublicIds === [] && $classificationCategoryByCollection === [])
+                            class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            <x-ui.icon name="fa-solid fa-xmark" />
+                            <span>{{ __('collections.classification.clear_selection') }}</span>
                         </button>
                         <button
                             type="button"
@@ -130,8 +164,35 @@
                     </div>
                 </div>
                 <x-form.input-error for="selectedClassificationPublicIds" />
+                <x-form.input-error for="classificationSuggestion" />
 
-                <div wire:loading.delay wire:target="classificationSearch,classificationVisibility,classificationType,classificationPerPage,selectHighConfidence,prepareClassificationPreview,confirmClassificationAssignments" role="status" aria-live="polite">
+                <div class="grid gap-3 rounded-control border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                    <div>
+                        <label for="classification-batch-category" class="block text-sm font-bold text-slate-700">
+                            {{ __('collections.classification.batch_target') }}
+                        </label>
+                        <select id="classification-batch-category" wire:model="classificationBatchCategoryPublicId" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100">
+                            <option value="">{{ __('collections.categories.select_root') }}</option>
+                            @foreach ($assignmentOptions as $option)
+                                <option value="{{ $option['value'] }}">{{ $option['label'] }}</option>
+                            @endforeach
+                        </select>
+                        <x-form.input-error for="classificationBatchCategoryPublicId" />
+                    </div>
+                    <button
+                        type="button"
+                        wire:click="applyClassificationBatchCategory"
+                        wire:loading.attr="disabled"
+                        wire:target="applyClassificationBatchCategory"
+                        @disabled($selectedClassificationPublicIds === [])
+                        class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        <x-ui.icon name="fa-solid fa-layer-group" />
+                        <span>{{ __('collections.classification.apply_to_selected') }}</span>
+                    </button>
+                </div>
+
+                <div wire:loading.delay wire:target="classificationSearch,classificationVisibility,classificationModerationStatus,classificationType,classificationPerPage,selectCurrentClassificationPage,selectHighConfidence,clearClassificationSelection,stageClassificationSuggestion,applyClassificationBatchCategory,prepareClassificationPreview,confirmClassificationAssignments" role="status" aria-live="polite">
                     <div class="flex items-center gap-2 rounded-control bg-sky-50 px-4 py-3 text-sm font-bold text-sky-800">
                         <x-ui.icon name="fa-solid fa-spinner fa-spin" />
                         <span>{{ __('collections.classification.loading') }}</span>
@@ -185,7 +246,6 @@
                     </section>
                 @endif
 
-                @island(name: 'collection-classification-pagination', always: true, with: $this->paginationIslandPage)
                 <x-ui.pagination-region name="collection-classification-results">
                     <div class="divide-y divide-slate-200 border-y border-slate-200">
                         @forelse ($classificationPage as $collection)
@@ -231,6 +291,18 @@
                                     </div>
                                     @if ($collection->classification_presentation['categoryPath'])
                                         <p class="mt-2 break-words text-sm font-black text-slate-900">{{ $collection->classification_presentation['categoryPath'] }}</p>
+                                        @if ($collection->classification_presentation['canStage'])
+                                            <button
+                                                type="button"
+                                                wire:click="stageClassificationSuggestion('{{ $collection->public_id }}')"
+                                                wire:loading.attr="disabled"
+                                                wire:target="stageClassificationSuggestion('{{ $collection->public_id }}')"
+                                                class="mt-3 inline-flex min-h-11 items-center justify-center gap-2 rounded-control border border-emerald-300 bg-white px-3 py-2 text-sm font-bold text-emerald-800 hover:bg-emerald-50 disabled:cursor-wait disabled:opacity-60"
+                                            >
+                                                <x-ui.icon name="fa-solid fa-check" />
+                                                <span>{{ __('collections.classification.accept_suggestion') }}</span>
+                                            </button>
+                                        @endif
                                     @else
                                         <p class="mt-2 text-sm font-bold text-slate-600">{{ __('collections.classification.suggestion_none') }}</p>
                                     @endif
@@ -282,7 +354,6 @@
                         </nav>
                     @endif
                 </x-ui.pagination-region>
-                @endisland
             </div>
         </section>
     @endif
@@ -293,73 +364,88 @@
         icon="fa-solid fa-sitemap"
     >
         @if ($canManage)
-            <form data-category-create-form wire:submit="createCategory" class="grid gap-4 rounded-control border border-slate-200 bg-slate-50 p-4 lg:grid-cols-2" novalidate>
-                <div>
-                    <label for="category-parent" class="block text-sm font-bold text-slate-700">{{ __('collections.categories.parent') }}</label>
-                    <select id="category-parent" wire:model="parentPublicId" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100">
-                        <option value="">{{ __('collections.categories.create_root') }}</option>
-                        @foreach ($rootOptions as $option)
-                            <option value="{{ $option['value'] }}">{{ $option['label'] }}</option>
-                        @endforeach
-                    </select>
-                    <x-form.input-error for="parentPublicId" />
-                </div>
-                <x-form.field :label="__('collections.categories.slug')" for="category-slug" wire:model="slug" required />
-                <x-form.field :label="__('collections.categories.name_ru')" for="category-name-ru" wire:model="nameRu" required />
-                <x-form.field :label="__('collections.categories.name_en')" for="category-name-en" wire:model="nameEn" required />
-                <div class="lg:col-span-2">
-                    <button type="submit" wire:loading.attr="disabled" wire:target="createCategory" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-600 disabled:opacity-60 sm:w-auto">
-                        <x-ui.icon name="fa-solid fa-plus" />
-                        <span>{{ __('collections.categories.create') }}</span>
-                    </button>
-                </div>
-            </form>
+            <details data-category-create-disclosure class="group rounded-control border border-slate-200 bg-slate-50">
+                <summary class="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 font-black text-slate-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
+                    <span class="inline-flex min-w-0 items-center gap-2">
+                        <x-ui.icon name="fa-solid fa-plus text-emerald-700" />
+                        <span class="break-words">{{ __('collections.categories.create_disclosure') }}</span>
+                    </span>
+                    <x-ui.icon name="fa-solid fa-chevron-down shrink-0 text-slate-400 transition group-open:rotate-180" />
+                </summary>
+                <form data-category-create-form wire:submit="createCategory" class="grid gap-4 border-t border-slate-200 p-4 lg:grid-cols-2" novalidate>
+                    <div>
+                        <label for="category-parent" class="block text-sm font-bold text-slate-700">{{ __('collections.categories.parent') }}</label>
+                        <select id="category-parent" wire:model="parentPublicId" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100">
+                            <option value="">{{ __('collections.categories.create_root') }}</option>
+                            @foreach ($rootOptions as $option)
+                                <option value="{{ $option['value'] }}">{{ $option['label'] }}</option>
+                            @endforeach
+                        </select>
+                        <x-form.input-error for="parentPublicId" />
+                    </div>
+                    <x-form.field :label="__('collections.categories.slug')" for="category-slug" wire:model="slug" required />
+                    <x-form.field :label="__('collections.categories.name_ru')" for="category-name-ru" wire:model="nameRu" required />
+                    <x-form.field :label="__('collections.categories.name_en')" for="category-name-en" wire:model="nameEn" required />
+                    <div class="lg:col-span-2">
+                        <button type="submit" wire:loading.attr="disabled" wire:target="createCategory" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-600 disabled:opacity-60 sm:w-auto">
+                            <x-ui.icon name="fa-solid fa-plus" />
+                            <span>{{ __('collections.categories.create') }}</span>
+                        </button>
+                    </div>
+                </form>
+            </details>
         @endif
 
-        <div class="mt-5 divide-y divide-slate-200">
+        <div class="mt-5 space-y-3">
             @foreach ($categoryTree as $root)
-                <article wire:key="category-root-{{ $root->public_id }}" class="py-4 first:pt-0 last:pb-0">
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                        <div class="min-w-0">
-                            <div class="flex flex-wrap items-center gap-2">
-                                <h3 class="break-words font-black text-slate-800">{{ $root->display_name }}</h3>
+                <details data-category-root-disclosure wire:key="category-root-{{ $root->public_id }}" class="group rounded-control border border-slate-200 bg-white">
+                    <summary
+                        aria-label="{{ __('collections.categories.expand_category', ['name' => $root->display_name]) }}"
+                        class="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
+                    >
+                        <span class="min-w-0">
+                            <span class="flex flex-wrap items-center gap-2">
+                                <span class="break-words font-black text-slate-800">{{ $root->display_name }}</span>
                                 <x-ui.status-pill :variant="$root->is_active ? 'success' : 'muted'">
                                     {{ $root->is_active ? __('collections.categories.active') : __('collections.categories.archived') }}
                                 </x-ui.status-pill>
-                            </div>
-                            <p class="mt-1 text-xs font-semibold text-slate-500">{{ $root->slug }} · {{ __('collections.categories.assigned_count', ['count' => $root->collections_count]) }}</p>
-                        </div>
+                            </span>
+                            <span class="mt-1 block text-xs font-semibold text-slate-500">{{ $root->slug }} · {{ __('collections.categories.assigned_count', ['count' => $root->branch_collections_count]) }}</span>
+                        </span>
+                        <x-ui.icon name="fa-solid fa-chevron-down shrink-0 text-slate-400 transition group-open:rotate-180" />
+                    </summary>
+                    <div class="border-t border-slate-200 p-4">
                         @if ($canManage)
-                            <div class="flex gap-2">
+                            <div class="flex flex-wrap justify-end gap-2">
                                 <button type="button" wire:click="moveCategory('{{ $root->public_id }}', -1)" class="grid h-11 w-11 place-items-center rounded-control bg-slate-100 text-slate-700 hover:bg-slate-200" aria-label="{{ __('collections.categories.move_up') }}"><x-ui.icon name="fa-solid fa-arrow-up" /></button>
                                 <button type="button" wire:click="moveCategory('{{ $root->public_id }}', 1)" class="grid h-11 w-11 place-items-center rounded-control bg-slate-100 text-slate-700 hover:bg-slate-200" aria-label="{{ __('collections.categories.move_down') }}"><x-ui.icon name="fa-solid fa-arrow-down" /></button>
                                 <button type="button" wire:click="selectCategory('{{ $root->public_id }}')" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-slate-100 px-3 text-sm font-bold text-slate-700 hover:bg-slate-200"><x-ui.icon name="fa-solid fa-pen" />{{ __('collections.actions.edit') }}</button>
                             </div>
                         @endif
+                        @if ($root->children->isNotEmpty())
+                            <div class="mt-3 grid gap-2 lg:grid-cols-2">
+                                @foreach ($root->children as $child)
+                                    <div wire:key="category-child-{{ $child->public_id }}" class="flex flex-wrap items-center justify-between gap-3 rounded-control border border-slate-200 bg-slate-50 p-3">
+                                        <div class="min-w-0">
+                                            <p class="break-words text-sm font-black text-slate-800">{{ $child->display_name }}</p>
+                                            <p class="mt-1 text-xs font-semibold text-slate-500">{{ $child->slug }} · {{ __('collections.categories.assigned_count', ['count' => $child->collections_count]) }}</p>
+                                        </div>
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <x-ui.status-pill :variant="$child->is_active ? 'success' : 'muted'">
+                                                {{ $child->is_active ? __('collections.categories.active') : __('collections.categories.archived') }}
+                                            </x-ui.status-pill>
+                                            @if ($canManage)
+                                                <button type="button" wire:click="moveCategory('{{ $child->public_id }}', -1)" class="grid h-11 w-11 place-items-center rounded-control bg-white text-slate-700 hover:bg-slate-100" aria-label="{{ __('collections.categories.move_up') }}"><x-ui.icon name="fa-solid fa-arrow-up" /></button>
+                                                <button type="button" wire:click="moveCategory('{{ $child->public_id }}', 1)" class="grid h-11 w-11 place-items-center rounded-control bg-white text-slate-700 hover:bg-slate-100" aria-label="{{ __('collections.categories.move_down') }}"><x-ui.icon name="fa-solid fa-arrow-down" /></button>
+                                                <button type="button" wire:click="selectCategory('{{ $child->public_id }}')" class="grid h-11 w-11 place-items-center rounded-control bg-white text-slate-700 hover:bg-slate-100" aria-label="{{ __('collections.actions.edit') }}"><x-ui.icon name="fa-solid fa-pen" /></button>
+                                            @endif
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
                     </div>
-                    @if ($root->children->isNotEmpty())
-                        <div class="mt-3 grid gap-2 lg:grid-cols-2">
-                            @foreach ($root->children as $child)
-                                <div wire:key="category-child-{{ $child->public_id }}" class="flex flex-wrap items-center justify-between gap-3 rounded-control border border-slate-200 bg-white p-3">
-                                    <div class="min-w-0">
-                                        <p class="break-words text-sm font-black text-slate-800">{{ $child->display_name }}</p>
-                                        <p class="mt-1 text-xs font-semibold text-slate-500">{{ $child->slug }} · {{ __('collections.categories.assigned_count', ['count' => $child->collections_count]) }}</p>
-                                    </div>
-                                    <div class="flex items-center gap-2">
-                                        <x-ui.status-pill :variant="$child->is_active ? 'success' : 'muted'">
-                                            {{ $child->is_active ? __('collections.categories.active') : __('collections.categories.archived') }}
-                                        </x-ui.status-pill>
-                                        @if ($canManage)
-                                            <button type="button" wire:click="moveCategory('{{ $child->public_id }}', -1)" class="grid h-11 w-11 place-items-center rounded-control bg-slate-100 text-slate-700 hover:bg-slate-200" aria-label="{{ __('collections.categories.move_up') }}"><x-ui.icon name="fa-solid fa-arrow-up" /></button>
-                                            <button type="button" wire:click="moveCategory('{{ $child->public_id }}', 1)" class="grid h-11 w-11 place-items-center rounded-control bg-slate-100 text-slate-700 hover:bg-slate-200" aria-label="{{ __('collections.categories.move_down') }}"><x-ui.icon name="fa-solid fa-arrow-down" /></button>
-                                            <button type="button" wire:click="selectCategory('{{ $child->public_id }}')" class="grid h-11 w-11 place-items-center rounded-control bg-slate-100 text-slate-700 hover:bg-slate-200" aria-label="{{ __('collections.actions.edit') }}"><x-ui.icon name="fa-solid fa-pen" /></button>
-                                        @endif
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
-                    @endif
-                </article>
+                </details>
             @endforeach
         </div>
     </x-ui.panel>
@@ -380,4 +466,6 @@
         </x-ui.panel>
     @endif
 
+    </div>
+    @endisland
 </section>

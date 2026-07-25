@@ -48,6 +48,27 @@
         </div>
     </nav>
 
+    @if ($discoverySectionNavigation !== [])
+        <nav
+            data-discovery-section-navigation
+            aria-label="{{ __('recommendations.page.sections') }}"
+            class="rounded-panel border border-emerald-200 bg-emerald-50/70 p-2"
+        >
+            <div class="flex flex-wrap gap-2">
+                @foreach ($discoverySectionNavigation as $sectionLink)
+                    <a
+                        href="{{ $sectionLink['url'] }}"
+                        class="inline-flex min-h-11 items-center rounded-control px-4 py-2 text-sm font-black text-emerald-800 transition hover:bg-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
+                    >{{ $sectionLink['label'] }}</a>
+                @endforeach
+            </div>
+        </nav>
+
+        <div data-discovery-collection-results>
+            <livewire:collections.catalog-collection-explorer :key="$collectionExplorerKey" />
+        </div>
+    @endif
+
     <details data-discovery-filters @if ($hasFilters) open @endif class="group rounded-panel border border-slate-200 bg-white shadow-sm shadow-slate-200/70">
         <summary class="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 sm:px-6">
             <span class="flex min-w-0 items-center gap-3">
@@ -204,7 +225,7 @@
         <div class="rounded-panel border border-sky-200 bg-sky-50 p-4 text-sm leading-6 text-sky-900">{{ __('recommendations.page.upcoming_notice') }}</div>
     @endif
 
-    <section data-discovery-title-results aria-labelledby="discovery-results" aria-busy="false" class="scroll-mt-40 rounded-panel border border-slate-200 bg-slate-50/60 p-4 sm:p-6">
+    <section @if ($type === 'popular') id="popular-titles" @endif data-discovery-title-results aria-labelledby="discovery-results" aria-busy="false" class="scroll-mt-28 rounded-panel border border-slate-200 bg-slate-50/60 p-4 sm:p-6">
         <div class="flex flex-wrap items-end justify-between gap-3">
             <div>
                 <p class="text-sm font-black uppercase tracking-[0.12em] text-emerald-700">{{ __('recommendations.page.series_section_eyebrow') }}</p>
@@ -281,9 +302,4 @@
         @endif
     </section>
 
-    @if ($type === 'popular')
-        <div data-discovery-collection-results>
-            <livewire:collections.catalog-collection-explorer :key="$collectionExplorerKey" />
-        </div>
-    @endif
 </div>

@@ -67,17 +67,31 @@ final class CatalogDiscoveryLayoutTest extends TestCase
     {
         $response = $this->get(route('discover.index', ['type' => 'popular']))
             ->assertOk()
+            ->assertSee('data-discovery-section-navigation', false)
+            ->assertSee('href="#collections"', false)
+            ->assertSee('href="#popular-titles"', false)
             ->assertSee('data-discovery-title-results', false)
+            ->assertSee('id="popular-titles"', false)
             ->assertSee('data-discovery-collection-results', false)
+            ->assertSeeText(__('recommendations.page.popular_series'))
             ->assertSeeText(__('recommendations.page.series_section_title'))
             ->assertSeeText(__('collections.directory.title'));
 
         $html = $response->getContent();
 
         $this->assertLessThan(
-            strpos($html, 'data-discovery-collection-results'),
             strpos($html, 'data-discovery-title-results'),
+            strpos($html, 'data-discovery-collection-results'),
         );
+    }
+
+    public function test_non_popular_modes_do_not_render_collection_section_navigation(): void
+    {
+        $this->get(route('discover.index', ['type' => 'random']))
+            ->assertOk()
+            ->assertDontSee('data-discovery-section-navigation', false)
+            ->assertDontSee('data-discovery-collection-results', false)
+            ->assertDontSee('id="popular-titles"', false);
     }
 
     /** @return array<string, array{string}> */

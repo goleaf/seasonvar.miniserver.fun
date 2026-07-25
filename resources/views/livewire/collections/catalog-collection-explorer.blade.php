@@ -60,14 +60,16 @@
                         <span class="shrink-0 text-xs">{{ $option['count'] }}</span>
                     </button>
                 @endforeach
-                <button type="button" wire:click="$set('category', 'uncategorized')" @class([
-                    'flex min-h-11 w-full items-center justify-between gap-3 rounded-control px-3 py-2 text-left text-sm font-bold',
-                    'bg-emerald-700 text-white' => $category === 'uncategorized',
-                    'text-slate-700 hover:bg-slate-100' => $category !== 'uncategorized',
-                ])>
-                    <span>{{ __('collections.directory.uncategorized') }}</span>
-                    <span class="text-xs">{{ $uncategorizedCount }}</span>
-                </button>
+                @if ($showUncategorizedFilter)
+                    <button type="button" wire:click="$set('category', 'uncategorized')" @class([
+                        'flex min-h-11 w-full items-center justify-between gap-3 rounded-control px-3 py-2 text-left text-sm font-bold',
+                        'bg-emerald-700 text-white' => $category === 'uncategorized',
+                        'text-slate-700 hover:bg-slate-100' => $category !== 'uncategorized',
+                    ])>
+                        <span>{{ __('collections.directory.uncategorized') }}</span>
+                        <span class="text-xs">{{ $uncategorizedCount }}</span>
+                    </button>
+                @endif
             </div>
         </aside>
 
@@ -81,7 +83,9 @@
                             @foreach ($categoryNavigation as $option)
                                 <option value="{{ $option['slug'] }}">{{ $option['label'] }} ({{ $option['count'] }})</option>
                             @endforeach
-                            <option value="uncategorized">{{ __('collections.directory.uncategorized') }} ({{ $uncategorizedCount }})</option>
+                            @if ($showUncategorizedFilter)
+                                <option value="uncategorized">{{ __('collections.directory.uncategorized') }} ({{ $uncategorizedCount }})</option>
+                            @endif
                         </select>
                     </div>
                     @if ($subcategoryOptions !== [])

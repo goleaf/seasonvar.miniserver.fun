@@ -73,12 +73,11 @@ final class AppLayoutData
         $layoutHeaderActions = [];
 
         if ($this->router->has('discover.index')) {
-            $layoutHeaderNavigation[] = $this->headerLink(
-                'discover.index',
+            $layoutHeaderNavigation[] = $this->headerLinkUrl(
+                $this->collectionDirectoryUrl(),
                 'fa-solid fa-compass',
                 __('recommendations.navigation.discover'),
                 $this->request->routeIs('discover.*', 'localized.discover.*', 'collections.show', 'localized.collections.show', 'profiles.collections', 'localized.profiles.collections'),
-                ['type' => 'popular'],
             );
         }
 
@@ -214,12 +213,11 @@ final class AppLayoutData
         ];
 
         if ($this->router->has('discover.index')) {
-            $layoutFooterNavigation[] = $this->footerLink(
-                'discover.index',
+            $layoutFooterNavigation[] = $this->footerLinkUrl(
+                $this->collectionDirectoryUrl(),
                 'fa-solid fa-compass text-slate-400',
                 __('recommendations.navigation.discover'),
                 $this->request->routeIs('discover.*', 'localized.discover.*', 'collections.show', 'localized.collections.show', 'profiles.collections', 'localized.profiles.collections'),
-                ['type' => 'popular'],
             );
         }
 
@@ -483,6 +481,11 @@ final class AppLayoutData
         }
 
         return 'general';
+    }
+
+    private function collectionDirectoryUrl(): string
+    {
+        return $this->navigationRoute('discover.index', ['type' => 'popular']).'#collections';
     }
 
     private function technicalIssueUrl(): string

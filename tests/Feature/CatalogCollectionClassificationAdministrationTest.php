@@ -18,11 +18,14 @@ use App\Models\CatalogCollectionCategory;
 use App\Models\User;
 use App\Services\Collections\CatalogCollectionCategoryQuery;
 use App\Services\Collections\CatalogCollectionCategoryService;
+use App\Services\Collections\CatalogCollectionClassificationQuery;
 use App\Services\Collections\CatalogCollectionQuery;
 use App\Support\Cache\CacheDomain;
 use App\Support\Cache\CacheVersionRegistry;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
@@ -286,6 +289,43 @@ final class CatalogCollectionClassificationAdministrationTest extends TestCase
             ->assertViewHas('classificationPage', null);
     }
 
+    public function test_classification_queue_defaults_to_public_approved_and_moderation_is_filterable(): void
+    {
+        $admin = $this->administrator();
+        $approved = $this->collection('Одобренная очередь Netflix', [
+            'description' => 'Оригинальные проекты Netflix',
+        ]);
+        $pending = $this->collection('Ожидает модерации', [
+            'moderation_status' => CatalogCollectionModerationStatus::Pending,
+        ]);
+        $private = $this->collection('Личная очередь', [
+            'visibility' => CatalogCollectionVisibility::Private,
+        ]);
+
+        $component = Livewire::actingAs($admin)
+            ->test(CatalogCollectionCategoryManager::class)
+            ->assertSet('classificationVisibility', CatalogCollectionVisibility::Public->value)
+            ->assertSet('classificationModerationStatus', CatalogCollectionModerationStatus::Approved->value)
+            ->assertViewHas('classificationPage', fn ($page): bool => $page->pluck('public_id')->all() === [$approved->public_id])
+            ->assertSeeText($approved->name)
+            ->assertDontSeeText($pending->name)
+            ->assertDontSeeText($private->name)
+            ->assertSeeHtml('id="classification-moderation"')
+            ->call('selectHighConfidence')
+            ->call('prepareClassificationPreview')
+            ->assertSet('classificationPreviewOpen', true)
+            ->set('classificationModerationStatus', '')
+            ->assertSet('classificationPreviewOpen', false)
+            ->assertViewHas('classificationPage', fn ($page): bool => $page->total() === 2);
+
+        $component
+            ->set('paginators.collectionCategoryClassificationPage', 2)
+            ->set('classificationModerationStatus', CatalogCollectionModerationStatus::Approved->value)
+            ->assertSet('paginators.collectionCategoryClassificationPage', 1)
+            ->set('classificationModerationStatus', 'forged')
+            ->assertSet('classificationModerationStatus', CatalogCollectionModerationStatus::Approved->value);
+    }
+
     public function test_classification_filter_resets_its_named_page_and_clears_preview_state(): void
     {
         $admin = $this->administrator();
@@ -321,6 +361,180 @@ final class CatalogCollectionClassificationAdministrationTest extends TestCase
 
         $this->assertNull($collection->refresh()->catalog_collection_category_id);
         $this->assertSame(1, $collection->content_version);
+    }
+
+    public function test_page_selection_and_clear_are_bounded_to_the_current_queue_without_writes(): void
+    {
+        $admin = $this->administrator();
+        $first = $this->collection('Первая строка страницы');
+        $second = $this->collection('Вторая строка страницы');
+        $excluded = $this->collection('Исключённая личная строка', [
+            'visibility' => CatalogCollectionVisibility::Private,
+        ]);
+        $category = CatalogCollectionCategory::query()->where('slug', 'comedy')->firstOrFail();
+
+        Livewire::actingAs($admin)
+            ->test(CatalogCollectionCategoryManager::class)
+            ->call('selectCurrentClassificationPage')
+            ->assertSet('selectedClassificationPublicIds', [
+                $second->public_id,
+                $first->public_id,
+            ])
+            ->set('classificationCategoryByCollection.'.$first->public_id, $category->public_id)
+            ->set('classificationBatchCategoryPublicId', $category->public_id)
+            ->call('clearClassificationSelection')
+            ->assertSet('selectedClassificationPublicIds', [])
+            ->assertSet('classificationCategoryByCollection', [])
+            ->assertSet('classificationBatchCategoryPublicId', '')
+            ->assertSet('classificationPreviewOpen', false);
+
+        $this->assertNull($first->refresh()->catalog_collection_category_id);
+        $this->assertNull($second->refresh()->catalog_collection_category_id);
+        $this->assertNull($excluded->refresh()->catalog_collection_category_id);
+    }
+
+    public function test_suggestion_and_manual_category_staging_are_current_page_only_and_write_nothing(): void
+    {
+        $admin = $this->administrator();
+        $collection = $this->collection('Лучшие сериалы Netflix', [
+            'description' => 'Оригинальные проекты Netflix',
+        ]);
+        $foreign = $this->collection('Личная строка вне очереди', [
+            'visibility' => CatalogCollectionVisibility::Private,
+        ]);
+        $netflix = CatalogCollectionCategory::query()->where('slug', 'netflix')->firstOrFail();
+        $comedy = CatalogCollectionCategory::query()->where('slug', 'comedy')->firstOrFail();
+
+        $component = Livewire::actingAs($admin)
+            ->test(CatalogCollectionCategoryManager::class)
+            ->call('stageClassificationSuggestion', $collection->public_id)
+            ->assertSet('selectedClassificationPublicIds', [$collection->public_id])
+            ->assertSet(
+                'classificationCategoryByCollection.'.$collection->public_id,
+                $netflix->public_id,
+            )
+            ->call('stageClassificationSuggestion', $foreign->public_id)
+            ->assertHasErrors('classificationSuggestion')
+            ->assertSet('selectedClassificationPublicIds', [$collection->public_id]);
+
+        $component
+            ->set('classificationCategoryByCollection.'.$collection->public_id, $comedy->public_id)
+            ->assertSet('selectedClassificationPublicIds', [$collection->public_id])
+            ->set('classificationCategoryByCollection.'.$collection->public_id, '')
+            ->assertSet('selectedClassificationPublicIds', []);
+
+        $this->assertNull($collection->refresh()->catalog_collection_category_id);
+        $this->assertNull($foreign->refresh()->catalog_collection_category_id);
+    }
+
+    public function test_batch_category_staging_accepts_only_selected_current_page_rows(): void
+    {
+        $admin = $this->administrator();
+        $first = $this->collection('Первая пакетная строка');
+        $second = $this->collection('Вторая пакетная строка');
+        $foreign = $this->collection('Личная внедрённая строка', [
+            'visibility' => CatalogCollectionVisibility::Private,
+        ]);
+        $category = CatalogCollectionCategory::query()->where('slug', 'comedy')->firstOrFail();
+
+        $component = Livewire::actingAs($admin)
+            ->test(CatalogCollectionCategoryManager::class)
+            ->set('selectedClassificationPublicIds', [
+                $first->public_id,
+                $second->public_id,
+                $foreign->public_id,
+            ])
+            ->set('classificationBatchCategoryPublicId', $category->public_id)
+            ->call('applyClassificationBatchCategory')
+            ->assertSet('selectedClassificationPublicIds', [
+                $first->public_id,
+                $second->public_id,
+            ])
+            ->assertSet('classificationCategoryByCollection', [
+                $first->public_id => $category->public_id,
+                $second->public_id => $category->public_id,
+            ]);
+
+        $component
+            ->call('clearClassificationSelection')
+            ->set('classificationBatchCategoryPublicId', $category->public_id)
+            ->call('applyClassificationBatchCategory')
+            ->assertHasErrors('selectedClassificationPublicIds')
+            ->set('selectedClassificationPublicIds', [$first->public_id])
+            ->set('classificationBatchCategoryPublicId', (string) Str::uuid())
+            ->call('applyClassificationBatchCategory')
+            ->assertHasErrors('classificationBatchCategoryPublicId');
+
+        $this->assertNull($first->refresh()->catalog_collection_category_id);
+        $this->assertNull($second->refresh()->catalog_collection_category_id);
+        $this->assertNull($foreign->refresh()->catalog_collection_category_id);
+    }
+
+    public function test_request_scoped_classification_page_is_reused_between_action_and_render(): void
+    {
+        $admin = $this->administrator();
+        $this->collection('Лучшие сериалы Netflix', [
+            'description' => 'Оригинальные проекты Netflix',
+        ]);
+        $component = Livewire::actingAs($admin)
+            ->test(CatalogCollectionCategoryManager::class);
+        $pageQueries = [];
+
+        DB::listen(static function (QueryExecuted $query) use (&$pageQueries): void {
+            $sql = str($query->sql)
+                ->replace(['`', '"'], '')
+                ->lower()
+                ->squish()
+                ->toString();
+
+            if (str_contains($sql, 'from catalog_collections')
+                && str_contains($sql, 'catalog_collection_category_id is null')
+                && str_contains($sql, 'order by updated_at desc, id desc')
+                && str_contains($sql, ' limit ')) {
+                $pageQueries[] = $sql;
+            }
+        });
+
+        $component->call('selectHighConfidence');
+
+        $this->assertCount(1, $pageQueries, implode("\n", $pageQueries));
+    }
+
+    public function test_confidence_order_is_limited_to_the_current_database_page(): void
+    {
+        $admin = $this->administrator();
+        $high = $this->collection('Лучшие сериалы Netflix', [
+            'description' => 'Оригинальные проекты Netflix',
+        ]);
+        $low = $this->collection('Фантастика');
+        $none = $this->collection('Нейтральный редакционный список');
+        $queryPage = app(CatalogCollectionClassificationQuery::class)
+            ->paginateUncategorized(
+                visibility: CatalogCollectionVisibility::Public->value,
+                moderationStatus: CatalogCollectionModerationStatus::Approved->value,
+            );
+
+        $this->assertSame(
+            [$none->public_id, $low->public_id, $high->public_id],
+            $queryPage->pluck('public_id')->all(),
+        );
+
+        Livewire::actingAs($admin)
+            ->test(CatalogCollectionCategoryManager::class)
+            ->assertViewHas(
+                'classificationPage',
+                fn ($page): bool => $page->pluck('public_id')->all() === [
+                    $high->public_id,
+                    $low->public_id,
+                    $none->public_id,
+                ],
+            )
+            ->call('selectCurrentClassificationPage')
+            ->assertSet('selectedClassificationPublicIds', [
+                $high->public_id,
+                $low->public_id,
+                $none->public_id,
+            ]);
     }
 
     public function test_final_confirmation_applies_reviewed_rows_and_skips_a_stale_row(): void
@@ -379,9 +593,47 @@ final class CatalogCollectionClassificationAdministrationTest extends TestCase
             ->assertSeeHtml('id="classification-visibility"')
             ->assertSeeHtml('id="classification-type"')
             ->assertSeeHtml('id="classification-per-page"')
+            ->assertSeeHtml('id="classification-batch-category"')
+            ->assertSeeText(__('collections.classification.select_current_page'))
+            ->assertSeeText(__('collections.classification.accept_suggestion'))
+            ->assertSeeText(__('collections.classification.apply_to_selected'))
             ->assertSeeHtml('min-h-11')
+            ->assertSeeHtml('data-category-create-disclosure')
+            ->assertSeeHtml('data-category-root-disclosure')
+            ->assertSeeHtml('<summary')
+            ->assertDontSeeHtml('x-data')
+            ->assertDontSeeHtml('<script')
+            ->assertDontSeeHtml('<style')
             ->assertDontSeeHtml('<img')
             ->assertDontSeeHtml('poster');
+        $this->assertSame(
+            5,
+            substr_count($component->html(), 'data-category-root-disclosure'),
+        );
+
+        $template = file_get_contents(resource_path(
+            'views/livewire/collections/catalog-collection-category-manager.blade.php',
+        ));
+
+        $this->assertIsString($template);
+        $this->assertSame(
+            1,
+            substr_count(
+                $template,
+                "@island(name: 'collection-classification-pagination'",
+            ),
+        );
+        $this->assertLessThan(
+            strpos($template, 'data-collection-classification'),
+            strpos(
+                $template,
+                "@island(name: 'collection-classification-pagination'",
+            ),
+        );
+        $this->assertGreaterThan(
+            strpos($template, 'data-category-root-disclosure'),
+            strpos($template, '@endisland'),
+        );
 
         $component
             ->call('selectHighConfidence')
@@ -395,7 +647,8 @@ final class CatalogCollectionClassificationAdministrationTest extends TestCase
 
         Livewire::actingAs($this->administrator(AdminRoleCode::Moderator))
             ->test(CatalogCollectionCategoryManager::class)
-            ->assertDontSeeHtml('data-collection-classification');
+            ->assertDontSeeHtml('data-collection-classification')
+            ->assertDontSeeHtml('data-category-create-disclosure');
     }
 
     private function administrator(

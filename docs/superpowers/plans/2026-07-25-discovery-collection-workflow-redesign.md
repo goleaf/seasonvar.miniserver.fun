@@ -44,7 +44,7 @@ Tailwind CSS 4.3.2, PHPUnit 12.5.32, Playwright.
 - Collection explorer before the title-results section.
 - Other eight modes unchanged.
 
-- [ ] **Step 1: Write the public-order RED**
+- [x] **Step 1: Write the public-order RED**
 
 Change the existing
 `test_popular_mode_visually_separates_series_from_collection_explorer`
@@ -65,7 +65,7 @@ Also assert:
 - random output has no discovery section navigation and no collection
   explorer.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 ```bash
 php artisan test tests/Feature/CatalogDiscoveryLayoutTest.php \
@@ -75,7 +75,7 @@ php artisan test tests/Feature/CatalogDiscoveryLayoutTest.php \
 Expected: FAIL because current title results precede collection explorer and
 the section navigation/title anchor do not exist.
 
-- [ ] **Step 3: Implement minimal public ordering**
+- [x] **Step 3: Implement minimal public ordering**
 
 In `CatalogDiscoveryPage::render()` prepare a popular-only list:
 
@@ -99,7 +99,7 @@ In Blade:
 Use existing button/navigation classes, visible focus, `min-h-11`, no inline
 CSS/JS and no new card shell.
 
-- [ ] **Step 4: Verify GREEN and regress all modes**
+- [x] **Step 4: Verify GREEN and regress all modes**
 
 ```bash
 php artisan test tests/Feature/CatalogDiscoveryLayoutTest.php \
@@ -126,7 +126,7 @@ Expected: PASS; nine mode routes and one-H1 contract remain green.
 - Correct default/localized discovery URLs.
 - Category/subcategory URL variants treated as interactive filtered state.
 
-- [ ] **Step 1: Write navigation and SEO RED**
+- [x] **Step 1: Write navigation and SEO RED**
 
 Add layout tests with registered routes for RU and localized EN requests:
 
@@ -150,7 +150,7 @@ subcategory variant render:
 - `noindex,follow`;
 - no JSON-LD/alternate output expected for an indexable unfiltered page.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 ```bash
 php artisan test tests/Unit/AppLayoutOptionalNavigationTest.php \
@@ -160,7 +160,7 @@ php artisan test tests/Unit/AppLayoutOptionalNavigationTest.php \
 Expected: FAIL because layout URLs have no fragment and category/subcategory
 are not part of `$collectionStatefulVariant`.
 
-- [ ] **Step 3: Implement locale-aware URL helper and SEO keys**
+- [x] **Step 3: Implement locale-aware URL helper and SEO keys**
 
 Add a private `collectionDirectoryUrl()` in `AppLayoutData`:
 
@@ -184,7 +184,7 @@ Extend `request()->hasAny()` with:
 
 Do not change `CatalogSeoBuilder` or canonical route construction.
 
-- [ ] **Step 4: Verify GREEN**
+- [x] **Step 4: Verify GREEN**
 
 ```bash
 php artisan test tests/Unit/AppLayoutOptionalNavigationTest.php \
@@ -211,7 +211,7 @@ Expected: PASS; unregistered optional-route behavior remains green.
 - Prepared `showUncategorizedFilter` flag.
 - Blade performs no count filtering.
 
-- [ ] **Step 1: Write zero-count RED**
+- [x] **Step 1: Write zero-count RED**
 
 Create one collection under `themes-and-genres / detective-and-crime` and no
 collections under `format`.
@@ -228,7 +228,7 @@ Assert unfiltered explorer:
 Add a bookmarked zero-count `collections_category=format` case and assert the
 selected root remains present with exact empty-state behavior.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 ```bash
 php artisan test tests/Feature/CatalogCollectionExplorerCategoryTest.php
@@ -236,7 +236,7 @@ php artisan test tests/Feature/CatalogCollectionExplorerCategoryTest.php
 
 Expected: FAIL because all active roots and children currently render.
 
-- [ ] **Step 3: Implement prepared filtering**
+- [x] **Step 3: Implement prepared filtering**
 
 When mapping the directory tree:
 
@@ -248,7 +248,7 @@ When mapping the directory tree:
 Wrap desktop/mobile uncategorized controls in the prepared boolean.
 Do not change category query/count SQL.
 
-- [ ] **Step 4: Verify GREEN and directory regression**
+- [x] **Step 4: Verify GREEN and directory regression**
 
 ```bash
 php artisan test tests/Feature/CatalogCollectionExplorerCategoryTest.php \
@@ -278,7 +278,7 @@ Expected: PASS; deterministic two-phase directory ordering remains green.
 - Component default public/approved queue.
 - Normalized URL-backed moderation select.
 
-- [ ] **Step 1: Write query RED**
+- [x] **Step 1: Write query RED**
 
 Create public approved, public pending, private approved and categorized
 collections. Call:
@@ -293,7 +293,7 @@ $page = $query->paginateUncategorized(
 Assert only public approved uncategorized UUID is returned. Assert invalid
 status keeps the service's backward-compatible unfiltered behavior.
 
-- [ ] **Step 2: Verify query RED**
+- [x] **Step 2: Verify query RED**
 
 ```bash
 php artisan test tests/Feature/CatalogCollectionClassificationQueryTest.php
@@ -302,7 +302,7 @@ php artisan test tests/Feature/CatalogCollectionClassificationQueryTest.php
 Expected: ERROR/FAIL because the named `moderationStatus` parameter does not
 exist.
 
-- [ ] **Step 3: Implement query predicate**
+- [x] **Step 3: Implement query predicate**
 
 Import `CatalogCollectionModerationStatus`, parse with `tryFrom()`, and add:
 
@@ -316,7 +316,7 @@ Import `CatalogCollectionModerationStatus`, parse with `tryFrom()`, and add:
 
 Keep method defaults unfiltered to preserve callers.
 
-- [ ] **Step 4: Write component-default RED**
+- [x] **Step 4: Write component-default RED**
 
 Add public approved and public pending fixtures. Assert a fresh manager:
 
@@ -326,7 +326,7 @@ Add public approved and public pending fixtures. Assert a fresh manager:
 - setting moderation to empty reveals both;
 - update resets only named classification paginator and clears preview.
 
-- [ ] **Step 5: Verify component RED**
+- [x] **Step 5: Verify component RED**
 
 ```bash
 php artisan test tests/Feature/CatalogCollectionClassificationAdministrationTest.php
@@ -334,7 +334,7 @@ php artisan test tests/Feature/CatalogCollectionClassificationAdministrationTest
 
 Expected: FAIL because moderation state/control is absent.
 
-- [ ] **Step 6: Implement component state/control**
+- [x] **Step 6: Implement component state/control**
 
 Add URL property:
 
@@ -351,7 +351,7 @@ Set visibility default/URL exception to `public`, normalize against enum
 cases, pass to query, prepare translated options in PHP, and render the fifth
 filter control. Keep all user-facing strings in both locale files.
 
-- [ ] **Step 7: Verify GREEN**
+- [x] **Step 7: Verify GREEN**
 
 ```bash
 php artisan test tests/Feature/CatalogCollectionClassificationQueryTest.php \
@@ -381,7 +381,7 @@ Expected: PASS.
 - `applyClassificationBatchCategory()`.
 - Array update hook that synchronizes selection.
 
-- [ ] **Step 1: Write page-selection RED**
+- [x] **Step 1: Write page-selection RED**
 
 Create two current-page collections and a third excluded by filter. Assert:
 
@@ -399,7 +399,7 @@ Livewire::actingAs($admin)
 
 Assert all collection category FK values remain null.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 ```bash
 php artisan test tests/Feature/CatalogCollectionClassificationAdministrationTest.php \
@@ -408,14 +408,14 @@ php artisan test tests/Feature/CatalogCollectionClassificationAdministrationTest
 
 Expected: FAIL because actions do not exist.
 
-- [ ] **Step 3: Implement page selection/clear**
+- [x] **Step 3: Implement page selection/clear**
 
 Resolve current computed page server-side, select only its normalized public
 UUIDs and cap at 50. Clear selection, category map, batch category,
 validation and preview in the clear action. Reuse a private
 `resetClassificationSelection()` helper from filter resets where appropriate.
 
-- [ ] **Step 4: Write row suggestion/manual-sync RED**
+- [x] **Step 4: Write row suggestion/manual-sync RED**
 
 For a high-confidence Netflix row:
 
@@ -427,7 +427,7 @@ For a high-confidence Netflix row:
 - clear the nested value and assert row is removed;
 - assert no database write.
 
-- [ ] **Step 5: Verify RED**
+- [x] **Step 5: Verify RED**
 
 ```bash
 php artisan test tests/Feature/CatalogCollectionClassificationAdministrationTest.php \
@@ -437,7 +437,7 @@ php artisan test tests/Feature/CatalogCollectionClassificationAdministrationTest
 Expected: FAIL because staging action and keyed array hook behavior are
 missing.
 
-- [ ] **Step 6: Implement row staging**
+- [x] **Step 6: Implement row staging**
 
 Use Livewire 4 array hook:
 
@@ -453,7 +453,7 @@ row from selection, cap to current-page UUIDs during render and always close
 preview. Suggestion action re-resolves current page/suggestions and accepts
 only `isSuggested()` output.
 
-- [ ] **Step 7: Write batch staging RED**
+- [x] **Step 7: Write batch staging RED**
 
 Select two rows, set `classificationBatchCategoryPublicId` to an active
 category, call `applyClassificationBatchCategory`, and assert both maps are
@@ -464,7 +464,7 @@ filled without a write. Cover:
 - browser-injected UUID outside current page;
 - maximum 50 rows.
 
-- [ ] **Step 8: Verify RED**
+- [x] **Step 8: Verify RED**
 
 ```bash
 php artisan test tests/Feature/CatalogCollectionClassificationAdministrationTest.php \
@@ -473,7 +473,7 @@ php artisan test tests/Feature/CatalogCollectionClassificationAdministrationTest
 
 Expected: FAIL because batch state/action do not exist.
 
-- [ ] **Step 9: Implement batch staging and controls**
+- [x] **Step 9: Implement batch staging and controls**
 
 Server-resolve active category UUIDs and current-page UUIDs. Reject invalid
 state through existing localized classification validation. Fill only
@@ -489,7 +489,7 @@ selected current-page map entries. Render:
 Keep actions 44 px, wrapping and disabled/loading states. Do not call
 `confirmAssignments()` from any staging action.
 
-- [ ] **Step 10: Verify GREEN and confirm regression**
+- [x] **Step 10: Verify GREEN and confirm regression**
 
 ```bash
 php artisan test tests/Feature/CatalogCollectionClassificationAdministrationTest.php
@@ -513,7 +513,7 @@ Expected: PASS including existing no-write preview and stale confirmation.
 - One classification page query per Livewire action request.
 - Current-page-only confidence ordering.
 
-- [ ] **Step 1: Write duplicate-query RED**
+- [x] **Step 1: Write duplicate-query RED**
 
 Attach `DB::listen()` around a Livewire `selectHighConfidence` call. Normalize
 SQL and count the distinctive:
@@ -528,7 +528,7 @@ Assert the paginator select/count fingerprint occurs only once per action
 request rather than once in action and again in render. Ignore setup/initial
 mount queries by resetting counters immediately before the call.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 ```bash
 php artisan test tests/Feature/CatalogCollectionClassificationAdministrationTest.php \
@@ -537,7 +537,7 @@ php artisan test tests/Feature/CatalogCollectionClassificationAdministrationTest
 
 Expected: FAIL with duplicated classification paginator query fingerprints.
 
-- [ ] **Step 3: Implement computed owners**
+- [x] **Step 3: Implement computed owners**
 
 Add boot-injected protected services and Livewire `#[Computed]` methods:
 
@@ -559,7 +559,7 @@ Action methods and render must access the same computed property names.
 Computed values remain request-only and are never public serialized state.
 Do not add Laravel shared cache or `Cache::remember`.
 
-- [ ] **Step 4: Write presentation-order RED**
+- [x] **Step 4: Write presentation-order RED**
 
 Create current-page rows producing high, low and none suggestions. Assert
 view page UUID order is high → low → none while:
@@ -568,7 +568,7 @@ view page UUID order is high → low → none while:
 - underlying query test still asserts stable database ordering;
 - selecting current page includes the same UUID set.
 
-- [ ] **Step 5: Verify RED**
+- [x] **Step 5: Verify RED**
 
 ```bash
 php artisan test tests/Feature/CatalogCollectionClassificationAdministrationTest.php \
@@ -577,7 +577,7 @@ php artisan test tests/Feature/CatalogCollectionClassificationAdministrationTest
 
 Expected: FAIL because render preserves database order.
 
-- [ ] **Step 6: Implement stable page-only order**
+- [x] **Step 6: Implement stable page-only order**
 
 After attaching suggestion presentation, sort the paginator collection by:
 
@@ -591,7 +591,7 @@ After attaching suggestion presentation, sort the paginator collection by:
 
 Do not change SQL order, total, paginator page or global filtering.
 
-- [ ] **Step 7: Verify GREEN and query budget**
+- [x] **Step 7: Verify GREEN and query budget**
 
 ```bash
 php artisan test tests/Feature/CatalogCollectionClassificationAdministrationTest.php \
@@ -618,7 +618,7 @@ Expected: PASS and query-budget cap unchanged.
 - One native root disclosure per category.
 - Existing create/move/edit actions inside accessible progressive UI.
 
-- [ ] **Step 1: Write disclosure RED**
+- [x] **Step 1: Write disclosure RED**
 
 Assert manager HTML contains:
 
@@ -631,7 +631,7 @@ Assert manager HTML contains:
 Assert a moderator without `content.manage` still receives no classification
 queue and no create controls.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 ```bash
 php artisan test tests/Feature/CatalogCollectionClassificationAdministrationTest.php \
@@ -641,7 +641,7 @@ php artisan test tests/Feature/CatalogCollectionClassificationAdministrationTest
 Expected: FAIL because create/tree content is always expanded and data
 markers are absent.
 
-- [ ] **Step 3: Implement native disclosures**
+- [x] **Step 3: Implement native disclosures**
 
 Wrap create form in one `<details>` with a translated summary. Replace each
 root `<article>` shell with `<details>`:
@@ -652,7 +652,7 @@ root `<article>` shell with `<details>`:
 - root move/edit controls live in the revealed body;
 - keep selected edit panel unchanged.
 
-- [ ] **Step 4: Complete RU/EN parity**
+- [x] **Step 4: Complete RU/EN parity**
 
 Add exact keys for:
 
@@ -669,7 +669,7 @@ Add exact keys for:
 
 Run recursive parity test.
 
-- [ ] **Step 5: Verify GREEN, Blade rules and build**
+- [x] **Step 5: Verify GREEN, Blade rules and build**
 
 ```bash
 php artisan test tests/Feature/CatalogCollectionClassificationAdministrationTest.php \
@@ -692,7 +692,7 @@ Tailwind utilities.
 - Inspect: changed PHP/Blade/lang/tests
 - Update: current Task 56 compliance evidence
 
-- [ ] **Step 1: Extend browser assertions before markup GREEN**
+- [x] **Step 1: Extend browser assertions before markup GREEN**
 
 Before the final markup is considered complete, update the existing browser
 spec to assert:
@@ -710,7 +710,7 @@ spec to assert:
 
 Keep Desktop Chromium, Mobile Chromium and Tablet Chromium projects.
 
-- [ ] **Step 2: Run focused PHP regression**
+- [x] **Step 2: Run focused PHP regression**
 
 ```bash
 php artisan test \
@@ -725,7 +725,7 @@ php artisan test \
   tests/Unit/BladeTemplateTest.php
 ```
 
-- [ ] **Step 3: Run exact SQLite plan evidence**
+- [x] **Step 3: Run exact SQLite plan evidence**
 
 ```bash
 sqlite3 database/database.sqlite \
@@ -736,7 +736,7 @@ Record selected index/temp sort honestly. Do not add an index unless this
 measured result changes the approved no-DDL decision and the plan is updated
 first.
 
-- [ ] **Step 4: Run browser QA**
+- [x] **Step 4: Run browser QA**
 
 ```bash
 npx playwright test tests/browser/discovery-collections.spec.js
@@ -745,7 +745,7 @@ npx playwright test tests/browser/discovery-collections.spec.js
 Inspect generated desktop/mobile/tablet screenshots visually for hierarchy,
 wrapping, category visibility, disclosures and absence of images.
 
-- [ ] **Step 5: Run wider affected gates**
+- [x] **Step 5: Run wider affected gates**
 
 ```bash
 ./vendor/bin/pint --dirty --format agent
@@ -776,7 +776,7 @@ separately and record it as unresolved. Do not claim a full pass.
 - Modify: `docs/plans/current-task-plan.md`
 - Modify: this plan
 
-- [ ] **Step 1: Update canonical owners**
+- [x] **Step 1: Update canonical owners**
 
 Record only implemented facts:
 
@@ -790,7 +790,7 @@ Record only implemented facts:
 - no route/schema/dependency/data/image change;
 - rollout/rollback and manual-confirmation production limitation.
 
-- [ ] **Step 2: Update README and CHANGELOG**
+- [x] **Step 2: Update README and CHANGELOG**
 
 README:
 
@@ -806,7 +806,7 @@ CHANGELOG:
 - preserve every previous entry;
 - keep exact identifiers in technical form.
 
-- [ ] **Step 3: Refresh/check docs**
+- [x] **Step 3: Refresh/check docs**
 
 ```bash
 php artisan project:docs-refresh
@@ -816,7 +816,7 @@ bash scripts/check-changelog-policy.sh
 bash scripts/ci-check.sh docs
 ```
 
-- [ ] **Step 4: Re-read requirements/spec/plan**
+- [x] **Step 4: Re-read requirements/spec/plan**
 
 Fresh-read:
 
@@ -828,7 +828,7 @@ Fresh-read:
 
 Correct every unsupported `completed` status.
 
-- [ ] **Step 5: Repository-wide relevant legacy scan**
+- [x] **Step 5: Repository-wide relevant legacy scan**
 
 Search and inspect:
 
@@ -845,7 +845,7 @@ Confirm no duplicate route/service, automatic category write, dead zero-count
 control, unbounded inference, query from Blade, inline business JS/CSS or
 stale image behavior remains in Task 56 scope.
 
-- [ ] **Step 6: Exact diff and branch review**
+- [x] **Step 6: Exact diff and branch review**
 
 ```bash
 git status --short --branch
@@ -864,24 +864,49 @@ change. Do not use `--no-verify`. Push the completed commit to configured
 `origin main`. If authentication or remote state rejects the push, record
 exact output as `unresolved`; do not report success.
 
+### Final verification evidence
+
+- Focused affected matrix: `88` tests passed with `2 482` assertions.
+- Wider collection/discovery/layout matrix: `128` tests passed with `2 750`
+  assertions.
+- Default full suite stops at the unrelated
+  `UserProfileMediaProcessingTest` because `phpunit.xml` fixes the PHP memory
+  limit at `256M`; the process exhausts memory inside GD image allocation.
+- The full suite excluding exactly that test reached `1 758` passed and `11`
+  skipped, then reported two unrelated existing blockers: the other-browser
+  session flash assertion and missing importer class
+  `SeasonvarImportDispatchBatcher`.
+- Pint, Vite production build, managed documentation, README/CHANGELOG
+  policies, docs CI and `git diff HEAD --check` pass.
+- SQLite selects covering index
+  `catalog_collections_category_public_order_idx`; the temporary B-tree is
+  limited to the bounded `updated_at,id` ordering.
+- Playwright passed `3/3` Desktop/Mobile/Tablet scenarios; all six current
+  screenshots were visually inspected for hierarchy, wrapping, disclosures,
+  zero-count controls, text-only collection cards and overflow.
+- The relevant legacy scan found one stale historical frontend-audit claim
+  about a `16:9` collection cover and corrected it. Deprecated API
+  `cover_url=null`, exact legacy-cover purge and dated historic 404 evidence
+  remain intentionally compatible.
+
 ---
 
 ## Final acceptance checklist
 
-- [ ] `/discover/popular` remains the only collection directory route.
-- [ ] Global «Подборки» opens `#collections` in RU and EN.
-- [ ] Collection explorer appears before title results.
-- [ ] Other discovery modes remain collection-free.
-- [ ] Zero-count categories/subcategories are not dead public controls.
-- [ ] Category/subcategory URL variants are noindex with clean canonical.
-- [ ] Admin default queue is public/approved and remains filterable.
-- [ ] Page/row/batch staging performs zero writes.
-- [ ] Existing preview/confirm authorization/concurrency is unchanged.
-- [ ] One Livewire action request does not duplicate classification page SQL.
-- [ ] Confidence sorting is current-page-only.
-- [ ] Category dictionary uses native progressive disclosure.
-- [ ] RU/EN parity, 44 px, mobile wrapping and text-only contracts pass.
-- [ ] Query cap and existing index path remain bounded.
-- [ ] No migration/dependency/env/route/cache-store/production DML exists.
-- [ ] Canonical docs, README, CHANGELOG and compliance evidence are current.
+- [x] `/discover/popular` remains the only collection directory route.
+- [x] Global «Подборки» opens `#collections` in RU and EN.
+- [x] Collection explorer appears before title results.
+- [x] Other discovery modes remain collection-free.
+- [x] Zero-count categories/subcategories are not dead public controls.
+- [x] Category/subcategory URL variants are noindex with clean canonical.
+- [x] Admin default queue is public/approved and remains filterable.
+- [x] Page/row/batch staging performs zero writes.
+- [x] Existing preview/confirm authorization/concurrency is unchanged.
+- [x] One Livewire action request does not duplicate classification page SQL.
+- [x] Confidence sorting is current-page-only.
+- [x] Category dictionary uses native progressive disclosure.
+- [x] RU/EN parity, 44 px, mobile wrapping and text-only contracts pass.
+- [x] Query cap and existing index path remain bounded.
+- [x] No migration/dependency/env/route/cache-store/production DML exists.
+- [x] Canonical docs, README, CHANGELOG and compliance evidence are current.
 - [ ] Task 56 commit is isolated in `main`; push result is reported honestly.

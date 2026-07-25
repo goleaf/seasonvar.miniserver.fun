@@ -235,7 +235,7 @@ Source relations: `CatalogCollection::sourceRecord()`, `CatalogCollectionSource:
 
 `CatalogCollectionSourceScope` вычисляется из `source_type` через `HdRezkaCollectionTypeCompatibility`: поддерживаемы `series|show|anime|documentary`, вне текущей сериаловой области находятся `film|cartoon`, отсутствующий или неизвестный тип остаётся `unknown`. Scope используется только для read-only административной диагностики; schema, source identity, match status/method и локальная relation identity от него не зависят.
 
-Предложения административного центра классификации не образуют новую таблицу или relation. Они вычисляются только для текущей страницы из уже сохранённых collection/translations/source и bounded sample membership metadata, передаются как DTO без raw member titles и исчезают после запроса. Единственным persisted фактом остаётся nullable category FK самой подборки; подтверждение увеличивает её `content_version`, но не меняет owner, visibility, moderation, translations или membership.
+Предложения административного центра классификации не образуют новую таблицу или relation. Они вычисляются только для текущей страницы из уже сохранённых collection/translations/source и bounded sample membership metadata, передаются как DTO без raw member titles и исчезают после запроса. Выбор страницы, принятие подсказки строки, batch category и confidence order также остаются request/browser draft без persistence. Единственным persisted фактом остаётся nullable category FK самой подборки; только явное подтверждение увеличивает её `content_version`, но не меняет owner, visibility, moderation, translations или membership.
 
 ### Invariants
 

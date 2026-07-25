@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Livewire\Collections;
 
 use App\DTOs\CatalogCollectionCategorySuggestion;
+use App\DTOs\CatalogCollectionClassificationSummary;
 use App\Enums\AdminPermission;
 use App\Enums\CatalogCollectionCategorySuggestionConfidence;
+use App\Enums\CatalogCollectionModerationStatus;
 use App\Enums\CatalogCollectionType;
 use App\Enums\CatalogCollectionVisibility;
 use App\Livewire\Concerns\InteractsWithPaginationIslands;
@@ -22,6 +24,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -55,8 +58,11 @@ final class CatalogCollectionCategoryManager extends Component
     #[Url(as: 'collection_classification_q', history: true, except: '')]
     public string $classificationSearch = '';
 
-    #[Url(as: 'collection_classification_visibility', history: true, except: '')]
-    public string $classificationVisibility = '';
+    #[Url(as: 'collection_classification_visibility', history: true, except: 'public')]
+    public string $classificationVisibility = 'public';
+
+    #[Url(as: 'collection_classification_moderation', history: true, except: 'approved')]
+    public string $classificationModerationStatus = 'approved';
 
     #[Url(as: 'collection_classification_type', history: true, except: '')]
     public string $classificationType = '';
@@ -69,6 +75,8 @@ final class CatalogCollectionCategoryManager extends Component
 
     /** @var array<string, string> */
     public array $classificationCategoryByCollection = [];
+
+    public string $classificationBatchCategoryPublicId = '';
 
     /** @var array<string, int> */
     #[Locked]
@@ -89,10 +97,18 @@ final class CatalogCollectionCategoryManager extends Component
 
     public ?string $notice = null;
 
-    public function boot(): void
-    {
+    protected CatalogCollectionCategoryQuery $categoryQuery;
+
+    protected CatalogCollectionClassificationQuery $classificationQuery;
+
+    public function boot(
+        CatalogCollectionCategoryQuery $categoryQuery,
+        CatalogCollectionClassificationQuery $classificationQuery,
+    ): void {
         Gate::authorize(AdminPermission::ContentView->value);
         $this->canManage = Gate::allows(AdminPermission::ContentManage->value);
+        $this->categoryQuery = $categoryQuery;
+        $this->classificationQuery = $classificationQuery;
     }
 
     public function updatedClassificationSearch(): void
@@ -137,6 +153,23 @@ final class CatalogCollectionCategoryManager extends Component
         $this->resetClassificationContext();
     }
 
+    public function updatedClassificationModerationStatus(): void
+    {
+        $allowed = [
+            '',
+            ...array_map(
+                fn (CatalogCollectionModerationStatus $status): string => $status->value,
+                CatalogCollectionModerationStatus::cases(),
+            ),
+        ];
+        $this->classificationModerationStatus = in_array(
+            $this->classificationModerationStatus,
+            $allowed,
+            true,
+        ) ? $this->classificationModerationStatus : CatalogCollectionModerationStatus::Approved->value;
+        $this->resetClassificationContext();
+    }
+
     public function updatedClassificationPerPage(): void
     {
         $this->classificationPerPage = in_array(
@@ -161,9 +194,36 @@ final class CatalogCollectionCategoryManager extends Component
         $this->closeClassificationPreview();
     }
 
-    public function updatedClassificationCategoryByCollection(): void
-    {
+    public function updatedClassificationCategoryByCollection(
+        mixed $value,
+        mixed $key,
+    ): void {
+        if (is_string($key) && Str::isUuid($key)) {
+            $publicId = Str::lower($key);
+            $selected = collect($this->selectedClassificationPublicIds)
+                ->filter(fn (mixed $candidate): bool => is_string($candidate) && Str::isUuid($candidate))
+                ->map(fn (string $candidate): string => Str::lower($candidate));
+
+            if (is_scalar($value) && Str::isUuid((string) $value)) {
+                $selected->push($publicId);
+            } else {
+                $selected = $selected->reject(
+                    fn (string $candidate): bool => $candidate === $publicId,
+                );
+            }
+
+            $this->selectedClassificationPublicIds = $selected
+                ->unique()
+                ->take(50)
+                ->values()
+                ->all();
+        }
+
         $this->closeClassificationPreview();
+        $this->resetValidation([
+            'selectedClassificationPublicIds',
+            'classificationCategoryByCollection',
+        ]);
     }
 
     public function createCategory(CatalogCollectionCategoryService $categories): void
@@ -229,13 +289,10 @@ final class CatalogCollectionCategoryManager extends Component
         $this->notice = __('collections.categories.order_updated');
     }
 
-    public function selectHighConfidence(
-        CatalogCollectionCategoryQuery $categories,
-        CatalogCollectionClassificationQuery $classification,
-    ): void {
+    public function selectHighConfidence(): void
+    {
         $this->authorizeManage();
-        $page = $this->classificationPage($classification);
-        $suggestions = $classification->suggestionsFor($page, $categories->activeTree());
+        $suggestions = $this->classificationSuggestions;
         $selected = [];
         $categoryByCollection = [];
 
@@ -258,15 +315,156 @@ final class CatalogCollectionCategoryManager extends Component
         ]);
     }
 
-    public function prepareClassificationPreview(
-        CatalogCollectionCategoryQuery $categories,
-        CatalogCollectionClassificationQuery $classification,
+    public function selectCurrentClassificationPage(): void
+    {
+        $this->authorizeManage();
+        $page = $this->sortClassificationPageByConfidence(
+            $this->classificationPage,
+            $this->classificationSuggestions,
+        );
+        $selected = $page
+            ->pluck('public_id')
+            ->filter(fn (mixed $publicId): bool => is_string($publicId) && Str::isUuid($publicId))
+            ->map(fn (string $publicId): string => Str::lower($publicId))
+            ->unique()
+            ->take(50)
+            ->values()
+            ->all();
+        $allowed = array_flip($selected);
+
+        $this->selectedClassificationPublicIds = $selected;
+        $this->classificationCategoryByCollection = array_intersect_key(
+            $this->classificationCategoryByCollection,
+            $allowed,
+        );
+        $this->closeClassificationPreview();
+        $this->resetValidation([
+            'selectedClassificationPublicIds',
+            'classificationCategoryByCollection',
+        ]);
+    }
+
+    public function clearClassificationSelection(): void
+    {
+        $this->authorizeManage();
+        $this->selectedClassificationPublicIds = [];
+        $this->classificationCategoryByCollection = [];
+        $this->classificationBatchCategoryPublicId = '';
+        $this->closeClassificationPreview();
+        $this->resetValidation([
+            'selectedClassificationPublicIds',
+            'classificationCategoryByCollection',
+            'classificationBatchCategoryPublicId',
+            'classificationSuggestion',
+        ]);
+    }
+
+    public function stageClassificationSuggestion(
+        string $publicId,
     ): void {
         $this->authorizeManage();
-        $page = $this->classificationPage($classification);
+        $publicId = Str::lower(trim($publicId));
+        $page = $this->classificationPage;
+        $pagePublicIds = $page->pluck('public_id')
+            ->map(fn (string $candidate): string => Str::lower($candidate));
+
+        if (! Str::isUuid($publicId) || ! $pagePublicIds->contains($publicId)) {
+            $this->classificationValidation(
+                'classificationSuggestion',
+                __('collections.classification.validation_suggestion'),
+            );
+        }
+
+        $suggestion = $this->classificationSuggestions[$publicId] ?? null;
+
+        if (! $suggestion instanceof CatalogCollectionCategorySuggestion
+            || ! $suggestion->isSuggested()) {
+            $this->classificationValidation(
+                'classificationSuggestion',
+                __('collections.classification.validation_suggestion'),
+            );
+        }
+
+        $this->selectedClassificationPublicIds = collect(
+            $this->selectedClassificationPublicIds,
+        )
+            ->push($publicId)
+            ->filter(fn (mixed $candidate): bool => is_string($candidate) && Str::isUuid($candidate))
+            ->map(fn (string $candidate): string => Str::lower($candidate))
+            ->unique()
+            ->take(50)
+            ->values()
+            ->all();
+        $this->classificationCategoryByCollection[$publicId] = (string) $suggestion->categoryPublicId;
+        $this->closeClassificationPreview();
+        $this->resetValidation([
+            'selectedClassificationPublicIds',
+            'classificationCategoryByCollection.'.$publicId,
+            'classificationSuggestion',
+        ]);
+    }
+
+    public function applyClassificationBatchCategory(): void
+    {
+        $this->authorizeManage();
+        $pagePublicIds = $this->classificationPage
+            ->pluck('public_id')
+            ->filter(fn (mixed $publicId): bool => is_string($publicId) && Str::isUuid($publicId))
+            ->map(fn (string $publicId): string => Str::lower($publicId))
+            ->take(50)
+            ->values();
+        $pageLookup = $pagePublicIds->flip();
+        $selected = collect($this->selectedClassificationPublicIds)
+            ->filter(fn (mixed $publicId): bool => is_string($publicId) && Str::isUuid($publicId))
+            ->map(fn (string $publicId): string => Str::lower($publicId))
+            ->unique()
+            ->filter(fn (string $publicId): bool => $pageLookup->has($publicId))
+            ->take(50)
+            ->values();
+
+        if ($selected->isEmpty()) {
+            $this->classificationValidation(
+                'selectedClassificationPublicIds',
+                __('collections.classification.validation_selection'),
+            );
+        }
+
+        $categoryPublicId = Str::lower(trim($this->classificationBatchCategoryPublicId));
+        $activeCategoryPublicIds = $this->activeCategoryPublicIds($this->categoryTree);
+
+        if (! Str::isUuid($categoryPublicId)
+            || ! in_array($categoryPublicId, $activeCategoryPublicIds, true)) {
+            $this->classificationValidation(
+                'classificationBatchCategoryPublicId',
+                __('collections.classification.validation_target'),
+            );
+        }
+
+        $this->selectedClassificationPublicIds = $selected->all();
+
+        foreach ($selected as $publicId) {
+            $this->classificationCategoryByCollection[$publicId] = $categoryPublicId;
+        }
+
+        $this->classificationCategoryByCollection = array_intersect_key(
+            $this->classificationCategoryByCollection,
+            $pageLookup->all(),
+        );
+        $this->closeClassificationPreview();
+        $this->resetValidation([
+            'selectedClassificationPublicIds',
+            'classificationCategoryByCollection',
+            'classificationBatchCategoryPublicId',
+        ]);
+    }
+
+    public function prepareClassificationPreview(): void
+    {
+        $this->authorizeManage();
+        $page = $this->classificationPage;
         $pageCollections = $page->getCollection()->keyBy('public_id');
         $activeCategoryPublicIds = $this->activeCategoryPublicIds(
-            $categories->activeTree(),
+            $this->categoryTree,
         );
         $selected = collect($this->selectedClassificationPublicIds)
             ->filter(fn (mixed $publicId): bool => is_string($publicId) && Str::isUuid($publicId))
@@ -345,6 +543,7 @@ final class CatalogCollectionCategoryManager extends Component
         );
         $this->selectedClassificationPublicIds = [];
         $this->classificationCategoryByCollection = [];
+        $this->classificationBatchCategoryPublicId = '';
         $this->closeClassificationPreview();
         $this->notice = __('collections.classification.confirmed', [
             'changed' => $result->changed,
@@ -353,11 +552,16 @@ final class CatalogCollectionCategoryManager extends Component
         $this->resetPage(pageName: 'collectionCategoryClassificationPage');
     }
 
-    public function render(
-        CatalogCollectionCategoryQuery $categories,
-        CatalogCollectionClassificationQuery $classification,
-    ): View {
-        $tree = $categories->administrationTree();
+    public function render(): View
+    {
+        $tree = $this->categoryTree;
+        $tree->each(function (CatalogCollectionCategory $root): void {
+            $root->setAttribute(
+                'branch_collections_count',
+                (int) $root->collections_count
+                    + (int) $root->children->sum('collections_count'),
+            );
+        });
         $rootOptions = $tree
             ->filter(fn (CatalogCollectionCategory $category): bool => $category->is_active)
             ->map(fn (CatalogCollectionCategory $category): array => [
@@ -391,12 +595,9 @@ final class CatalogCollectionCategoryManager extends Component
         $classificationPage = null;
 
         if ($this->canManage) {
-            $classificationSummary = $classification->summary();
-            $classificationPage = $this->classificationPage($classification);
-            $classificationSuggestions = $classification->suggestionsFor(
-                $classificationPage,
-                $tree,
-            );
+            $classificationSummary = $this->classificationSummary;
+            $classificationPage = $this->classificationPage;
+            $classificationSuggestions = $this->classificationSuggestions;
             $this->pruneClassificationState(
                 $classificationPage->pluck('public_id')->all(),
             );
@@ -420,6 +621,7 @@ final class CatalogCollectionCategoryManager extends Component
                     'score' => $suggestion->score,
                     'confidenceLabel' => $suggestion->confidence->label(),
                     'confidenceVariant' => $suggestion->confidence->variant(),
+                    'canStage' => $suggestion->isSuggested(),
                     'reasonLabels' => array_map(
                         fn (string $reason): string => __(
                             'collections.classification.reasons.'.$reason,
@@ -436,6 +638,10 @@ final class CatalogCollectionCategoryManager extends Component
                     $classificationSuggestionPresentations[$collection->public_id],
                 );
             });
+            $classificationPage = $this->sortClassificationPageByConfidence(
+                $classificationPage,
+                $classificationSuggestions,
+            );
         }
 
         $classificationOptionLabels = collect($assignmentOptions)
@@ -451,6 +657,12 @@ final class CatalogCollectionCategoryManager extends Component
             ->map(fn (CatalogCollectionType $type): array => [
                 'value' => $type->value,
                 'label' => $type->label(),
+            ])
+            ->all();
+        $classificationModerationOptions = collect(CatalogCollectionModerationStatus::cases())
+            ->map(fn (CatalogCollectionModerationStatus $status): array => [
+                'value' => $status->value,
+                'label' => $status->label(),
             ])
             ->all();
         $classificationPreviewRows = collect($this->classificationPreviewAssignments)
@@ -477,20 +689,86 @@ final class CatalogCollectionCategoryManager extends Component
             'classificationPage' => $classificationPage,
             'classificationOptionLabels' => $classificationOptionLabels,
             'classificationVisibilityOptions' => $classificationVisibilityOptions,
+            'classificationModerationOptions' => $classificationModerationOptions,
             'classificationTypeOptions' => $classificationTypeOptions,
             'classificationPreviewRows' => $classificationPreviewRows,
         ]);
     }
 
-    private function classificationPage(
-        CatalogCollectionClassificationQuery $classification,
-    ): LengthAwarePaginator {
-        return $classification->paginateUncategorized(
+    /** @return Collection<int, CatalogCollectionCategory> */
+    #[Computed]
+    public function categoryTree(): Collection
+    {
+        return $this->categoryQuery->administrationTree();
+    }
+
+    /** @return LengthAwarePaginator<int, CatalogCollection> */
+    #[Computed]
+    public function classificationPage(): LengthAwarePaginator
+    {
+        return $this->classificationQuery->paginateUncategorized(
             search: $this->classificationSearch,
             visibility: $this->classificationVisibility,
             type: $this->classificationType,
             perPage: $this->classificationPerPage,
+            moderationStatus: $this->classificationModerationStatus,
         );
+    }
+
+    /** @return array<string, CatalogCollectionCategorySuggestion> */
+    #[Computed]
+    public function classificationSuggestions(): array
+    {
+        return $this->classificationQuery->suggestionsFor(
+            $this->classificationPage,
+            $this->categoryTree,
+        );
+    }
+
+    #[Computed]
+    public function classificationSummary(): CatalogCollectionClassificationSummary
+    {
+        return $this->classificationQuery->summary();
+    }
+
+    /**
+     * @param  LengthAwarePaginator<int, CatalogCollection>  $page
+     * @param  array<string, CatalogCollectionCategorySuggestion>  $suggestions
+     * @return LengthAwarePaginator<int, CatalogCollection>
+     */
+    private function sortClassificationPageByConfidence(
+        LengthAwarePaginator $page,
+        array $suggestions,
+    ): LengthAwarePaginator {
+        $originalPositions = $page->getCollection()
+            ->pluck('public_id')
+            ->flip();
+        $sorted = $page->getCollection()
+            ->sortBy(function (CatalogCollection $collection) use ($suggestions, $originalPositions): array {
+                $suggestion = $suggestions[$collection->public_id];
+
+                return [
+                    $this->confidenceRank($suggestion->confidence),
+                    -$suggestion->score,
+                    (int) $originalPositions->get($collection->public_id, PHP_INT_MAX),
+                ];
+            })
+            ->values();
+
+        $page->setCollection($sorted);
+
+        return $page;
+    }
+
+    private function confidenceRank(
+        CatalogCollectionCategorySuggestionConfidence $confidence,
+    ): int {
+        return match ($confidence) {
+            CatalogCollectionCategorySuggestionConfidence::High => 0,
+            CatalogCollectionCategorySuggestionConfidence::Medium => 1,
+            CatalogCollectionCategorySuggestionConfidence::Low => 2,
+            CatalogCollectionCategorySuggestionConfidence::None => 3,
+        };
     }
 
     /**
@@ -544,6 +822,7 @@ final class CatalogCollectionCategoryManager extends Component
     {
         $this->selectedClassificationPublicIds = [];
         $this->classificationCategoryByCollection = [];
+        $this->classificationBatchCategoryPublicId = '';
         $this->closeClassificationPreview();
         $this->resetPage(pageName: 'collectionCategoryClassificationPage');
     }

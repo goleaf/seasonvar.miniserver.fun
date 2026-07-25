@@ -5,7 +5,7 @@ return [
     'page' => [
         'eyebrow' => 'Series discovery', 'title' => 'Find your next series',
         'description' => 'Public rankings are kept separate from recommendations that use your library and viewing history.',
-        'breadcrumbs' => 'Discovery navigation', 'controls' => 'Discovery type and filters', 'results' => 'Discovery results',
+        'breadcrumbs' => 'Discovery navigation', 'controls' => 'Discovery type and filters', 'results' => 'Discovery results', 'sections' => 'Page sections',
         'loading' => 'Updating recommendations…', 'refresh' => 'Refresh recommendations', 'show_another' => 'Show another set',
         'previous' => 'Previous page', 'next' => 'Next page', 'page_number' => 'Page :page', 'filters' => 'Filters',
         'filters_hint' => 'Genre, country, year, quality, and additional conditions', 'filters_active' => 'Filtering conditions are active',
@@ -22,7 +22,7 @@ return [
         'upcoming_notice' => 'A release date does not mean video is available yet.', 'sign_in' => 'Sign in for personal recommendations',
         'browse_popular' => 'Browse popular series', 'open_catalog' => 'Open catalog', 'why' => 'Why this is shown',
         'result_count' => ':count series|:count series',
-        'series_section_eyebrow' => 'Catalog series', 'series_section_title' => 'Series by the selected method',
+        'series_section_eyebrow' => 'Catalog series', 'popular_series' => 'Popular series', 'series_section_title' => 'Series by the selected method',
         'series_section_description' => 'Series rankings and the thematic collection catalog are separated to make both easier to browse.',
     ],
     'card' => ['rank' => 'Position :rank', 'catalog_title' => 'catalog title'],

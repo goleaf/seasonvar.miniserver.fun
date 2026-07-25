@@ -73,6 +73,7 @@ final class CatalogCollectionClassificationQuery
         string $visibility = '',
         string $type = '',
         int $perPage = 20,
+        string $moderationStatus = '',
     ): LengthAwarePaginator {
         $perPage = max(10, min(50, $perPage));
 
@@ -84,6 +85,7 @@ final class CatalogCollectionClassificationQuery
         $searchPattern = $this->containsPattern($search);
         $visibilityFilter = CatalogCollectionVisibility::tryFrom($visibility);
         $typeFilter = CatalogCollectionType::tryFrom($type);
+        $moderationFilter = CatalogCollectionModerationStatus::tryFrom($moderationStatus);
         $query = CatalogCollection::query()
             ->select([
                 'id',
@@ -106,6 +108,13 @@ final class CatalogCollectionClassificationQuery
             ->when(
                 $typeFilter !== null,
                 fn (Builder $query): Builder => $query->where('type', $typeFilter->value),
+            )
+            ->when(
+                $moderationFilter !== null,
+                fn (Builder $query): Builder => $query->where(
+                    'moderation_status',
+                    $moderationFilter->value,
+                ),
             )
             ->when($search !== '', function (Builder $query) use ($searchPattern): void {
                 $query->where(function (Builder $query) use ($searchPattern): void {

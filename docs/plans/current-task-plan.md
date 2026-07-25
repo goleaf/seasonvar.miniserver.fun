@@ -3,6 +3,132 @@
 Дата: 24.07.2026
 Статус: importer Tasks 2–4 имеют `implementation_complete`, а общая Tasks 2–4 delivery остаётся `unresolved` до завершения unrelated dependency/system/player/collection/lease scopes, очистки shared worktree и повторной проверки snapshot. Production workers/scheduler/Redis/data не изменяются.
 
+## Task 56 — collection-first discovery и classification sprint
+
+Статус: `implementation_verified_documented_delivery_pending`.
+
+Дата начала: 25.07.2026.
+
+Approved design:
+[`2026-07-25-discovery-collection-workflow-redesign-design.md`](../superpowers/specs/2026-07-25-discovery-collection-workflow-redesign-design.md).
+
+### Цель и подтверждённая причина
+
+Полностью обновить section подборок внутри `/discover/popular`: сделать
+text-only каталог доступным до длинной выдачи сериалов, убрать dead
+zero-count category controls, ускорить ручную классификацию 1 403 строк и
+устранить повторные query между Livewire action/render. На 25.07.2026 все
+1 403 подборки остаются без категории, включая 501 public/approved; первый
+50-row batch имеет 3 high, 5 low и 42 none, поэтому выбран bounded
+human-in-the-loop sprint, а не auto-classifier.
+
+### Ожидаемые изменяемые файлы
+
+- `app/Livewire/CatalogDiscoveryPage.php`;
+- `app/Livewire/Collections/CatalogCollectionExplorer.php`;
+- `app/Livewire/Collections/CatalogCollectionCategoryManager.php`;
+- `app/Services/Collections/CatalogCollectionClassificationQuery.php`;
+- `app/View/ViewData/AppLayoutData.php`;
+- `resources/views/livewire/catalog-discovery-page.blade.php`;
+- `resources/views/livewire/collections/catalog-collection-explorer.blade.php`;
+- `resources/views/livewire/collections/catalog-collection-category-manager.blade.php`;
+- `lang/ru/collections.php`, `lang/en/collections.php`;
+- `lang/ru/recommendations.php`, `lang/en/recommendations.php`;
+- focused collection/discovery/layout/translation feature and unit tests;
+- `tests/browser/discovery-collections.spec.js`;
+- applicable `docs/*.md`;
+- Task 56 spec/plan/compliance evidence;
+- `README.md`;
+- `CHANGELOG.md`.
+
+Новая migration, route, config, dependency, environment variable, queue,
+scheduler, cache store, JavaScript/CSS asset или production DML не
+планируется. Discovery, требующее изменить этот вывод, немедленно обновит
+scope до implementation.
+
+### Сохраняемые public contracts
+
+- только `/discover/popular` владеет public collection directory;
+- `/discover`, `/collections`, `/lists`, `/selections`,
+  `/recommendations`, `/my/lists` остаются `404`;
+- один full-page `CatalogDiscoveryPage`, один H1 и девять recommendation
+  modes;
+- localized routes, canonical URLs, API Resources и sitemap shape;
+- `CatalogCollection` public UUID/slug/owner/visibility/moderation/type;
+- двухуровневый category FK и stable category slugs;
+- полностью text-only collection presentation без image/fallback/upload;
+- no automatic category write или persisted guess;
+- final `content.manage`, preview, content-version, transaction, audit и
+  after-commit invalidation boundaries;
+- max 50 collections × 50 evidence rows и отсутствие global confidence
+  inference;
+- RU/EN parity, 44 px controls, no nested scroll и mobile wrapping;
+- importer, player, Premium, payments, ads, calendar, regional/legal и
+  user-private behavior.
+
+### Cross-feature, maintenance и production risks
+
+| Domain | Статус | Решение |
+| --- | --- | --- |
+| Public discovery IA | `affected` | Collection explorer before title list; section anchors preserve same route |
+| Global navigation | `affected` | Locale-aware popular URL gains `#collections`; active semantics unchanged |
+| SEO | `affected` | category/subcategory query states become clean-canonical noindex variants |
+| Public category UI | `affected` | Zero-count controls hidden; selected bookmarked state preserved |
+| Admin classification | `affected` | Page/row/batch staging only; explicit preview/confirm unchanged |
+| Authorization/privacy | `already_compliant` | `content.view/manage`, private evidence and server re-resolution preserved |
+| Queries | `affected` | Request-scoped computed reuse; existing bounded page/evidence caps remain |
+| Cache | `already_compliant` | Staging no invalidation; confirm uses existing after-commit owner |
+| Search/API/sitemap | `compatible` | Only confirmed FK consumed; public shapes unchanged |
+| Importer | `compatible` | No category inference/write from import path |
+| Images/storage | `already_compliant` | No image is displayed, created, cached or saved |
+| Migrations/dependencies/env | `not_applicable` | No DDL/package/provider/config secret change |
+| Production data | `not_applicable` | No collection assignment without later explicit manager confirmation |
+| Rollback | `completed` | Revert Task56 code; no schema/data rollback; confirmed FK remains domain data |
+| Shared Git index | `risk_recorded` | Existing staged соседних задач сохранён; Task56 требует path-limited delivery без reset/stash/unstage |
+
+### Task-specific requirement-compliance matrix
+
+| Requirement/domain | Статус | Evidence / следующий gate |
+| --- | --- | --- |
+| Root/index/canonical requirements fresh read | `completed` | Выполнено 25.07.2026 до Task56 edits |
+| Applicable Markdown fresh read | `completed` | Architecture, security, authorization, performance, caching, UI, frontend, views, admin, production/maintenance/integration and Task52 owners inspected |
+| Actual versions and official docs | `completed` | PHP 8.5.8, Laravel 13.22.0, Livewire 4.3.3, Tailwind 4.3.2; Boost lifecycle/computed/pagination/eager-loading docs checked |
+| Existing implementation first | `completed` | Public route/component/view/layout, category query, manager, scorer, confirmation, tests and browser flow traced |
+| Read-only public/browser evidence | `completed` | Live desktop page: explorer at ~7 700 px, no overflow/images; navigation lacks fragment |
+| Read-only data evidence | `completed` | 1 403 total/uncategorized, 501 public approved uncategorized |
+| Read-only suggestion/query evidence | `completed` | Current 50 rows: 3 high/5 low/42 none; tree 4 queries, cold probes + bounded queue measured, scorer 0 SQL |
+| Alternatives/recommendation | `completed` | UI-only and persisted classifier rejected; collection-first human-confirmed sprint selected |
+| User design approval | `completed` | User explicitly repeated instruction to implement all recommended work |
+| Approved design spec | `completed` | Task56 design records scope, contracts, data flow, errors, TDD, rollout and rollback |
+| Expected/protected files and risks | `completed` | Manifests and cross-feature table recorded above |
+| Detailed TDD implementation plan | `completed` | Task56 plan reread; scope, exact files, RED/GREEN commands, rollback and delivery gates verified |
+| TDD RED/GREEN | `completed` | Public order/anchors/SEO, zero-count controls, moderation queue, page/row/batch staging, computed query reuse, page-only confidence order, disclosures и Livewire island synchronization сначала получили целевые RED, затем GREEN |
+| Laravel/PHP/Tailwind implementation | `completed` | Один full-page discovery owner и существующий category manager расширены без route, DDL, dependency, JavaScript/CSS или production DML |
+| Focused/query/static/build/browser verification | `completed_with_independent_full_suite_blockers` | Fresh focused 88 tests / 2 482 assertions и wider 128 / 2 750 GREEN; Pint, Vite build, docs gates, SQLite covering-index plan и Playwright Desktop/Mobile/Tablet 3/3 GREEN с визуальной проверкой. Штатный full suite остановлен независимым GD memory exhaustion при 256 MB; запуск без этого теста дал 1 758 passed / 11 skipped и два независимых результата: stale session flash assertion и отсутствующий importer-класс `SeasonvarImportDispatchBatcher` |
+| Canonical docs/README/CHANGELOG | `completed` | Architecture/data/performance/frontend/views/UI/admin owners, docs map, README visitor history и отдельная русская CHANGELOG entry обновлены; managed docs/policy/docs gates GREEN |
+| Final requirements/legacy scan | `completed` | Requirements/spec/plan перечитаны; duplicate routes/services, automatic writes, dead controls, Blade queries/scripts/styles и collection images проверены; deprecated API `cover_url=null`, purge boundary и датированные старые 404 evidence сохранены как совместимость/история |
+| Commit/push main | `pending` | Path-limited commit only after fresh full-suite/diff verification; push result будет зафиксирован честно |
+
+### Безлимитный execution order
+
+1. Записать и перечитать детальный TDD implementation plan.
+2. Добавить RED public ordering/navigation/SEO/dead-control tests.
+3. Реализовать collection-first public IA и locale-aware anchors.
+4. Добавить RED moderation/default queue/page-row-batch staging tests.
+5. Реализовать no-write classification sprint.
+6. Добавить RED request-scoped duplicate-query regression.
+7. Реализовать computed tree/page/suggestion reuse и confidence-first
+   current-page presentation.
+8. Перестроить category dictionary через native progressive disclosure.
+9. Выполнить RU/EN parity, focused regressions, Pint, build и EXPLAIN.
+10. Выполнить desktop/mobile/tablet Playwright и визуально проверить
+    screenshots.
+11. Обновить canonical owners, README, CHANGELOG и compliance evidence.
+12. Перечитать requirements/spec/plan, выполнить repository-wide legacy
+    scan и exact diff review.
+13. Выполнить только path-limited commit/push в `main`; внешний отказ
+    зафиксировать как `unresolved`.
+
 ## Активный аудит девяти `/discover/*` режимов — query, cache, UI и end-to-end
 
 Статус: `approved_master_plan_ready`; browser/SQLite evidence завершён, рекомендуемая hybrid architecture согласована, исполнимый TDD master plan записан в [`docs/superpowers/plans/2026-07-24-discovery-sections-end-to-end-improvement-master-plan.md`](../superpowers/plans/2026-07-24-discovery-sections-end-to-end-improvement-master-plan.md). Код, схема, данные, cache, queue, scheduler и production services на planning-only этапе не изменяются.

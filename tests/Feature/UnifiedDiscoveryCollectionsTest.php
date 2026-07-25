@@ -11,6 +11,8 @@ use App\Enums\CatalogCollectionVisibility;
 use App\Livewire\CatalogAdministrationPage;
 use App\Livewire\CatalogDiscoveryPage;
 use App\Models\CatalogCollection;
+use App\Models\CatalogTitle;
+use App\Models\LicensedMedia;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
@@ -43,6 +45,37 @@ final class UnifiedDiscoveryCollectionsTest extends TestCase
             ->assertOk()
             ->assertSeeLivewire('collections.catalog-collection-explorer')
             ->assertSee('id="collections"', false);
+    }
+
+    public function test_collection_category_state_keeps_a_clean_noindex_canonical(): void
+    {
+        $title = CatalogTitle::factory()->create();
+        LicensedMedia::factory()->for($title)->create([
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+        $canonical = route('discover.index', ['type' => 'popular']);
+
+        $this->get($canonical)
+            ->assertOk()
+            ->assertSee('<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">', false)
+            ->assertSee('application/ld+json', false)
+            ->assertSee('hreflang=', false);
+
+        foreach ([
+            ['collections_category' => 'themes-and-genres'],
+            [
+                'collections_category' => 'themes-and-genres',
+                'collections_subcategory' => 'detective-and-crime',
+            ],
+        ] as $query) {
+            $this->get($canonical.'?'.http_build_query($query))
+                ->assertOk()
+                ->assertSee('<link rel="canonical" href="'.$canonical.'">', false)
+                ->assertSee('<meta name="robots" content="noindex,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">', false)
+                ->assertDontSee('application/ld+json', false)
+                ->assertDontSee('hreflang=', false);
+        }
     }
 
     public function test_removed_directory_and_legacy_urls_return_404_without_redirects(): void

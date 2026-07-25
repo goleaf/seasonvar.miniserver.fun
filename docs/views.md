@@ -1,6 +1,6 @@
 # Blade-шаблоны
 
-Обновлено: 20.07.2026
+Обновлено: 25.07.2026
 
 ## Правило без inline PHP
 
@@ -51,9 +51,11 @@
 
 `x-collections.collection-card` получает eager-loaded `CatalogCollection` summary и `CatalogCollectionCardViewModel`; Blade не считает visibility/count/URL/category и не запрашивает owner/items. Карточка полностью text-only: category path, название, описание и счётчик, без `<img>`, cover/fallback poster URL и decorative placeholder. ViewModel превращает описание в escaped plain-text excerpt длиной не более 180 Unicode-символов. Collection item rows переиспользуют `x-catalog.title-card`, prepared collection item attributes и stable `wire:key` по item ID. Public count и owner count подготовлены query-object раздельно.
 
-`CatalogDiscoveryPage` является единственным full-page owner публичного discovery. Девять режимов имеют один H1 и реальную горизонтально прокручиваемую навигацию; refresh является secondary results action, а общий filters `<details>` закрыт без условий и открыт при URL state. Только `popular` отдельно монтирует `CatalogCollectionExplorer`, который хранит URL-backed search/sort/root/subcategory/page и рендерит compact text-only cards. `CatalogAdministrationPage` аналогично владеет `/admin/catalog`; вложенные компоненты не расширяют layout и не создают второй `<h1>`.
+`CatalogDiscoveryPage` является единственным full-page owner публичного discovery. Девять режимов имеют один H1 и реальную переносящуюся навигацию; refresh является secondary results action, а общий filters `<details>` закрыт без условий и открыт при URL state. Только `popular` выводит query-free anchors `#collections`/`#popular-titles` и монтирует `CatalogCollectionExplorer` перед serial results. Explorer хранит URL-backed search/sort/root/subcategory/page, получает готовые positive-count navigation arrays и рендерит compact text-only cards; Blade не фильтрует counts. `CatalogAdministrationPage` аналогично владеет `/admin/catalog`; вложенные компоненты не расширяют layout и не создают второй `<h1>`.
 
 Collection Livewire views содержат только passive loops/conditions над prepared values. Locked UUID/title IDs остаются в component, policy and criteria — в PHP. Нет `@php`, model/service/database calls, inline CSS или inline business JavaScript. Empty/search-empty/unavailable/moderation/status/loading/error/report/share/delete/restore states имеют реальные controls или safe text; absent likes/follows/collaboration не изображаются неработающими кнопками.
+
+`CatalogCollectionCategoryManager` передаёт Blade уже подготовленные current-page suggestion presentations, enum labels, category options и branch counts. Счётчик выбора, page/row/batch controls, preview, paginator и category dictionary находятся в одной именованной island, чтобы действие строки не оставляло соседний DOM устаревшим. Форма создания и каждый root справочника используют semantic `<details>/<summary>`; action buttons не вложены в `summary`, а Alpine, modal, inline script/style и изображения отсутствуют.
 
 Title membership selector оставляет checkbox на deferred `wire:model="selectedCollectionPublicIds"`, а локализованный счётчик использует `wire:text` от `selectedCollectionPublicIds.length`. Точно нацеленный на этот массив `wire:dirty` показывает локализованный текстовый status до Apply и исчезает при совпадении draft с server snapshot. Серверный `selectedCountLabel` остаётся SSR/no-JavaScript fallback; оптимистическая presentation не сохраняет membership и не заменяет `apply()`, policy или validation.
 
