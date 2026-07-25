@@ -211,7 +211,7 @@
                                         </div>
                                         <h3 class="mt-2 break-words text-base font-black text-slate-900">{{ $collection->display_name }}</h3>
                                         @if ($collection->display_description)
-                                            <p class="mt-1 line-clamp-2 break-words text-sm leading-6 text-slate-600">{{ $collection->display_description }}</p>
+                                            <p class="mt-1 break-words text-sm leading-6 text-slate-600">{{ $collection->display_description }}</p>
                                         @endif
                                         <p class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs font-semibold text-slate-500">
                                             <span>{{ __('collections.page.owner') }}: {{ $collection->owner_label }}</span>
