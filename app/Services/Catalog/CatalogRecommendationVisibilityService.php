@@ -23,7 +23,10 @@ final class CatalogRecommendationVisibilityService
         'studio' => 'studios',
     ];
 
-    public function __construct(private readonly CatalogTitleQuery $titles) {}
+    public function __construct(
+        private readonly CatalogTitleQuery $titles,
+        private readonly CatalogWatchableTitleQuery $watchableTitles,
+    ) {}
 
     /**
      * @param  list<int>  $excludedIds
@@ -34,11 +37,9 @@ final class CatalogRecommendationVisibilityService
         bool $watchable,
         array $excludedIds = [],
     ): Builder {
-        $query = $this->titles->visibleTo($context->user);
-
-        if ($watchable) {
-            $query->whereExists($this->mediaQuery($context)->selectRaw('1')->toBase());
-        }
+        $query = $watchable
+            ? $this->watchableTitles->visibleTo($context->user)
+            : $this->titles->visibleTo($context->user);
 
         if ($excludedIds !== []) {
             $query->whereKeyNot($excludedIds);
@@ -102,12 +103,7 @@ final class CatalogRecommendationVisibilityService
     /** @return Builder<LicensedMedia> */
     private function mediaQuery(CatalogRecommendationContext $context): Builder
     {
-        return LicensedMedia::query()
-            ->whereColumn('licensed_media.catalog_title_id', 'catalog_titles.id')
-            ->published()
-            ->forAvailableReleases($context->user)
-            ->withoutKnownFailures()
-            ->withPlaybackLocation();
+        return $this->watchableTitles->mediaForTitle($context->user);
     }
 
     private function provider(string $source): string

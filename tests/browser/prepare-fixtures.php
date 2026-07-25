@@ -416,6 +416,64 @@ CatalogCollectionItem::query()->create([
     'position' => 1,
 ]);
 
+$editorialTitles = CatalogTitle::factory()
+    ->count(11)
+    ->create()
+    ->each(function (CatalogTitle $catalogTitle): void {
+        LicensedMedia::factory()->for($catalogTitle)->create([
+            'status' => 'published',
+            'published_at' => now()->subMinute(),
+        ]);
+    })
+    ->prepend($title)
+    ->values();
+$readyEditorialCollection = CatalogCollection::query()->create([
+    'public_id' => (string) Str::uuid(),
+    'owner_id' => null,
+    'catalog_collection_category_id' => $collectionCategory->id,
+    'name' => 'Готовая браузерная редакционная подборка',
+    'description' => 'Двенадцать доступных сериалов для проверки редакционной готовности.',
+    'slug' => 'browser-ready-editorial-collection',
+    'type' => CatalogCollectionType::Editorial,
+    'visibility' => CatalogCollectionVisibility::Public,
+    'moderation_status' => CatalogCollectionModerationStatus::Approved,
+    'sort_mode' => CatalogCollectionSort::Manual,
+    'content_locale' => 'ru',
+    'content_version' => 1,
+    'is_featured' => true,
+    'published_at' => now()->subMinute(),
+]);
+$thinEditorialCollection = CatalogCollection::query()->create([
+    'public_id' => (string) Str::uuid(),
+    'owner_id' => null,
+    'catalog_collection_category_id' => $collectionCategory->id,
+    'name' => 'Тонкая браузерная редакционная подборка',
+    'description' => 'Одиннадцать доступных сериалов для проверки безопасного отказа.',
+    'slug' => 'browser-thin-editorial-collection',
+    'type' => CatalogCollectionType::Editorial,
+    'visibility' => CatalogCollectionVisibility::Public,
+    'moderation_status' => CatalogCollectionModerationStatus::Approved,
+    'sort_mode' => CatalogCollectionSort::Manual,
+    'content_locale' => 'ru',
+    'content_version' => 1,
+    'published_at' => now()->subMinute(),
+]);
+
+$editorialTitles->each(function (CatalogTitle $catalogTitle, int $index) use ($readyEditorialCollection): void {
+    CatalogCollectionItem::query()->create([
+        'catalog_collection_id' => $readyEditorialCollection->id,
+        'catalog_title_id' => $catalogTitle->id,
+        'position' => $index + 1,
+    ]);
+});
+$editorialTitles->take(11)->each(function (CatalogTitle $catalogTitle, int $index) use ($thinEditorialCollection): void {
+    CatalogCollectionItem::query()->create([
+        'catalog_collection_id' => $thinEditorialCollection->id,
+        'catalog_title_id' => $catalogTitle->id,
+        'position' => $index + 1,
+    ]);
+});
+
 UserAccountSetting::query()->create([
     'user_id' => $englishUser->id,
     'locale' => 'en',

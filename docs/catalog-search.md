@@ -190,6 +190,15 @@ Canonical discovery URL — `/discover/{type}` и `/{locale}/discover/{type}`; d
 
 Filters reuse `CatalogTaxonomyRegistry`, task 04 facet SQL and canonical visibility. Interface locale does not change media preference or title identity. Personal feedback/history/current user/recent IDs/seed never enter query. Filtered/authenticated/personal/random pages are noindex and canonicalize to stable public type; default filters are omitted. Search empty state links to clearly labelled popular discovery and never treats those cards as search matches.
 
+Редакционный discovery и featured-блок главной принимают только одну и ту же
+readiness-passing подборку: editorial, public, approved, published, не
+удалённую, с доступным source record и без недоступных гостю membership.
+Минимум составляет 12 воспроизводимых тайтлов для локальной подборки и 4 для
+source-managed. Тонкая или ставшая недоступной featured-подборка исключается
+целиком, а не отдаёт частичный список; прошедшие подборки сохраняют
+publication order, manual item order и unique title IDs. Обычный каталог
+подборок, detail, API и sitemap этим rollout-фильтром не сужаются.
+
 Все девять discovery type сохраняют прежние route identities. Явное
 обновление выполняет один server resolve уже с новым seed. Deterministic guest
 types используют общий канонический candidate pool, после которого текущая

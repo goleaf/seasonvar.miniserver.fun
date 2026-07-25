@@ -8352,6 +8352,138 @@ regenerate/delete без второго schedule source, shared cache или н�
   завершился кодом `128`: GitHub credentials в окружении отсутствуют; commit
   сохранён локально, force/rebase/hook bypass не использовались.
 
+## Task 61 — readiness редакционных подборок
+
+Статус: `implementation_verified_documentation_and_delivery`.
+
+Дата начала: 26.07.2026.
+
+Approved design:
+[`2026-07-26-editorial-collection-readiness-design.md`](../superpowers/specs/2026-07-26-editorial-collection-readiness-design.md).
+
+Detailed implementation plan:
+[`2026-07-26-editorial-collection-readiness.md`](../superpowers/plans/2026-07-26-editorial-collection-readiness.md).
+
+### Цель и baseline
+
+Task 15 editorial master plan и discovery Task 9 требуют единой readiness
+boundary до широкого editorial rollout. Текущий feature guard проверяет
+только editorial/public/approved, а homepage/discovery доверяют persisted
+`is_featured`. Read-only SQLite показывает 54 public approved source-managed
+подборки: 15 непустых, 39 пустых, featured rows сейчас нет.
+
+Выбран server-owned mutation/read/admin guard: local collection требует 12
+guest-watchable titles, source-managed — 4, unavailable membership — 0.
+Production content mutation и canary в этот code change не входят.
+
+### Ожидаемые изменяемые файлы
+
+- новый readiness reason enum;
+- новый neutral `CatalogWatchableTitleQuery`;
+- новый `CatalogCollectionPublicationReadiness`;
+- recommendation visibility delegation;
+- collection moderation/query и public editorial discovery;
+- collection admin Livewire/Blade и RU/EN collection translations;
+- два focused feature tests;
+- editorial/discovery master plans, canonical owners, эта section;
+- `README.md` и `CHANGELOG.md`.
+
+Migration, dependency, env, route, API schema, cache key, queue, scheduler,
+importer command и production DML не планируются.
+
+### Protected contracts
+
+- все collection/discovery routes, names, URL state и 404 decisions;
+- collection identity/type/visibility/moderation/source/category/manual order;
+- canonical title/media entitlement и private user state;
+- обычная public collection page/directory/API/sitemap eligibility;
+- policy, lock, audit, version and targeted invalidation on feature;
+- recommendation source/reason/filter/cache behavior;
+- text-only cards без collection image/fallback/storage;
+- SQLite и configured supported database compatibility;
+- foreign Tasks 57/58/60/62 working tree/index.
+
+### Cross-feature и production risks
+
+| Domain | Статус | Решение |
+| --- | --- | --- |
+| Feature mutation | `critical_affected` | Locked authoritative readiness before false→true |
+| Homepage/editorial discovery | `critical_affected` | Same eligible featured-ID subquery, fail closed |
+| Public collection directory/detail | `compatible` | Ordinary public rows remain visible regardless of readiness |
+| Watchability/visibility | `critical_affected` | Shared neutral title/media query; no client trust |
+| Admin/UI/mobile | `affected` | Prepared bounded metrics/reasons, no Blade query |
+| Recommendation | `compatible_refactor` | Existing filter behavior delegates only base watchable boundary |
+| Cache/SEO/API/sitemap/import | `unchanged` | No new keys/payloads/invalidation/command |
+| Images/storage | `already_compliant` | Text-only; no read/write/fallback |
+| Schema/data/dependency/env | `not_applicable` | No migration or production mutation |
+| Production | `affected_read_only` | Query/EXPLAIN/browser evidence; no activation |
+| Rollback | `completed` | Code/docs revert only |
+| Shared Git state | `critical_risk_recorded` | Exact alternate index; no foreign staging |
+
+### Task-specific requirement-compliance matrix
+
+| Requirement/domain | Статус | Evidence |
+| --- | --- | --- |
+| Root/index/canonical requirements fresh/final read | `completed` | Выполнено 26.07.2026 до PHP edits и перед delivery |
+| Related collection/discovery/editorial docs | `completed` | Architecture, data, search, perf/cache, security, ops and both master plans inspected |
+| Installed versions | `completed` | PHP 8.5, Laravel 13.22.0, Boost 2.4.13, Livewire 4.3.3, PHPUnit 12.5.32, Tailwind 4.3.2 |
+| Official Laravel/Livewire behavior | `completed` | Boost docs checked for subquery joins, reusable query objects, transactions, render DI and testing |
+| Existing implementation first | `completed` | Moderation/query/discovery/admin/model/media flow traced |
+| Read-only production-size evidence | `completed` | 54 source public approved; 15 nonempty/39 empty; no featured rows |
+| Alternatives and explicit authorization | `completed` | Read-only-only and write-only rejected; user preauthorized unified recommendation |
+| Design/plan/files/contracts/risks | `completed` | Linked spec/plan and matrices |
+| Migration/routes/API/cache/dependency | `not_applicable` | Scope intentionally avoids them |
+| Production/rollback/data safety | `completed` | No DML, migration, image write or activation; canary separate; code-only rollback |
+| TDD RED | `completed` | Missing service, accepted thin feature, stale public reads and absent admin status all failed before implementation |
+| Implementation | `completed` | Shared watchable query, readiness batch/subquery, locked feature guard, homepage/discovery and admin presentation |
+| Query/security/browser verification | `completed` | Focused/broad tests, scoped PHPStan/Pint, EXPLAIN, Vite and Chromium desktop/mobile/tablet |
+| Canonical docs/README/CHANGELOG | `completed` | Architecture/search/frontend/performance, both master plans and visitor/technical histories updated |
+| Full repository baseline | `unresolved` | Two unrelated pre-existing failures documented below; Task 61 suites pass |
+| Commit/push in `main` | `pending_shared_index_guard` | Exact Task 61 scope only; configured push attempted honestly |
+
+### Execution checklist
+
+1. `[completed]` Requirements/version/Git/code/data discovery.
+2. `[completed]` Compare three approaches and approve unified design.
+3. `[completed]` Write and reread design/detailed plan/compliance matrix.
+4. `[completed]` Create exact RED readiness/moderation tests.
+5. `[completed]` GREEN watchable/readiness/write boundaries.
+6. `[completed]` RED/GREEN public read and admin presentation.
+7. `[completed]` Focused/static/build/browser/EXPLAIN verification.
+8. `[completed]` Canonical docs/README/CHANGELOG and final scan.
+9. `[pending]` Exact commit in `main` and configured push.
+
+### Verification evidence
+
+- Readiness RED доказал отсутствие boundary и принятие тонкой подборки старым
+  feature path; public RED вернул readiness-failing featured IDs; admin RED
+  не нашёл prepared status/count/action contract.
+- Readiness GREEN: `7 tests / 52 assertions`; broad
+  `--filter=CatalogCollection`: `78 / 509`.
+- Admin page с десятью rows выполняет ровно один grouped readiness query.
+- Фактическая SQLite moderation queue содержит 20 rows и 12 memberships:
+  grouped readiness занял около `3,17–5,18 ms`. Eligible featured subquery
+  после cold `4,86 ms` занял `0,43–0,54 ms`; `EXPLAIN QUERY PLAN` использует
+  существующие featured/source/membership/media indexes без temp sort.
+- Scoped Task 61 PHPStan завершился с `0 errors`; пять прежних ошибок
+  source-sync PHPDoc в неизменённых строках `CatalogCollectionQuery`
+  остаются вне scope и не маскируются.
+- Vite build прошёл. Managed Chromium desktop/mobile/tablet подтвердил
+  readiness UI, text-only карточки, категории/подкатегории, отсутствие
+  overflow, console/page и first-party HTTP errors.
+- Независимый read-only review выявил и через отдельные RED/GREEN закрыл
+  cache-side effect exact retry, missing-row race и stale unfeature; повторный
+  verdict — `Ready: Yes`, без оставшихся Critical/Important/Minor.
+- Полный repository snapshot сначала остановился на известном накопительном
+  GD memory-case при `256 MB`; exact test отдельно прошёл `1 / 12`.
+  Повтор без него выполнил `1832` tests: `1819` passed, `11` skipped, один
+  несвязанный account session-message assertion failed и один находившийся в
+  `HEAD` importer test получил отсутствующий ещё до Task 61 class. Оба
+  baseline failure остаются `unresolved` вне Task 61; scoped/broad collection
+  suites в том же tree зелёные.
+- Production rows, source content, images, cache, schema, routes и workers не
+  изменялись; production canary остаётся отдельным явным operator gate.
+
 ## Task 62 — primary-key hydration эпизодов главной
 
 Статус: `design_approved_plan_preparation`.

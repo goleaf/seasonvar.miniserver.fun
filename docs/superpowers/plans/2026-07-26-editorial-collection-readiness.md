@@ -41,14 +41,14 @@ Livewire `4.3.3`, SQLite, PHPUnit `12.5.32`, Pint `1.29.3`, Tailwind CSS
 - Consumes: existing `CatalogCollectionModerationService::feature()`.
 - Produces: fixtures/assertions for exact Task 15 semantics.
 
-- [ ] Создать local 12/12, local 11/11, source 4/4, source 3/3 и unavailable
+- [x] Создать local 12/12, local 11/11, source 4/4, source 3/3 и unavailable
   fixtures через реальные `CatalogTitle`, `LicensedMedia`,
   `CatalogCollectionItem`, `CatalogCollectionSource`.
-- [ ] Assert desired `evaluate()` array and stable reason codes.
-- [ ] Assert thin `feature(true)` throws localized validation and preserves
+- [x] Assert desired `evaluate()` array and stable reason codes.
+- [x] Assert thin `feature(true)` throws localized validation and preserves
   `is_featured`, `content_version` and audit count.
-- [ ] Assert ready feature succeeds and exact retry is no-op.
-- [ ] Run:
+- [x] Assert ready feature succeeds and exact retry is no-op.
+- [x] Run:
 
 ```bash
 php artisan test tests/Feature/CatalogCollectionPublicationReadinessTest.php
@@ -74,13 +74,13 @@ moderation accepts thin collection.
 - `CatalogCollectionPublicationReadiness::evaluate()` and `evaluateMany()`.
 - `CatalogCollectionPublicationReadiness::eligibleFeaturedCollectionIds()`.
 
-- [ ] Реализовать enum из восьми allowlisted reasons с localized label.
-- [ ] Вынести canonical visible+playable media query и делегировать ему
+- [x] Реализовать enum из восьми allowlisted reasons с localized label.
+- [x] Вынести canonical visible+playable media query и делегировать ему
   существующий recommendation watchable path без изменения filters.
-- [ ] Реализовать one/batch grouped readiness metrics и thresholds `12|4`.
-- [ ] Добавить feature guard только для перехода `false → true`; unfeature и
+- [x] Реализовать one/batch grouped readiness metrics и thresholds `12|4`.
+- [x] Добавить feature guard только для перехода `false → true`; unfeature и
   exact retry сохранить.
-- [ ] Запустить RED test до GREEN, затем:
+- [x] Запустить RED test до GREEN, затем:
 
 ```bash
 php artisan test tests/Feature/CatalogCollectionPublicationReadinessTest.php
@@ -103,12 +103,12 @@ php artisan test tests/Feature/CatalogCollectionPublicationReadinessTest.php
 - Produces: readiness-filtered homepage collection rows and editorial title
   candidates.
 
-- [ ] RED: thin featured collection absent; ready source/local present;
+- [x] RED: thin featured collection absent; ready source/local present;
   unavailable membership removes entire collection.
-- [ ] RED: multiple ready collections preserve publication/manual item order
+- [x] RED: multiple ready collections preserve publication/manual item order
   and unique candidate IDs.
-- [ ] GREEN: add the same eligible-ID subquery to both read boundaries.
-- [ ] Run:
+- [x] GREEN: add the same eligible-ID subquery to both read boundaries.
+- [x] Run:
 
 ```bash
 php artisan test \
@@ -133,12 +133,12 @@ php artisan test \
 - Render consumes `evaluateMany()` for the current paginator only.
 - Blade receives prepared scalar labels/counts/reasons; no queries.
 
-- [ ] RED HTTP/Livewire assertions for ready/not-ready status, counts,
+- [x] RED HTTP/Livewire assertions for ready/not-ready status, counts,
   reasons and absent feature control on thin collection.
-- [ ] GREEN prepared presentation attributes and compact responsive status
+- [x] GREEN prepared presentation attributes and compact responsive status
   block; stale featured row retains unfeature control.
-- [ ] Assert render query ceiling does not grow per collection.
-- [ ] Run:
+- [x] Assert render query ceiling does not grow per collection.
+- [x] Run:
 
 ```bash
 php artisan test tests/Feature/CatalogCollectionPublicationReadinessTest.php
@@ -152,9 +152,9 @@ npm run build
 - Modify: `docs/plans/current-task-plan.md`
 - Modify: this plan.
 
-- [ ] Run `EXPLAIN QUERY PLAN` for eligible featured IDs and admin batch
+- [x] Run `EXPLAIN QUERY PLAN` for eligible featured IDs and admin batch
   metrics on current SQLite; record indexes/temp sorts truthfully.
-- [ ] Run focused and adjacent suites:
+- [x] Run focused and adjacent suites:
 
 ```bash
 php artisan test --filter=CatalogCollection
@@ -170,10 +170,10 @@ php artisan project:docs-refresh --check
 npm run build
 ```
 
-- [ ] Playwright desktop/mobile:
+- [x] Playwright desktop/mobile/tablet:
   `/discover/editorial`, `/discover/popular`, admin collection section;
   no image, overflow, console/page/local HTTP error.
-- [ ] Search repository for duplicate readiness/playability logic, direct
+- [x] Search repository for duplicate readiness/playability logic, direct
   `is_featured` public trust, Blade queries, stale buttons and debug/TODO.
 
 ### Task 6: Documentation and delivery
@@ -192,15 +192,39 @@ npm run build
 - Modify: `README.md`
 - Modify: `CHANGELOG.md`
 
-- [ ] Обновить canonical owners только фактическим behavior/evidence.
-- [ ] README visitor history описывает защиту качества без внутренних
+- [x] Обновить canonical owners только фактическим behavior/evidence.
+- [x] README visitor history описывает защиту качества без внутренних
   названий.
-- [ ] Добавить отдельную русскую CHANGELOG entry.
-- [ ] Перечитать требования/spec/plan и заполнить compliance matrix.
+- [x] Добавить отдельную русскую CHANGELOG entry.
+- [x] Перечитать требования/spec/plan и заполнить compliance matrix.
 - [ ] Commit exact Task 61 scope в `main` через isolated index, сохранив
   foreign staged/unstaged state.
 - [ ] Выполнить configured non-force push; auth/network failure записать
   `unresolved`.
+
+## Verification evidence
+
+- RED: readiness service отсутствовал, а прежняя moderation boundary принимала
+  тонкую подборку; public reads возвращали readiness-failing featured rows;
+  admin не имел status/count/reason contract.
+- GREEN: readiness `7 tests / 52 assertions`; `CatalogCollection` broad
+  filter `78 / 509`.
+- Admin batch: ровно один grouped readiness query на 10 rows.
+- SQLite: featured/source/membership/media indexes без temp sort; фактическая
+  moderation queue — 20 rows/12 memberships, readiness около
+  `3,17–5,18 ms`; eligible query warm `0,43–0,54 ms`.
+- Static: scoped Task 61 PHPStan — `0 errors`; five прежних
+  `CatalogCollectionQuery` source-sync errors в неизменённых строках остаются
+  отдельно от scope.
+- Frontend: Vite build прошёл; Chromium desktop/mobile/tablet прошёл без
+  collection images, overflow, console/page/local-response errors.
+- Independent read-only code review после двух RED/GREEN follow-up исправлений
+  завершён verdict `Ready: Yes`, без оставшихся Critical/Important/Minor.
+- Full repository snapshot без известного накопительного GD memory-case:
+  `1832 tests`, `1819 passed`, `11 skipped`, один несвязанный account
+  session-message failure и один уже находившийся в `HEAD` importer test без
+  реализованного класса. Исключённый GD test отдельно прошёл `1 / 12`.
+- Production data: no DML, feature activation or source/image storage.
 
 ## Rollback
 

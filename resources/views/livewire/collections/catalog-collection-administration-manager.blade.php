@@ -110,6 +110,41 @@
                         @endunless
                     </div>
 
+                    <div
+                        data-collection-readiness="{{ $collection->public_id }}"
+                        data-collection-readiness-state="{{ $collection->presentation_readiness_state }}"
+                        class="mt-4 flex min-w-0 items-start gap-3 border-t border-slate-200 pt-4"
+                    >
+                        <span @class([
+                            'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-control',
+                            'bg-emerald-50 text-emerald-700' => $collection->presentation_readiness_state === 'ready',
+                            'bg-amber-50 text-amber-800' => $collection->presentation_readiness_state !== 'ready',
+                        ])>
+                            <x-ui.icon
+                                :name="$collection->presentation_readiness_state === 'ready' ? 'fa-solid fa-circle-check' : 'fa-solid fa-triangle-exclamation'"
+                            />
+                        </span>
+                        <div class="min-w-0">
+                            <p @class([
+                                'text-sm font-black',
+                                'text-emerald-800' => $collection->presentation_readiness_state === 'ready',
+                                'text-amber-900' => $collection->presentation_readiness_state !== 'ready',
+                            ])>{{ $collection->presentation_readiness_label }}</p>
+                            <p class="mt-1 text-xs font-semibold leading-5 text-slate-600">{{ $collection->presentation_readiness_count_label }}</p>
+                            @if ($collection->presentation_readiness_reasons !== [])
+                                <p class="mt-2 text-xs font-bold text-slate-700">{{ __('collections.admin.readiness_reasons_title') }}</p>
+                                <ul class="mt-1 space-y-1 text-xs leading-5 text-slate-600">
+                                    @foreach ($collection->presentation_readiness_reasons as $reason)
+                                        <li class="flex min-w-0 items-start gap-2">
+                                            <x-ui.icon name="fa-solid fa-circle-xmark" align="start" class="shrink-0 text-amber-700" />
+                                            <span class="min-w-0 break-words">{{ $reason }}</span>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @endif
+                        </div>
+                    </div>
+
                     @if ($canModerateCollections)
                     <div class="mt-4 flex flex-wrap gap-2 border-t border-slate-200 pt-4">
                         @unless ($collection->presentation_deleted)
@@ -118,7 +153,7 @@
                             <button type="button" wire:click="moderate('{{ $collection->public_id }}', 'hidden')" wire:loading.attr="disabled" class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-control bg-amber-50 px-3 text-sm font-bold text-amber-800 hover:bg-amber-100 sm:flex-none"><x-ui.icon name="fa-solid fa-eye-slash" />{{ __('collections.admin.hide') }}</button>
                             <button type="button" wire:click="moderate('{{ $collection->public_id }}', 'archived')" wire:loading.attr="disabled" class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-control bg-slate-100 px-3 text-sm font-bold text-slate-700 hover:bg-slate-200 sm:flex-none"><x-ui.icon name="fa-solid fa-box-archive" />{{ __('collections.admin.archive') }}</button>
                             @if ($collection->presentation_can_feature)
-                                <button type="button" wire:click="feature('{{ $collection->public_id }}', {{ $collection->presentation_feature_next }})" wire:loading.attr="disabled" class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-control bg-amber-50 px-3 text-sm font-bold text-amber-800 hover:bg-amber-100 sm:flex-none"><x-ui.icon name="fa-solid fa-star" />{{ $collection->presentation_feature_label }}</button>
+                                <button type="button" data-collection-feature-action="{{ $collection->public_id }}" wire:click="feature('{{ $collection->public_id }}', {{ $collection->presentation_feature_next }})" wire:loading.attr="disabled" class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-control bg-amber-50 px-3 text-sm font-bold text-amber-800 hover:bg-amber-100 sm:flex-none"><x-ui.icon name="fa-solid fa-star" />{{ $collection->presentation_feature_label }}</button>
                             @endif
                         @endunless
                         @if ($collection->presentation_has_open_reports)

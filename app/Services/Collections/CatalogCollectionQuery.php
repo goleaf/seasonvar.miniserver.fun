@@ -56,6 +56,7 @@ final class CatalogCollectionQuery
         private readonly CatalogSearchNormalizer $search,
         private readonly CatalogCollectionSchema $schema,
         private readonly CatalogCollectionSummaryLoader $summaryLoader,
+        private readonly CatalogCollectionPublicationReadiness $readiness,
         private readonly HdRezkaCollectionTypeCompatibility $sourceTypes,
         private readonly CommentRelationshipService $relationships,
         private readonly UserPortalCache $userPortalCache,
@@ -279,6 +280,7 @@ final class CatalogCollectionQuery
         return $this->summaryQuery()
             ->publiclyListed()
             ->where('is_featured', true)
+            ->whereIn('catalog_collections.id', $this->readiness->eligibleFeaturedCollectionIds())
             ->orderByDesc('updated_at')
             ->orderByDesc('id')
             ->limit(max(1, min(12, $limit)))

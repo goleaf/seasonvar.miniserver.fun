@@ -6,13 +6,13 @@ namespace App\Livewire\Collections;
 
 use App\Enums\AdminPermission;
 use App\Enums\CatalogCollectionModerationStatus;
+use App\Enums\CatalogCollectionReadinessReason;
 use App\Enums\CatalogCollectionReportStatus;
-use App\Enums\CatalogCollectionType;
-use App\Enums\CatalogCollectionVisibility;
 use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Models\CatalogCollectionReport;
 use App\Models\User;
 use App\Services\Collections\CatalogCollectionModerationService;
+use App\Services\Collections\CatalogCollectionPublicationReadiness;
 use App\Services\Collections\CatalogCollectionQuery;
 use App\Services\Collections\CatalogCollectionResolver;
 use Illuminate\Contracts\View\View;
@@ -90,10 +90,13 @@ final class CatalogCollectionAdministrationManager extends Component
             : __('collections.admin.saved');
     }
 
-    public function render(CatalogCollectionQuery $collections): View
-    {
+    public function render(
+        CatalogCollectionQuery $collections,
+        CatalogCollectionPublicationReadiness $readiness,
+    ): View {
         $paginator = $collections->moderationQueue($this->search);
         $sourceSyncSummary = $collections->latestSourceSyncSummary();
+        $readinessByCollection = $readiness->evaluateMany($paginator->getCollection());
 
         if ($sourceSyncSummary !== null) {
             $sourceSyncSummary['status_label'] = __('collections.sync.status.'.$sourceSyncSummary['status']);
@@ -149,6 +152,7 @@ final class CatalogCollectionAdministrationManager extends Component
         }
 
         foreach ($paginator->getCollection() as $collection) {
+            $collectionReadiness = $readinessByCollection[(int) $collection->getKey()];
             $totalItems = (int) ($collection->total_items_count ?? 0);
             $openReports = (int) ($collection->open_reports_count ?? 0);
             $collection->setAttribute('presentation_type_label', $collection->type->label());
@@ -170,10 +174,33 @@ final class CatalogCollectionAdministrationManager extends Component
             $collection->setAttribute('presentation_deleted', $collection->trashed());
             $collection->setAttribute('presentation_has_open_reports', $openReports > 0);
             $collection->setAttribute(
+                'presentation_readiness_state',
+                $collectionReadiness['ready'] ? 'ready' : 'not-ready',
+            );
+            $collection->setAttribute(
+                'presentation_readiness_label',
+                $collectionReadiness['ready']
+                    ? __('collections.admin.readiness_ready')
+                    : __('collections.admin.readiness_not_ready'),
+            );
+            $collection->setAttribute(
+                'presentation_readiness_count_label',
+                __('collections.admin.readiness_count', [
+                    'visible' => $collectionReadiness['visible_items'],
+                    'total' => $collectionReadiness['total_items'],
+                    'required' => $collectionReadiness['required_items'],
+                ]),
+            );
+            $collection->setAttribute(
+                'presentation_readiness_reasons',
+                collect($collectionReadiness['reason_codes'])
+                    ->map(fn (string $code): string => CatalogCollectionReadinessReason::tryFrom($code)?->label()
+                        ?? __('collections.admin.readiness_unknown_reason'))
+                    ->all(),
+            );
+            $collection->setAttribute(
                 'presentation_can_feature',
-                $collection->type === CatalogCollectionType::Editorial
-                    && $collection->visibility === CatalogCollectionVisibility::Public
-                    && $collection->moderation_status === CatalogCollectionModerationStatus::Approved,
+                $collection->is_featured || $collectionReadiness['ready'],
             );
             $collection->setAttribute('presentation_feature_next', $collection->is_featured ? 'false' : 'true');
             $collection->setAttribute(

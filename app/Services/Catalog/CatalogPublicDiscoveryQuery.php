@@ -19,6 +19,7 @@ use App\Models\CatalogTitleUserState;
 use App\Models\Episode;
 use App\Models\EpisodeViewProgress;
 use App\Models\Season;
+use App\Services\Collections\CatalogCollectionPublicationReadiness;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\Query\JoinClause;
@@ -31,6 +32,7 @@ final class CatalogPublicDiscoveryQuery
     public function __construct(
         private readonly CatalogRecommendationVisibilityService $visibility,
         private readonly CatalogPopularityQuery $popularity,
+        private readonly CatalogCollectionPublicationReadiness $collectionReadiness,
     ) {}
 
     /**
@@ -419,6 +421,7 @@ final class CatalogPublicDiscoveryQuery
             ->where('catalog_collections.visibility', CatalogCollectionVisibility::Public->value)
             ->where('catalog_collections.moderation_status', CatalogCollectionModerationStatus::Approved->value)
             ->where('catalog_collections.is_featured', true)
+            ->whereIn('catalog_collections.id', $this->collectionReadiness->eligibleFeaturedCollectionIds())
             ->whereNull('catalog_collections.deleted_at')
             ->whereNotNull('catalog_collections.published_at')
             ->orderByDesc('catalog_collections.published_at')

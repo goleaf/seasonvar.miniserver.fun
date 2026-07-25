@@ -454,6 +454,8 @@
 - `2026_07_25_140100_add_category_to_catalog_collections.php`
 - `2026_07_25_140200_install_default_catalog_collection_categories.php`
 - `2026_07_25_140300_drop_catalog_collection_cover_columns.php`
+- `2026_07_25_220709_create_release_calendar_feeds_table.php`
+- `2026_07_26_120000_replace_recommendation_feedback_index_for_activity_order.php`
 <!-- project-docs:end -->
 
 ## 2026-07-16 — recommendation/discovery task 18

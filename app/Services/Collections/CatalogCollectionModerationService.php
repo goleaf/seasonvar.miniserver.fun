@@ -7,7 +7,6 @@ namespace App\Services\Collections;
 use App\Enums\AdminAuditAction;
 use App\Enums\CatalogCollectionModerationStatus;
 use App\Enums\CatalogCollectionReportStatus;
-use App\Enums\CatalogCollectionType;
 use App\Enums\CatalogCollectionVisibility;
 use App\Models\CatalogCollection;
 use App\Models\CatalogCollectionReport;
@@ -23,6 +22,7 @@ final class CatalogCollectionModerationService
     public function __construct(
         private readonly CatalogCollectionCacheInvalidator $cache,
         private readonly AdminAuditRecorder $audit,
+        private readonly CatalogCollectionPublicationReadiness $readiness,
     ) {}
 
     public function moderate(User $actor, CatalogCollection $collection, CatalogCollectionModerationStatus $status): CatalogCollection
@@ -91,14 +91,12 @@ final class CatalogCollectionModerationService
             $locked = CatalogCollection::query()->lockForUpdate()->findOrFail($collection->id);
             Gate::forUser($actor)->authorize('feature', $locked);
 
-            if ($featured && ($locked->type !== CatalogCollectionType::Editorial
-                || $locked->visibility !== CatalogCollectionVisibility::Public
-                || $locked->moderation_status !== CatalogCollectionModerationStatus::Approved)) {
-                throw ValidationException::withMessages(['feature' => [__('collections.errors.feature_requires_public')]]);
-            }
-
             if ($locked->is_featured === $featured) {
                 return ['collection' => $locked, 'changed' => false];
+            }
+
+            if ($featured && ! $this->readiness->evaluate($locked)['ready']) {
+                throw ValidationException::withMessages(['feature' => [__('collections.errors.feature_not_ready')]]);
             }
 
             $before = $this->fingerprint($locked);
@@ -121,7 +119,9 @@ final class CatalogCollectionModerationService
         /** @var CatalogCollection $collection */
         $collection = $result['collection'];
 
-        $this->cache->changed($collection);
+        if ($result['changed']) {
+            $this->cache->changed($collection);
+        }
 
         return $collection->refresh();
     }

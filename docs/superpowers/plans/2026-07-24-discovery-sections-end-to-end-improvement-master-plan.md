@@ -678,9 +678,10 @@ php artisan test tests/Feature/CatalogUpcomingDiscoveryQueryTest.php tests/Featu
 
 Unrestricted fallback to 54 unfeatured collections is rejected: он нарушает canonical featured-only editorial architecture и выдаёт тонкие/непроверенные списки за готовый editorial result.
 
-- [ ] RED: thin featured collection does not enter discovery.
-- [ ] RED: readiness-passing featured collection preserves manual item order and produces unique eligible IDs.
-- [ ] GREEN discovery tests.
+- [x] RED: thin featured collection does not enter discovery.
+- [x] RED: readiness-passing featured collection preserves manual item order and produces unique eligible IDs.
+- [x] GREEN discovery tests; homepage and editorial candidates use the same
+  eligible-ID subquery, including unavailable and missing-source failure.
 - [ ] Separately, through existing authorized collection UI/service, activate one real readiness-passing collection as production canary only after explicit operator gate.
 - [ ] Verify cache invalidation, SEO change from empty noindex to non-empty canonical behavior and rollback by removing only `is_featured`.
 

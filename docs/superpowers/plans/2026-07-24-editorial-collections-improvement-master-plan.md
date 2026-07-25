@@ -427,7 +427,8 @@ public function effectiveCatalogTitleId(
 
 **Priority:** P1 local curation.
 
-**Status:** `planned`.
+**Status:** `implemented_code_verified`; production canary remains an explicit
+operator gate.
 
 **Files:**
 
@@ -791,12 +792,22 @@ public function evaluate(CatalogCollection $collection): array;
 - unknown reason codes fail closed in UI;
 - readiness does not silently publish, feature or alter content.
 
-**RED tests:**
+**Verified contracts:**
 
-- `test_empty_thin_and_unavailable_collection_cannot_be_featured`.
-- `test_ready_local_and_source_collection_use_distinct_documented_minimums`.
-- `test_exact_retry_is_noop_and_preserves_first_feature_audit`.
-- `test_visibility_change_immediately_revokes_readiness_and_cache_eligibility`.
+- [x] Empty, thin, unavailable, missing-source and structurally invalid
+  collections fail closed with allowlisted reasons.
+- [x] Ready local/source collections use the documented 12/4 minima.
+- [x] Failed feature preserves state/version/audit; exact successful retry is
+  a no-op and preserves the first audit.
+- [x] Homepage and editorial discovery re-evaluate visibility/playability and
+  exclude the whole collection after readiness loss.
+- [x] Admin shows one batched text-only status/count/reason presentation and
+  withholds feature from non-ready rows while preserving unfeature.
+
+Focused readiness, discovery and adjacent collection suites passed; SQLite
+plans use the existing feature/source/membership/media indexes, Vite built,
+and Chromium desktop/mobile/tablet checks passed without collection images,
+overflow or browser errors. No production row was featured by this task.
 
 **Rollback:** remove readiness guard/panel; existing policy/moderation eligibility remains. Any already unfeatured collection stays public.
 

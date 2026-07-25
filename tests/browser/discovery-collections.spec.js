@@ -86,7 +86,8 @@ test('discovery and collection taxonomy stay text-only and responsive', async ({
         const recommendationMetaBox = await page
             .locator('[data-recommendation-row]')
             .nth(1)
-            .getByText('материал каталога', { exact: true })
+            .locator('.whitespace-nowrap')
+            .first()
             .boundingBox();
 
         expect(recommendationMetaBox?.height).toBeLessThanOrEqual(20);
@@ -120,6 +121,13 @@ test('discovery and collection taxonomy stay text-only and responsive', async ({
     await expect(page.locator('[data-discovery-collection-results]')).toHaveCount(0);
     await assertResponsivePage(page);
 
+    const editorialResponse = await page.goto('/discover/editorial');
+
+    expect(editorialResponse?.status()).toBe(200);
+    await expect(page.getByRole('heading', { level: 1, name: 'Выбор редакции' })).toBeVisible();
+    expect(await page.locator('[data-recommendation-row]').count()).toBeGreaterThan(0);
+    await assertResponsivePage(page);
+
     const englishResponse = await page.goto('/en/discover/popular');
 
     expect(englishResponse?.status()).toBe(200);
@@ -130,7 +138,7 @@ test('discovery and collection taxonomy stay text-only and responsive', async ({
     await login(page, 'browser@example.com');
     await page.goto('/collections/browser-detective-collection');
     await expect(page.getByRole('heading', { level: 1, name: 'Браузерная подборка детективов' })).toBeVisible();
-    await expect(page.getByText('Темы и жанры › Детективы и криминал', { exact: true })).toBeVisible();
+    await expect(page.getByText('Темы и жанры › Детективы и криминал', { exact: true }).first()).toBeVisible();
     await expect(page.locator('article').first().locator('img')).toHaveCount(0);
     await page.getByRole('link', { name: 'Управлять' }).click();
     await expect(page.locator('#collection-edit-category-root option:checked')).toHaveText('Темы и жанры');
@@ -177,6 +185,30 @@ test('discovery and collection taxonomy stay text-only and responsive', async ({
     await classification.getByRole('button', { name: 'Вернуться к выбору' }).click();
     await expect(classification.locator('[data-classification-preview]')).toHaveCount(0);
     await expect(page.getByText('Категории и подкатегории', { exact: true })).toBeVisible();
+
+    const moderationManager = page.locator('[data-livewire-catalog-collection-administration-manager]');
+    const readyEditorialCard = moderationManager.locator('article').filter({
+        hasText: 'Готовая браузерная редакционная подборка',
+    });
+    const thinEditorialCard = moderationManager.locator('article').filter({
+        hasText: 'Тонкая браузерная редакционная подборка',
+    });
+
+    await expect(readyEditorialCard.locator('[data-collection-readiness]')).toHaveAttribute(
+        'data-collection-readiness-state',
+        'ready',
+    );
+    await expect(readyEditorialCard.getByText('Готова к редакционному показу', { exact: true })).toBeVisible();
+    await expect(readyEditorialCard.getByText('Доступно гостю: 12 из 12 · минимум: 12', { exact: true })).toBeVisible();
+    await expect(readyEditorialCard.locator('[data-collection-feature-action]')).toHaveCount(1);
+    await expect(thinEditorialCard.locator('[data-collection-readiness]')).toHaveAttribute(
+        'data-collection-readiness-state',
+        'not-ready',
+    );
+    await expect(thinEditorialCard.getByText('Не готова к редакционному показу', { exact: true })).toBeVisible();
+    await expect(thinEditorialCard.getByText('Недостаточно доступных для просмотра сериалов.', { exact: true })).toBeVisible();
+    await expect(thinEditorialCard.locator('[data-collection-feature-action]')).toHaveCount(0);
+    await expect(moderationManager.locator('img')).toHaveCount(0);
 
     const createDisclosure = page.locator('[data-category-create-disclosure]');
     const categoryDisclosures = page.locator('[data-category-root-disclosure]');
