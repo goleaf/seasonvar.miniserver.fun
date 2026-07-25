@@ -8634,3 +8634,127 @@ key/version/invalidation lifecycle.
 - Configured HTTPS push завершился кодом `128` до передачи данных из-за
   отсутствующей GitHub-аутентификации; force, branch/worktree или
   credential mutation не применялись.
+
+## Task 64 — единый стандарт `lang/*` и проверка переводов
+
+Статус: `approved_design_detailed_plan_pending`.
+
+Дата начала: 26.07.2026.
+
+Approved design:
+[`2026-07-26-translation-catalog-standardization-design.md`](../superpowers/specs/2026-07-26-translation-catalog-standardization-design.md).
+
+### Цель и baseline
+
+Все source-code interface catalogs должны повторять структуру и порядок
+`lang/ru`, использовать только вертикальные непустые PHP-массивы и проходить
+общий semantic/format contract. `lang/en` получает единый US English, а
+обычные английские фразы в `lang/ru` переводятся по смыслу.
+
+Read-only baseline: две локали, по 21 файлу и 4 962 конечных ключа; file,
+recursive key, scalar type и named-placeholder parity уже полные, duplicate
+keys отсутствуют. Найдены 208 горизонтальных массивов в `ru`, 290 в `en`,
+одно recursive-order расхождение в `en/tags.php`, смешанный US/UK English и
+отдельные English prose fragments в русском UI.
+
+### Ожидаемые изменяемые файлы
+
+- все существующие `lang/ru/*.php` и `lang/en/*.php`;
+- новый общий `tests/Unit/TranslationCatalogParityTest.php`;
+- canonical multilingual requirements и development guidance;
+- approved design, detailed implementation plan и эта Task 64 section;
+- затронутые frontend/testing documentation owners;
+- `README.md` и `CHANGELOG.md`.
+
+Новая locale, dependency, migration, route, API, config, env, cache key,
+database row, storage object, queue или production DML не планируется.
+
+### Protected contracts
+
+- exact supported locale identifiers `ru|en` и fallback `ru`;
+- exact translation file names, stable recursive keys, order, scalar types,
+  named placeholders и language-specific plural semantics;
+- Laravel PHP translation loader, Livewire locale hydration и localized
+  routes;
+- cache identity/version ownership и existing translation fingerprint;
+- search/SEO/mail/notification/admin/accessibility consumers;
+- all DB/editorial/provider/user-generated translations;
+- branch `main`, current history и foreign Task 63/shared-tree scope.
+
+### Cross-feature и production risks
+
+| Domain | Статус | Решение |
+| --- | --- | --- |
+| PHP catalog source format | `critical_affected` | Все непустые arrays vertical, один item на строку |
+| RU structure/order | `critical_affected` | Canonical file/key/order owner |
+| EN editorial wording | `affected` | US English, stable keys/placeholders |
+| RU editorial wording | `affected` | English prose переводится; brands/protocols/IDs сохраняются |
+| Laravel fallback/Livewire | `compatible` | Loader/state не меняются |
+| Public/admin/a11y UI | `affected` | Representative long-label browser matrix |
+| Cache | `compatible_automatic` | Existing translation fingerprint меняется по content |
+| Search/SEO/mail/notifications | `affected_review` | Общий structural contract + targeted smoke |
+| Routes/API/permissions | `unchanged` | Identity/authorization не меняются |
+| Schema/data/storage/import | `not_applicable` | DDL/DML/files отсутствуют |
+| Dependencies/env/build config | `not_applicable` | Installed tooling only, no lock/config edit |
+| Production | `code_only` | No cache flush; ordinary code/assets deployment |
+| Rollback | `completed_preliminary` | Revert commits only |
+| Shared Git state | `critical_risk_recorded` | Exact alternate-index delivery only |
+
+### Task-specific requirement-compliance matrix
+
+| Requirement/domain | Статус | Evidence / следующий gate |
+| --- | --- | --- |
+| Root/index/canonical requirements fresh read | `completed` | 26.07.2026 before language edits |
+| Multilingual/development/system/ops owners | `completed` | Existing PHP/fallback/parity/device contracts traced |
+| Installed versions | `completed` | PHP 8.5.8, Laravel 13.22.0, Boost 2.4.13, Livewire 4.3.3, PHPUnit 12.5.32, Tailwind 4.3.2 |
+| Existing implementation first | `completed` | 42 files, configs, fingerprint and current tests inventoried |
+| Alternatives/user authorization | `completed` | Three approaches compared; user approved full recommended normalization |
+| Canonical permanent rule first | `completed` | Multilingual owner updated before application/test edits |
+| Approved design | `completed` | Linked design includes format, editorial, testing, device and rollback decisions |
+| Detailed unlimited plan | `pending` | Next required gate |
+| TDD RED | `pending` | Global contract must fail on current 498 horizontal arrays/order/dialect |
+| Implementation | `pending` | No language source formatting before plan/RED |
+| Static/build/browser verification | `pending` | Exact matrix defined in design |
+| Phone/tablet/TV quality program | `separate_follow_up` | Task 65 repository-wide audit/design/master plan, not mixed into locale diff |
+| Docs/README/CHANGELOG/final reread | `pending` | Required after verified implementation |
+| Commit/push in `main` | `pending` | Exact Task 64 scope only |
+
+### Безлимитный execution order
+
+1. `[completed]` Requirements/Git/version/config/test discovery.
+2. `[completed]` Full locale inventory and structural/editorial baseline.
+3. `[completed]` Compare approaches and obtain user approval.
+4. `[completed]` Update canonical rule and approved design.
+5. `[in_progress]` Self-review design and write exact detailed plan.
+6. `[pending]` TDD RED global structural/format/editorial contract.
+7. `[pending]` AST mechanical vertical normalization with semantic snapshot.
+8. `[pending]` Reviewed RU/EN editorial corrections and order repair.
+9. `[pending]` Focused/existing/static/build/device/browser verification.
+10. `[pending]` Final docs/README/CHANGELOG/compliance/legacy scan.
+11. `[pending]` Exact isolated commits in existing `main`.
+12. `[pending]` Configured non-force push or honest external failure.
+
+## Task 65 — качество телефона, планшета и TV
+
+Статус: `queued_for_repository_wide_discovery_and_design`.
+
+Дата постановки: 26.07.2026.
+
+Task 65 не смешивается с механическим Task 64 diff. Он начнётся с отдельного
+repository-wide аудита существующего Task 23 responsive shell, viewport
+matrix, high-traffic public/private/admin surfaces, player lifecycle,
+keyboard/focus/remote-like navigation, long translations, query/payload
+budgets и browser evidence. Затем будут созданы отдельные design и
+безлимитный master plan с независимо проверяемыми фазами:
+
+1. shell/header/search/navigation/footer;
+2. home/catalog/discover/collections;
+3. title/player/seasons/episodes;
+4. auth/library/profile/settings/calendar;
+5. administration/support/premium;
+6. narrow-phone, phone, tablet portrait/landscape, desktop и TV-like
+   Playwright matrix;
+7. performance, accessibility, documentation, rollout и rollback.
+
+Конкретные UI-файлы и изменения не считаются утверждёнными до завершения
+этого evidence-first design gate.

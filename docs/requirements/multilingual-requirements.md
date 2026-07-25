@@ -28,5 +28,15 @@
 - После major framework, Livewire, validation, mail, notification или frontend upgrade обязателен translation completeness audit всех поддерживаемых locale, ключей, placeholders и plural forms.
 - Operational UI, когда он реально существует, переводит system status, database/cache/session/storage/mail/provider/queue/scheduler/service-worker/backup/restore/deployment/rollback/incident, loading/empty/error и accessibility labels во всех поддерживаемых locale. В persistence/API/audit остаются только стабильные codes (`healthy|degraded|unavailable|misconfigured|not_installed|unknown`), не переведённый текст.
 - Interface locale не становится media-language, provider, status, cache или persisted identity.
+- `lang/ru` является каноническим владельцем набора PHP-файлов, recursive key
+  paths и порядка ключей для source-code interface catalogs. Каждый
+  поддерживаемый locale повторяет эту структуру, типы и named placeholders.
+- Каждый непустой PHP-массив в `lang/*/*.php` записывается вертикально: один
+  элемент на строку, вложенность четыре пробела и завершающая запятая.
+  Однострочные массивы с элементами не допускаются.
+- Обычный текст `lang/ru` пишется по-русски с исключениями для официальных
+  брендов, протоколов, форматов, shortcuts и технических идентификаторов.
+  Обычный текст `lang/en` следует единому US English; stable keys,
+  product/provider names и placeholders при редакционной правке не меняются.
 - После крупного cross-system изменения обязателен полный translation completeness audit. Он подтверждает наличие каждого supported locale и каждого нового key, совпадение placeholders и pluralization structures, отсутствие duplicate keys/raw rendered keys/hardcoded user-facing text, запрет translated identity, рабочий fallback locale, сохранение locale при Livewire hydration и валидность localized routes/`hreflang`.
 - Тот же audit отдельно покрывает search без duplicate translated records, administration, email, notifications и translated accessibility labels. User-generated, advertiser-created и legal-submission content автоматически не переводится.
