@@ -7205,7 +7205,7 @@ real consumer. No migration/config/package/environment file is expected.
 
 ## Task 53 — производительность главной страницы
 
-Статус: `implementation_plan_written_execution_authorized`.
+Статус: `implemented_verified_and_pushed_with_independent_full_suite_blockers`.
 
 Дата начала: 25.07.2026.
 
@@ -7308,14 +7308,14 @@ production DML не ожидаются.
 | Existing implementation first | `completed` | Route → Livewire → builder → snapshot/recommendations/content query → Blade traced |
 | Measured root cause | `completed` | Cache telemetry, DB listeners, live payload/headers, section bytes и 8,69 s cold rebuild breakdown |
 | Expected/protected files | `completed` | Manifests recorded above and in detailed plan |
-| Cross-feature/rollback/operations review | `completed_preliminary` | Matrix above; no DDL/dependency/env/production mutation |
+| Cross-feature/rollback/operations review | `completed` | Matrix выше повторно сверена; no DDL/dependency/env/production mutation, rollback остаётся code-only |
 | Written plan reread | `completed` | Detailed plan перечитан; episode/media merge уточнён двойным query/component cap |
-| TDD RED | `completed_partial` | Bounded group/overflow and guest path failed exactly; cold snapshot/metrics tests pending |
-| Minimal GREEN | `in_progress` | Bounded group and guest path pass 7 tests / 41 assertions; cold snapshot unresolved |
-| Focused/wide/browser verification | `pending` | PHPUnit/Pint/build/live HTTP gates |
-| Canonical docs/README/CHANGELOG | `pending` | Update after verified product behavior |
-| Final requirement/legacy reread | `pending` | Required before completion |
-| Commit/push in `main` | `unresolved_shared_worktree` | Existing mixed index must not absorb foreign tasks |
+| TDD RED | `completed` | Bounded group/overflow и guest type дали ожидаемые failures; planner/cache regressions добавлены до соответствующего GREEN |
+| Minimal GREEN | `completed` | Focused 10 tests / 52 assertions; same-snapshot exact 48-row hash совпал, old/new query `3235,54→146,16 ms` |
+| Focused/wide/browser verification | `completed_with_independent_blockers` | Affected suite 122 tests / 1157 assertions, PHPStan/Pint/Vite GREEN; Chromium desktop/mobile `200`, no overflow/errors. Full suite: 1727 passed, 11 skipped, 2 unrelated failures + 6 unrelated errors |
+| Canonical docs/README/CHANGELOG | `completed` | `frontend.md`, `caching.md`, `performance.md`, canonical home spec, visitor history и русский changelog обновлены; `project:docs-refresh --check` GREEN |
+| Final requirement/legacy reread | `completed` | Applicable requirements перечитаны; duplicate/legacy scan не нашёл старого homepage `Trending` path или unbounded current implementation |
+| Commit/push in `main` | `completed` | Task delivery вошла в `422d9d1` и присутствует в `origin/main`; случайно попавший временный test config удаляется отдельным cleanup commit |
 
 ### Execution sequence
 

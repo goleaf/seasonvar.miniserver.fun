@@ -130,3 +130,29 @@ correlated `EXISTS` для восьми video titles вернул те же ID �
 - Частичный deploy безопасен только как атомарный code/assets release: новые group keys и Blade consumer должны выкатываться вместе.
 - При unavailable cache запрос всё равно строит bounded HTML; unavailable recommendation data даёт существующий честный empty state.
 - Queue, storage, service worker, PHP-FPM, Redis/Memcached configuration и importer data вручную не изменяются.
+
+## Итоговое evidence
+
+- Same-snapshot старый и новый алгоритмы вернули одинаковые 48 пар
+  `catalog_title_id/added_at` и одинаковый SHA-256; время запроса:
+  `3235,54→146,16 ms`.
+- Рабочий HTML: `1 529 634–1 598 093→740 034–740 490` байт. После targeted
+  homepage generation bump первый HTTPS-запрос: `MISS`, TTFB `0,834 s`;
+  последующие `HIT`: `0,062–0,083 s`.
+- Обычный cold builder с сохранённым точным metrics snapshot:
+  `635,38 ms`, 67 queries/`394,72 ms` SQL. Полный первый exact metrics build
+  около `3,37 s` остаётся warmer/explicit-refresh работой.
+- Focused performance/content tests: 10 tests / 52 assertions. Affected
+  homepage/cache/API/recommendation suite: 122 tests / 1157 assertions.
+  PHPStan, task-scoped Pint, Vite build и `project:docs-refresh --check`
+  прошли.
+- Managed Chromium проверил desktop `1440×1200` и mobile `390×844`: HTTP
+  `200`, 12 release groups, 8 recommendation rows, overflow links, нулевое
+  горизонтальное переполнение и отсутствие console/page/local-resource
+  errors.
+- Full suite с временно увеличенным memory limit завершил 1727 tests
+  успешно и пропустил 11; две failures и шесть errors относятся к текущим
+  параллельным collection/session/CI-hook/import-dispatch изменениям, не к
+  homepage. Стандартный 256 MiB прогон раньше остановился на накопительном
+  GD memory exhaustion; тот image test изолированно прошёл.
+- Реализация и тематическая документация опубликованы в `422d9d1`.
