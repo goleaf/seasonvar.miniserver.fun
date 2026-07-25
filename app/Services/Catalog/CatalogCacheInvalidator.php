@@ -58,13 +58,20 @@ final class CatalogCacheInvalidator
         $invalidate();
     }
 
-    public function importedTitleChanged(int $titleId): void
-    {
+    public function importedTitleChanged(
+        int $titleId,
+        bool $warm = true,
+        bool $invalidateCollections = true,
+    ): void {
         if ($titleId < 1) {
             return;
         }
 
-        $invalidate = fn () => $this->invalidateImportedTitleNow($titleId);
+        $invalidate = fn () => $this->invalidateImportedTitleNow(
+            $titleId,
+            $warm,
+            $invalidateCollections,
+        );
 
         if (DB::transactionLevel() > 0) {
             DB::afterCommit($invalidate);
@@ -111,12 +118,21 @@ final class CatalogCacheInvalidator
         $this->dispatchWarm($titleIds, refresh: $titleIds === []);
     }
 
-    private function invalidateImportedTitleNow(int $titleId): void
-    {
+    private function invalidateImportedTitleNow(
+        int $titleId,
+        bool $warm,
+        bool $invalidateCollections,
+    ): void {
         $this->versions->bump(CacheDomain::TitleDetail, 'title:'.$titleId);
         $this->telemetry->increment(CacheDomain::TitleDetail, 'invalidation');
-        $this->collections->titleChanged($titleId);
-        $this->dispatchWarm([$titleId], refresh: false);
+
+        if ($invalidateCollections) {
+            $this->collections->titleChanged($titleId);
+        }
+
+        if ($warm) {
+            $this->dispatchWarm([$titleId], refresh: false);
+        }
     }
 
     private function invalidateTitlePlaybackMetadataNow(int $titleId): void

@@ -6,6 +6,7 @@ namespace Tests\Feature;
 
 use App\Jobs\WarmCatalogCaches;
 use App\Models\CatalogTitle;
+use App\Models\SeasonvarImportRun;
 use App\Services\Catalog\CacheWarmingState;
 use App\Services\Catalog\CatalogCacheWarmer;
 use App\Services\Catalog\CatalogCacheWarmRequestStore;
@@ -15,6 +16,7 @@ use App\Support\Cache\CacheDomain;
 use App\Support\Cache\CacheKeyFactory;
 use App\Support\Cache\CacheRebuildTimeout;
 use App\Support\Cache\CacheVersionRegistry;
+use DateTimeInterface;
 use Illuminate\Cache\Repository;
 use Illuminate\Contracts\Cache\LockProvider;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -115,12 +117,40 @@ final class CacheWarmJobTest extends TestCase
 
     public function test_legacy_job_without_pending_intent_is_a_no_op(): void
     {
-        (new WarmCatalogCaches)->handle(
-            app(CatalogCacheWarmer::class),
-            app(CatalogCacheWarmRequestStore::class),
-        );
+        $this->app->call([new WarmCatalogCaches, 'handle']);
 
         $this->assertNull(app(CacheWarmingState::class)->read());
+    }
+
+    public function test_job_keeps_pending_intent_and_dispatches_one_delayed_tail_during_import(): void
+    {
+        config(['cache-architecture.warming.full_import_pause_seconds' => 300]);
+        Queue::fake();
+        SeasonvarImportRun::query()->create([
+            'mode' => 'all',
+            'status' => 'running',
+        ]);
+        $store = app(CatalogCacheWarmRequestStore::class);
+        $store->request([41], refresh: true);
+
+        $this->app->call([new WarmCatalogCaches, 'handle']);
+
+        $work = $store->claim(10);
+        $this->assertNotNull($work);
+        $this->assertTrue($work->refresh);
+        $this->assertSame([41], $work->titleIds);
+        $this->assertNull(app(CacheWarmingState::class)->read());
+        Queue::assertPushed(
+            WarmCatalogCaches::class,
+            function (WarmCatalogCaches $job): bool {
+                if (! $job->delay instanceof DateTimeInterface) {
+                    return false;
+                }
+
+                return $job->delay->getTimestamp() === now()->addSeconds(300)->getTimestamp();
+            },
+        );
+        Queue::assertPushed(WarmCatalogCaches::class, 1);
     }
 
     public function test_job_acknowledges_one_batch_and_dispatches_a_tail_for_remaining_work(): void
@@ -130,7 +160,7 @@ final class CacheWarmJobTest extends TestCase
         $store = app(CatalogCacheWarmRequestStore::class);
         $store->request([41, 42]);
 
-        (new WarmCatalogCaches)->handle(app(CatalogCacheWarmer::class), $store);
+        $this->app->call([new WarmCatalogCaches, 'handle']);
 
         $remaining = $store->claim(10);
         $this->assertNotNull($remaining);
@@ -157,7 +187,7 @@ final class CacheWarmJobTest extends TestCase
         $store = app(CatalogCacheWarmRequestStore::class);
         $store->request($titles->modelKeys());
 
-        (new WarmCatalogCaches)->handle(app(CatalogCacheWarmer::class), $store);
+        $this->app->call([new WarmCatalogCaches, 'handle']);
 
         $remaining = $store->claim(10);
         $this->assertNotNull($remaining);
@@ -180,7 +210,7 @@ final class CacheWarmJobTest extends TestCase
         $store = app(CatalogCacheWarmRequestStore::class);
         $store->request(refresh: true);
 
-        (new WarmCatalogCaches)->handle(app(CatalogCacheWarmer::class), $store);
+        $this->app->call([new WarmCatalogCaches, 'handle']);
 
         $this->assertNull($store->claim(10));
         $this->assertSame('degraded', app(CacheWarmingState::class)->read()['status'] ?? null);

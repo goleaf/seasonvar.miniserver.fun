@@ -248,9 +248,14 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
                 $comparison,
                 $warningCount,
             );
-            $cacheInvalidator->importedTitleChanged((int) $catalogTitle->id);
+            $visitorRun = $this->isVisitorRun($group->run);
+            $cacheInvalidator->importedTitleChanged(
+                (int) $catalogTitle->id,
+                warm: $visitorRun,
+                invalidateCollections: $visitorRun,
+            );
 
-            if ($this->isVisitorRun($group->run)) {
+            if ($visitorRun) {
                 if ($status === SeasonvarImportTitleGroupStatus::Completed) {
                     $refreshStates->completed($catalogTitle->id, $group->seasonvar_import_run_id);
                 } else {

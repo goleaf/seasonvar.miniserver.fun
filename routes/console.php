@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Schedule;
 
 Schedule::useCache((string) config('cache-architecture.stores.locks', 'redis-locks'));
 
-Schedule::command('cache:warm-catalog --queue --refresh')
+Schedule::command('cache:warm-catalog --queue')
     ->everyTenMinutes()
     ->name('catalog-cache-warm')
     ->withoutOverlapping(10)

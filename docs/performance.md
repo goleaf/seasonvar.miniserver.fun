@@ -374,6 +374,31 @@ Follow-up 25.07.2026 устранил повторный `BYPASS` full-response 
 
 В том же follow-up full-history `UNION ALL → MAX/GROUP BY` заменён adaptive newest-event window с exact visibility revalidation и существующими `episodes_created_at_idx`/`licensed_media_created_at_idx`. Same-snapshot сравнение вернуло одинаковые 48 ID/timestamp rows и SHA-256, но изменило query с `3 235,54 ms` до `146,16 ms`; correlated `EXISTS` для восьми video title IDs занял `5,34 ms` вместо materialization всех public media около `2 129 ms`. Обычный cold generation с сохранённым exact metrics snapshot дал builder `635,38 ms`, 67 queries/`394,72 ms` SQL; первый в истории exact metrics build остаётся отдельной дорогой операцией около `3,37 s` и выполняется warmer/explicit refresh boundary, а не после каждого content invalidation. Это локальные диагностические observations на текущей SQLite, не p95/SLA; schema, route, visibility и API snapshot не менялись.
 
+Следующий cache/import contention audit показал, что рабочий homepage уже
+даёт `MISS` за `1,32 s` и повторные `HIT` за `0,07–0,08 s`, но background
+metrics фиксировали средний `CatalogStats` rebuild `54,16 s`, homepage
+rebuild `4,14 s` и 2 722 title-detail rebuilds при активном полном импорте.
+Регулярный critical schedule поэтому больше не форсирует `--refresh`, exact
+home metrics используют 30-минутное fresh/24-часовое stale окно stats, а
+`WarmCatalogCaches` сохраняет intent и откладывает работу до terminal import.
+Title groups полного run выполняют scoped invalidation без proactive HTTP
+warm и без повторного collection-derived bump `Homepage`; terminal global
+finalizer обновляет dependent public domains один раз. Targeted visitor run
+сохраняет немедленные collection scopes и warm. Routes, cache keys, schema и
+visitor visibility не меняются. Эти значения являются read-only operational
+observations, а не p95/SLA.
+
+После естественной ротации long-lived import workers десять последовательных
+samples за 30 секунд сохранили `Homepage` generation `57424` и счётчик
+invalidation `424` неизменными при продолжающемся run `#1255`. Следующий
+HTTPS-проход дал `MISS 1,287 s`, затем `HIT 0,062 s` и `HIT 0,073 s`.
+Штатный `cache:warm-catalog --queue` во время того же run оставил pending
+`refresh=true`, перевёл работу в delayed очередь и не увеличил
+`CatalogStats`: 18 rebuilds / 974 874 ms до и после проверки. Это bounded
+operational evidence одной рабочей серии, не p95/SLA; оно закрывает текущий
+gate `<1,5 s cold / <=0,1 s hot`, поэтому materialized read model без новой
+измеренной причины не добавляется.
+
 Следующий bounded follow-up локализовал тот же pattern в обычной выдаче `/titles`: при idle import queue natural `/titles?per_page=96` `MISS` занял `20,72 s`, а последующие `HIT` — `0,10–0,14 s`. Direct `CatalogTitlesPageBuilder` profile занимал `5 478,85 ms`; один hydration query с тремя correlated `withCount()` subquery — `5 177,83 ms`. После первой доставки builder заполняет все три card attributes общим grouped loader по не более чем 96 ID. Последующий count-sort follow-up убрал и оставшийся correlated ordering aggregate: `episodes_desc`, `seasons_desc` и `with_video` присоединяют один visibility-aware grouped subquery через `leftJoinSub()`, сохраняют zero-count titles через `COALESCE` и применяются одинаково к default и FTS-ranked веткам.
 
 Первая доставка была подтверждена RED с 1 failure/5 semantic assertions, GREEN с 2 tests/9 assertions, affected suite 113 tests/1 045 assertions и полным snapshot 1 444 tests/1 433 passed/11 expected skipped/123 046 assertions. Для следующего count-sort follow-up отдельный RED сохранил правильный порядок, но обнаружил три correlated result aggregates: 1 passed/3 failed и 14 assertions. После grouped join второй RED обнаружил повторную materialization агрегата во внутреннем paginator count: 5 passed/3 failed и 32 assertions. Финальный GREEN покрывает ordinary, parameter-ranked и реальную FTS-ranked ветки — 8 tests/32 assertions; затронутый каталог/API/cache suite — 119 tests/1 069 assertions.

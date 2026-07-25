@@ -6,11 +6,15 @@ namespace Tests\Feature;
 
 use App\DTOs\Seasonvar\SeasonvarCatalogData;
 use App\DTOs\Seasonvar\SeasonvarPreparedCatalogPage;
+use App\Enums\CatalogCollectionModerationStatus;
+use App\Enums\CatalogCollectionVisibility;
 use App\Enums\MediaFileSizeCheckStatus;
 use App\Enums\MediaHealthStatus;
 use App\Jobs\FinalizeSeasonvarImportTitleGroup;
 use App\Jobs\WarmCatalogCaches;
 use App\Models\ApiSyncChange;
+use App\Models\CatalogCollection;
+use App\Models\CatalogCollectionItem;
 use App\Models\CatalogTitle;
 use App\Models\LicensedMedia;
 use App\Models\Season;
@@ -23,12 +27,15 @@ use App\Services\Seasonvar\SeasonvarCatalogParser;
 use App\Services\Seasonvar\SeasonvarImportTitleGroupDispatcher;
 use App\Services\Seasonvar\SeasonvarPageClaimManager;
 use App\Services\Seasonvar\SeasonvarTitleMerger;
+use App\Support\Cache\CacheDomain;
+use App\Support\Cache\CacheVersionRegistry;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
 use Mockery\MockInterface;
 use RuntimeException;
 use Tests\TestCase;
@@ -233,6 +240,53 @@ class SeasonvarImportTitleGroupFinalizerTest extends TestCase
         $this->assertNotNull($warmWork);
         $this->assertSame([$title->id], $warmWork->titleIds);
         Queue::assertPushed(WarmCatalogCaches::class, 1);
+    }
+
+    public function test_full_import_finalizer_invalidates_without_scheduling_a_per_title_warm(): void
+    {
+        config(['cache-architecture.warming.enabled' => true]);
+        $title = $this->titleWithSeasonUrls([1]);
+        $group = app(SeasonvarImportTitleGroupDispatcher::class)
+            ->start($title, 'seasonvar-import');
+        $group->run->update([
+            'mode' => 'all',
+            'summary' => [
+                'provider' => 'seasonvar',
+                'queue' => 'seasonvar-import',
+            ],
+        ]);
+        $collection = CatalogCollection::query()->create([
+            'public_id' => (string) Str::uuid(),
+            'name' => 'Подборка массового импорта',
+            'slug' => 'podborka-massovogo-importa',
+            'visibility' => CatalogCollectionVisibility::Public,
+            'moderation_status' => CatalogCollectionModerationStatus::Approved,
+            'published_at' => now(),
+        ]);
+        CatalogCollectionItem::query()->create([
+            'catalog_collection_id' => $collection->id,
+            'catalog_title_id' => $title->id,
+            'position' => 1,
+        ]);
+        $this->prepareAllRows($group->preparedPages()->with('sourcePage')->get(), [1 => 2]);
+        $versions = app(CacheVersionRegistry::class);
+        $titleVersion = $versions->version(CacheDomain::TitleDetail, 'title:'.$title->id);
+        $homepageVersion = $versions->version(CacheDomain::Homepage);
+        $collectionsVersion = $versions->version(CacheDomain::Collections);
+
+        $this->app->call([
+            (new FinalizeSeasonvarImportTitleGroup($group->id))->withFakeQueueInteractions(),
+            'handle',
+        ]);
+
+        $this->assertGreaterThan(
+            $titleVersion,
+            $versions->version(CacheDomain::TitleDetail, 'title:'.$title->id),
+        );
+        $this->assertSame($homepageVersion, $versions->version(CacheDomain::Homepage));
+        $this->assertSame($collectionsVersion, $versions->version(CacheDomain::Collections));
+        $this->assertNull(app(CatalogCacheWarmRequestStore::class)->claim(10));
+        Queue::assertNotPushed(WarmCatalogCaches::class);
     }
 
     public function test_finalizer_applies_prepared_direct_media_without_provider_http(): void

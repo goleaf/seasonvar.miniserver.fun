@@ -16,7 +16,8 @@ final class CacheWarmScheduleTest extends TestCase
 
         $this->assertNotNull($event);
         $this->assertSame('*/10 * * * *', $event->expression);
-        $this->assertStringContainsString('cache:warm-catalog --queue --refresh', $event->command);
+        $this->assertStringContainsString('cache:warm-catalog --queue', $event->command);
+        $this->assertStringNotContainsString('--refresh', $event->command);
         $this->assertTrue($event->withoutOverlapping);
         $this->assertSame(10, $event->expiresAt);
         $this->assertTrue($event->onOneServer);

@@ -13,8 +13,12 @@ use App\Services\Catalog\CatalogHomeContentAdditionQuery;
 use App\Services\Catalog\CatalogHomeMetricsCache;
 use App\Services\Catalog\CatalogHomePageBuilder;
 use App\Services\Catalog\CatalogHomeSnapshotCache;
+use App\Support\Cache\CacheDomain;
+use App\Support\Cache\CacheKeyFactory;
+use App\Support\Cache\CacheVersionRegistry;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
@@ -141,6 +145,23 @@ final class CatalogHomePerformanceTest extends TestCase
 
         $this->assertSame(1, $metrics->metrics()['titles']);
         $this->assertSame(2, $metrics->refresh()['titles']);
+    }
+
+    public function test_home_metrics_use_the_stats_ttl_inside_the_homepage_namespace(): void
+    {
+        config(['cache-architecture.domains.homepage.fresh' => 0]);
+        CatalogTitle::factory()->create();
+
+        $this->assertSame(1, app(CatalogHomeMetricsCache::class)->metrics()['titles']);
+
+        $key = app(CacheKeyFactory::class)->data(
+            CacheDomain::Homepage,
+            'metrics',
+            ['audience' => 'public', 'locale' => app()->getLocale()],
+            app(CacheVersionRegistry::class)->version(CacheDomain::Homepage, 'metrics'),
+        );
+
+        $this->assertTrue(Cache::store('array')->has($key));
     }
 
     public function test_mass_import_homepage_remains_inside_the_shared_html_cache_budget(): void

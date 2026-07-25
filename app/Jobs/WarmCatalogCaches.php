@@ -8,6 +8,7 @@ use App\DTOs\CatalogCacheWarmWork;
 use App\Services\Catalog\CacheWarmingState;
 use App\Services\Catalog\CatalogCacheWarmer;
 use App\Services\Catalog\CatalogCacheWarmRequestStore;
+use App\Services\Seasonvar\SeasonvarImportActivity;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
@@ -43,8 +44,21 @@ final class WarmCatalogCaches implements ShouldBeUniqueUntilProcessing, ShouldQu
         $this->afterCommit();
     }
 
-    public function handle(CatalogCacheWarmer $warmer, CatalogCacheWarmRequestStore $requests): void
-    {
+    public function handle(
+        CatalogCacheWarmer $warmer,
+        CatalogCacheWarmRequestStore $requests,
+        SeasonvarImportActivity $imports,
+    ): void {
+        if ($imports->active()) {
+            self::dispatch()
+                ->delay(now()->addSeconds(max(30, (int) config(
+                    'cache-architecture.warming.full_import_pause_seconds',
+                    300,
+                ))));
+
+            return;
+        }
+
         $work = $requests->claim(
             max(1, (int) config('cache-architecture.warming.request_batch_title_limit', 250)),
         );

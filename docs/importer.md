@@ -1,6 +1,6 @@
 # Конвейер импорта Seasonvar
 
-Обновлено: 24.07.2026
+Обновлено: 25.07.2026
 
 ## Граница данных
 
@@ -82,6 +82,17 @@ Sync CLI/legacy wrapper, `/admin/imports`, cron/CLI `--queued` и retry испо
 После начального полного SSR видимая карточка получает `wire:init` без модификаторов только для stale refreshable state и может поставить один forced targeted refresh, если последнее успешное обновление было более 15 минут назад. При active refresh, свежем `completed` state или отсутствии source URL init request не отправляется; coordinator всё равно повторно проверяет eligibility под distributed lock, поэтому render hint не заменяет server authority. SSR, crawler и клиент без JavaScript не создают import job. Browser передаёт только locked ID тайтла: URL читается из базы, нормализуется и повторно проверяется по HTTPS allowlist `seasonvar.ru`. Coordinator немедленно создаёт title group и dispatches по одному preparation job на каноническую и каждую известную прямую страницу сезона — без chunk/max-pages limit. Динамически найденные страницы добавляются в ту же группу до закрытия discovery, а посетители разных тайтлов создают независимые группы. После fan-in один finalizer применяет payload в стабильном порядке и записывает все сезоны и серии внутрь того же `CatalogTitle`. Новое 15-минутное окно начинается только после `completed`; `partial/failed` не считаются свежим обновлением.
 
 Preparation выполняет HTTP, parser и проверку внешних media до catalog write; durable payload не содержит credentials и не требует повторного сетевого запроса при apply/retry. Finalizer строит общий source manifest и не удаляет локальные сезоны, серии или media, которых нет в provider snapshot. Ошибка или warning отдельной страницы делает группу `partial`, сохраняя успешно подготовленные данные; exact verified duplicates сезонного семейства объединяются с сохранением slug redirects. Global queued importer использует тот же group pipeline, но после всех terminal groups дополнительно выполняет catalog-wide maintenance, media checks, merge, recommendations и stats refresh.
+
+После успешного apply title-group всегда bump-ит scoped `TitleDetail` и
+зависимые публичные collection scopes. Targeted URL/visitor run дополнительно
+ставит proactive warm конкретной карточки. Группа массового global run его не
+ставит: terminal global finalizer выполняет общую catalog invalidation и
+единый coalesced warm, поэтому промежуточный per-title HTML иначе сразу
+становился бы недостижимым. Пока global run остаётся `queued|running`, общий
+`WarmCatalogCaches` не claim-ит durable intent и откладывается на
+существующее bounded import-pause окно. Та же пауза применяется при другом
+активном targeted Seasonvar run, как и в остальных public warm jobs.
+Invalidation при этом не теряется, queue/cache clear не требуется.
 
 Queue jobs принимают только IDs, lease token, canonical group key и force flag. Provider HTML/JSON, credentials и URLs в queue payload не кладутся. Preparation после release claim посылает deduplicated group signal; terminal group посылает global signal. Оба finalizer реализуют `ShouldBeUniqueUntilProcessing`: ожидающий job удерживает unique key, перед обработкой key освобождается, поэтому более поздний terminal event может поставить следующий wake-up. Перед fan-in group finalizer освобождает exact same-run claim только у уже terminal staging-row через полную пару page/run/token; это закрывает окно, в котором base dispatcher успел claim-ить уже подготовленный sibling season. Claim незавершённой строки и claim другого run остаются блокирующими. Если другие siblings/claims ещё живы, finalizer обновляет heartbeat и завершает job без `release()`/polling; это не расходует queue attempts. Redis group/apply lock защищает единственное применение. Global finalizer аналогично ждёт terminal state всех групп, а Redis lock `seasonvar-import-finalizer` сериализует catalog-wide cleanup, media maintenance, merge и recommendation rebuild между runs; только редкая конкуренция за apply/global lock использует delayed release.
 

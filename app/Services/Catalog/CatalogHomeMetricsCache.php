@@ -44,7 +44,7 @@ final class CatalogHomeMetricsCache
             CacheDomain::Homepage,
             'metrics',
             ['audience' => 'public', 'locale' => app()->getLocale()],
-            $this->ttl->for(CacheDomain::Homepage),
+            $this->ttl->for(CacheDomain::CatalogStats),
             fn (): array => $this->build(),
             false,
             self::VERSION_SCOPE,
