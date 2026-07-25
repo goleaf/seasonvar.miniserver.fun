@@ -394,6 +394,28 @@ CatalogCollectionItem::query()->create([
     'position' => 1,
 ]);
 
+$uncategorizedCollection = CatalogCollection::query()->create([
+    'public_id' => (string) Str::uuid(),
+    'owner_id' => $user->id,
+    'catalog_collection_category_id' => null,
+    'name' => 'Браузерная подборка Netflix',
+    'description' => 'Оригинальные проекты Netflix для проверки рекомендации.',
+    'slug' => 'browser-netflix-collection',
+    'type' => CatalogCollectionType::User,
+    'visibility' => CatalogCollectionVisibility::Public,
+    'moderation_status' => CatalogCollectionModerationStatus::Approved,
+    'sort_mode' => CatalogCollectionSort::Manual,
+    'content_locale' => 'ru',
+    'content_version' => 1,
+    'published_at' => now()->subMinute(),
+]);
+CatalogCollectionItem::query()->create([
+    'catalog_collection_id' => $uncategorizedCollection->id,
+    'catalog_title_id' => $title->id,
+    'added_by_id' => $user->id,
+    'position' => 1,
+]);
+
 UserAccountSetting::query()->create([
     'user_id' => $englishUser->id,
     'locale' => 'en',

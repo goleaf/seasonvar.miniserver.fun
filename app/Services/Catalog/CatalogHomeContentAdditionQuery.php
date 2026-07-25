@@ -68,7 +68,8 @@ final class CatalogHomeContentAdditionQuery
      * @return Collection<int, array{
      *     title: CatalogTitle,
      *     episodes: Collection<int, Episode>,
-     *     media: Collection<int, LicensedMedia>
+     *     media: Collection<int, LicensedMedia>,
+     *     has_more: bool
      * }>
      */
     public function latestReleaseGroups(Collection $titles, array $updates, int $limit = 12): Collection

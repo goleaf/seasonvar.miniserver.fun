@@ -110,6 +110,21 @@ test('discovery and collection taxonomy stay text-only and responsive', async ({
     await expect(page).toHaveURL(/\/(?:ru\/?)?$/);
     await login(page, 'browser-admin@example.com');
     await page.goto('/admin/catalog?section=collections');
+    const classification = page.locator('[data-collection-classification]');
+
+    await expect(classification.getByRole('heading', { level: 2, name: 'Классификация подборок' })).toBeVisible();
+    await expect(classification.locator('[data-classification-summary]')).toBeVisible();
+    await expect(classification.getByText('Браузерная подборка Netflix', { exact: true })).toBeVisible();
+    await expect(classification.getByText('Платформы — Netflix', { exact: true })).toBeVisible();
+    await expect(classification.getByText('Высокая уверенность', { exact: true })).toBeVisible();
+    await expect(classification.locator('img')).toHaveCount(0);
+    await classification.getByRole('button', { name: 'Выбрать с высокой уверенностью' }).click();
+    await expect(classification.getByText('Выбрано: 1', { exact: true })).toBeVisible();
+    await classification.getByRole('button', { name: 'Проверить выбранное' }).click();
+    await expect(classification.locator('[data-classification-preview]')).toBeVisible();
+    await expect(classification.getByRole('button', { name: 'Подтвердить назначения' })).toBeVisible();
+    await classification.getByRole('button', { name: 'Вернуться к выбору' }).click();
+    await expect(classification.locator('[data-classification-preview]')).toHaveCount(0);
     await expect(page.getByText('Категории и подкатегории', { exact: true })).toBeVisible();
     await expect(page.locator('[data-category-create-form]')).toBeVisible();
     await expect(page.getByText('Детективы и криминал', { exact: true })).toBeVisible();

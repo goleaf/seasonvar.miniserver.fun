@@ -1,6 +1,6 @@
 # Требования к системной интеграции
 
-Обновлено: 19.07.2026
+Обновлено: 25.07.2026
 
 Этот документ обязателен для любой задачи, затрагивающей более одного feature domain, shared identity, visibility, access, notifications, audit, cache, search, SEO, account lifecycle, imports или administration. Он дополняет тематические документы-владельцы и не создаёт вторую доменную архитектуру.
 
@@ -80,4 +80,6 @@
 - Единственная публичная directory-точка рекомендаций и подборок — `/discover/{type}`; при `type=popular` она содержит независимую секцию публичных коллекций с query keys `collections_q`, `collections_sort` и `collectionsPage`.
 - `/collections/{slug}`, localized detail, owner/profile и read-only API остаются самостоятельными доменными boundaries, но отдельный `/collections` directory запрещён. Собственных изображений, upload/delivery route или image cache у подборок нет.
 - Единственная административная точка управления сериалами и коллекциями — `/admin/catalog`; внутренние manager-компоненты не являются full-page routes и не создают дублирующий admin contract.
+- Классификация существующих подборок остаётся human-in-the-loop: deterministic suggestions вычисляются только для уже пагинированной страницы из bounded сохранённых evidence, объясняются stable reason/confidence codes и никогда не сохраняются автоматически. Catalog-wide inference, внешний AI provider и persisted guess-state без отдельного продуктового решения запрещены.
+- Preview/selection/confidence не являются authority. Подтверждение повторно требует `content.manage`, authoritative active category/root, exact UUID и совпавший `content_version`; один пакет ограничен 100 строками, а material assignment использует существующие audit и after-commit collection invalidation boundaries.
 - Удалённые `/collections`, `/admin/collections`, `/discover`, `/recommendations`, `/lists`, `/selections` и `/my/lists` возвращают `404` без compatibility redirects по явному продуктовому решению. Новые aliases для них не добавляются.
