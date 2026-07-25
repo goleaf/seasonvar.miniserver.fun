@@ -896,6 +896,83 @@ Expected: local/remote SHA equal; branch `main`; clean tree.
 GitHub Actions status если он уже terminal, и все unresolved external states.
 Не заявлять CI success до фактического terminal result.
 
+---
+
+### Task 7: Ужесточить exact repository и identity diagnostics после senior review
+
+**Priority:** high.
+
+**Why:** текущая реализация распознаёт любой SSH remote и любое непустое
+`core.sshCommand`. Это не доказывает утверждённые repository-scoped границы и
+может дать ложный локальный GREEN перед push в неверный repository либо через
+неявно выбранную SSH identity.
+
+**Files:**
+
+- Modify: `scripts/git-doctor.sh`
+- Modify: `tests/Unit/GitWorkflowDoctorTest.php`
+- Modify: `docs/development.md`
+- Modify: `docs/ci.md`
+- Modify: `README.md`
+- Modify: `CHANGELOG.md`
+- Modify: `docs/plans/current-task-plan.md`
+
+**Dependencies:** существующий Bash doctor, PHPUnit/Symfony Process fixtures,
+canonical HTTPS/SSH URL и repository-local Git config. Новые packages,
+routes, schema, data, cache, translations или runtime services не нужны.
+
+**Risks:** слишком широкое string parsing может раскрыть credential path или
+отклонить корректную quoted identity. Проверка поэтому подтверждает только
+наличие explicit `-i`, `IdentitiesOnly=yes` и `BatchMode=yes`, никогда не
+выводит значение команды и оставляет фактическую identity/read verification
+за exact `git ls-remote`.
+
+- [x] **Step 1: RED exact-remote tests**
+
+Добавить тесты, которые требуют отказа для SSH URL другого repository и
+подтверждают отсутствие remote URL в диагностическом output.
+
+- [x] **Step 2: RED exact-identity tests**
+
+Добавить тесты для отсутствующего и неполного `core.sshCommand`; valid fixture
+должна содержать explicit `-i`, `IdentitiesOnly=yes` и `BatchMode=yes`.
+
+- [x] **Step 3: Запустить RED**
+
+```bash
+php artisan test tests/Unit/GitWorkflowDoctorTest.php
+```
+
+Expected: новые assertions падают только из-за отсутствующей exact
+remote/identity проверки.
+
+- [x] **Step 4: Реализовать минимальный GREEN**
+
+Doctor принимает canonical HTTPS и canonical SSH URL, не печатает URL,
+credential command или private path. SSH transport требует repository-local
+explicit identity и два безопасных options.
+
+- [x] **Step 5: Запустить GREEN и связанный contract**
+
+```bash
+php artisan test tests/Unit/GitWorkflowDoctorTest.php \
+  tests/Unit/CiQualityGateContractTest.php
+bash -n scripts/git-doctor.sh
+```
+
+- [x] **Step 6: Обновить documentation и compliance**
+
+Уточнить canonical remote/identity checks в owner-документах, русском
+`CHANGELOG.md`, developer section `README.md` и Task 55 matrix. Visitor
+product behavior, migrations, routes, SQL, translations, cache и permissions
+остаются `not_applicable`.
+
+- [x] **Step 7: Выполнить финальные gates**
+
+Запустить focused tests, Pint для изменённого PHPUnit-файла, Bash syntax,
+Composer validation, docs/policy/diff/secret scans. Commit/push выполняются
+только из `main`; clean-tree `pre-push` и exact deploy-key GREEN не обходятся.
+
 ## Plan Self-Review
 
 - Spec coverage: authentication, doctor, Composer, TDD, docs, SSH rollout,

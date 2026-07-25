@@ -101,6 +101,8 @@ done
 
 origin_url="$(git remote get-url origin 2>/dev/null || true)"
 transport=""
+canonical_https_origin="https://github.com/goleaf/seasonvar.miniserver.fun.git"
+canonical_ssh_origin="git@github.com:goleaf/seasonvar.miniserver.fun.git"
 
 if [[ -z "$origin_url" ]]; then
     fail "Remote origin не настроен."
@@ -110,6 +112,8 @@ elif [[ "$origin_url" =~ ^https:// ]]; then
 
     if [[ "$authority" == *"@"* ]]; then
         fail "HTTPS origin содержит запрещённые embedded credentials."
+    elif [[ "$origin_url" != "$canonical_https_origin" ]]; then
+        fail "origin не соответствует каноническому repository."
     else
         transport="https"
         ok "origin использует HTTPS без embedded credentials."
@@ -124,14 +128,23 @@ elif [[ "$origin_url" =~ ^https:// ]]; then
         fi
     fi
 elif [[ "$origin_url" =~ ^ssh:// ]] || [[ "$origin_url" =~ ^[^/]+@[^:]+:.+ ]]; then
-    transport="ssh"
-    ok "origin использует SSH."
-
-    if git config --local --get core.sshCommand >/dev/null 2>&1 \
-        || [[ -n "${SSH_AUTH_SOCK:-}" ]]; then
-        ok "Обнаружен локальный SSH identity mechanism."
+    if [[ "$origin_url" != "$canonical_ssh_origin" ]]; then
+        fail "origin не соответствует каноническому repository."
     else
-        warn "SSH identity будет окончательно проверена только режимом --remote."
+        transport="ssh"
+        ok "origin использует SSH."
+
+        ssh_command="$(git config --local --get core.sshCommand 2>/dev/null || true)"
+
+        if [[ -z "$ssh_command" ]]; then
+            fail "SSH origin требует repository-local exact identity."
+        elif [[ ! "$ssh_command" =~ (^|[[:space:]])-i([[:space:]]|$) ]] \
+            || [[ "$ssh_command" != *"IdentitiesOnly=yes"* ]] \
+            || [[ "$ssh_command" != *"BatchMode=yes"* ]]; then
+            fail "SSH identity должна явно задавать ключ, IdentitiesOnly=yes и BatchMode=yes."
+        else
+            ok "Repository-local SSH identity policy настроена."
+        fi
     fi
 else
     fail "Remote origin использует неподдерживаемый transport."

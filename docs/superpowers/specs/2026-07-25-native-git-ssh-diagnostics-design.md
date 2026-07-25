@@ -135,10 +135,13 @@ Default mode не обращается к сети и проверяет:
 4. наличие, tracked state и executable bit для `pre-commit`, `pre-push`,
    `post-commit` и `lib/git-guard.sh`;
 5. shell syntax versioned hooks;
-6. наличие `origin` и отсутствие embedded userinfo/token в remote URL;
-7. тип transport: `ssh`, `https` или unsupported;
-8. наличие локального HTTPS credential mechanism как capability signal, без
-   чтения credential;
+6. наличие `origin`, отсутствие embedded userinfo/token и точное соответствие
+   одному из двух canonical URL текущего repository: HTTPS до rollout либо SSH
+   после rollout;
+7. для SSH — наличие repository-local `core.sshCommand` с explicit identity,
+   `IdentitiesOnly=yes` и `BatchMode=yes`, без вывода команды или пути;
+8. для HTTPS — наличие локального credential mechanism как capability signal,
+   без чтения credential;
 9. количество staged, unstaged и untracked paths без вывода содержимого;
 10. ahead/behind относительно доступного локального `origin/main`, не
     выполняя fetch;

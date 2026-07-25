@@ -7617,9 +7617,11 @@ gate.
 
 ## Task 55 — нативный Git через repository-scoped SSH и doctor
 
-Статус: `awaiting_github_deploy_key_registration`.
+Статус: `hardening_verification_in_progress_external_deploy_key_unresolved`.
 
 Дата начала: 25.07.2026.
+
+Последняя проверка: 26.07.2026.
 
 Approved design:
 [`2026-07-25-native-git-ssh-diagnostics-design.md`](../superpowers/specs/2026-07-25-native-git-ssh-diagnostics-design.md).
@@ -7679,7 +7681,7 @@ production-runtime files не входят в Task 55.
 | Secret lifecycle | `affected` | Exact key вне Git, `0600`; public key добавляется только как one-repository deploy key |
 | GitHub connector | `affected_compatible` | Используется для read-only auth/repository evidence, не для локального credential |
 | Hooks/CI | `affected_compatible` | Doctor дополняет, но не дублирует и не обходит hooks/quality gate |
-| Shared index | `risk_recorded` | Path-limited commits; существующие два чужих staged Markdown сохраняются |
+| Shared index | `risk_recorded` | После параллельного commit Task 56 в индексе одновременно находятся Task 55 hardening и новый Task 57 homepage scope. Delivery требует alternate-index commit exact Task 55 paths/section; foreign blobs не unstage/reset/stash и не включаются в Task 55 commit |
 | Dependencies | `not_applicable` | Новые packages/system dependencies не добавляются |
 | Routes/migrations/data | `not_applicable` | Нет application/schema/DML изменения |
 | Translations/cache/permissions/queues | `not_applicable` | Нет domain/runtime state |
@@ -7691,21 +7693,27 @@ production-runtime files не входят в Task 55.
 
 | Requirement/domain | Статус | Evidence / следующий gate |
 | --- | --- | --- |
-| Root/index/canonical requirements fresh read | `completed` | Выполнено 25.07.2026 до tracked edits |
-| Maintenance/production owners | `completed` | Secret/provider/rollback requirements перечитаны; application production impact отсутствует |
-| Related Markdown | `completed` | Git workflow, CI, MCP, Task 54 plan/spec и documentation map inspected |
-| Installed versions | `completed` | PHP 8.5, Laravel 13.22.0, Boost 2.4.13, PHPUnit 12.5.32; Git 2.52 |
+| Root/index/canonical requirements fresh read | `completed` | Root instructions, canonical index and applicable requirement owners reread on 26.07.2026 before continuation actions |
+| Maintenance/production owners | `completed` | Secret/provider/rollback requirements reread on 26.07.2026; application production impact remains absent |
+| Related Markdown | `completed` | Git workflow, CI, MCP/integration catalog, documentation map, approved spec and implementation plan rechecked |
+| Installed versions | `completed` | PHP 8.5.8, Laravel 13.22.0, Boost 2.4.13, Livewire 4.3.3, Pint 1.29.3, PHPUnit 12.5.32, Composer 2.10.2, Node 26.4.0, npm 12.0.1 and Git 2.52.0 |
 | Existing implementation first | `completed` | Composer scripts, four hooks, guard library, changelog updater, doctor command and tests traced |
 | Root cause reproduction | `completed` | HTTPS push auth failure, no helper/`gh`/GCM, SSH `Permission denied (publickey)` |
 | GitHub App availability | `completed` | Connector installation `88463274`; target repository grants `push`/`admin`, local Git auth remains separate |
 | Alternatives and official docs | `completed` | SSH deploy key selected over HTTPS helper and connector-created commits |
+| Browser owner-setting fallback | `unresolved` | Fresh connector discovery still exposes neither Deploy keys nor a generic REST mutation. Playwright CLI has no running authenticated browser, while the project browser contract is isolated and intentionally persists no GitHub cookies; installing an unauthenticated browser cannot satisfy repository-owner login/2FA. The deploy-key registration therefore remains an explicit owner action |
+| Senior exact-boundary review | `completed` | Review on 26.07.2026 found that the doctor accepted any SSH remote and treated any non-empty local `core.sshCommand` or agent as an identity mechanism. The approved repository-scoped contract instead requires the exact repository and explicit repository-local identity. TDD RED produced exactly three expected failures while seven existing tests passed; the minimal GREEN validates canonical HTTPS/SSH URLs plus explicit `-i`, `IdentitiesOnly=yes` and `BatchMode=yes` without printing URL, command or private path. Fresh focused result: 10 tests, 31 assertions, Bash syntax GREEN |
+| Extended project inventory | `completed` | Fresh evidence: PHP 8.5.8, Laravel 13.22.0, SQLite default with configured SQLite/MySQL/MariaDB/PostgreSQL/SQL Server connections, Livewire 4.3.3, Tailwind 4.3.2, Vite 8.1.4, PHPUnit 12.5.32, 241 routes, 116 migrations, 132 models, 82 Livewire classes, 461 services, 68 actions, 34 Form Requests, 14 policies, 15 jobs, 20 commands, 34 API Resources, 325 PHPUnit files and existing Playwright browser tests |
+| Laravel/database/frontend functional impact | `not_applicable` | Task 55 changes developer Bash diagnostics, PHPUnit contract tests and Git/CI documentation only. No route, controller, model, relationship, migration, factory, seeder, request validation, policy/gate, middleware, service/action/DTO, event/listener/notification/job/command/schedule, Blade/Livewire/JavaScript, API Resource, SQL query, index, cache key, translation or visitor behavior is changed |
+| Security/dependency audit | `completed` | Exact remote and repository-local identity policy are fail-closed without echoing remote/command/key path. Focused debug scan and Task 55 diff secret scan are clean; `composer audit --locked` reports no advisories and production `npm audit --omit=dev` reports 0 vulnerabilities. Private key material was not read, logged, tracked or embedded |
+| Standalone current-plan consolidation policy | `unresolved` | `scripts/check-current-plan-policy.sh docs/plans/current-task-plan.md` rejects the historical file because it already contains many top-level task headings, beginning with another `Текущая задача` at line 1889. The checker is not currently wired into `ci-check.sh` or hooks; Task 55 adds no H1 and does not perform destructive cross-workstream archive consolidation |
 | Expected/protected files | `completed` | Manifests recorded above |
 | Design approval | `completed` | User approved recommended design after presentation |
 | Design spec/self-review | `completed` | Placeholder scan clean; architecture, errors, TDD, security, rollout, rollback and acceptance are internally consistent; docs/link/policy/diff checks pass; isolated commit `aedbd00` |
 | Written implementation plan | `completed` | Six-task inline plan contains exact files, interfaces, RED/GREEN code, SSH rollout, rollback, verification and remote evidence; placeholder/consistency/scope checks pass |
 | TDD RED/GREEN | `completed` | RED: 27 tests, 19 passed, 8 expected failures only because script/alias were absent. GREEN: те же 27 tests, 27 passed, 139 assertions; real local doctor passed branch/hooks/conflicts/privacy counts and failed only on the proven missing HTTPS credential helper |
-| SSH key/deploy-key/remote rollout | `unresolved` | Unique Ed25519 pair created outside Git with `0600/0644`; private material was neither read nor printed. Repeated exact repository check on 25.07.2026 still returns `Permission denied (publickey)`. Tool discovery exposes no Deploy keys or generic GitHub REST mutation, while `GITHUB_TOKEN`, `GH_TOKEN`, `CODEX_GITHUB_TOKEN` and `gh` are absent; owner must add the public key as one-repository deploy key with write access |
-| Verification/docs/README/CHANGELOG | `completed` | Development/CI/MCP owners, developer README flow и русский CHANGELOG updated. Fresh 40 tests / 171 assertions, Pint, five independent Bash syntax checks, strict Composer validation, README/CHANGELOG policy, managed docs, docs gate, diff check и secret scan outside explicit synthetic fixtures are GREEN; credential-dependent remote/pre-push evidence belongs to the unresolved rollout row |
-| Final requirement/legacy reread | `completed` | Root/index, code/architecture/development, multilingual/security, maintenance, production operations, system integration, approved spec, execution plan и Task 55 reread after implementation; legacy/duplicate/self-referential secret scans reviewed |
-| Commit/push in `main` | `unresolved` | Spec `aedbd00`, plan `d8db224`, implementation `288e3d7` и final plan/spec alignment `caa0bc8` committed path-limited in `main`; real pre-commit passed on exact alternate index, then the two foreign staged diffs were reapplied unchanged by scope. Push awaits registered deploy key and a clean tree after unrelated Task 52/56 work |
+| SSH key/deploy-key/remote rollout | `unresolved` | Systematic recheck on 26.07.2026 found that the original planned pair never disappeared: the earlier discovery filter produced a false negative because its public comment has the additional `deploy key` suffix. That false negative caused a second pair to be generated unnecessarily. Both private pairs remain outside Git with `0600`, private material was neither read nor printed, and separate exact repository checks reject both public identities. The original plan-matching pair remains canonical; the second is retained unconfigured until successful owner registration identifies the accepted key, avoiding destructive credential deletion. A premature local `core.sshCommand` that did not satisfy the GREEN gate was removed and HTTPS `origin` remains unchanged. Repeated tool discovery exposes neither Deploy keys nor a generic REST mutation, while local token/CLI credentials remain unavailable. After the owner reported registration complete, fresh exact checks still rejected both identities; verbose SSH showed the canonical fingerprint being offered without `Server accepts key`, both identities failed `ssh -T`, and three bounded exact-repository retries returned `Permission denied (publickey)`. Therefore the canonical public key is still not active in GitHub for the exact repository, and the owner gate remains unresolved |
+| Verification/docs/README/CHANGELOG | `completed` | Development/CI/MCP owners, developer README flow и русский CHANGELOG updated. Senior hardening RED was 7 passed / 3 expected failures; GREEN is 10/10 with 31 assertions, and the broader fresh focused pair is 30 tests / 147 assertions. Pint, PHP/Bash syntax, strict Composer validation, README/CHANGELOG policy, managed docs, docs gate, diff/debug/secret scans and dependency audits are GREEN; ShellCheck is not installed. Credential-dependent remote/pre-push evidence belongs to the unresolved rollout row |
+| Final requirement/legacy reread | `completed` | Root/index, code/architecture/development, multilingual/security, maintenance, production operations, system integration, approved spec, execution plan and Task 55 reread again on 26.07.2026; no new application legacy scope was introduced |
+| Commit/push in `main` | `unresolved` | Existing Task 55 commits remain in `main`; parallel Task 56 commit `ab55891` advanced HEAD during verification, а затем появились foreign Task 57/58 staged, unstaged и untracked изменения. Настоящий hardening commit изолирует ровно девять allowlisted Task 55 paths/section через alternate index; реальный mixed index и чужой working tree не входят в commit и сохраняются. The only doctor failure is the unchanged HTTPS credential mechanism, while exact canonical SSH read still returns `Permission denied (publickey)`. Strict clean-tree `pre-push` cannot run and no bypass is allowed |
 

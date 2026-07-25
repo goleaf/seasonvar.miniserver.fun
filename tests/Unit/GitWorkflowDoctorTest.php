@@ -103,6 +103,62 @@ final class GitWorkflowDoctorTest extends TestCase
         $this->assertStringNotContainsString('user:', $process->getOutput());
     }
 
+    public function test_ssh_remote_for_another_repository_is_rejected_without_echoing_it(): void
+    {
+        $this->makeRepository();
+        $this->runGit(
+            'remote',
+            'set-url',
+            'origin',
+            'git@github.com:goleaf/private-secret-repository.git',
+        );
+
+        $process = $this->runDoctor();
+
+        $this->assertSame(1, $process->getExitCode());
+        $this->assertStringContainsString(
+            '[FAIL] origin не соответствует каноническому repository.',
+            $process->getOutput(),
+        );
+        $this->assertStringNotContainsString(
+            'private-secret-repository',
+            $process->getOutput(),
+        );
+    }
+
+    public function test_ssh_remote_requires_repository_local_identity_command(): void
+    {
+        $this->makeRepository();
+        $this->runGit('config', '--unset', 'core.sshCommand');
+
+        $process = $this->runDoctor();
+
+        $this->assertSame(1, $process->getExitCode());
+        $this->assertStringContainsString(
+            '[FAIL] SSH origin требует repository-local exact identity.',
+            $process->getOutput(),
+        );
+    }
+
+    public function test_incomplete_ssh_identity_command_is_rejected_without_echoing_it(): void
+    {
+        $this->makeRepository();
+        $this->runGit(
+            'config',
+            'core.sshCommand',
+            'ssh -i /tmp/private-secret-key -o IdentitiesOnly=yes',
+        );
+
+        $process = $this->runDoctor();
+
+        $this->assertSame(1, $process->getExitCode());
+        $this->assertStringContainsString(
+            '[FAIL] SSH identity должна явно задавать ключ, IdentitiesOnly=yes и BatchMode=yes.',
+            $process->getOutput(),
+        );
+        $this->assertStringNotContainsString('/tmp/private-secret-key', $process->getOutput());
+    }
+
     public function test_unknown_argument_returns_usage_error(): void
     {
         $this->makeRepository();
@@ -119,7 +175,6 @@ final class GitWorkflowDoctorTest extends TestCase
     public function test_default_mode_does_not_contact_remote(): void
     {
         $this->makeRepository();
-        $this->runGit('remote', 'set-url', 'origin', 'ssh://127.0.0.1:1/never/contact.git');
 
         $process = $this->runDoctor();
 
@@ -160,6 +215,11 @@ final class GitWorkflowDoctorTest extends TestCase
             'add',
             'origin',
             'git@github.com:goleaf/seasonvar.miniserver.fun.git',
+        );
+        $this->runGit(
+            'config',
+            'core.sshCommand',
+            'ssh -i /tmp/seasonvar-test-deploy -o IdentitiesOnly=yes -o BatchMode=yes',
         );
 
         return $this->repositoryPath;
