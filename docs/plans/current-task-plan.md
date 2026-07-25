@@ -7333,7 +7333,7 @@ production DML не ожидаются.
 
 ## Task 54 — нормальный частичный Git commit
 
-Статус: `verified_ready_for_path_limited_delivery`.
+Статус: `reverified_ready_for_followup_delivery`.
 
 Дата начала: 25.07.2026.
 
@@ -7362,6 +7362,14 @@ CI/development contracts остались активными. Task 54 расши
 восстановление последнего проверенного hook/CI baseline. Удалённый
 `.github/skills/impeccable` является отдельным external change и не
 восстанавливается.
+
+Повторный concurrent discovery в 23:09–23:15 EEST: последующий commit
+`422d9d1` снова удалил `.githooks`, но сохранил уже проверенные Task 54
+документацию, тест и CI workflow в истории. После завершения и отправки
+соседних commit’ов рабочее дерево стало чистым на `3c52345`; hooks
+восстанавливаются из точного snapshot `4b78b33` отдельной path-limited
+фиксацией. Чужой временный `phpunit.high-memory.xml` и application-файлы не
+входят в эту фиксацию.
 
 Выбран минимальный contract: `pre-commit` проверяет `main`, unresolved
 conflicts, staged temporary/credential paths, updater и staged documentation
@@ -7431,17 +7439,17 @@ gate.
 | Existing implementation first | `completed` | Hook, guard library, updater, policies и contract tests traced |
 | Reproducible root cause | `completed` | Прямой hook exit 1 на unstaged tracked changes |
 | Secondary blocker | `completed` | Docs/policy sequence exit 1 на английской prose CHANGELOG |
-| Concurrent repository change | `completed` | `1ec68b8` pushed; hooks/workflow deleted and exact parent baseline inspected |
+| Concurrent repository change | `completed` | `1ec68b8` и `422d9d1` pushed; повторное удаление hooks обнаружено, writers завершили свои clean commits, exact `4b78b33` snapshot выбран для восстановления |
 | Expected/protected files | `completed` | Manifests recorded above |
 | Migration/route/cache/permission/production review | `completed` | Все `not_applicable`; pre-push remains strict |
 | Written plan reread | `completed` | Detailed plan and Task 54 current scope reread before RED |
 | TDD RED | `completed` | Integration test failed with exact `есть unstaged tracked changes` diagnostic |
 | Minimal GREEN | `completed` | Removed only two commit clean-tree calls/helpers; integration test passes |
 | Russian CHANGELOG policy | `completed` | 25 violating lines translated; unchanged scanner exits 0 |
-| Focused/docs/hook verification | `completed` | 32 tests / 143 assertions, Pint, shell syntax, README/CHANGELOG policies, docs refresh/CI, diff check and staged real-hook run pass |
+| Focused/docs/hook verification | `completed` | После повторного восстановления fresh run: 32 tests / 143 assertions, Pint, shell syntax, README/CHANGELOG policies, docs refresh/CI, diff check и staged real-hook run при чужом unstaged-файле прошли |
 | README actuality | `completed` | Git section updated; visitor history unchanged because product behavior did not change |
 | Final requirement/legacy reread | `completed` | Applicable canonical owners reread; removed helpers remain only in negative tests |
-| Commit/push in `main` | `unresolved` | Path-limited commit and configured push are the remaining delivery actions |
+| Commit/push in `main` | `in_progress` | `4b78b33` уже входит в `origin/main`; после повторного удаления hooks требуются fresh verification, отдельный path-limited commit и configured push |
 
 ### Verification evidence Task 54
 
@@ -7466,3 +7474,10 @@ gate.
 - Parent snapshot восстановил pinned `.github/workflows/ci.yml`,
   `post-commit`, clean-tree `pre-push` и guard library; contract test повторно
   проверяет pinned actions и обязательный push clean-tree helper.
+- После повторного удаления `.githooks` exact snapshot `4b78b33` восстановлен
+  на текущем `3c52345`. Fresh combined contract suite снова прошёл 32 теста /
+  143 утверждения; README/CHANGELOG policies, docs profile, Pint, shell syntax
+  и `git diff --check` также прошли. Настоящий `pre-commit` с отдельным
+  path-limited index завершился кодом 0, пока чужой файл
+  `docs/superpowers/plans/2026-07-25-collection-classification-cockpit.md`
+  оставался unstaged; основной index не изменился.
