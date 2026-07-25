@@ -663,14 +663,14 @@ git diff --check
 
 Expected: `main`; Task 55 paths известны; чужие Task 52 paths явно отделены.
 
-- [ ] **Step 2: Запустить pre-commit на exact temporary index**
+- [x] **Step 2: Запустить pre-commit на exact temporary index**
 
 Создать temporary index из current `HEAD`, добавить Task 55 code/docs paths,
 а из `docs/plans/current-task-plan.md` применить только Task 55 hunk. Запустить
 на нём настоящий `.githooks/pre-commit`. Проверить, что основной index blob
 для двух Task 52 paths не изменился.
 
-- [ ] **Step 3: Создать path-limited implementation commit**
+- [x] **Step 3: Создать path-limited implementation commit**
 
 Commit message:
 
@@ -680,7 +680,7 @@ feat: add native Git workflow diagnostics
 
 Не использовать `--no-verify`, reset, stash, checkout или broad add.
 
-- [ ] **Step 4: Синхронизировать основной index без потери Task 52**
+- [x] **Step 4: Синхронизировать основной index без потери Task 52**
 
 Если alternate-index commit оставил основной index относительно прежнего
 HEAD, восстановить только semantic staged Task 52 state из неизменённого
@@ -703,7 +703,7 @@ worktree и сравнить staged diff до/после. Не включать 
   `IdentitiesOnly=yes`.
 - No tracked credential files or values.
 
-- [ ] **Step 1: Resolve safe user-level SSH directory**
+- [x] **Step 1: Resolve safe user-level SSH directory**
 
 Run:
 
@@ -717,7 +717,7 @@ install -d -m 0700 "$seasonvar_ssh_dir"
 
 Не выводить resolved private path в tracked documentation/final summary.
 
-- [ ] **Step 2: Проверить отсутствие exact key pair**
+- [x] **Step 2: Проверить отсутствие exact key pair**
 
 Run:
 
@@ -728,7 +728,7 @@ test ! -e "$seasonvar_key_path.pub"
 
 Если exact target существует, остановиться и не перезаписывать его.
 
-- [ ] **Step 3: Создать repository-specific Ed25519 pair**
+- [x] **Step 3: Создать repository-specific Ed25519 pair**
 
 Run:
 
@@ -795,7 +795,7 @@ Expected: SSH transport `[OK]`, remote read `[OK]`; private path не
 - Produces: verified fast-forward `origin/main`.
 - Preserves: clean-tree pre-push and GitHub main history rules.
 
-- [ ] **Step 1: Fresh focused and static verification**
+- [x] **Step 1: Fresh focused and static verification**
 
 Run:
 
@@ -806,14 +806,16 @@ php artisan test tests/Unit/GitWorkflowDoctorTest.php \
   tests/Unit/ChangelogPolicyScriptTest.php
 ./vendor/bin/pint tests/Unit/GitWorkflowDoctorTest.php \
   tests/Unit/CiQualityGateContractTest.php --format agent
-bash -n scripts/git-doctor.sh .githooks/pre-commit .githooks/pre-push \
-  .githooks/post-commit .githooks/lib/git-guard.sh
+for shell_file in scripts/git-doctor.sh .githooks/pre-commit \
+  .githooks/pre-push .githooks/post-commit .githooks/lib/git-guard.sh; do
+  bash -n "$shell_file"
+done
 composer validate --strict
 ```
 
 Expected: exit `0`, zero PHPUnit failures.
 
-- [ ] **Step 2: Fresh documentation verification**
+- [x] **Step 2: Fresh documentation verification**
 
 Run:
 
@@ -827,7 +829,7 @@ git diff --check
 
 Expected: exit `0`.
 
-- [ ] **Step 3: Legacy/secret scan**
+- [x] **Step 3: Legacy/secret scan**
 
 Run:
 
@@ -837,16 +839,20 @@ rg -n \
   . \
   --glob '!vendor/**' \
   --glob '!node_modules/**' \
-  --glob '!.git/**'
+  --glob '!.git/**' \
+  --glob '!docs/superpowers/plans/2026-07-25-native-git-ssh-diagnostics.md' \
+  --glob '!docs/superpowers/plans/2026-07-16-canonical-ci-quality-gate.md' \
+  --glob '!tests/Unit/GitWorkflowDoctorTest.php'
 rg -n \
   "git-doctor|git:doctor|core\\.sshCommand|core\\.hooksPath" \
   composer.json scripts tests docs README.md AGENTS.md
 ```
 
-Expected: первый scan не находит credentials/private key; второй показывает
-один coherent doctor workflow.
+Expected: первый scan не находит credentials/private key вне трёх явно
+исключённых синтетических fixtures/self-references; второй показывает один
+coherent doctor workflow.
 
-- [ ] **Step 4: Повторно прочитать requirements и matrix**
+- [x] **Step 4: Повторно прочитать requirements и matrix**
 
 Перечитать `AGENTS.md`, requirements index, code/architecture/development,
 multilingual, security, maintenance, production operations, system-wide

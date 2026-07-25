@@ -64,8 +64,8 @@ Laravel, Git hooks, GitHub ruleset или правах repository.
 
 Отдельная Ed25519-пара создаётся вне repository. Public key добавляется в
 настройки только `goleaf/seasonvar.miniserver.fun` как deploy key с write
-access. SSH host alias закрепляет exact identity через `IdentitiesOnly yes`;
-private key остаётся на сервере с режимом `0600`.
+access. Repository-local `core.sshCommand` закрепляет exact identity через
+`IdentitiesOnly=yes`; private key остаётся на сервере с режимом `0600`.
 
 Преимущества:
 
@@ -97,19 +97,21 @@ connector в конкурирующий Git workflow.
 
 ### Authentication boundary вне repository
 
-Private key, SSH config и `known_hosts` принадлежат user-level environment и
-никогда не попадают в Git. Для unattended repository-scoped push ключ
-создаётся без passphrase, но компенсирующие границы обязательны:
+Private key и `known_hosts` принадлежат user-level environment, а exact
+identity выбирается только repository-local значением `core.sshCommand` в
+неотслеживаемом `.git/config`; ничто из этого не попадает в tracked Git.
+Для unattended repository-scoped push ключ создаётся без passphrase, но
+компенсирующие границы обязательны:
 
 - уникальная key pair только для этого repository;
 - private key mode `0600`, директория SSH mode `0700`;
 - public deploy key имеет write access только к одному repository;
-- SSH alias использует exact `IdentityFile` и `IdentitiesOnly yes`;
+- local `core.sshCommand` использует exact key и `IdentitiesOnly=yes`;
 - remote меняется на SSH только после успешного read-only доступа;
 - public/private key contents не печатаются в tracked logs, plans,
   changelog или final summary;
 - при утрате контроля deploy key сначала отзывается на GitHub, затем
-  удаляются локальные private/public files и alias.
+  удаляются exact local `core.sshCommand` и private/public files.
 
 GitHub App connector остаётся отдельной user/app integration для repository
 metadata и явно запрошенных API actions. Он не становится скрытым credential
@@ -284,7 +286,7 @@ Visitor product не меняется, поэтому новая датиров�
 2. Создать repository-specific Ed25519 pair вне checkout.
 3. Передать владельцу только public key для добавления как write deploy key.
 4. После подтверждения проверить SSH authentication и exact repository.
-5. Сохранить user-level SSH alias с exact identity.
+5. Сохранить repository-local `core.sshCommand` с exact identity.
 6. Переключить `origin` на SSH.
 7. Запустить local doctor, focused/wide checks и strict pre-push.
 8. Выполнить обычный fast-forward `git push origin main`.
@@ -297,7 +299,7 @@ Visitor product не меняется, поэтому новая датиров�
 1. вернуть `origin` на документированный HTTPS URL;
 2. подтвердить read-only `git ls-remote`;
 3. отозвать deploy key в GitHub;
-4. удалить только exact repository-specific alias и key pair;
+4. удалить только exact repository-local `core.sshCommand` и key pair;
 5. не трогать другие SSH identities, credentials или repositories;
 6. откатить doctor/Composer/docs обычным новым commit’ом в `main`, без
    переписывания истории.
