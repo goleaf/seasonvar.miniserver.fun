@@ -5,7 +5,7 @@
 
 Дата: 25.07.2026.
 
-Статус: `approved_execution_in_progress`.
+Статус: `implementation_verified_committed_push_unresolved`.
 
 Этот план не ограничивается косметическим первым diff. После основной
 реализации он продолжается измерением, regression-аудитом и только при
@@ -267,7 +267,7 @@ README visitor history обновить фактическим результа�
 stale cache paths и неоконченный task code. Текстовое совпадение
 классифицировать до удаления.
 
-- [ ] **Step 4: exact staging, commit and push**
+- [x] **Step 4: exact staging, commit and push**
 
 Проверить `main`, shared status и exact task paths. Не stage/commit чужие
 Task 52/54 изменения. Выполнить обычный commit с README и CHANGELOG,
@@ -291,7 +291,7 @@ Task 52/54 изменения. Выполнить обычный commit с READM
 | Cross-feature verification | `completed_with_independent_blockers` | Focused 45/230, adjacent 108/957, broad 1771 tests with 1758 pass/11 skip and only two pre-existing external results; GD test isolated GREEN 1/12 |
 | Canonical docs/README/CHANGELOG | `completed` | Cache/performance/importer/queue owners, Russian visitor history and dated changelog updated |
 | Final requirement reread/legacy scan | `completed` | Applicable requirements reread; scheduled refresh/direct dispatch/duplicate invalidator/stale mass fan-out scan classified |
-| Commit/push in `main` | `pending_shared_index_guard` | Another workspace owner staged mixed collection and Task 56 paths; no index mutation or mixed commit by Task 56 |
+| Commit/push in `main` | `implementation_committed_push_unresolved` | Path-limited commit `0b2bb88` contains exactly 18 Task 56 files; configured `git push origin main` failed because the HTTPS remote has no available credentials |
 
 ## Verification evidence
 
@@ -318,3 +318,8 @@ Task 52/54 изменения. Выполнить обычный commit с READM
   HTTPS then measured `MISS 1,287 s`, `HIT 0,062 s`, `HIT 0,073 s`.
   The <1,5 s cold and <=0,1 s hot gates pass; materialized read model is
   `not_applicable`.
+- The product, tests, canonical documentation, visitor README and Russian
+  changelog were committed to `main` as `0b2bb88` without any collection
+  task path. The configured push was attempted and remains `unresolved`
+  because the HTTPS remote cannot obtain a username or credential in this
+  environment.
