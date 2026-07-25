@@ -8637,8 +8637,8 @@ key/version/invalidation lifecycle.
 
 ## Task 63 — provenance-first качество тегов
 
-Статус: `implementation_verified_delivery_in_progress`; production DML
-`unresolved_active_import`.
+Статус: `implementation_committed_push_unresolved`; production DML
+`unresolved_active_import`, remote delivery `unresolved_external_auth`.
 
 Дата начала: 26.07.2026.
 
@@ -8688,7 +8688,7 @@ Detailed live plan:
 | Managed docs gates | `unresolved_shared_docs` | Foreign dirty `MAINTENANCE_LOG.md` и исторический второй H1 вне Task 63 scope |
 | Production repair | `unresolved_active_import` | Read-only dry-run completed; write запрещён активным импортом |
 | README/CHANGELOG/owners | `completed` | Visitor/technical history, tag/demo/import/cache/deployment owners обновлены |
-| Commit/push in `main` | `pending` | Exact isolated task scope only |
+| Commit/push in `main` | `completed_with_unresolved_push` | Exact implementation commit `ee17708e8a1833d512ec6ad467918fa7cc395db9`; `git push origin main` завершился кодом 128: GitHub HTTPS credentials недоступны |
 
 ### Protected contracts и scope
 

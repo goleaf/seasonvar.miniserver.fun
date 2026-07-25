@@ -152,7 +152,7 @@
 
 ## Task 9 — Critical: production data repair
 
-- `[unresolved_active_import]` Убедиться, что import terminal, recommendation build не activatable, writers реально остановлены: run `#1255` остаётся `running`, 4 live claims и 9 647 pending jobs подтверждены.
+- `[unresolved_active_import]` Убедиться, что import terminal, recommendation build не activatable, writers реально остановлены: run `#1255` остаётся `running`, 4 live claims и 9 379 pending jobs подтверждены.
 - `[skipped_safety_gate]` Создать согласованный SQLite backup вне tracked/public storage: write window не наступил, поэтому backup/force sequence намеренно не имитировался.
 - `[completed]` Запустить `demo:repair-user-portal --dry-run --json`: 123 305 expected, 123 121 matched, 64 protected current, 123 076 кандидатов, 229 owned tags, 16 464 affected titles и 9 985 basis points.
 - `[skipped_safety_gate]` Выполнить guarded force repair: запрещено active-import guard и отсутствует реальное подтверждённое writer-pause окно.
@@ -167,9 +167,9 @@
 - `[completed]` Проверить и осмысленно обновить `README.md` для visitor-visible исправления качества тегов.
 - `[completed]` Добавить русскую датированную запись `CHANGELOG.md`.
 - `[completed]` Перечитать applicable requirements и закрыть compliance matrix; production write честно оставлен unresolved.
-- `[in_progress]` Проверить `git status`, unstaged/staged/untracked, diff/stat, secrets/debug/mass formatting.
-- `[pending]` Создать exact isolated commit только task-файлов в `main`.
-- `[pending]` Выполнить обычный `git push origin main`; внешний отказ записать дословно.
+- `[completed]` Проверить `git status`, unstaged/staged/untracked, diff/stat, secrets/debug/mass formatting.
+- `[completed]` Создать exact isolated commit только task-файлов в `main`: `ee17708e8a1833d512ec6ad467918fa7cc395db9`.
+- `[unresolved_external_auth]` Обычный `git push origin main` завершился кодом 128: `fatal: could not read Username for 'https://github.com': No such device or address`.
 
 ## Expected changed files
 
