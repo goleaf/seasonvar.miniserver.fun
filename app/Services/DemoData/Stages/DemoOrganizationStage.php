@@ -11,18 +11,13 @@ use App\Enums\CatalogCollectionModerationStatus;
 use App\Enums\CatalogCollectionSort;
 use App\Enums\CatalogCollectionType;
 use App\Enums\CatalogCollectionVisibility;
-use App\Enums\TagModerationStatus;
-use App\Enums\TagSource;
-use App\Enums\TagType;
-use App\Enums\TagVisibility;
 use App\Models\CatalogCollection;
 use App\Models\CatalogCollectionItem;
-use App\Models\Tag;
-use App\Models\TagTranslation;
 use App\Models\User;
 use App\Models\UserTag;
 use App\Services\DemoData\DemoBulkWriter;
 use App\Services\DemoData\DemoPersonaFactory;
+use App\Services\DemoData\DemoPublicTagAssignmentCleaner;
 use App\Services\DemoData\DemoRussianText;
 use App\Services\DemoData\DemoStableValue;
 use App\Services\DemoData\DemoTitleSelector;
@@ -38,6 +33,7 @@ final readonly class DemoOrganizationStage implements DemoDataStage
         private DemoPersonaFactory $personas,
         private DemoRussianText $text,
         private TagNormalizationService $normalizer,
+        private DemoPublicTagAssignmentCleaner $publicTagAssignments,
     ) {}
 
     public function key(): string
@@ -55,6 +51,7 @@ final readonly class DemoOrganizationStage implements DemoDataStage
     public function repairKnownDemoUsers(DemoDataOptions $options, ?Closure $progress = null): DemoStageReport
     {
         $startedAt = microtime(true);
+        $publicTagCleanup = $this->publicTagAssignments->repair($options);
         $selector = new DemoTitleSelector($options);
         $writer = new DemoBulkWriter($options);
         $users = $this->users($options);
@@ -138,16 +135,15 @@ final readonly class DemoOrganizationStage implements DemoDataStage
             $progress?->__invoke($this->key(), $userIndex, $options->userCount);
         }
 
-        $publicTagIds = $this->publicTagIds($options, $writer);
-        $publicAssignmentCount = $this->assignPublicTags($options, $selector, $writer, $publicTagIds);
-
         return new DemoStageReport($this->key(), [
             'personal_tags' => $personalTagCount,
             'personal_assignments' => $personalAssignmentCount,
             'collections' => $collectionCount,
             'collection_items' => $collectionItemCount,
-            'public_tags' => count($publicTagIds),
-            'public_assignments' => $publicAssignmentCount,
+            'public_tags' => 0,
+            'public_assignments' => 0,
+            'public_assignments_removed' => $publicTagCleanup['removed_assignments'],
+            'public_tags_archived' => $publicTagCleanup['archived_demo_tags'],
         ], microtime(true) - $startedAt);
     }
 
@@ -341,141 +337,6 @@ final readonly class DemoOrganizationStage implements DemoDataStage
         }
 
         return $rows;
-    }
-
-    /** @return list<int> */
-    private function publicTagIds(DemoDataOptions $options, DemoBulkWriter $writer): array
-    {
-        $eligible = Tag::query()->publiclyEligible()->orderBy('id')->limit($options->publicTagTarget)->pluck('id');
-
-        if ($eligible->count() >= $options->publicTagTarget) {
-            return $eligible->map(static fn (mixed $id): int => (int) $id)->all();
-        }
-
-        $existingHashes = Tag::query()
-            ->whereNotNull('normalized_name_hash')
-            ->pluck('normalized_name_hash')
-            ->filter(static fn (mixed $hash): bool => is_string($hash))
-            ->flip();
-        $missing = $options->publicTagTarget - $eligible->count();
-        $rows = [];
-        $ordinal = 0;
-        $now = CarbonImmutable::parse('2025-12-31 12:00:00');
-        $versionHash = substr(hash('sha256', $options->version), 0, 12);
-
-        while (count($rows) < $missing) {
-            $name = $this->normalizer->display($this->text->publicTag($ordinal));
-            $normalized = $this->normalizer->comparison($name);
-            $hash = $this->normalizer->hash($name);
-
-            if (! $existingHashes->has($hash)) {
-                $rows[] = [
-                    'public_id' => $this->stable->uuid("organization:public-tag:{$ordinal}"),
-                    'name' => $name,
-                    'slug' => "demo-tag-{$versionHash}-".($ordinal + 1),
-                    'source_url' => null,
-                    'code' => "demo-tag-{$versionHash}-".($ordinal + 1),
-                    'type' => TagType::System->value,
-                    'visibility' => TagVisibility::Public->value,
-                    'moderation_status' => TagModerationStatus::Approved->value,
-                    'source' => TagSource::System->value,
-                    'normalized_name' => $normalized,
-                    'normalized_name_hash' => $hash,
-                    'content_version' => 1,
-                    'merged_into_id' => null,
-                    'archived_at' => null,
-                    'created_at' => $now->addMinutes($ordinal),
-                    'updated_at' => $now->addMinutes($ordinal),
-                ];
-                $existingHashes->put($hash, true);
-            }
-
-            $ordinal++;
-        }
-
-        $writer->upsert(
-            (new Tag)->getTable(),
-            $rows,
-            ['normalized_name_hash'],
-            $this->updates($rows, ['normalized_name_hash', 'created_at']),
-        );
-        $generatedTags = Tag::query()
-            ->whereIn('normalized_name_hash', array_column($rows, 'normalized_name_hash'))
-            ->get(['id', 'name', 'normalized_name_hash']);
-        $translationRows = $generatedTags->map(function (Tag $tag) use ($now): array {
-            $name = $tag->canonicalName();
-
-            return [
-                'tag_id' => $tag->id,
-                'locale' => 'ru',
-                'label' => $name,
-                'short_description' => "Сериалы с характеристикой «{$name}».",
-                'description' => "Тематическая метка «{$name}» объединяет подходящие сериалы, передачи и документальные истории.",
-                'seo_title' => null,
-                'seo_description' => null,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ];
-        })->all();
-        $writer->upsert(
-            (new TagTranslation)->getTable(),
-            $translationRows,
-            ['tag_id', 'locale'],
-            $this->updates($translationRows, ['tag_id', 'locale', 'created_at']),
-        );
-
-        return Tag::query()
-            ->publiclyEligible()
-            ->orderBy('id')
-            ->limit($options->publicTagTarget)
-            ->pluck('id')
-            ->map(static fn (mixed $id): int => (int) $id)
-            ->all();
-    }
-
-    /**
-     * @param  list<int>  $tagIds
-     */
-    private function assignPublicTags(
-        DemoDataOptions $options,
-        DemoTitleSelector $selector,
-        DemoBulkWriter $writer,
-        array $tagIds,
-    ): int {
-        if ($tagIds === []) {
-            return 0;
-        }
-
-        $total = 0;
-
-        foreach ($selector->selectedIds(1)->chunk($options->chunkSize) as $titleIds) {
-            $rows = [];
-
-            foreach ($titleIds as $titleId) {
-                $count = min(count($tagIds), $this->stable->integer(
-                    "organization:title:{$titleId}:public-tag-count",
-                    min(3, count($tagIds)),
-                    min(12, count($tagIds)),
-                ));
-                $offset = $this->stable->integer(
-                    "organization:title:{$titleId}:public-tag-offset",
-                    0,
-                    count($tagIds) - 1,
-                );
-
-                for ($ordinal = 0; $ordinal < $count; $ordinal++) {
-                    $rows[] = [
-                        'catalog_title_id' => $titleId,
-                        'tag_id' => $tagIds[($offset + $ordinal) % count($tagIds)],
-                    ];
-                }
-            }
-
-            $writer->upsert('catalog_title_tag', $rows, ['catalog_title_id', 'tag_id'], []);
-            $total += count($rows);
-        }
-
-        return $total;
     }
 
     private function createdAt(int $userIndex): CarbonImmutable

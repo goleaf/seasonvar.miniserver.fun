@@ -13,10 +13,12 @@ use App\Models\ContentRequest;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\Season;
+use App\Models\Tag;
 use App\Models\UserTag;
 use App\Services\DemoData\DemoUserPortalRepairer;
 use App\Services\DemoData\Stages\DemoAccountStage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -78,6 +80,7 @@ final class DemoUserPortalRepairCommandTest extends TestCase
         $this->artisan('demo:repair-user-portal', ['--dry-run' => true])
             ->expectsOutputToContain('Dry-run завершён')
             ->expectsOutputToContain('users_without_requests: 2')
+            ->expectsOutputToContain('orphaned_demo_public_tag_assignments: 0')
             ->assertSuccessful();
 
         $this->assertSame(0, ContentRequest::query()->count());
@@ -94,6 +97,8 @@ final class DemoUserPortalRepairCommandTest extends TestCase
         $this->assertSame(4, UserTag::query()->count());
         $this->assertSame(4, CatalogCollection::query()->count());
         $this->assertSame(4, CatalogTitleUserState::query()->count());
+        $this->assertSame(0, Tag::query()->count());
+        $this->assertSame(0, DB::table('catalog_title_tag')->count());
         Queue::assertPushed(WarmUserPortalCache::class, 2);
 
         $this->artisan('demo:repair-user-portal', ['--force' => true, '--json' => true])

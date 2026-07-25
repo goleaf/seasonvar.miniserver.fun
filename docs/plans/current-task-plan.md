@@ -8635,6 +8635,71 @@ key/version/invalidation lifecycle.
   отсутствующей GitHub-аутентификации; force, branch/worktree или
   credential mutation не применялись.
 
+## Task 63 — provenance-first качество тегов
+
+Статус: `implementation_verified_delivery_in_progress`; production DML
+`unresolved_active_import`.
+
+Дата начала: 26.07.2026.
+
+Design:
+[`2026-07-26-tag-quality-provenance-repair-design.md`](../superpowers/specs/2026-07-26-tag-quality-provenance-repair-design.md).
+
+Detailed live plan:
+[`2026-07-26-tag-quality-provenance-repair.md`](../superpowers/plans/2026-07-26-tag-quality-provenance-repair.md).
+
+### Решение и evidence
+
+- Восемь шумных тегов «Цветка зла» точно воспроизводятся прежним
+  `DemoOrganizationStage::assignPublicTags()` и отсутствуют во всех
+  сохранённых provider snapshots; четыре правдоподобных тега имеют current
+  Seasonvar provenance.
+- Новый bounded cleaner удаляет только exact historical pairs без любого
+  current provenance, а owned `demo-tag-*` требует одновременно versioned
+  `code`, deterministic UUIDv5 `public_id`, `type=system` и `source=system`.
+  Имя и slug не считаются ownership evidence.
+- Demo stage больше не создаёт, не переиспользует и не назначает global tags;
+  personal tags, collections и остальные owner-scoped fixtures сохранены.
+- Устаревшие рекомендации для затронутых IDs удаляются в общей транзакции,
+  titles получают dirty marker, а `TagCacheInvalidator` выполняет один
+  global after-commit bump.
+- Production dry-run за 3,79 s и 124 088 KiB peak RSS нашёл 123 305 expected,
+  123 121 attached, 64 current-protected, 123 076 cleanup candidates, 229
+  owned/archivable tags, 16 464 affected titles и 9 985 basis points.
+  Для title 16585 он удалит ровно восемь demo pairs и сохранит `дорама`,
+  `полиция`, `психопат`, `серийные убийства`.
+- Run `#1255` остаётся активным: 9 379 pending и 4 live claims. Backup,
+  writer pause, force repair и post-write smoke намеренно не имитировались.
+
+### Compliance matrix
+
+| Requirement/domain | Статус | Evidence / ограничение |
+| --- | --- | --- |
+| Requirements/read order | `completed` | Root/index/canonical owners прочитаны до реализации и повторно сверены перед delivery |
+| Versions/DB/current architecture | `completed` | PHP 8.5.8, Laravel 13.22.0, Boost 2.4.13, Livewire 4.3.3, PHPUnit 12.5.32, Tailwind 4.3.2, production SQLite |
+| Canonical global-tag rule | `completed` | `DATA_RELATIONS.md`: новая aggregate связь требует current provider/editorial provenance |
+| TDD/backend/concurrency | `completed` | Exact fingerprint, density guard, transaction, provenance recheck и active import/build fail-closed |
+| Query/index/performance | `completed` | Chunked projections/grouped deletes; existing pivot/provenance/recommendation indexes выбраны `EXPLAIN`; migration не нужна |
+| Search/SEO/cache/recommendations | `completed` | Authoritative pivots, stale-row deletion, dirty tracking и global catalog/tag invalidation |
+| Security/auth/input | `already_compliant` | Existing operator-only command и production flags; web/API/input/raw SQL/secrets не добавлены |
+| Frontend/routes/API/translations | `not_applicable` | Public contracts и HTML/JS/CSS не меняются |
+| Focused/static/build verification | `completed` | Related 101/109 180; final exact 12/5 675; Pint/PHPStan/Rector 0; Composer/npm audit 0; Vite 25 modules |
+| Full suite | `unresolved_shared_tree` | Default process достиг GD 256M; exact GD test зелёный; widest exclusion остановлен одним foreign recommendation UI failure |
+| Managed docs gates | `unresolved_shared_docs` | Foreign dirty `MAINTENANCE_LOG.md` и исторический второй H1 вне Task 63 scope |
+| Production repair | `unresolved_active_import` | Read-only dry-run completed; write запрещён активным импортом |
+| README/CHANGELOG/owners | `completed` | Visitor/technical history, tag/demo/import/cache/deployment owners обновлены |
+| Commit/push in `main` | `pending` | Exact isolated task scope only |
+
+### Protected contracts и scope
+
+Public routes/names/API/query/filter/pagination, Tag IDs/slugs/provider
+mappings/translations, current provenance, personal user state,
+Seasonvar source/import/media lifecycle, recommendation algorithm/config,
+collections/search/SEO identities, secrets и foreign shared-tree changes
+сохранены. Migration, index, controller, Form Request, policy, middleware,
+API Resource, frontend component, job, scheduler, dependency и env change
+не добавлены.
+
 ## Task 64 — единый стандарт `lang/*` и проверка переводов
 
 Статус: `approved_design_and_plan_tdd_pending`.

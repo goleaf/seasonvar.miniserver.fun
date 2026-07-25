@@ -16,7 +16,7 @@ use Throwable;
     {--backup-confirmed : Подтвердить проверенный backup перед production write}
     {--writers-paused : Подтвердить остановку production writers}
     {--json : Вывести машинно-читаемый JSON}')]
-#[Description('Проверяет и исправляет requests/library/tags/WebP известных demo users')]
+#[Description('Проверяет и исправляет user portal и legacy public-tag footprint известных demo data')]
 final class RepairDemoUserPortal extends Command
 {
     public function handle(DemoUserPortalRepairer $repairer): int

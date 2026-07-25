@@ -7,6 +7,7 @@ namespace Tests\Feature\DemoData;
 use App\DTOs\DemoData\DemoDataOptions;
 use App\Enums\CatalogCollectionSort;
 use App\Enums\CatalogCollectionVisibility;
+use App\Enums\CatalogWatchStatus;
 use App\Models\CatalogCollection;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleUserState;
@@ -57,7 +58,7 @@ final class DemoCatalogCorpusStageTest extends TestCase
         ]);
     }
 
-    public function test_organization_stage_fills_tags_collections_and_exact_half_public_assignments_idempotently(): void
+    public function test_organization_stage_fills_personal_tags_and_collections_without_mutating_global_tags(): void
     {
         CatalogTitle::factory()->count(8)->create();
         $options = DemoDataOptions::fromConfig();
@@ -71,8 +72,10 @@ final class DemoCatalogCorpusStageTest extends TestCase
         $this->assertSame($firstCounts, $this->organizationCounts());
         $this->assertSame(48, $firstReport->counters['personal_tags']);
         $this->assertSame(48, $secondReport->counters['personal_tags']);
-        $this->assertGreaterThanOrEqual(12, Tag::query()->publiclyEligible()->count());
-        $this->assertSame(4, DB::table('catalog_title_tag')->distinct()->count('catalog_title_id'));
+        $this->assertSame(0, $firstReport->counters['public_tags']);
+        $this->assertSame(0, $firstReport->counters['public_assignments']);
+        $this->assertSame(0, Tag::query()->count());
+        $this->assertSame(0, DB::table('catalog_title_tag')->count());
 
         $users = User::query()->whereIn('email', [
             'user1@example.com', 'user2@example.com', 'user3@example.com', 'user4@example.com',
@@ -141,7 +144,7 @@ final class DemoCatalogCorpusStageTest extends TestCase
         $this->assertFalse($duplicateCollectionPivot);
     }
 
-    public function test_organization_stage_generates_public_tags_when_normalized_hashes_already_exist(): void
+    public function test_organization_stage_preserves_existing_global_tags_without_assigning_them(): void
     {
         CatalogTitle::factory()->count(2)->create();
         $existingTag = Tag::query()->create([
@@ -153,8 +156,11 @@ final class DemoCatalogCorpusStageTest extends TestCase
 
         $report = app(DemoOrganizationStage::class)->run($options);
 
-        $this->assertSame(12, $report->counters['public_tags']);
+        $this->assertSame(0, $report->counters['public_tags']);
+        $this->assertSame(0, $report->counters['public_assignments']);
         $this->assertModelExists($existingTag);
+        $this->assertSame(1, Tag::query()->count());
+        $this->assertSame(0, DB::table('catalog_title_tag')->count());
     }
 
     public function test_title_contexts_hydrate_only_boundary_release_records(): void
@@ -275,9 +281,11 @@ final class DemoCatalogCorpusStageTest extends TestCase
                 $this->assertGreaterThanOrEqual(0, $progress->progress_percent);
                 $this->assertLessThanOrEqual(100, $progress->progress_percent);
                 $this->assertTrue(Str::isUlid((string) $progress->playback_session_id));
-                $this->assertSame($state->watch_status->value === 'completed', $progress->completed_at !== null);
+                $watchStatus = $state->getAttribute('watch_status');
+                $this->assertInstanceOf(CatalogWatchStatus::class, $watchStatus);
+                $this->assertSame($watchStatus === CatalogWatchStatus::Completed, $progress->completed_at !== null);
                 $this->assertNotNull($progress->first_started_at);
-                $this->assertNotNull($progress->last_watched_at);
+                $this->assertNotNull($progress->getRawOriginal('last_watched_at'));
             });
 
         $this->assertFalse(CatalogTitleUserState::query()

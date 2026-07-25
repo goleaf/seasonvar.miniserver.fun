@@ -34,6 +34,7 @@ return [
         'minimum' => 20,
         'maximum' => 60,
     ],
+    // Historical replay boundary for the provenance repair; new demo runs do not create global tags.
     'public_tag_target' => 800,
     'asset_disk' => env('UPLOAD_DISK', 'uploads'),
     'asset_prefix' => 'demo-data/seasonvar-demo-v1',

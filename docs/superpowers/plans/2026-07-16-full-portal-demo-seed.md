@@ -1,5 +1,7 @@
 # Full Portal Demo Seed Implementation Plan
 
+> **Коррекция 26.07.2026:** пункты этого исторического плана о создании и случайном назначении глобальных public tags отменены canonical tag-quality contract. Текущий demo pipeline создаёт только owner-scoped личные теги и никогда не пишет `catalog_title_tag`. `public_tag_target` сохранён исключительно для точного replay/очистки уже существующего `seasonvar-demo-v1` footprint; подробности и evidence находятся в `2026-07-26-tag-quality-provenance-repair.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build an idempotent, development-only Laravel seed pipeline that creates 100 complete demo users and natural Russian activity across exactly half of the published catalog per user, including library state, progress, reviews, comments, dialogues, tags, collections, requests, reports, technical support workflows, notifications, and audit coverage without duplicates.

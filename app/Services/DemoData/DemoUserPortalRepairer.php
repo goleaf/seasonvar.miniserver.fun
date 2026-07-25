@@ -27,6 +27,7 @@ final readonly class DemoUserPortalRepairer
         private DemoOrganizationStage $organization,
         private DemoCatalogActivityStage $catalogActivity,
         private DemoContentRequestStage $contentRequests,
+        private DemoPublicTagAssignmentCleaner $publicTagAssignments,
         private UserPortalCacheInvalidator $userPortalCache,
     ) {}
 
@@ -36,6 +37,7 @@ final readonly class DemoUserPortalRepairer
         $options = DemoDataOptions::fromConfig();
         $users = $this->users($options);
         $userIds = $users->pluck('id');
+        $publicTagState = $this->publicTagAssignments->inspect($options);
 
         return [
             'users' => $users->count(),
@@ -56,6 +58,15 @@ final readonly class DemoUserPortalRepairer
                 $userIds,
             ),
             'invalid_profile_images' => $users->filter(fn (User $user): bool => ! $this->validProfileImages($user))->count(),
+            'legacy_demo_tag_pool_size' => $publicTagState['legacy_tag_pool_size'],
+            'legacy_demo_tag_expected_pairs' => $publicTagState['expected_pairs'],
+            'legacy_demo_tag_matched_pairs' => $publicTagState['attached_expected_pairs'],
+            'legacy_demo_tag_protected_current_pairs' => $publicTagState['protected_current_assignments'],
+            'legacy_demo_owned_tags' => $publicTagState['owned_demo_tags'],
+            'legacy_demo_affected_titles' => $publicTagState['affected_titles'],
+            'legacy_demo_match_basis_points' => $publicTagState['match_basis_points'],
+            'orphaned_demo_public_tag_assignments' => $publicTagState['cleanup_candidates'],
+            'archivable_demo_public_tags' => $publicTagState['archivable_demo_tags'],
         ];
     }
 
@@ -70,7 +81,18 @@ final readonly class DemoUserPortalRepairer
             || $before['users_without_collections'] > 0;
         $needsCatalogActivity = $before['users_without_library'] > 0;
         $needsContentRequests = $before['users_without_requests'] > 0;
+        $needsPublicTagCleanup = $before['orphaned_demo_public_tag_assignments'] > 0
+            || $before['archivable_demo_public_tags'] > 0;
         $stageCounters = [];
+
+        if ($needsPublicTagCleanup) {
+            $publicTagCleanup = $this->publicTagAssignments->repair($options);
+            $stageCounters = [
+                ...$stageCounters,
+                'public_assignments_removed' => $publicTagCleanup['removed_assignments'],
+                'public_tags_archived' => $publicTagCleanup['archived_demo_tags'],
+            ];
+        }
 
         if ($needsProfileImages) {
             $this->repairProfileImages($users, $options);
@@ -136,7 +158,10 @@ final readonly class DemoUserPortalRepairer
         })->values();
     }
 
-    /** @param Collection<int, int> $presentOwners @param Collection<int, int> $allOwners */
+    /**
+     * @param  Collection<int, int>  $presentOwners
+     * @param  Collection<int, int>  $allOwners
+     */
     private function missingOwners(Collection $presentOwners, Collection $allOwners): int
     {
         return $allOwners->map(fn (mixed $id): int => (int) $id)
