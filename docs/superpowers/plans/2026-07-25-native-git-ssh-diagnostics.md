@@ -58,7 +58,7 @@ Composer 2, GitHub SSH.
 - Preserves: реальные hooks копируются в fixture только для syntax/tracked
   checks; их application behavior не подменяется.
 
-- [ ] **Step 1: Создать fixture и happy-path test**
+- [x] **Step 1: Создать fixture и happy-path test**
 
 Создать `tests/Unit/GitWorkflowDoctorTest.php` со следующей структурой:
 
@@ -161,7 +161,7 @@ class GitWorkflowDoctorTest extends TestCase
 }
 ```
 
-- [ ] **Step 2: Добавить failure/partial/privacy tests**
+- [x] **Step 2: Добавить failure/partial/privacy tests**
 
 Добавить в тот же класс до private helpers:
 
@@ -258,7 +258,7 @@ public function test_default_mode_does_not_contact_remote(): void
 }
 ```
 
-- [ ] **Step 3: Добавить Composer/contract expectations**
+- [x] **Step 3: Добавить Composer/contract expectations**
 
 В `tests/Unit/CiQualityGateContractTest.php` добавить:
 
@@ -284,7 +284,7 @@ public function test_git_doctor_is_exposed_without_replacing_versioned_hooks(): 
 }
 ```
 
-- [ ] **Step 4: Запустить RED**
+- [x] **Step 4: Запустить RED**
 
 Run:
 
@@ -297,7 +297,7 @@ Expected: FAIL из-за отсутствующих `scripts/git-doctor.sh` и
 `scripts.git:doctor`; failure не должен быть вызван неверной temp-repository
 fixture.
 
-- [ ] **Step 5: Записать RED evidence в Task 55 matrix**
+- [x] **Step 5: Записать RED evidence в Task 55 matrix**
 
 В `docs/plans/current-task-plan.md` сохранить exact test count и первые
 ожидаемые diagnostics. Не менять Task 52 hunks и не выполнять broad
@@ -321,7 +321,7 @@ fixture.
 - Output: stable `[OK]`, `[WARN]`, `[FAIL]`; no filenames from dirty state,
   credentials, remote userinfo or key path.
 
-- [ ] **Step 1: Создать executable script**
+- [x] **Step 1: Создать executable script**
 
 Создать `scripts/git-doctor.sh`:
 
@@ -507,7 +507,7 @@ fi
 
 Установить tracked executable mode `0755`.
 
-- [ ] **Step 2: Добавить Composer alias**
+- [x] **Step 2: Добавить Composer alias**
 
 В `composer.json` рядом с `hooks:install` добавить:
 
@@ -517,7 +517,7 @@ fi
 
 Не менять package manifests или lock files.
 
-- [ ] **Step 3: Запустить GREEN**
+- [x] **Step 3: Запустить GREEN**
 
 Run:
 
@@ -528,7 +528,7 @@ php artisan test tests/Unit/GitWorkflowDoctorTest.php \
 
 Expected: все doctor и CI contract tests PASS.
 
-- [ ] **Step 4: Проверить реальный локальный diagnostic**
+- [x] **Step 4: Проверить реальный локальный diagnostic**
 
 Run:
 
@@ -541,7 +541,7 @@ Expected до SSH rollout: exit `1` только по доказанному HTT
 credential-helper blocker; branch/hooks/conflicts checks `[OK]`, dirty Task 52
 files показаны только counts.
 
-- [ ] **Step 5: Refactor только после GREEN**
+- [x] **Step 5: Refactor только после GREEN**
 
 Если shellcheck-подобная читаемость требует изменения, сохранять один
 responsibility на helper и повторно запускать оба focused test files. Не
@@ -567,7 +567,7 @@ responsibility на helper и повторно запускать оба focused
 - `docs/mcp.md` владеет connector-vs-Git credential boundary.
 - README получает только developer quick-start; visitor history не меняется.
 
-- [ ] **Step 1: Обновить development owner**
+- [x] **Step 1: Обновить development owner**
 
 Добавить exact команды:
 
@@ -580,7 +580,7 @@ composer git:doctor -- --remote
 Описать, что private deploy key находится вне Git, `--remote` read-only, а
 write access доказывает только normal push после clean-tree `pre-push`.
 
-- [ ] **Step 2: Обновить CI owner**
+- [x] **Step 2: Обновить CI owner**
 
 Зафиксировать:
 
@@ -589,7 +589,7 @@ write access доказывает только normal push после clean-tree
 - `--remote` не меняет ref;
 - strict pre-push остаётся единственным local publish gate.
 
-- [ ] **Step 3: Обновить MCP owner**
+- [x] **Step 3: Обновить MCP owner**
 
 Добавить:
 
@@ -598,7 +598,7 @@ write access доказывает только normal push после clean-tree
 - project `.codex/config.toml` не получает GitHub token/MCP secret;
 - connector-created commit не является fallback обычного local push.
 
-- [ ] **Step 4: Обновить README и русский CHANGELOG**
+- [x] **Step 4: Обновить README и русский CHANGELOG**
 
 В `README.md` Git-раздел добавить `composer git:doctor` и `--remote`.
 Не добавлять visitor-history entry.
@@ -615,12 +615,12 @@ write access доказывает только normal push после clean-tree
   CI не ослаблены.
 ```
 
-- [ ] **Step 5: Обновить compliance evidence**
+- [x] **Step 5: Обновить compliance evidence**
 
 В Task 55 matrix отметить RED/GREEN, exact tests/assertions, files,
 cross-feature state и оставшийся deploy-key owner gate. Не изменять Task 52.
 
-- [ ] **Step 6: Проверить документацию**
+- [x] **Step 6: Проверить документацию**
 
 Run:
 
@@ -650,7 +650,7 @@ Expected: exit `0`.
 - Produces: normal partial commit in `main`.
 - Preserves: соседние staged semantics и рабочее содержимое.
 
-- [ ] **Step 1: Проверить exact scope**
+- [x] **Step 1: Проверить exact scope**
 
 Run:
 

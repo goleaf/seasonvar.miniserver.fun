@@ -7488,3 +7488,97 @@ gate.
   запуска remote update с сообщением
   `could not read Username for 'https://github.com': No such device or
   address`; push честно остаётся `unresolved`.
+## Task 55 — нативный Git через repository-scoped SSH и doctor
+
+Статус: `repository_implementation_green`.
+
+Дата начала: 25.07.2026.
+
+Approved design:
+[`2026-07-25-native-git-ssh-diagnostics-design.md`](../superpowers/specs/2026-07-25-native-git-ssh-diagnostics-design.md).
+
+Detailed TDD implementation plan:
+[`2026-07-25-native-git-ssh-diagnostics.md`](../superpowers/plans/2026-07-25-native-git-ssh-diagnostics.md).
+
+### Цель и подтверждённая причина
+
+Довести восстановленный partial-commit workflow до обычного
+`git commit → git push origin main`. Локальный HTTPS remote не имеет
+credential helper, `gh` или GCM; SSH agent/key также отсутствуют. GitHub App
+connector имеет repository `push`, но не предоставляет credential локальному
+Git process. Выбран отдельный Ed25519 deploy key только для
+`goleaf/seasonvar.miniserver.fun`, native SSH remote и read-only
+`scripts/git-doctor.sh`.
+
+### Ожидаемые изменяемые файлы
+
+- `scripts/git-doctor.sh`;
+- `composer.json`;
+- `tests/Unit/GitWorkflowDoctorTest.php`;
+- `tests/Unit/CiQualityGateContractTest.php`;
+- `docs/development.md`;
+- `docs/ci.md`;
+- `docs/mcp.md`;
+- `docs/superpowers/specs/2026-07-25-native-git-ssh-diagnostics-design.md`;
+- `docs/superpowers/plans/2026-07-25-native-git-ssh-diagnostics.md`;
+- `docs/plans/current-task-plan.md`;
+- `README.md`;
+- `CHANGELOG.md`.
+
+User-level SSH private/public key, host alias и local `origin` config не
+являются tracked files. Другие application, migration, route, translation,
+cache, permission, queue, environment, frontend и production-runtime files
+не входят в Task 55.
+
+### Сохраняемые contracts
+
+- работа и commits только в существующей `main`;
+- без branch/worktree/PR и без переписывания истории;
+- partial `pre-commit` с branch/conflict/staged safe-path/docs checks;
+- clean-tree `pre-push` и полный backend/frontend gate;
+- единственная автоматическая staged mutation — русский `CHANGELOG.md`;
+- отсутствие PAT, OAuth/App token, private key или credential path в Git;
+- GitHub ruleset, secret scanning, push protection и pinned Actions;
+- GitHub App connector не становится Git CLI credential helper;
+- чужие staged Task 52 plan/spec не входят в Task 55 commits;
+- отсутствие Laravel/product/schema/data/cache/permission behavior change.
+
+### Cross-feature, maintenance и production risks
+
+| Domain | Статус | Решение |
+| --- | --- | --- |
+| Git commit | `already_compliant` | Partial commit contract не меняется |
+| Git push | `affected` | HTTPS без auth заменяется проверенным repository-scoped SSH transport |
+| Secret lifecycle | `affected` | Exact key вне Git, `0600`; public key добавляется только как one-repository deploy key |
+| GitHub connector | `affected_compatible` | Используется для read-only auth/repository evidence, не для локального credential |
+| Hooks/CI | `affected_compatible` | Doctor дополняет, но не дублирует и не обходит hooks/quality gate |
+| Shared index | `risk_recorded` | Path-limited commits; существующие два чужих staged Markdown сохраняются |
+| Dependencies | `not_applicable` | Новые packages/system dependencies не добавляются |
+| Routes/migrations/data | `not_applicable` | Нет application/schema/DML изменения |
+| Translations/cache/permissions/queues | `not_applicable` | Нет domain/runtime state |
+| Visitor/mobile/SEO/browser | `not_applicable` | Product UI/behavior не меняется |
+| Production runtime | `not_applicable` | Меняется developer Git transport, не application deployment/runtime |
+| Rollback | `completed_preliminary` | HTTPS remote → revoke deploy key → exact local alias/key removal → code revert commit |
+
+### Task-specific requirement-compliance matrix
+
+| Requirement/domain | Статус | Evidence / следующий gate |
+| --- | --- | --- |
+| Root/index/canonical requirements fresh read | `completed` | Выполнено 25.07.2026 до tracked edits |
+| Maintenance/production owners | `completed` | Secret/provider/rollback requirements перечитаны; application production impact отсутствует |
+| Related Markdown | `completed` | Git workflow, CI, MCP, Task 54 plan/spec и documentation map inspected |
+| Installed versions | `completed` | PHP 8.5, Laravel 13.22.0, Boost 2.4.13, PHPUnit 12.5.32; Git 2.52 |
+| Existing implementation first | `completed` | Composer scripts, four hooks, guard library, changelog updater, doctor command and tests traced |
+| Root cause reproduction | `completed` | HTTPS push auth failure, no helper/`gh`/GCM, SSH `Permission denied (publickey)` |
+| GitHub App availability | `completed` | Connector installation `88463274`; target repository grants `push`/`admin`, local Git auth remains separate |
+| Alternatives and official docs | `completed` | SSH deploy key selected over HTTPS helper and connector-created commits |
+| Expected/protected files | `completed` | Manifests recorded above |
+| Design approval | `completed` | User approved recommended design after presentation |
+| Design spec/self-review | `completed` | Placeholder scan clean; architecture, errors, TDD, security, rollout, rollback and acceptance are internally consistent; docs/link/policy/diff checks pass; isolated commit `aedbd00` |
+| Written implementation plan | `completed` | Six-task inline plan contains exact files, interfaces, RED/GREEN code, SSH rollout, rollback, verification and remote evidence; placeholder/consistency/scope checks pass |
+| TDD RED/GREEN | `completed` | RED: 27 tests, 19 passed, 8 expected failures only because script/alias were absent. GREEN: те же 27 tests, 27 passed, 139 assertions; real local doctor passed branch/hooks/conflicts/privacy counts and failed only on the proven missing HTTPS credential helper |
+| SSH key/deploy-key/remote rollout | `pending` | Public-key owner action and bounded verification required |
+| Verification/docs/README/CHANGELOG | `in_progress` | Development/CI/MCP owners, developer README flow и русский CHANGELOG updated; focused GREEN passed, remaining static/docs/wide gates follow |
+| Final requirement/legacy reread | `pending` | Required before completion |
+| Commit/push in `main` | `in_progress` | Spec `aedbd00` and implementation plan `d8db224` committed path-limited in `main`; implementation commit and configured push remain |
+

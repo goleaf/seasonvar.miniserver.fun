@@ -350,6 +350,26 @@ final class CiQualityGateContractTest extends TestCase
         $this->assertStringNotContainsString('seasonvar_git_guard_require_no_untracked_files()', $guard);
     }
 
+    public function test_git_doctor_is_exposed_without_replacing_versioned_hooks(): void
+    {
+        $composer = json_decode(
+            File::get(base_path('composer.json')),
+            true,
+            512,
+            JSON_THROW_ON_ERROR,
+        );
+
+        $this->assertSame('bash scripts/git-doctor.sh', $composer['scripts']['git:doctor'] ?? null);
+        $this->assertFileExists(base_path('scripts/git-doctor.sh'));
+        $this->assertTrue(is_executable(base_path('scripts/git-doctor.sh')));
+
+        $preCommit = File::get(base_path('.githooks/pre-commit'));
+        $prePush = File::get(base_path('.githooks/pre-push'));
+
+        $this->assertStringContainsString('seasonvar_git_guard_require_safe_paths staged', $preCommit);
+        $this->assertStringContainsString('seasonvar_git_guard_require_clean_tree', $prePush);
+    }
+
     private function runGit(string $repositoryPath, string ...$arguments): void
     {
         $process = new Process(['git', ...$arguments], $repositoryPath);

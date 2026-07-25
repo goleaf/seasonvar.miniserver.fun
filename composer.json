@@ -64,6 +64,7 @@
             "npm run build"
         ],
         "hooks:install": "git config --local core.hooksPath .githooks",
+        "git:doctor": "bash scripts/git-doctor.sh",
         "dev": [
             "Composer\\Config::disableProcessTimeout",
             "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --tries=3 --timeout=900\" \"php artisan pail --timeout=0\" \"npm run dev\" --names=server,queue,logs,vite --kill-others"
