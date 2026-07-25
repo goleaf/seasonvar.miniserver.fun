@@ -8354,7 +8354,7 @@ regenerate/delete без второго schedule source, shared cache или н�
 
 ## Task 61 — readiness редакционных подборок
 
-Статус: `implementation_verified_documentation_and_delivery`.
+Статус: `implementation_verified_committed_push_unresolved_authentication`.
 
 Дата начала: 26.07.2026.
 
@@ -8439,7 +8439,7 @@ importer command и production DML не планируются.
 | Query/security/browser verification | `completed` | Focused/broad tests, scoped PHPStan/Pint, EXPLAIN, Vite and Chromium desktop/mobile/tablet |
 | Canonical docs/README/CHANGELOG | `completed` | Architecture/search/frontend/performance, both master plans and visitor/technical histories updated |
 | Full repository baseline | `unresolved` | Two unrelated pre-existing failures documented below; Task 61 suites pass |
-| Commit/push in `main` | `pending_shared_index_guard` | Exact Task 61 scope only; configured push attempted honestly |
+| Commit/push in `main` | `completed_commit_unresolved_push_authentication` | Exact 26-file Task 61 commit `c8cf7f0` создан в `main` штатным pre-commit через alternate index; чужие staged/unstaged/untracked файлы не включены. Настроенный HTTPS push отклонён до передачи данных: `fatal: could not read Username for 'https://github.com': No such device or address` |
 
 ### Execution checklist
 
@@ -8451,7 +8451,9 @@ importer command и production DML не планируются.
 6. `[completed]` RED/GREEN public read and admin presentation.
 7. `[completed]` Focused/static/build/browser/EXPLAIN verification.
 8. `[completed]` Canonical docs/README/CHANGELOG and final scan.
-9. `[pending]` Exact commit in `main` and configured push.
+9. `[completed_with_unresolved_push]` Exact commit `c8cf7f0` создан в
+   `main`; configured non-force push выполнен и отклонён только из-за
+   отсутствующей HTTPS-аутентификации GitHub.
 
 ### Verification evidence
 
@@ -8483,6 +8485,12 @@ importer command и production DML не планируются.
   suites в том же tree зелёные.
 - Production rows, source content, images, cache, schema, routes и workers не
   изменялись; production canary остаётся отдельным явным operator gate.
+- Exact implementation/docs commit `c8cf7f0` имеет parent `15816b5` и
+  содержит только 26 проверенных Task 61 путей, включая две автоматически
+  требуемые строки инвентаря уже находившихся в `HEAD` миграций. Чужой
+  незакоммиченный migration и остальные параллельные файлы не включены.
+  `git push origin main` фактически выполнен и завершился кодом `128` до
+  передачи данных из-за отсутствующей HTTPS-аутентификации.
 
 ## Task 62 — primary-key hydration эпизодов главной
 

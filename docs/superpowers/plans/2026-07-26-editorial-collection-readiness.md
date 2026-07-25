@@ -197,10 +197,10 @@ npm run build
   названий.
 - [x] Добавить отдельную русскую CHANGELOG entry.
 - [x] Перечитать требования/spec/plan и заполнить compliance matrix.
-- [ ] Commit exact Task 61 scope в `main` через isolated index, сохранив
+- [x] Commit exact Task 61 scope в `main` через isolated index, сохранив
   foreign staged/unstaged state.
-- [ ] Выполнить configured non-force push; auth/network failure записать
-  `unresolved`.
+- [x] Выполнить configured non-force push; commit `c8cf7f0` сохранён локально,
+  а отказ HTTPS-аутентификации записан как `unresolved`.
 
 ## Verification evidence
 
@@ -225,6 +225,9 @@ npm run build
   session-message failure и один уже находившийся в `HEAD` importer test без
   реализованного класса. Исключённый GD test отдельно прошёл `1 / 12`.
 - Production data: no DML, feature activation or source/image storage.
+- Delivery: exact 26-file commit `c8cf7f0` создан штатным pre-commit в
+  `main`; `git push origin main` завершился кодом `128` до передачи данных:
+  `could not read Username for 'https://github.com'`.
 
 ## Rollback
 
