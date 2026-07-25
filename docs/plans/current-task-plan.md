@@ -8352,3 +8352,119 @@ regenerate/delete без второго schedule source, shared cache или н�
   завершился кодом `128`: GitHub credentials в окружении отсутствуют; commit
   сохранён локально, force/rebase/hook bypass не использовались.
 
+## Task 62 — primary-key hydration эпизодов главной
+
+Статус: `design_approved_plan_preparation`.
+
+Дата начала: 26.07.2026.
+
+Approved design:
+[`2026-07-26-homepage-episode-hydration-primary-key-design.md`](../superpowers/specs/2026-07-26-homepage-episode-hydration-primary-key-design.md).
+
+### Цель и root cause
+
+Ускорить оставшийся cold SQL path блока «Новые серии» без изменения
+разметки, данных, видимости или response-cache lifecycle.
+
+Актуальный direct profile:
+
+- builder `358,53 ms`, 57 запросов и `219,69 ms` SQL;
+- две episode hydration операции занимают `86,04–88,23 ms`;
+- planner выбирает широкий
+  `episodes_recommendation_release_events_idx` вместо primary key, хотя
+  запросы уже ограничены 28 и 37 ID.
+
+Same-snapshot hypothesis check с локальным `NOT INDEXED` сохранил количество
+и identity строк и изменил медианы `85,89 → 0,92 ms` и
+`89,60 → 0,07 ms`; оба плана стали `INTEGER PRIMARY KEY (rowid=?)`.
+
+### Выбранное решение
+
+Переиспользовать существующий SQLite-only
+`CatalogHomeContentAdditionQuery::withoutSecondaryIndexes()` в двух наружных
+bounded episode hydration queries. Inner ranking/visibility queries сохраняют
+текущие специализированные индексы. Для других database drivers helper
+остаётся no-op.
+
+Новый composite index отклонён как избыточный write/storage cost без
+гарантии planner. Новый snapshot отклонён из-за ненужного cache
+key/version/invalidation lifecycle.
+
+### Ожидаемые изменяемые файлы
+
+- `app/Services/Catalog/CatalogHomeContentAdditionQuery.php`;
+- `tests/Feature/CatalogHomePerformanceTest.php` или существующий ближайший
+  `CatalogHomeContentAdditionTest.php`;
+- `docs/performance.md`;
+- approved design и detailed implementation plan;
+- эта Task 62 section;
+- `README.md` и `CHANGELOG.md`.
+
+`docs/caching.md` обновляется только если implementation discovery фактически
+изменит cache contract; текущий design его не меняет.
+
+### Protected files и public contracts
+
+- `routes/web.php`, `routes/api.php`, route names и locale aliases;
+- homepage Blade/components, text, ordering, SEO и payload shape;
+- title/season/episode/media visibility и publication predicates;
+- release group limit, projections, relations и `has_more`;
+- snapshot/metrics/full-response keys, versions, TTL, invalidation и warm;
+- existing indexes, migrations и database data;
+- importer command, queues, workers, admin, API/mobile, player;
+- auth, privacy, Premium, region/legal и translations;
+- foreign Task 60/61 staged/unstaged/untracked scope.
+
+### Migration, routes, translations, cache и compatibility risks
+
+| Domain | Статус | Решение |
+| --- | --- | --- |
+| SQLite query planner | `affected` | Только два bounded outer query получают `NOT INDEXED` |
+| Inner ranking/visibility | `compatible` | Existing indexes и predicates остаются |
+| Other database drivers | `compatible` | Existing helper возвращает query без изменения |
+| Homepage HTML/SEO/mobile | `unchanged` | Никакой Blade/DTO/payload change |
+| Cache keys/TTL/invalidation | `unchanged` | Response/data cache lifecycle не меняется |
+| Import/queue/scheduler | `unchanged` | Read-only home builder scope |
+| Auth/privacy/permissions | `unchanged` | Public visibility predicates сохранены |
+| Search/recommendations/calendar | `unchanged` | Query не публикует mutation/event |
+| Migration/schema/data | `not_applicable` | DDL/DML/backfill отсутствуют |
+| Routes/API/translations | `not_applicable` | Public identity/text не меняются |
+| Dependencies/env/config | `not_applicable` | Package/config/environment не меняются |
+| Rollback | `completed_preliminary` | Code/docs revert; data/cache restore не нужен |
+| Shared Git state | `critical_risk_recorded` | Exact alternate index; foreign scope не трогать |
+
+### Task-specific requirement-compliance matrix
+
+| Requirement/domain | Статус | Evidence / следующий gate |
+| --- | --- | --- |
+| Root/index/canonical requirements fresh read | `completed` | Выполнено 26.07.2026 до PHP edits |
+| Related home/performance/cache/import/ops docs | `completed` | Owners и Task 57 evidence перечитаны |
+| Installed versions | `completed` | PHP 8.5, Laravel 13.22.0, Boost 2.4.13, Livewire 4.3.3, PHPUnit 12.5.32, Tailwind 4.3.2 |
+| Official Laravel 13 behavior | `completed` | Boost/Context7: DB query listeners/plans, cache SWR и queue/context contracts |
+| Existing implementation first | `completed` | Builder/snapshot/metrics/content-addition/tests/Blade traced |
+| Read-only reproducible root cause | `completed` | Direct builder, slow SQL, EXPLAIN и five-sample A/B comparison |
+| Alternatives and authorization | `completed` | Three approaches compared; user explicitly preauthorized recommended implementation |
+| Design/files/contracts/risks | `completed` | Linked approved design and matrices above |
+| Detailed unlimited TDD plan | `pending` | Required before RED |
+| Production/rollback/data safety | `completed_preliminary` | No DDL/DML/cache mutation; code-only rollback |
+| TDD RED | `pending` | Exact two hydration hints must fail first |
+| Minimal GREEN | `pending` | No implementation before RED |
+| Focused/static/broad/live verification | `pending` | Defined in design; evidence required |
+| Canonical docs/README/CHANGELOG | `pending` | Update after confirmed GREEN measurement |
+| Final requirements/legacy scan | `pending` | Required before completion |
+| Commit/push in `main` | `pending` | Exact Task 62 scope only |
+
+### Безлимитный execution order
+
+1. Зафиксировать и self-review approved design.
+2. Создать detailed implementation plan с exact RED/GREEN.
+3. Перечитать plan и applicable requirements.
+4. RED: доказать отсутствие двух primary-key hydration boundaries.
+5. GREEN: применить existing helper ровно в двух outer queries.
+6. Проверить identity, visibility, ordering, limits и non-SQLite no-op.
+7. Focused/adjacent/static/broad verification.
+8. Повторить direct builder/EXPLAIN и safe live HTTP matrix.
+9. Обновить performance owner, README/CHANGELOG и compliance evidence.
+10. Выполнить final requirement/legacy scan.
+11. Exact commit только в `main`.
+12. Выполнить configured push или записать внешний отказ как `unresolved`.
