@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Enums\CatalogRecommendationFeedback;
 use App\Enums\ReleaseCalendarNotificationType;
 use App\Enums\ReleaseDatePrecision;
 use App\Enums\ReleaseScheduleEntryType;
 use App\Enums\ReleaseScheduleSource;
 use App\Enums\ReleaseScheduleStatus;
 use App\Models\CatalogTitle;
+use App\Models\CatalogTitleUserState;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\ReleaseScheduleEntry;
@@ -165,6 +167,34 @@ final class ReleaseCalendarDefaultViewTest extends TestCase
 
         $this->assertCount(1, $notifications);
         $this->assertSame(route('calendar.index'), $notifications->first()?->url);
+    }
+
+    public function test_more_like_this_keeps_release_notifications_while_negative_feedback_suppresses_them(): void
+    {
+        $user = User::factory()->create();
+        $entry = $this->createReleasedEntry('Сериал с положительным сигналом');
+        $state = CatalogTitleUserState::query()->create([
+            'user_id' => $user->id,
+            'catalog_title_id' => $entry->catalog_title_id,
+            'recommendation_feedback' => CatalogRecommendationFeedback::MoreLikeThis,
+            'recommendation_feedback_updated_at' => now(),
+        ]);
+        $user->notify(new ReleaseCalendarActivityNotification(
+            ReleaseCalendarNotificationType::Released,
+            $entry->public_id,
+            $entry->entry_type->value,
+            $entry->status->value,
+            $entry->revision,
+        ));
+
+        $this->assertCount(1, app(ReleaseCalendarNotificationQuery::class)->forUser($user));
+
+        $state->update([
+            'recommendation_feedback' => CatalogRecommendationFeedback::NotInterested,
+            'recommendation_feedback_updated_at' => now(),
+        ]);
+
+        $this->assertCount(0, app(ReleaseCalendarNotificationQuery::class)->forUser($user));
     }
 
     private function createReleasedEntry(

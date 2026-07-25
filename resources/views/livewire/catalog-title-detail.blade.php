@@ -277,13 +277,7 @@
                             <li wire:key="title-related-{{ $title->id }}-{{ $recommendationItem->title->id }}" data-recommendation-row>
                                 <x-catalog.title-card :title="$recommendationItem->title" layout="recommendation" :rank="$recommendationItem->rank" :reason-labels="$recommendationItem->reasonLabels" />
                                 @if ($recommendationItem->canDismiss)
-                                    <details class="relative z-20 border-t border-slate-100 bg-slate-50 px-3 py-2">
-                                        <summary class="flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-bold text-slate-600 hover:text-emerald-700"><x-ui.icon name="fa-solid fa-sliders" /><span>{{ __('recommendations.feedback.menu') }}</span></summary>
-                                        <div class="flex flex-wrap gap-2 pb-2">
-                                            <button type="button" wire:click="setRecommendationFeedback({{ $recommendationItem->title->id }}, 'not_interested')" wire:loading.attr="disabled" class="min-h-11 rounded-control bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-amber-50 hover:text-amber-800 disabled:opacity-60">{{ __('recommendations.feedback.not_interested') }}</button>
-                                            <button type="button" wire:click="setRecommendationFeedback({{ $recommendationItem->title->id }}, 'blacklisted')" wire:loading.attr="disabled" class="min-h-11 rounded-control bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-rose-50 hover:text-rose-800 disabled:opacity-60">{{ __('recommendations.feedback.blacklist') }}</button>
-                                        </div>
-                                    </details>
+                                    <x-catalog.recommendation-feedback :title-id="$recommendationItem->title->id" action="setRecommendationFeedback" />
                                 @endif
                             </li>
                         @endforeach
@@ -306,13 +300,7 @@
                                     :reason-labels="$recommendationItem->reasonLabels"
                                 />
                                 @if ($recommendationItem->canDismiss)
-                                    <details class="relative z-20 border-t border-slate-100 bg-slate-50 px-3 py-2">
-                                        <summary class="flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-bold text-slate-600 hover:text-emerald-700"><x-ui.icon name="fa-solid fa-sliders" /><span>{{ __('recommendations.feedback.menu') }}</span></summary>
-                                        <div class="flex flex-wrap gap-2 pb-2">
-                                            <button type="button" wire:click="setRecommendationFeedback({{ $recommendationItem->title->id }}, 'not_interested')" wire:loading.attr="disabled" class="min-h-11 rounded-control bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-amber-50 hover:text-amber-800 disabled:opacity-60">{{ __('recommendations.feedback.not_interested') }}</button>
-                                            <button type="button" wire:click="setRecommendationFeedback({{ $recommendationItem->title->id }}, 'blacklisted')" wire:loading.attr="disabled" class="min-h-11 rounded-control bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-rose-50 hover:text-rose-800 disabled:opacity-60">{{ __('recommendations.feedback.blacklist') }}</button>
-                                        </div>
-                                    </details>
+                                    <x-catalog.recommendation-feedback :title-id="$recommendationItem->title->id" action="setRecommendationFeedback" />
                                 @endif
                             </li>
                         @endforeach

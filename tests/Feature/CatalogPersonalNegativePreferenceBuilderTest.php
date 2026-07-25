@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Enums\CatalogRecommendationFeedback;
 use App\Enums\CatalogWatchStatus;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleUserState;
@@ -48,6 +49,24 @@ final class CatalogPersonalNegativePreferenceBuilderTest extends TestCase
         $this->assertGreaterThan(0, $reduced);
         $this->assertLessThan($recentDemotion, $reduced);
         $this->assertLessThanOrEqual(120, $recentDemotion);
+    }
+
+    public function test_more_like_this_feedback_never_creates_a_negative_feature_demotion(): void
+    {
+        $genre = Genre::query()->create(['name' => 'Фантастика', 'slug' => 'positive-feedback-feature']);
+        $user = User::factory()->create();
+
+        CatalogTitle::factory()->count(3)->create()->each(function (CatalogTitle $title) use ($genre, $user): void {
+            $title->genres()->attach($genre);
+            CatalogTitleUserState::query()->create([
+                'user_id' => $user->id,
+                'catalog_title_id' => $title->id,
+                'recommendation_feedback' => CatalogRecommendationFeedback::MoreLikeThis,
+                'recommendation_feedback_updated_at' => now(),
+            ]);
+        });
+
+        $this->assertSame([], app(CatalogPersonalNegativePreferenceBuilder::class)->forUser($user));
     }
 
     private function negativeTitles(User $user, Genre $genre, int $count, mixed $activity): void

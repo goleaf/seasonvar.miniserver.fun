@@ -6,6 +6,7 @@ namespace Tests\Feature;
 
 use App\DTOs\CatalogRecommendationContext;
 use App\Enums\CatalogPopularityPeriod;
+use App\Enums\CatalogRecommendationFeedback;
 use App\Enums\CatalogRecommendationType;
 use App\Livewire\CatalogDiscoveryPage;
 use App\Models\CatalogTitle;
@@ -148,6 +149,29 @@ final class CatalogDiscoveryInteractionTest extends TestCase
         $this->assertSame(1, $result->page);
         $this->assertCount(24, $result->items);
         $this->assertFalse($result->hasMore);
+    }
+
+    public function test_verified_user_can_save_and_undo_more_like_this_feedback(): void
+    {
+        $user = User::factory()->create();
+        $title = $this->playableTitle('Точный положительный сигнал');
+
+        Livewire::actingAs($user)
+            ->test(CatalogDiscoveryPage::class, ['type' => 'personalized'])
+            ->call('setFeedback', $title->id, 'more_like_this')
+            ->assertHasNoErrors()
+            ->assertSet('lastFeedbackTitleId', $title->id)
+            ->assertSet('notice', 'Будем чаще учитывать похожие сериалы в персональных рекомендациях.')
+            ->call('undoFeedback')
+            ->assertHasNoErrors()
+            ->assertSet('lastFeedbackTitleId', null);
+
+        $this->assertDatabaseHas('catalog_title_user_states', [
+            'user_id' => $user->id,
+            'catalog_title_id' => $title->id,
+            'recommendation_feedback' => null,
+        ]);
+        $this->assertContains('more_like_this', CatalogRecommendationFeedback::values());
     }
 
     private function guestPersonalizedContext(): CatalogRecommendationContext

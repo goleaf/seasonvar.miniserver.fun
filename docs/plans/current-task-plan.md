@@ -7718,6 +7718,178 @@ production-runtime files не входят в Task 55.
 | Commit/push in `main` | `unresolved` | Existing Task 55 commits remain in `main`; parallel Task 56 commit `ab55891` advanced HEAD during verification, а затем появились foreign Task 57/58 staged, unstaged и untracked изменения. Настоящий hardening commit изолирует ровно девять allowlisted Task 55 paths/section через alternate index; реальный mixed index и чужой working tree не входят в commit и сохраняются. The only doctor failure is the unchanged HTTPS credential mechanism, while exact canonical SSH read still returns `Permission denied (publickey)`. Strict clean-tree `pre-push` cannot run and no bypass is allowed |
 
 
+## Task 58 — объяснимость рекомендаций и двусторонний feedback
+
+Статус: `approved_plan_reread_ready_for_tdd`.
+
+Дата начала: 26.07.2026.
+
+Approved design:
+[`2026-07-26-recommendation-explainability-feedback-design.md`](../superpowers/specs/2026-07-26-recommendation-explainability-feedback-design.md).
+
+Detailed implementation plan:
+[`2026-07-26-recommendation-explainability-feedback.md`](../superpowers/plans/2026-07-26-recommendation-explainability-feedback.md).
+
+### Цель
+
+Сделать уже существующую multi-source recommendation систему понятной и
+управляемой: явно показывать broad reasons, добавить обратимый положительный
+intent «Больше похожего» рядом с двумя существующими отрицательными
+действиями и использовать его как bounded персональный source signal без
+создания второй recommendation boundary, event analytics или новой таблицы.
+
+### Подтверждённый baseline
+
+- Runtime: PHP 8.5.8; Laravel 13.22.0; Boost 2.4.13; Livewire 4.3.3;
+  Tailwind CSS 4.3.2; Vite 8.1.4; PHPUnit 12.5.32; SQLite.
+- Frontend: full-page Livewire + Blade components + Tailwind; Vue/Inertia и
+  новый JS framework не нужны.
+- Routes: существующие `discover.index` и `titles.show`; новых routes,
+  controllers или API endpoints не требуется.
+- Domain: `CatalogRecommendationService` orchestrates candidates,
+  personalization, diversity, quality and repeat suppression;
+  `CatalogUserStateService` owns feedback write/undo.
+- Data: existing unique user-title state, nullable string feedback column и
+  semantic timestamp/version не требуют column/data migration; фактический
+  `EXPLAIN` обосновал reversible replacement composite feedback index.
+- Security: `CatalogTitlePolicy::interact`, verified email, canonical
+  entitlement visibility, Livewire CSRF, transaction и 30/min rate limit уже
+  действуют.
+- Privacy/cache: personalized HTML/API owner state остаются
+  `private, no-store`; private reasons не входят в URL/shared cache.
+- Existing defect: generic `whereNotNull(recommendation_feedback)` в profile,
+  negative-preference и hidden-library paths сделал бы любое новое
+  положительное значение отрицательным.
+- GREEN discovery: profile state query выбирал feedback value, но не
+  `recommendation_feedback_updated_at`; positive recency evidence выявил
+  missing selected attribute. Колонка добавляется в тот же bounded query без
+  нового round trip.
+- SQL discovery: production `EXPLAIN` использует existing
+  `catalog_user_state_recommendation_feedback_idx`, но создаёт temp B-tree
+  для semantic activity order; production aggregate достигает 1 156 feedback
+  rows на пользователя. Scope расширен reversible replacement индекса тем же
+  именем и без duplicate index.
+- Existing UX defect: localized `recommendations.page.why` существует, но не
+  рендерится; feedback effect не объясняется, markup повторяется три раза.
+- CI: backend/frontend/browser quality gates в `.github/workflows/ci.yml`.
+- Git: existing `main`, `origin/main`, branch ahead 11 на старте Task 58.
+  До Task 58 существовал staged/unstaged Task 57 cache-warm scope; он не
+  reset/stash/unstage/overwrite и не должен попасть в Task 58 commit.
+
+### Выбранное решение
+
+1. Additive enum `more_like_this` в existing
+   `catalog_title_user_states.recommendation_feedback`.
+2. Явные enum helpers разделяют all feedback и exact negative values.
+3. v2 и legacy personalization используют отмеченный title как bounded
+   source; сам title exact-excluded как уже обработанный.
+4. Positive feedback не участвует в demotion, hidden library, release или
+   notification suppression.
+5. Recommendation card обозначает reason labels заголовком «Почему это
+   показано».
+6. Один query-free Blade component рендерит три действия с описанием scope,
+   44px targets и exact per-action Livewire loading target.
+7. Owner API enum расширяется additively; public response shape, routes,
+   filters, pagination и ranking не меняются.
+
+### Изменяемые файлы
+
+- `app/Enums/CatalogRecommendationFeedback.php`;
+- `app/Enums/CatalogPersonalEvidence.php`;
+- `app/Enums/CatalogRecommendationReason.php`;
+- `app/Enums/CatalogRecommendationSource.php`;
+- `app/Services/Catalog/CatalogPersonalPreferenceProfileBuilder.php`;
+- `app/Services/Catalog/CatalogPersonalNegativePreferenceBuilder.php`;
+- `app/Services/Catalog/CatalogPersonalizedRecommendationQuery.php`;
+- `app/Services/Catalog/CatalogPersonalizedCandidateScorer.php`;
+- `app/Services/Catalog/CatalogRecommendationExclusionService.php`;
+- `app/Services/Catalog/UserLibraryQuery.php`;
+- `app/Services/Catalog/CatalogTitleUserDataMerger.php`;
+- recommendation card, new feedback component, discovery/title-detail views;
+- RU/EN recommendation translations;
+- `resources/api/openapi.json`;
+- new reversible migration replacing the feedback index with semantic
+  activity-order columns;
+- focused unit/feature/Livewire/render/API/merge tests;
+- canonical recommendation/API docs, this plan, README and CHANGELOG.
+
+### Protected public contracts
+
+- `routes/web.php`, `routes/api.php`, route names/binding/status codes;
+- canonical `CatalogRecommendationService` API and result DTO shapes;
+- discovery type/filter/query-string/pagination codes and reset behavior;
+- `not_interested`, `blacklisted`, existing undo and optimistic versions;
+- policy, visibility, Premium/region/legal and owner-only privacy boundaries;
+- public recommendation JSON shape and all existing API field names;
+- cache keys/domains/TTL/invalidation; importer/player/search/SEO/admin/jobs;
+- existing migrations/data/index names/dependencies/env;
+- current branch/history and all foreign working-tree/index changes.
+
+### Cross-feature and risk matrix
+
+| Domain | Статус | Решение / verification |
+| --- | --- | --- |
+| Authentication/authorization | `compatible` | Existing verified-email policy/service; guest/invisible tests |
+| Validation | `affected` | Existing scalar normalization + enum `tryFrom`; invalid matrix tests |
+| Personalization | `affected` | New bounded positive source in v2 and legacy paths |
+| Negative demotion | `critical_affected` | Exact negative enum values only; three-source regression |
+| Hidden library | `affected` | Exact negatives only; list/count/pagination regression |
+| Notifications/calendar | `compatible` | Existing exact negative predicates; adjacent tests |
+| API/mobile/export | `additive` | Stable `more_like_this`; OpenAPI/export contract tests |
+| Privacy/cache | `compatible` | No shared cache/URL/private-detail exposure |
+| Search/filters/pagination | `unchanged` | Existing query-string contracts and discovery tests |
+| UI/accessibility/mobile | `affected` | Visible heading, explained 44px controls, browser QA |
+| SQL/index/query budget | `affected_bounded` | EXPLAIN justified exact type/activity composite replacement |
+| Migration/data/dependency/env | `migration_affected` | Reversible index replacement only; no row/data/package/env change |
+| Rollback | `documented` | Preserve enum recognition; disable UI/weight or normalize separately |
+| Shared Git index | `risk_recorded` | Task 57 scope preserved; delivery exact-hunk only |
+
+### Task-specific requirement-compliance matrix
+
+| Requirement/domain | Статус | Evidence / следующий gate |
+| --- | --- | --- |
+| Root/index/canonical requirements fresh read | `completed` | Выполнено 26.07.2026 до production edits |
+| Recommendation/UI/API/data/security/performance docs | `completed` | Owners и protected contracts traced |
+| Maintenance + production operations | `completed` | No upgrade/DDL/env; rollback/data/cache assessed |
+| Installed versions | `completed` | Runtime/Boost/lock/package inventory above |
+| Official Laravel/Livewire behavior | `completed` | Boost 13.x enum/cast/query and Livewire 4 exact loading target docs |
+| Existing implementation first | `completed` | Service/profile/exclusion/user-state/library/UI/API flows traced |
+| Alternatives and user authorization | `completed` | Three options compared; user preauthorized implementation |
+| Canonical permanent rule first | `completed` | Personalization design updated before code |
+| Approved design spec | `completed` | Scope/data/security/perf/errors/rollback/acceptance self-reviewed |
+| Expected/protected files and risks | `completed` | Manifests and matrices above |
+| Detailed unlimited plan | `completed` | 63 ordered items with why/files/deps/risks/checks |
+| Plan reread before implementation | `completed` | Design/plan/current Task 58 reread in full |
+| TDD RED before implementation | `completed` | 41 focused tests: 33 pass, 4 failures + 4 expected missing-contract errors |
+| Minimal GREEN | `completed` | 61 focused tests / 397 assertions plus 14 external-contract tests / 43 assertions |
+| SQL EXPLAIN/query budget | `completed` | Production read-only old-index plan recorded; migrated-schema tests verify covering index/no temp sort and reversible down/up |
+| Security/privacy/cross-feature review | `completed` | Component action allowlist, owner API no-store, invisible/guest, release/library/merge regressions and repository-wide semantic/debug/Blade-query scans green |
+| Focused/full/static/build/browser verification | `unresolved` | Focused 78/446 and adjacent 32/260 green; PHPStan/Pint/task Rector/docs/build/cache/browser green. Full 1808-test run has 1795 pass/11 skip plus two known unrelated failures; full Rector has only unrelated collection `never` diffs |
+| Canonical docs/OpenAPI/README/CHANGELOG | `completed` | Owners, architecture, data, performance, API, deployment, security, visitor history and changelog updated |
+| Final requirements reread/legacy scan | `completed` | Index, system-wide, maintenance, production, multilingual and three recommendation owners reread; stale two-value/generic-null/duplicate/debug scans resolved |
+| Commit/push in `main` | `pending_shared_index_guard` | Foreign Task 57 scope must not enter Task 58 commit |
+
+### Живой execution checklist
+
+1. `[completed]` Перечитать approved design, detailed plan и эту section.
+2. `[completed]` Написать и запустить exact RED tests.
+3. `[completed]` Реализовать enum/data semantics и получить backend GREEN.
+4. `[completed]` Реализовать reusable UI/explanations и получить render/Livewire
+   GREEN.
+5. `[completed]` Проверить API/export/merge/release/library compatibility.
+6. `[completed]` Выполнить SQL EXPLAIN, query budget, security/privacy and
+   architecture review.
+7. `[completed]` Запустить focused/adjacent/full/static/docs/build/browser
+   checks; task regressions устранены, два full-suite и один full-Rector
+   внешних отклонения записаны как `unresolved`.
+8. `[completed]` Обновить canonical docs, README, CHANGELOG и compliance
+   evidence.
+9. `[completed]` Перечитать requirements/spec/plan и выполнить repository-wide
+   legacy/duplicate/debug/secret scan; stale two-value statements and generic
+   null predicates устранены, owner requirements перечитаны.
+10. `[pending]` Exact task stage/commit в `main`; сохранить foreign index.
+11. `[pending]` Push только при пройденном clean-tree/pre-push gate; иначе
+    exact unresolved blocker без ложного success.
 ## Task 59 — grouped summary public-каталога подборок
 
 Статус: `implementation_committed_push_unresolved_authentication`.

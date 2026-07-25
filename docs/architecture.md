@@ -443,6 +443,16 @@ Schema/index/rollback и aggregate definitions принадлежат [`DATA_REL
 
 `CatalogRecommendationService` — единственный orchestration layer для homepage, title related/similar, discovery, library и legacy recommendation API. Он собирает server-only `CatalogRecommendationContext`, выбирает один bounded query provider, применяет canonical visibility/exclusions/availability rerank/diversity/repeat suppression и отдаёт typed result/item/explanation DTO. Controllers и Livewire только нормализуют request state и выбирают response; Blade не запрашивает модели и не рассчитывает ranking.
 
+Recommendation feedback остаётся в canonical one-row-per-user/title state.
+`more_like_this` — явный bounded positive source для legacy и v2
+personalization; `not_interested|blacklisted` — единственные отрицательные
+feedback values. Поэтому положительный сигнал не попадает в hidden library,
+feature demotion или release-notification suppression, но отмеченный source
+title по-прежнему exact-excluded из нового результата. Карточка явно
+подписывает broad reason как «Почему это показано» и объясняет последствия
+всех трёх обратимых действий до записи, не раскрывая source title, private
+activity или internal weight.
+
 `CatalogDiscoveryPage` выполняет один `discover()` на interaction. При явном
 обновлении новый seed и page 1 устанавливаются до запроса, а защищённый
 request-local `CatalogRecommendationResult` передаётся следующему render того
@@ -464,7 +474,7 @@ Generic taxonomy/rating/year/page-quality данные читаются прям
 
 Read-only inventory 17.07.2026: 32 938 visible titles, 380 772 active `v4` rows для 32 373 source titles, без self/duplicate/invalid-reason pairs; пять полных `v6` build'ов корректно отклонены quality gate, один zero-row build имеет stale heartbeat, а 5 328 dirty IDs превышают scoped threshold. Pruner и full rebuild не запускаются конкурентно с активным long-running importer на SQLite: прежний `v4` остаётся доступным, gate не ослабляется и худший build не активируется принудительно.
 
-Stable types/sources, user-signal/exclusion policy, routes, fallback и SEO описаны в [общем recommendation design](superpowers/specs/2026-07-13-recommendation-v3-list-design.md). Формулы content similarity, quality gate, activation и scoped rebuild принадлежат [v6 design](superpowers/specs/2026-07-16-recommendation-similarity-v6-design.md); audit/checklist — в соответствующем [v6 execution plan](superpowers/plans/2026-07-16-recommendation-similarity-v6.md).
+Stable types/sources, user-signal/exclusion policy, routes, fallback и SEO описаны в [общем recommendation design](superpowers/specs/2026-07-13-recommendation-v3-list-design.md). Двусторонний feedback и объяснимость уточнены в [design от 26.07.2026](superpowers/specs/2026-07-26-recommendation-explainability-feedback-design.md). Формулы content similarity, quality gate, activation и scoped rebuild принадлежат [v6 design](superpowers/specs/2026-07-16-recommendation-similarity-v6-design.md); audit/checklist — в соответствующем [v6 execution plan](superpowers/plans/2026-07-16-recommendation-similarity-v6.md).
 
 ## Размер внешнего видео и authenticated delivery boundary
 
@@ -514,7 +524,7 @@ HTML season lane получает episode metadata/counts, source summaries — 
 
 ## Каноническая личная библиотека Task 09
 
-Личная библиотека расширяет существующие `CatalogTitleUserState`, `EpisodeViewProgress`, коллекции и календарь релизов; второй bookmark, status, progress, blacklist или collection aggregate не создаётся. `in_watchlist` остаётся единственным bookmark/favorite flag на уникальной паре user/title. `planned`, `watching`, `paused`, `completed` и `dropped` — стабильные serial-level status codes; «просмотрено» как история выводится из progress, а не хранится переводной строкой. `not_interested` и более сильный `blacklisted` остаются отдельным recommendation feedback dimension с централизованным precedence.
+Личная библиотека расширяет существующие `CatalogTitleUserState`, `EpisodeViewProgress`, коллекции и календарь релизов; второй bookmark, status, progress, blacklist или collection aggregate не создаётся. `in_watchlist` остаётся единственным bookmark/favorite flag на уникальной паре user/title. `planned`, `watching`, `paused`, `completed` и `dropped` — стабильные serial-level status codes; «просмотрено» как история выводится из progress, а не хранится переводной строкой. Положительный `more_like_this`, отрицательный `not_interested` и более сильный `blacklisted` остаются отдельным recommendation feedback dimension с централизованным precedence; hidden library включает только два отрицательных значения.
 
 `UserLibraryQuery` и `UserLibrarySummaryQuery` владеют owner-scoped pagination, grouped counters, filters, deterministic sorting и update predicate. `CatalogWatchStatusTransitionService` — единственная boundary автоматических переходов: meaningful playback может изменить только empty/planned → watching, а completed ставится после завершения всех доступных воспроизводимых серий. Явные paused/dropped/completed не перезаписываются открытием страницы или обычным heartbeat; новый сезон/эпизод сохраняет исторический completed и создаёт отдельный update indicator.
 

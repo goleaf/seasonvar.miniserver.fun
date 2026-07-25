@@ -77,7 +77,10 @@ final readonly class UserLibraryQuery
         if (! Schema::hasColumn('catalog_title_user_states', 'recommendation_feedback')) {
             $query->whereRaw('1 = 0');
         } else {
-            $query->whereNotNull('recommendation_feedback');
+            $query->whereIn(
+                'recommendation_feedback',
+                CatalogRecommendationFeedback::negativeValues(),
+            );
         }
 
         $query->orderByDesc('recommendation_feedback_updated_at')->orderByDesc('id');
@@ -148,10 +151,10 @@ final readonly class UserLibraryQuery
             })
             ->where(function (Builder $state): void {
                 $state->whereNull('recommendation_feedback')
-                    ->orWhereNotIn('recommendation_feedback', [
-                        CatalogRecommendationFeedback::NotInterested->value,
-                        CatalogRecommendationFeedback::Blacklisted->value,
-                    ]);
+                    ->orWhereNotIn(
+                        'recommendation_feedback',
+                        CatalogRecommendationFeedback::negativeValues(),
+                    );
             });
         $this->personalUpdates->constrain($query, $user, $hasUpdates);
 
@@ -252,7 +255,10 @@ final readonly class UserLibraryQuery
 
         return CatalogTitleUserState::query()
             ->whereBelongsTo($user)
-            ->whereNotNull('recommendation_feedback')
+            ->whereIn(
+                'recommendation_feedback',
+                CatalogRecommendationFeedback::negativeValues(),
+            )
             ->count();
     }
 

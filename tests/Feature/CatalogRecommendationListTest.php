@@ -9,6 +9,7 @@ use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRecommendation;
 use App\Models\Genre;
 use App\Models\LicensedMedia;
+use App\Models\User;
 use App\Services\Catalog\CatalogTitlePageBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -106,6 +107,7 @@ class CatalogRecommendationListTest extends TestCase
         $this->assertStringNotContainsString('aspect-[16/10]', $html);
         $this->assertStringNotContainsString('scale-[1.02]', $html);
         $this->assertStringContainsString('Романтика', $html);
+        $this->assertStringContainsString('Почему это показано', $html);
         $this->assertStringContainsString('Легкая история любви', $html);
         $this->assertStringContainsString('data-recommendation-rank="1"', $html);
         $this->assertStringContainsString('data-recommendation-rank="2"', $html);
@@ -113,6 +115,30 @@ class CatalogRecommendationListTest extends TestCase
         $this->assertStringNotContainsString('Ближайшие совпадения', $html);
         $this->assertStringNotContainsString('По похожим жанрам', $html);
         $this->assertStringNotContainsString('За '.$source->year.' год', $html);
+    }
+
+    public function test_authenticated_recommendation_controls_explain_all_three_feedback_actions(): void
+    {
+        $user = User::factory()->create();
+        $source = CatalogTitle::factory()->create(['title' => 'Источник рекомендаций']);
+        $candidate = $this->recommendableTitle('Управляемая рекомендация');
+        $this->storeRecommendation($source, $candidate, 1, 900, [
+            'genre' => ['count' => 1, 'score' => 300],
+        ]);
+
+        $html = $this->actingAs($user)
+            ->get(route('titles.show', $source))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertStringContainsString('Больше похожего', $html);
+        $this->assertStringContainsString('Учтём интерес к похожим темам и признакам.', $html);
+        $this->assertStringContainsString('Скроем этот сериал из рекомендаций.', $html);
+        $this->assertStringContainsString('Полностью исключим сериал из рекомендаций и релизных уведомлений.', $html);
+        $this->assertStringContainsString(
+            "wire:target=\"setRecommendationFeedback({$candidate->id}, 'more_like_this')\"",
+            $html,
+        );
     }
 
     /**

@@ -6,6 +6,8 @@ namespace Tests\Feature;
 
 use App\DTOs\CatalogPersonalSourceSignal;
 use App\Enums\CatalogPersonalEvidence;
+use App\Enums\CatalogRecommendationFeedback;
+use App\Enums\CatalogRecommendationReason;
 use App\Enums\CatalogWatchStatus;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleUserState;
@@ -113,6 +115,25 @@ final class CatalogPersonalPreferenceProfileBuilderTest extends TestCase
 
         $this->assertSame(30, $signals[$legacy->id]->confidence);
         $this->assertSame(60, $signals[$recent->id]->confidence);
+    }
+
+    public function test_more_like_this_is_a_bounded_positive_source_signal(): void
+    {
+        $user = User::factory()->create();
+        [$title] = $this->titleWithEpisodes(1);
+        CatalogTitleUserState::query()->create([
+            'user_id' => $user->id,
+            'catalog_title_id' => $title->id,
+            'recommendation_feedback' => CatalogRecommendationFeedback::MoreLikeThis,
+            'recommendation_feedback_updated_at' => now(),
+        ]);
+
+        $signal = $this->signalFor($user, $title);
+
+        $this->assertContains(CatalogPersonalEvidence::RecommendationFeedback, $signal->evidence);
+        $this->assertContains(CatalogRecommendationReason::BecausePositiveFeedback, $signal->reasonCodes);
+        $this->assertGreaterThanOrEqual(150, $signal->confidence);
+        $this->assertLessThanOrEqual(320, $signal->confidence);
     }
 
     public function test_query_count_is_constant_for_small_and_large_profiles(): void

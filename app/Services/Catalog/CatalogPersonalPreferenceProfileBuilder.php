@@ -7,6 +7,7 @@ namespace App\Services\Catalog;
 use App\DTOs\CatalogPersonalPreferenceProfile;
 use App\DTOs\CatalogPersonalSourceSignal;
 use App\Enums\CatalogPersonalEvidence;
+use App\Enums\CatalogRecommendationFeedback;
 use App\Enums\CatalogRecommendationReason;
 use App\Enums\CatalogWatchStatus;
 use App\Models\CatalogTitleUserState;
@@ -76,11 +77,23 @@ final class CatalogPersonalPreferenceProfileBuilder
         foreach ($states as $state) {
             $titleId = (int) $state->catalog_title_id;
             $status = $this->watchStatus($state);
+            $feedback = $this->recommendationFeedback($state);
 
-            if ($this->isNegativeState($state, $status)) {
+            if ($feedback?->isNegative() === true || $status === CatalogWatchStatus::Dropped) {
                 $negativeTitleIds[$titleId] = true;
 
                 continue;
+            }
+
+            if ($feedback === CatalogRecommendationFeedback::MoreLikeThis) {
+                $this->addEvidence(
+                    $evidence,
+                    $titleId,
+                    CatalogPersonalEvidence::RecommendationFeedback,
+                    CatalogRecommendationReason::BecausePositiveFeedback,
+                    max(1, (int) config('recommendations.personalized_v2.feedback_weight', 180)),
+                    $this->stateActivity($state, 'recommendation_feedback_updated_at'),
+                );
             }
 
             if ($state->in_watchlist) {
@@ -221,6 +234,7 @@ final class CatalogPersonalPreferenceProfileBuilder
             'in_watchlist',
             'rating',
             'recommendation_feedback',
+            'recommendation_feedback_updated_at',
             'watch_status',
             'watchlist_updated_at',
             'rating_updated_at',
@@ -350,12 +364,17 @@ final class CatalogPersonalPreferenceProfileBuilder
             : CatalogWatchStatus::tryFrom((string) $status);
     }
 
-    private function isNegativeState(CatalogTitleUserState $state, ?CatalogWatchStatus $status): bool
+    private function recommendationFeedback(CatalogTitleUserState $state): ?CatalogRecommendationFeedback
     {
-        $hasFeedback = in_array('recommendation_feedback', $this->stateColumns(), true)
-            && $state->getAttribute('recommendation_feedback') !== null;
+        if (! in_array('recommendation_feedback', $this->stateColumns(), true)) {
+            return null;
+        }
 
-        return $hasFeedback || $status === CatalogWatchStatus::Dropped;
+        $feedback = $state->getAttribute('recommendation_feedback');
+
+        return $feedback instanceof CatalogRecommendationFeedback
+            ? $feedback
+            : CatalogRecommendationFeedback::tryFrom((string) $feedback);
     }
 
     /** @return list<string> */

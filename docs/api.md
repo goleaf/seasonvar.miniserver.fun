@@ -192,6 +192,6 @@ Task 07 не переименовывает route/API fields и не раскр�
 
 ## Personal-library API compatibility Task 09
 
-Existing `/api/v1/me` library/title-state/sync resources remain the mobile compatibility boundary; no second marker, blacklist or collection API was added. `watch_status` accepts/returns stable `planned|watching|paused|completed|dropped|null`; bookmark remains `in_watchlist`, feedback remains `not_interested|blacklisted|null`, and optimistic version fields keep their names. OpenAPI mirrors the additive `paused` enum without translated values.
+Existing `/api/v1/me` library/title-state/sync resources remain the mobile compatibility boundary; no second marker, blacklist or collection API was added. `watch_status` accepts/returns stable `planned|watching|paused|completed|dropped|null`; bookmark remains `in_watchlist`, feedback accepts/returns additive stable `more_like_this|not_interested|blacklisted|null`, and optimistic version fields keep their names. OpenAPI mirrors both enums without translated values.
 
 Manual markers and personal update acknowledgments are currently web/Livewire owner actions and are absent from public API payloads. Public title resources never expose exact progress, marker position, blacklist, acknowledgment or private collection membership; authenticated resources derive owner from Sanctum/session and remain `private, no-store`.

@@ -215,10 +215,10 @@ final readonly class ReleaseCalendarQuery
                     })
                     ->where(function (Builder $state): void {
                         $state->whereNull('recommendation_feedback')
-                            ->orWhereNotIn('recommendation_feedback', [
-                                CatalogRecommendationFeedback::NotInterested->value,
-                                CatalogRecommendationFeedback::Blacklisted->value,
-                            ]);
+                            ->orWhereNotIn(
+                                'recommendation_feedback',
+                                CatalogRecommendationFeedback::negativeValues(),
+                            );
                     })
                     ->selectRaw('1')
                     ->toBase(),
@@ -228,10 +228,10 @@ final readonly class ReleaseCalendarQuery
             CatalogTitleUserState::query()
                 ->whereColumn('catalog_title_user_states.catalog_title_id', 'release_schedule_entries.catalog_title_id')
                 ->where('catalog_title_user_states.user_id', $user->id)
-                ->whereIn('catalog_title_user_states.recommendation_feedback', [
-                    CatalogRecommendationFeedback::NotInterested->value,
-                    CatalogRecommendationFeedback::Blacklisted->value,
-                ])
+                ->whereIn(
+                    'catalog_title_user_states.recommendation_feedback',
+                    CatalogRecommendationFeedback::negativeValues(),
+                )
                 ->selectRaw('1')
                 ->toBase(),
         );

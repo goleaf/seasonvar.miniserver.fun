@@ -6,6 +6,7 @@ namespace App\Enums;
 
 enum CatalogPersonalEvidence: string
 {
+    case RecommendationFeedback = 'recommendation_feedback';
     case MeaningfulProgress = 'meaningful_progress';
     case CompletedDepth = 'completed_depth';
     case Watchlist = 'watchlist';

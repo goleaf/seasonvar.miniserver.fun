@@ -34,10 +34,10 @@ final readonly class ReleaseCalendarNotificationQuery
             ->whereColumn('release_schedule_entries.public_id', 'notifications.data->entry_public_id')
             ->whereDoesntHave('catalogTitle.userStates', fn ($state) => $state
                 ->where('user_id', $user->id)
-                ->whereIn('recommendation_feedback', [
-                    CatalogRecommendationFeedback::NotInterested->value,
-                    CatalogRecommendationFeedback::Blacklisted->value,
-                ]));
+                ->whereIn(
+                    'recommendation_feedback',
+                    CatalogRecommendationFeedback::negativeValues(),
+                ));
         $this->visibility->constrain($visibleEntries, $user);
 
         $paginator = $user->notifications()->where('type', 'release-calendar.activity')
@@ -50,10 +50,10 @@ final readonly class ReleaseCalendarNotificationQuery
         $entriesQuery = ReleaseScheduleEntry::query()->whereIn('public_id', $entryIds)
             ->whereDoesntHave('catalogTitle.userStates', fn ($state) => $state
                 ->where('user_id', $user->id)
-                ->whereIn('recommendation_feedback', [
-                    CatalogRecommendationFeedback::NotInterested->value,
-                    CatalogRecommendationFeedback::Blacklisted->value,
-                ]));
+                ->whereIn(
+                    'recommendation_feedback',
+                    CatalogRecommendationFeedback::negativeValues(),
+                ));
         $this->visibility->constrain($entriesQuery, $user);
         $entries = $entriesQuery
             ->with('catalogTitle:id,slug,title,original_title')

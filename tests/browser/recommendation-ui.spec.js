@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('catalog card surfaces never render the redundant open-title action', async ({ page, baseURL }) => {
+test('catalog card surfaces never render the redundant open-title action', async ({ page, baseURL }, testInfo) => {
     const browserErrors = [];
     const localOrigin = new URL(baseURL).origin;
 
@@ -29,6 +29,7 @@ test('catalog card surfaces never render the redundant open-title action', async
 
     await expect(recommendationRows).toHaveCount(1);
     await expect(recommendationRows.getByRole('link', { name: 'Рекомендованный браузерный сериал' })).toBeVisible();
+    await expect(recommendationRows.getByText('Почему это показано', { exact: true })).toBeVisible();
     await expect(recommendationRows.getByText('Похожие жанры и темы', { exact: true })).toBeVisible();
     const recommendationHrefs = await recommendationRows.locator('a[href*="/titles/"]').evaluateAll(
         (links) => links.map((link) => link.getAttribute('href')),
@@ -48,7 +49,29 @@ test('catalog card surfaces never render the redundant open-title action', async
 
     expect(personalizedResponse?.status()).toBe(200);
     await expect(personalizedRows.getByRole('link', { name: 'Рекомендованный браузерный сериал' })).toBeVisible();
-    await expect(personalizedRows.getByText('По сериалам из вашего списка', { exact: true })).toBeVisible();
+    const personalizedReasonGroup = personalizedRows.first().locator('[aria-label="Почему это показано"]');
+
+    await expect(personalizedReasonGroup.getByText('Почему это показано', { exact: true })).toBeVisible();
+    await expect(personalizedReasonGroup.locator('div > span').first()).toBeVisible();
+    const feedback = personalizedRows.first().locator('[data-recommendation-feedback]');
+
+    await feedback.getByText('Настроить рекомендацию', { exact: true }).click();
+    await expect(feedback.getByText('Учтём интерес к похожим темам и признакам.', { exact: true })).toBeVisible();
+    await expect(feedback.getByText('Скроем этот сериал из рекомендаций.', { exact: true })).toBeVisible();
+    await expect(feedback.getByText('Полностью исключим сериал из рекомендаций и релизных уведомлений.', { exact: true })).toBeVisible();
+    await page.screenshot({
+        path: `output/playwright/recommendation-feedback-${testInfo.project.name.toLowerCase().replaceAll(' ', '-')}.png`,
+        fullPage: true,
+    });
+
+    const positiveFeedback = feedback.getByRole('button', { name: /Больше похожего/ });
+    const positiveFeedbackBox = await positiveFeedback.boundingBox();
+
+    expect(positiveFeedbackBox?.height).toBeGreaterThanOrEqual(44);
+    await positiveFeedback.click();
+    await expect(page.getByText('Будем чаще учитывать похожие сериалы в персональных рекомендациях.', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Отменить', exact: true }).click();
+    await expect(page.getByText('Настройка рекомендации отменена.', { exact: true })).toBeVisible();
     await expect(page.getByText('Открыть тайтл', { exact: true })).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1);
 

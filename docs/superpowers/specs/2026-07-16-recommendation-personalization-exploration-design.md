@@ -77,7 +77,10 @@ Profile получает уровень:
 
 ## Отрицательные сигналы
 
-`blacklisted`, `not_interested`, `dropped` и explicit recommendation feedback продолжают жёстко исключать сам тайтл.
+`blacklisted`, `not_interested` и `dropped` продолжают жёстко исключать сам
+тайтл. Только эти отрицательные значения участвуют в feature-level demotion:
+сам факт наличия любого `recommendation_feedback` больше не считается
+отрицательным сигналом.
 
 Feature-level demotion разрешён только когда есть минимум три независимых отрицательных source-title с общим конкретным feature. Demotion:
 
@@ -88,6 +91,40 @@ Feature-level demotion разрешён только когда есть мин�
 - хранится/вычисляется приватно и не раскрывается как публичная причина.
 
 Положительная новая активность может постепенно компенсировать старый demotion.
+
+## Явный положительный feedback и объяснимость
+
+`catalog_title_user_states.recommendation_feedback` остаётся единственным
+взаимоисключающим current-state contract для recommendation feedback. Помимо
+`not_interested` и `blacklisted` он принимает additive stable value
+`more_like_this`.
+
+`more_like_this` означает явный положительный intent:
+
+- отмеченный тайтл исключается из самой выдачи как уже обработанный, но
+  становится bounded source-title для поиска релевантных кандидатов;
+- сигнал получает semantic timestamp, recency decay и общий source confidence
+  cap наравне с другими evidence;
+- сигнал не участвует в negative feature demotion, hidden-library counts,
+  release suppression или notification suppression;
+- новое действие заменяет прежний recommendation feedback для той же пары
+  user/title, а undo очищает текущий feedback существующей optimistic-version
+  boundary;
+- значение разрешено в owner-only user-state/library API как additive enum
+  value и остаётся внутри authenticated `private, no-store` ответов.
+
+Карточка рекомендации явно обозначает локализованный блок «Почему это
+показано» и показывает только bounded broad reason labels. Для
+`more_like_this` используется честная причина уровня «На основе отметок
+„Больше похожего“». Нельзя раскрывать исходный private title, точный progress,
+название личной коллекции/тега, внутренние веса, algorithm/provider details
+или утверждать использование AI.
+
+Feedback control обязан объяснять эффект каждого действия до записи,
+сохранять server-side authorization, rate limit, CSRF/Livewire boundary,
+per-action loading state, success/error announcement и undo. Отдельная
+feedback-event table, impression analytics и скрытый behavioral tracking в
+эту границу не входят.
 
 ## Candidate scoring
 

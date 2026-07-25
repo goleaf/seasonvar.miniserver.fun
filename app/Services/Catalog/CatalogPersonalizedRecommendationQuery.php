@@ -7,6 +7,7 @@ namespace App\Services\Catalog;
 use App\DTOs\CatalogPersonalizedCandidateSet;
 use App\DTOs\CatalogRecommendationContext;
 use App\Enums\CatalogPersonalizationConfidence;
+use App\Enums\CatalogRecommendationFeedback;
 use App\Enums\CatalogRecommendationReason;
 use App\Enums\CatalogRecommendationSource;
 use App\Enums\CatalogWatchStatus;
@@ -184,6 +185,23 @@ final class CatalogPersonalizedRecommendationQuery
     {
         $signals = [];
         $historyLimit = max(10, min(500, (int) config('recommendations.history_title_limit', 120)));
+
+        if (Schema::hasColumn('catalog_title_user_states', 'recommendation_feedback')) {
+            $feedbackTitleIds = $this->orderBySignalActivity(CatalogTitleUserState::query()
+                ->whereBelongsTo($user)
+                ->where('recommendation_feedback', CatalogRecommendationFeedback::MoreLikeThis->value), 'recommendation_feedback_updated_at')
+                ->limit(80)
+                ->pluck('catalog_title_id');
+
+            foreach ($feedbackTitleIds as $titleId) {
+                $this->rememberSignal($signals, (int) $titleId, [
+                    'weight' => (int) config('recommendations.personalized.feedback_weight', 180),
+                    'source' => CatalogRecommendationSource::UserFeedback,
+                    'reason' => CatalogRecommendationReason::BecausePositiveFeedback,
+                ]);
+            }
+        }
+
         $progress = EpisodeViewProgress::query()
             ->whereBelongsTo($user)
             ->where(function ($query): void {
@@ -318,11 +336,17 @@ final class CatalogPersonalizedRecommendationQuery
         if ($feedbackAvailable && $statusAvailable) {
             $negativeStates->where(function (Builder $query): void {
                 $query
-                    ->whereNotNull('recommendation_feedback')
+                    ->whereIn(
+                        'recommendation_feedback',
+                        CatalogRecommendationFeedback::negativeValues(),
+                    )
                     ->orWhere('watch_status', CatalogWatchStatus::Dropped->value);
             });
         } elseif ($feedbackAvailable) {
-            $negativeStates->whereNotNull('recommendation_feedback');
+            $negativeStates->whereIn(
+                'recommendation_feedback',
+                CatalogRecommendationFeedback::negativeValues(),
+            );
         } else {
             $negativeStates->where('watch_status', CatalogWatchStatus::Dropped->value);
         }

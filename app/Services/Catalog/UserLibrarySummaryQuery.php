@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Catalog;
 
 use App\DTOs\UserLibrarySummary;
+use App\Enums\CatalogRecommendationFeedback;
 use App\Models\CatalogTitleUserState;
 use App\Models\EpisodePlaybackMarker;
 use App\Models\EpisodeViewProgress;
@@ -80,7 +81,10 @@ final readonly class UserLibrarySummaryQuery
             })
             ->where(function ($state): void {
                 $state->whereNull('recommendation_feedback')
-                    ->orWhereNotIn('recommendation_feedback', ['not_interested', 'blacklisted']);
+                    ->orWhereNotIn(
+                        'recommendation_feedback',
+                        CatalogRecommendationFeedback::negativeValues(),
+                    );
             });
         $updateEligibleCount = (clone $updatesBase)->count();
         $withUpdates = $this->personalUpdates->constrain(clone $updatesBase, $user, true)->count();

@@ -6,6 +6,7 @@ namespace App\Enums;
 
 enum CatalogRecommendationReason: string
 {
+    case BecausePositiveFeedback = 'because_positive_feedback';
     case BecauseHistory = 'because_history';
     case BecauseWatchlist = 'because_watchlist';
     case BecauseStatus = 'because_status';

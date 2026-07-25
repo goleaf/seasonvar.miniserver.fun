@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Web;
 
 use App\DTOs\UserLibraryFilters;
+use App\Enums\CatalogRecommendationFeedback;
 use App\Livewire\Library\UserLibraryPage;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleUserState;
@@ -17,6 +18,7 @@ use App\Services\Catalog\UserLibraryQuery;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -173,6 +175,93 @@ final class UserLibraryPageTest extends TestCase
         $this->assertSame(1, $card?->getAttribute('published_media_count'));
         $this->assertStringContainsString('select season_id, count(*) as aggregate_count from episodes', $sql);
         $this->assertStringNotContainsString('select count(*) from seasons where catalog_titles.id = seasons.catalog_title_id', $sql);
+    }
+
+    public function test_hidden_recommendations_only_include_negative_feedback(): void
+    {
+        $user = User::factory()->create();
+        $positive = CatalogTitle::factory()->create(['title' => 'Положительный сигнал']);
+        $negative = CatalogTitle::factory()->create(['title' => 'Скрытый сигнал']);
+
+        foreach ([
+            [$positive, CatalogRecommendationFeedback::MoreLikeThis],
+            [$negative, CatalogRecommendationFeedback::NotInterested],
+        ] as [$title, $feedback]) {
+            CatalogTitleUserState::query()->create([
+                'user_id' => $user->id,
+                'catalog_title_id' => $title->id,
+                'recommendation_feedback' => $feedback,
+                'recommendation_feedback_updated_at' => now(),
+            ]);
+        }
+
+        $query = app(UserLibraryQuery::class);
+        $items = $query->recommendationFeedback($user);
+
+        $this->assertSame(1, $query->recommendationFeedbackCount($user));
+        $this->assertSame([$negative->id], $items->pluck('catalog_title_id')->all());
+    }
+
+    public function test_feedback_index_covers_exact_type_activity_order_without_a_duplicate_index(): void
+    {
+        $index = collect(Schema::getIndexes('catalog_title_user_states'))
+            ->firstWhere('name', 'catalog_user_state_recommendation_feedback_idx');
+
+        $this->assertIsArray($index);
+        $this->assertSame([
+            'user_id',
+            'recommendation_feedback',
+            'recommendation_feedback_updated_at',
+            'id',
+            'catalog_title_id',
+        ], $index['columns']);
+    }
+
+    public function test_feedback_activity_query_uses_the_covering_index_without_a_temp_sort(): void
+    {
+        $plan = collect(DB::select(<<<'SQL'
+            EXPLAIN QUERY PLAN
+            SELECT catalog_title_id
+            FROM catalog_title_user_states
+            WHERE user_id = 1
+              AND recommendation_feedback = 'more_like_this'
+            ORDER BY recommendation_feedback_updated_at DESC, id DESC
+            LIMIT 80
+            SQL))
+            ->pluck('detail')
+            ->implode("\n");
+
+        $this->assertStringContainsString(
+            'catalog_user_state_recommendation_feedback_idx',
+            $plan,
+        );
+        $this->assertStringNotContainsString('TEMP B-TREE', $plan);
+    }
+
+    public function test_feedback_activity_index_migration_is_reversible(): void
+    {
+        $migration = require database_path(
+            'migrations/2026_07_26_120000_replace_recommendation_feedback_index_for_activity_order.php',
+        );
+
+        $migration->down();
+        $legacyIndex = collect(Schema::getIndexes('catalog_title_user_states'))
+            ->firstWhere('name', 'catalog_user_state_recommendation_feedback_idx');
+        $this->assertSame(
+            ['user_id', 'recommendation_feedback', 'catalog_title_id'],
+            $legacyIndex['columns'],
+        );
+
+        $migration->up();
+        $activityIndex = collect(Schema::getIndexes('catalog_title_user_states'))
+            ->firstWhere('name', 'catalog_user_state_recommendation_feedback_idx');
+        $this->assertSame([
+            'user_id',
+            'recommendation_feedback',
+            'recommendation_feedback_updated_at',
+            'id',
+            'catalog_title_id',
+        ], $activityIndex['columns']);
     }
 
     public function test_continue_watching_and_history_are_owner_scoped_and_history_actions_are_safe(): void

@@ -6,6 +6,7 @@ namespace App\Enums;
 
 enum CatalogRecommendationSource: string
 {
+    case UserFeedback = 'user_feedback';
     case UserHistory = 'user_history';
     case UserWatchlist = 'user_watchlist';
     case UserStatuses = 'user_statuses';

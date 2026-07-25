@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Catalog;
 
 use App\DTOs\CatalogRecommendationContext;
+use App\Enums\CatalogRecommendationFeedback;
 use App\Enums\CatalogRecommendationType;
 use App\Enums\CatalogWatchStatus;
 use App\Models\CatalogTitleUserState;
@@ -25,7 +26,10 @@ final class CatalogRecommendationExclusionService
         if ($user !== null && Schema::hasColumn('catalog_title_user_states', 'recommendation_feedback')) {
             $ids = $ids->merge(CatalogTitleUserState::query()
                 ->whereBelongsTo($user)
-                ->whereNotNull('recommendation_feedback')
+                ->whereIn(
+                    'recommendation_feedback',
+                    CatalogRecommendationFeedback::values(),
+                )
                 ->limit(5_000)
                 ->pluck('catalog_title_id'));
         }

@@ -34,13 +34,18 @@
     </div>
 
     @if ($reasonLabels !== [])
-        <div class="mt-2 flex flex-wrap gap-1.5">
-            @foreach (array_slice($reasonLabels, 0, 4) as $reasonLabel)
-                <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-700">
-                    <x-ui.icon name="fa-solid fa-check text-[0.8em]" />
-                    <span>{{ $reasonLabel }}</span>
-                </span>
-            @endforeach
+        <div class="mt-2" aria-label="{{ __('recommendations.page.why') }}">
+            <p class="text-xs font-black uppercase tracking-wide text-slate-500">
+                {{ __('recommendations.page.why') }}
+            </p>
+            <div class="mt-1.5 flex flex-wrap gap-1.5">
+                @foreach (array_slice($reasonLabels, 0, 4) as $reasonLabel)
+                    <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-700">
+                        <x-ui.icon name="fa-solid fa-check text-[0.8em]" />
+                        <span>{{ $reasonLabel }}</span>
+                    </span>
+                @endforeach
+            </div>
         </div>
     @endif
 

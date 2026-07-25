@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Api\V1;
 
+use App\Enums\CatalogRecommendationFeedback;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleUserState;
 use App\Models\User;
@@ -213,6 +214,34 @@ final class UserTitleStateTest extends TestCase
             ->assertNotFound();
         $this->putJson("/api/v1/me/watchlist/{$hiddenTitle->slug}")
             ->assertNotFound();
+    }
+
+    public function test_owner_state_and_openapi_expose_the_additive_more_like_this_value_privately(): void
+    {
+        $user = User::factory()->create();
+        $title = CatalogTitle::factory()->create(['slug' => 'positive-recommendation-feedback']);
+        CatalogTitleUserState::query()->create([
+            'user_id' => $user->id,
+            'catalog_title_id' => $title->id,
+            'recommendation_feedback' => CatalogRecommendationFeedback::MoreLikeThis,
+            'recommendation_feedback_updated_at' => now(),
+        ]);
+        Sanctum::actingAs($user, ['mobile:read']);
+
+        $this->getJson("/api/v1/me/titles/{$title->slug}/state")
+            ->assertOk()
+            ->assertHeader('Cache-Control', 'no-store, private')
+            ->assertHeaderMissing('ETag')
+            ->assertJsonPath('data.recommendation_feedback', 'more_like_this');
+
+        $enum = $this->getJson('/api/openapi.json')
+            ->assertOk()
+            ->json('components.schemas.UserTitleState.properties.recommendation_feedback.enum');
+
+        $this->assertContains('more_like_this', $enum);
+        $this->assertContains('not_interested', $enum);
+        $this->assertContains('blacklisted', $enum);
+        $this->assertContains(null, $enum);
     }
 
     public function test_openapi_describes_title_state_and_desired_state_mutations(): void

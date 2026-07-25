@@ -8,9 +8,11 @@ use App\Jobs\RefreshSeasonvarCatalogTitle;
 use App\Livewire\CatalogTitleDetail;
 use App\Livewire\CatalogTitlePlayer;
 use App\Models\CatalogTitle;
+use App\Models\CatalogTitleUserState;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\Season;
+use App\Models\User;
 use App\Services\Seasonvar\CatalogTitleRefreshStateStore;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -157,6 +159,62 @@ class CatalogTitleLiveRefreshTest extends TestCase
         }
 
         Queue::assertNothingPushed();
+    }
+
+    public function test_verified_user_can_save_and_undo_more_like_this_from_title_recommendations(): void
+    {
+        $user = User::factory()->create();
+        $source = $this->refreshableTitle();
+        $candidate = CatalogTitle::factory()->create(['title' => 'Положительная рекомендация']);
+        LicensedMedia::factory()->for($candidate)->create([
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(CatalogTitleDetail::class, ['catalogTitle' => $source])
+            ->call('setRecommendationFeedback', $candidate->id, 'more_like_this')
+            ->assertHasNoErrors()
+            ->assertSet('lastRecommendationFeedbackTitleId', $candidate->id)
+            ->assertSet('recommendationNotice', 'Будем чаще учитывать похожие сериалы в персональных рекомендациях.')
+            ->call('undoRecommendationFeedback')
+            ->assertHasNoErrors()
+            ->assertSet('lastRecommendationFeedbackTitleId', null);
+
+        $state = CatalogTitleUserState::query()
+            ->whereBelongsTo($user)
+            ->whereBelongsTo($candidate)
+            ->sole();
+
+        $this->assertNull($state->recommendation_feedback);
+        $this->assertSame(2, $state->recommendationFeedbackVersion());
+    }
+
+    public function test_recommendation_feedback_rejects_guest_invalid_current_and_invisible_targets(): void
+    {
+        $source = $this->refreshableTitle();
+        $candidate = CatalogTitle::factory()->create();
+        $invisible = CatalogTitle::factory()->create([
+            'is_published' => false,
+            'publication_status' => 'draft',
+        ]);
+
+        Livewire::test(CatalogTitleDetail::class, ['catalogTitle' => $source])
+            ->call('setRecommendationFeedback', $candidate->id, 'more_like_this')
+            ->assertRedirect(route('login'));
+
+        $user = User::factory()->create();
+        Livewire::actingAs($user)
+            ->test(CatalogTitleDetail::class, ['catalogTitle' => $source])
+            ->call('setRecommendationFeedback', $source->id, 'more_like_this')
+            ->assertHasErrors('recommendationFeedback');
+
+        Livewire::actingAs($user)
+            ->test(CatalogTitleDetail::class, ['catalogTitle' => $source])
+            ->call('setRecommendationFeedback', $invisible->id, 'more_like_this')
+            ->assertHasErrors('recommendationFeedback');
+
+        $this->assertFalse(CatalogTitleUserState::query()->whereBelongsTo($user)->exists());
     }
 
     public function test_player_refresh_event_reloads_new_releases_and_preserves_a_valid_selection(): void

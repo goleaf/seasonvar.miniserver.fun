@@ -87,8 +87,9 @@ final class CatalogTitleUserDataMerger
                         'recommendation_feedback',
                         'recommendation_feedback_updated_at',
                         [
-                            CatalogRecommendationFeedback::NotInterested->value => 1,
-                            CatalogRecommendationFeedback::Blacklisted->value => 2,
+                            CatalogRecommendationFeedback::MoreLikeThis->value => 1,
+                            CatalogRecommendationFeedback::NotInterested->value => 2,
+                            CatalogRecommendationFeedback::Blacklisted->value => 3,
                         ],
                     );
                     $status = $this->preferredSignal(

@@ -3412,6 +3412,7 @@
                             "null"
                         ],
                         "enum": [
+                            "more_like_this",
                             "not_interested",
                             "blacklisted",
                             null
@@ -3585,6 +3586,7 @@
                                     "null"
                                 ],
                                 "enum": [
+                                    "more_like_this",
                                     "not_interested",
                                     "blacklisted",
                                     null

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Catalog;
 
+use App\Enums\CatalogRecommendationFeedback;
 use App\Enums\CatalogWatchStatus;
 use App\Models\CatalogTitleUserState;
 use App\Models\User;
@@ -36,7 +37,10 @@ final class CatalogPersonalNegativePreferenceBuilder
             ->whereBelongsTo($user)
             ->where(function (Builder $query) use ($columns): void {
                 if (in_array('recommendation_feedback', $columns, true)) {
-                    $query->whereNotNull('recommendation_feedback');
+                    $query->whereIn(
+                        'recommendation_feedback',
+                        CatalogRecommendationFeedback::negativeValues(),
+                    );
                 }
 
                 if (in_array('watch_status', $columns, true)) {
@@ -126,7 +130,7 @@ final class CatalogPersonalNegativePreferenceBuilder
     {
         $activities = [];
 
-        if ($state->getAttribute('recommendation_feedback') !== null) {
+        if ($this->recommendationFeedback($state)?->isNegative() === true) {
             $activities[] = $this->activity($state->getAttribute('recommendation_feedback_updated_at'));
         }
 
@@ -140,6 +144,15 @@ final class CatalogPersonalNegativePreferenceBuilder
         usort($activities, static fn (CarbonImmutable $left, CarbonImmutable $right): int => $right <=> $left);
 
         return $activities[0] ?? null;
+    }
+
+    private function recommendationFeedback(CatalogTitleUserState $state): ?CatalogRecommendationFeedback
+    {
+        $feedback = $state->getAttribute('recommendation_feedback');
+
+        return $feedback instanceof CatalogRecommendationFeedback
+            ? $feedback
+            : CatalogRecommendationFeedback::tryFrom((string) $feedback);
     }
 
     private function activity(mixed $value): ?CarbonImmutable

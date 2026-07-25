@@ -71,10 +71,10 @@ final class ReleaseCalendarNotificationService
                 ->where($subscriptionField, true)
                 ->whereDoesntHave('user.catalogTitleStates', fn ($state) => $state
                     ->where('catalog_title_id', $entry->catalog_title_id)
-                    ->whereIn('recommendation_feedback', [
-                        CatalogRecommendationFeedback::NotInterested->value,
-                        CatalogRecommendationFeedback::Blacklisted->value,
-                    ]));
+                    ->whereIn(
+                        'recommendation_feedback',
+                        CatalogRecommendationFeedback::negativeValues(),
+                    ));
             $recipient = (clone $subscriptions)->with('user:id,name')->first()?->user;
 
             if (! $recipient instanceof User

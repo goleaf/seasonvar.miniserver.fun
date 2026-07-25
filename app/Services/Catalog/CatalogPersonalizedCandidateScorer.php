@@ -132,6 +132,7 @@ final class CatalogPersonalizedCandidateScorer
     private function sourceForReason(CatalogRecommendationReason $reason): CatalogRecommendationSource
     {
         return match ($reason) {
+            CatalogRecommendationReason::BecausePositiveFeedback => CatalogRecommendationSource::UserFeedback,
             CatalogRecommendationReason::BecauseWatchlist => CatalogRecommendationSource::UserWatchlist,
             CatalogRecommendationReason::BecauseStatus => CatalogRecommendationSource::UserStatuses,
             CatalogRecommendationReason::BecauseCollection => CatalogRecommendationSource::UserCollections,

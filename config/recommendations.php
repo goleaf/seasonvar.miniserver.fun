@@ -51,6 +51,7 @@ return [
         'probe_size' => 8,
     ],
     'personalized' => [
+        'feedback_weight' => 180,
         'history_weight' => 120,
         'completed_weight' => 160,
         'watchlist_weight' => 140,
@@ -69,6 +70,7 @@ return [
         'profile_high_threshold' => 600,
         'recency_half_life_days' => 180,
         'legacy_recency_factor' => 0.5,
+        'feedback_weight' => 180,
         'negative_minimum_sources' => 3,
         'negative_feature_cap' => 120,
         'negative_total_cap' => 240,

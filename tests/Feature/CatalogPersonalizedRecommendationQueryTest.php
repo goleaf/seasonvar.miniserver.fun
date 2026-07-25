@@ -186,6 +186,34 @@ final class CatalogPersonalizedRecommendationQueryTest extends TestCase
         $this->assertNotContains($dropped->id, $ids);
     }
 
+    public function test_more_like_this_uses_the_marked_title_as_a_positive_source_without_returning_it(): void
+    {
+        $user = User::factory()->create();
+        $source = CatalogTitle::factory()->create();
+        $candidate = $this->watchableTitle();
+        CatalogTitleUserState::query()->create([
+            'user_id' => $user->id,
+            'catalog_title_id' => $source->id,
+            'recommendation_feedback' => CatalogRecommendationFeedback::MoreLikeThis,
+            'recommendation_feedback_updated_at' => now(),
+        ]);
+        $this->recommend($source, $candidate, 1_500);
+
+        $set = app(CatalogPersonalizedRecommendationQuery::class)->candidateSet(
+            $this->context($user),
+            [],
+        );
+
+        $this->assertSame([$source->id], $set->sourceTitleIds);
+        $this->assertSame([$candidate->id], array_column($set->candidates, 'id'));
+        $this->assertNotContains($source->id, array_column($set->candidates, 'id'));
+        $this->assertSame(
+            CatalogRecommendationSource::UserFeedback->value,
+            $set->candidates[0]['source'] ?? null,
+        );
+        $this->assertSame('because_positive_feedback', $set->candidates[0]['reason'] ?? null);
+    }
+
     private function source(User $user, CatalogWatchStatus $status, ?int $rating = null): CatalogTitle
     {
         $title = CatalogTitle::factory()->create();
