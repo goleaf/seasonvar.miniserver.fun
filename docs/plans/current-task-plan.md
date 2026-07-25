@@ -7720,7 +7720,7 @@ production-runtime files не входят в Task 55.
 
 ## Task 59 — grouped summary public-каталога подборок
 
-Статус: `implementation_verified_delivery_pending`.
+Статус: `implementation_committed_push_unresolved_authentication`.
 
 Дата начала: 26.07.2026.
 
@@ -7805,7 +7805,7 @@ environment, queue, scheduler, JavaScript/CSS и production DML не плани�
 | Query plan/timing/count | `completed` | First read 211,38→138,83 ms; summary 180,78→111,48 ms; warm median ~117 ms / 6 statements; covering-index EXPLAIN |
 | Focused/static/docs/browser verification | `completed_with_independent_full_suite_blocker` | 71/457 collection, 21/96 adjacent discovery, Pint, loader PHPStan, docs, build and Playwright 2/2 GREEN; full process hit known GD 256 MB limit, exact test 1/12 GREEN |
 | README/CHANGELOG/final scan | `completed` | Russian visitor/technical entries added; requirements reread and active cover/correlated/Blade/debug duplicates scanned |
-| Commit/push in `main` | `pending_shared_index_guard` | Isolated Task 59 index; external push rejection honest |
+| Commit/push in `main` | `completed_commit_unresolved_push_authentication` | Exact nine-file Task 59 commit `5bfbd83` создан в `main` штатными hooks; `git push origin main` отклонён до передачи данных: `could not read Username for 'https://github.com'` |
 
 ### Execution checklist
 
@@ -7818,5 +7818,7 @@ environment, queue, scheduler, JavaScript/CSS и production DML не плани�
 7. `[completed]` Pint/PHPStan/docs/build/browser compatibility checks.
 8. `[completed]` Update README, Russian CHANGELOG and compliance evidence.
 9. `[completed]` Final requirements/legacy/diff audit.
-10. `[pending]` Exact Task 59 commit in `main`, then configured push.
+10. `[completed_with_unresolved_push]` Exact Task 59 commit `5bfbd83`
+    создан в `main`; configured HTTPS push отклонён из-за отсутствующих
+    credentials, без обхода hooks и без передачи данных.
 

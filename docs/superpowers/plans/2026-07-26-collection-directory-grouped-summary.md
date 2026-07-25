@@ -18,7 +18,7 @@ query. Остальные summary consumers не меняются.
 Livewire `4.3.3`, SQLite, PHPUnit `12.5.32`, Pint `1.29.3`, Tailwind CSS
 `4.3.2`, Vite `8.1.4`.
 
-**Plan status:** `implementation_verified_delivery_pending`.
+**Plan status:** `implementation_committed_push_unresolved_authentication`.
 
 ---
 

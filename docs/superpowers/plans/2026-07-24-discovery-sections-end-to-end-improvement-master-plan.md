@@ -10,13 +10,14 @@
 
 **Plan status:** `approved_for_inline_execution`; это planning-only change set. Код, схема, данные, cache, queue, scheduler, environment и production services этим документом не изменяются.
 
-**Execution status 25.07.2026:** Tasks 1, 3 и 4 и discovery-only часть
+**Execution status 26.07.2026:** Tasks 1, 3 и 4 и discovery-only часть
 Task 2 реализованы и проверены локально в system Task 40. Пять ожидаемых RED
 отказов стали GREEN; route, privacy, query-count и documentation gates прошли.
-Collection query budget из Task 2 остаётся в Task 39, потому что
-`CatalogCollectionQuery.php` уже занят отдельным незакоммиченным change set.
-Tasks 5+ и production activation не начинались. Commit/push остаётся
-`unresolved_shared_worktree`.
+Task 7 two-phase ID pagination реализована в system Task 51, а Task 59
+завершила вторую фазу: bounded correlated counts заменены одним grouped
+aggregate по exact page IDs; collection presentation остаётся полностью
+text-only.
+Tasks 5–6 и 8+ и production activation не начинались.
 
 ## Global Constraints
 
