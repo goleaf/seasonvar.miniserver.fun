@@ -17,6 +17,107 @@ final class PublicPageCacheWarmerTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_homepage_warmer_requests_only_canonical_home_routes(): void
+    {
+        config([
+            'app.url' => 'https://seasonvar.test',
+            'cache-architecture.page_cache.warming_enabled' => true,
+            'cache-architecture.page_cache.warm_base_url' => 'https://seasonvar.test',
+            'cache-architecture.warming.full_request_delay_milliseconds' => 0,
+            'catalog-collections.supported_locales' => ['ru', 'en'],
+        ]);
+        $manifest = app(PublicPageCacheManifest::class);
+        $manifest->record('/stats');
+        $manifest->record('/titles?page=2');
+        $requested = [];
+        Http::preventStrayRequests();
+        Http::fake(function (Request $request) use (&$requested) {
+            $requested[] = $request->url();
+            $this->assertTrue($request->hasHeader('X-Seasonvar-Cache-Warm', '1'));
+            $this->assertTrue($request->hasHeader('User-Agent', 'Seasonvar-Cache-Warmer/1.0'));
+
+            return Http::response('<html></html>');
+        });
+
+        $result = app(PublicPageCacheWarmer::class)->warmHomepages();
+
+        $this->assertSame([
+            'https://seasonvar.test/',
+            'https://seasonvar.test/ru',
+            'https://seasonvar.test/en',
+        ], $requested);
+        $this->assertSame(3, $result['attempted']);
+        $this->assertSame(3, $result['succeeded']);
+        $this->assertSame(0, $result['failed']);
+        $this->assertSame(0, $result['skipped']);
+        $this->assertFalse($result['limited']);
+    }
+
+    public function test_homepage_warmer_stops_before_next_locale_after_import_safe_budget(): void
+    {
+        config([
+            'app.url' => 'https://seasonvar.test',
+            'cache-architecture.page_cache.warming_enabled' => true,
+            'cache-architecture.page_cache.warm_base_url' => 'https://seasonvar.test',
+            'cache-architecture.page_cache.import_safe_homepage_warm_budget_seconds' => 1,
+            'cache-architecture.page_cache.warm_retry_times' => 1,
+            'cache-architecture.warming.full_request_delay_milliseconds' => 0,
+            'catalog-collections.supported_locales' => ['ru', 'en'],
+        ]);
+        Http::preventStrayRequests();
+        Http::fake(function () {
+            usleep(1_050_000);
+
+            return Http::response('<html></html>');
+        });
+
+        $result = app(PublicPageCacheWarmer::class)->warmHomepages();
+
+        $this->assertSame(1, $result['attempted']);
+        $this->assertSame(1, $result['succeeded']);
+        $this->assertSame(2, $result['skipped']);
+        $this->assertTrue($result['limited']);
+        Http::assertSentCount(1);
+    }
+
+    public function test_homepage_warmer_deduplicates_configured_locales(): void
+    {
+        config([
+            'app.url' => 'https://seasonvar.test',
+            'cache-architecture.page_cache.warming_enabled' => true,
+            'cache-architecture.page_cache.warm_base_url' => 'https://seasonvar.test',
+            'cache-architecture.warming.full_request_delay_milliseconds' => 0,
+            'catalog-collections.supported_locales' => ['ru', 'ru', 'en'],
+        ]);
+        Http::preventStrayRequests();
+        Http::fake(fn () => Http::response('<html></html>'));
+
+        $result = app(PublicPageCacheWarmer::class)->warmHomepages();
+
+        $this->assertSame(3, $result['attempted']);
+        $this->assertSame(3, $result['succeeded']);
+        Http::assertSentCount(3);
+    }
+
+    public function test_homepage_warmer_honors_the_existing_disabled_boundary(): void
+    {
+        config(['cache-architecture.page_cache.warming_enabled' => false]);
+        Http::preventStrayRequests();
+        Http::fake();
+
+        $result = app(PublicPageCacheWarmer::class)->warmHomepages();
+
+        $this->assertSame([
+            'attempted' => 0,
+            'succeeded' => 0,
+            'failed' => 0,
+            'skipped' => 0,
+            'limited' => false,
+            'errors' => [],
+        ], $result);
+        Http::assertNothingSent();
+    }
+
     public function test_manifest_keeps_only_recent_normalized_public_urls(): void
     {
         config(['cache-architecture.page_cache.manifest_limit' => 2]);
@@ -85,6 +186,21 @@ final class PublicPageCacheWarmerTest extends TestCase
         $this->expectException(LogicException::class);
 
         app(PublicPageCacheWarmer::class)->warm();
+    }
+
+    public function test_homepage_warmer_rejects_a_base_url_from_another_origin(): void
+    {
+        config([
+            'app.url' => 'https://seasonvar.test',
+            'cache-architecture.page_cache.warming_enabled' => true,
+            'cache-architecture.page_cache.warm_base_url' => 'https://evil.test',
+        ]);
+        Http::preventStrayRequests();
+        Http::fake();
+
+        $this->expectException(LogicException::class);
+
+        app(PublicPageCacheWarmer::class)->warmHomepages();
     }
 
     public function test_manifest_rejects_network_path_urls(): void

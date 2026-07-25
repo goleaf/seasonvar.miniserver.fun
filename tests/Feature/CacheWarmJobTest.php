@@ -23,6 +23,7 @@ use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SyncQueue;
 use Illuminate\Support\Facades\Cache;
@@ -124,8 +125,22 @@ final class CacheWarmJobTest extends TestCase
 
     public function test_job_keeps_pending_intent_and_dispatches_one_delayed_tail_during_import(): void
     {
-        config(['cache-architecture.warming.full_import_pause_seconds' => 300]);
+        config([
+            'app.url' => 'https://seasonvar.test',
+            'cache-architecture.page_cache.warming_enabled' => true,
+            'cache-architecture.page_cache.warm_base_url' => 'https://seasonvar.test',
+            'cache-architecture.warming.full_import_pause_seconds' => 300,
+            'cache-architecture.warming.full_request_delay_milliseconds' => 0,
+            'catalog-collections.supported_locales' => ['ru', 'en'],
+        ]);
         Queue::fake();
+        $requested = [];
+        Http::preventStrayRequests();
+        Http::fake(function (Request $request) use (&$requested) {
+            $requested[] = $request->url();
+
+            return Http::response('<html></html>');
+        });
         SeasonvarImportRun::query()->create([
             'mode' => 'all',
             'status' => 'running',
@@ -140,6 +155,11 @@ final class CacheWarmJobTest extends TestCase
         $this->assertTrue($work->refresh);
         $this->assertSame([41], $work->titleIds);
         $this->assertNull(app(CacheWarmingState::class)->read());
+        $this->assertSame([
+            'https://seasonvar.test/',
+            'https://seasonvar.test/ru',
+            'https://seasonvar.test/en',
+        ], $requested);
         Queue::assertPushed(
             WarmCatalogCaches::class,
             function (WarmCatalogCaches $job): bool {
@@ -150,6 +170,54 @@ final class CacheWarmJobTest extends TestCase
                 return $job->delay->getTimestamp() === now()->addSeconds(300)->getTimestamp();
             },
         );
+        Queue::assertPushed(WarmCatalogCaches::class, 1);
+    }
+
+    public function test_homepage_response_warm_does_not_publish_full_warm_state(): void
+    {
+        config([
+            'app.url' => 'https://seasonvar.test',
+            'cache-architecture.page_cache.warming_enabled' => true,
+            'cache-architecture.page_cache.warm_base_url' => 'https://seasonvar.test',
+            'cache-architecture.warming.full_request_delay_milliseconds' => 0,
+            'catalog-collections.supported_locales' => ['ru', 'en'],
+        ]);
+        Http::preventStrayRequests();
+        Http::fake(fn () => Http::response('<html></html>'));
+
+        $result = app(CatalogCacheWarmer::class)->warmHomepageResponses();
+
+        $this->assertSame(3, $result['attempted']);
+        $this->assertSame(3, $result['succeeded']);
+        $this->assertSame(0, $result['failed']);
+        $this->assertNull(app(CacheWarmingState::class)->read());
+        Http::assertSentCount(3);
+    }
+
+    public function test_active_import_keeps_pending_intent_when_page_warming_is_disabled(): void
+    {
+        config([
+            'cache-architecture.page_cache.warming_enabled' => false,
+            'cache-architecture.warming.full_import_pause_seconds' => 300,
+        ]);
+        Queue::fake();
+        Http::preventStrayRequests();
+        Http::fake();
+        SeasonvarImportRun::query()->create([
+            'mode' => 'all',
+            'status' => 'running',
+        ]);
+        $store = app(CatalogCacheWarmRequestStore::class);
+        $store->request([41], refresh: true);
+
+        $this->app->call([new WarmCatalogCaches, 'handle']);
+
+        $work = $store->claim(10);
+        $this->assertNotNull($work);
+        $this->assertTrue($work->refresh);
+        $this->assertSame([41], $work->titleIds);
+        $this->assertNull(app(CacheWarmingState::class)->read());
+        Http::assertNothingSent();
         Queue::assertPushed(WarmCatalogCaches::class, 1);
     }
 

@@ -122,6 +122,40 @@ final class CatalogCacheWarmer
         }
     }
 
+    /**
+     * @return array{
+     *     attempted: int,
+     *     succeeded: int,
+     *     failed: int,
+     *     skipped: int,
+     *     limited: bool,
+     *     errors: list<array{fingerprint: string, status: int|null, exception: string|null}>
+     * }
+     */
+    public function warmHomepageResponses(): array
+    {
+        $started = hrtime(true);
+        $result = $this->pages->warmHomepages();
+
+        $this->telemetry->duration(
+            CacheDomain::Operational,
+            'warming-homepage',
+            (int) ((hrtime(true) - $started) / 1_000_000),
+        );
+        $this->telemetry->increment(
+            CacheDomain::Operational,
+            'warming-page-failure',
+            $result['failed'],
+        );
+        $this->telemetry->increment(
+            CacheDomain::Operational,
+            'warming-page-skipped',
+            $result['skipped'],
+        );
+
+        return $result;
+    }
+
     public function titleBatchLimit(): int
     {
         $configured = max(1, (int) config('cache-architecture.warming.request_batch_title_limit', 250));

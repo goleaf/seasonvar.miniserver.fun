@@ -17,6 +17,7 @@ use App\Models\SeasonvarImportRun;
 use App\Models\SeasonvarImportTitleGroup;
 use App\Services\Api\V1\Sync\CatalogSyncChangePublisher;
 use App\Services\Catalog\CatalogCacheInvalidator;
+use App\Services\ReleaseCalendar\ReleaseCalendarCacheInvalidator;
 use App\Services\Seasonvar\CatalogTitleRefreshStateStore;
 use App\Services\Seasonvar\SeasonvarCatalogImporter;
 use App\Services\Seasonvar\SeasonvarCatalogParser;
@@ -84,6 +85,7 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
         CatalogTitleRefreshStateStore $refreshStates,
         SeasonvarImportRunRecorder $runs,
         CatalogCacheInvalidator $cacheInvalidator,
+        ReleaseCalendarCacheInvalidator $releaseCalendarCache,
         CatalogSyncChangePublisher $syncChanges,
         SeasonvarImportGroupKey $groupKeys,
         SeasonvarUrl $urls,
@@ -191,22 +193,36 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
                 ? $manifests->fromCatalog($catalogTitle)
                 : new SeasonvarTitleManifest([], [], []);
             $media = $this->checkpointedMedia($validRows);
+            $visitorRun = $this->isVisitorRun($group->run);
 
             foreach ($validRows as $item) {
                 if ($item['row']->status === SeasonvarPreparedPageStatus::Applied) {
                     continue;
                 }
 
-                $result = $importer->applyPreparedPage(
-                    $item['row']->sourcePage,
-                    $item['prepared'],
+                $apply = function () use (
+                    $importer,
+                    $item,
                     $catalogTitle,
-                    $group->seasonvar_import_run_id,
-                    publishSyncChange: false,
-                    afterCatalogCommit: static function (CatalogTitle $committedTitle) use (&$catalogTitleForSync): void {
-                        $catalogTitleForSync = $committedTitle;
-                    },
-                );
+                    $group,
+                    &$catalogTitleForSync,
+                ): array {
+                    return $importer->applyPreparedPage(
+                        page: $item['row']->sourcePage,
+                        prepared: $item['prepared'],
+                        preferredCatalogTitle: $catalogTitle,
+                        importRunId: $group->seasonvar_import_run_id,
+                        publishSyncChange: false,
+                        afterCatalogCommit: static function (CatalogTitle $committedTitle) use (&$catalogTitleForSync): void {
+                            $catalogTitleForSync = $committedTitle;
+                        },
+                    );
+                };
+                $result = $visitorRun
+                    ? $apply()
+                    : $cacheInvalidator->deferPublicInvalidation(
+                        fn (): array => $releaseCalendarCache->deferPublicInvalidation($apply),
+                    );
                 $catalogTitle = $result['catalog_title'];
                 $catalogTitleForSync = $catalogTitle;
                 $media['attached'] += $result['media_attached'];
@@ -248,7 +264,6 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
                 $comparison,
                 $warningCount,
             );
-            $visitorRun = $this->isVisitorRun($group->run);
             $cacheInvalidator->importedTitleChanged(
                 (int) $catalogTitle->id,
                 warm: $visitorRun,

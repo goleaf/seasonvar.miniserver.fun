@@ -50,6 +50,8 @@ final class WarmCatalogCaches implements ShouldBeUniqueUntilProcessing, ShouldQu
         SeasonvarImportActivity $imports,
     ): void {
         if ($imports->active()) {
+            $warmer->warmHomepageResponses();
+
             self::dispatch()
                 ->delay(now()->addSeconds(max(30, (int) config(
                     'cache-architecture.warming.full_import_pause_seconds',

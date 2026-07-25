@@ -15,9 +15,13 @@ use App\Models\ReleaseScheduleEntry;
 use App\Models\Season;
 use App\Models\Source;
 use App\Models\SourcePage;
+use App\Services\ReleaseCalendar\ReleaseCalendarCacheInvalidator;
 use App\Services\Seasonvar\SeasonvarReleaseObservationSynchronizer;
+use App\Support\Cache\CacheDomain;
+use App\Support\Cache\CacheVersionRegistry;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use RuntimeException;
 use Tests\TestCase;
 
 final class SeasonvarReleaseObservationSynchronizerTest extends TestCase
@@ -166,6 +170,69 @@ final class SeasonvarReleaseObservationSynchronizerTest extends TestCase
         $this->assertSame(ReleaseScheduleStatus::Confirmed, $entry?->status);
         $this->assertSame('2026-07-21', $entry?->date_value?->toDateString());
         $this->assertNull($entry?->released_at);
+    }
+
+    public function test_full_import_scope_persists_observation_without_per_record_public_invalidation(): void
+    {
+        [$title, $season, , $sourcePage] = $this->catalogContext(
+            translationName: 'Coldfilm',
+            releaseStatusText: '19.07.2026 3 серия (Coldfilm) из 8',
+        );
+        $invalidator = app(ReleaseCalendarCacheInvalidator::class);
+        $versions = app(CacheVersionRegistry::class);
+        $before = [
+            'calendar' => $versions->version(CacheDomain::ReleaseCalendar),
+            'homepage' => $versions->version(CacheDomain::Homepage),
+            'sitemap' => $versions->version(CacheDomain::Sitemap),
+            'title_calendar' => $versions->version(CacheDomain::ReleaseCalendar, 'title:'.$title->id),
+            'title_detail' => $versions->version(CacheDomain::TitleDetail, 'title:'.$title->id),
+        ];
+
+        $entry = $invalidator->deferPublicInvalidation(
+            fn () => app(SeasonvarReleaseObservationSynchronizer::class)
+                ->synchronize($title, $season, $sourcePage),
+        );
+
+        $this->assertNotNull($entry);
+        $this->assertSame(1, ReleaseScheduleEntry::query()->count());
+        $this->assertSame($before['calendar'], $versions->version(CacheDomain::ReleaseCalendar));
+        $this->assertSame($before['homepage'], $versions->version(CacheDomain::Homepage));
+        $this->assertSame($before['sitemap'], $versions->version(CacheDomain::Sitemap));
+        $this->assertSame(
+            $before['title_calendar'],
+            $versions->version(CacheDomain::ReleaseCalendar, 'title:'.$title->id),
+        );
+        $this->assertSame(
+            $before['title_detail'],
+            $versions->version(CacheDomain::TitleDetail, 'title:'.$title->id),
+        );
+    }
+
+    public function test_full_import_scope_is_restored_after_an_exception(): void
+    {
+        [$title] = $this->catalogContext(
+            translationName: 'Coldfilm',
+            releaseStatusText: '19.07.2026 3 серия (Coldfilm) из 8',
+        );
+        $invalidator = app(ReleaseCalendarCacheInvalidator::class);
+        $versions = app(CacheVersionRegistry::class);
+
+        try {
+            $invalidator->deferPublicInvalidation(
+                static fn (): never => throw new RuntimeException('expected'),
+            );
+            $this->fail('Scoped callback must propagate its exception.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('expected', $exception->getMessage());
+        }
+
+        $homepageVersion = $versions->version(CacheDomain::Homepage);
+        $invalidator->scheduleChanged($title->id);
+
+        $this->assertGreaterThan(
+            $homepageVersion,
+            $versions->version(CacheDomain::Homepage),
+        );
     }
 
     public function test_a_portal_publication_upgrades_provider_precision_without_stale_date_fields(): void

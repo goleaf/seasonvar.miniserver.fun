@@ -84,6 +84,33 @@ final class CatalogCacheInvalidatorTest extends TestCase
         Queue::assertPushed(WarmCatalogCaches::class, 1);
     }
 
+    public function test_full_import_scope_coalesces_global_invalidation_but_keeps_scoped_title_invalidation(): void
+    {
+        config(['cache-architecture.warming.enabled' => true]);
+        Queue::fake();
+        $invalidator = app(CatalogCacheInvalidator::class);
+        $versions = app(CacheVersionRegistry::class);
+        $homepageVersion = $versions->version(CacheDomain::Homepage);
+        $collectionsVersion = $versions->version(CacheDomain::Collections);
+        $titleVersion = $versions->version(CacheDomain::TitleDetail, 'title:17');
+
+        $invalidator->deferPublicInvalidation(
+            function () use ($invalidator): void {
+                $invalidator->catalogChanged([17]);
+                $invalidator->importedTitleChanged(17, warm: false, invalidateCollections: false);
+            },
+        );
+
+        $this->assertSame($homepageVersion, $versions->version(CacheDomain::Homepage));
+        $this->assertSame($collectionsVersion, $versions->version(CacheDomain::Collections));
+        $this->assertGreaterThan(
+            $titleVersion,
+            $versions->version(CacheDomain::TitleDetail, 'title:17'),
+        );
+        $this->assertNull(app(CatalogCacheWarmRequestStore::class)->claim(10));
+        Queue::assertNothingPushed();
+    }
+
     public function test_rolled_back_invalidation_does_not_create_warm_intent(): void
     {
         config(['cache-architecture.warming.enabled' => true]);

@@ -12,6 +12,7 @@ use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Models\SeasonvarImportRun;
 use App\Models\SourcePage;
+use App\Services\Catalog\CatalogCacheInvalidator;
 use App\Services\Catalog\CatalogMetadataDeduplicator;
 use App\Services\Catalog\CatalogRecommendationDirtyTitleTracker;
 use App\Services\Catalog\CatalogRecommendationSignalPruner;
@@ -21,6 +22,7 @@ use App\Services\Media\ExternalMediaMetadata;
 use App\Services\Media\LicensedMediaFileSizeBackfillBudget;
 use App\Services\Media\LicensedMediaFileSizeBacklog;
 use App\Services\Media\MediaSourceHealthManager;
+use App\Services\ReleaseCalendar\ReleaseCalendarCacheInvalidator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -58,6 +60,8 @@ class SeasonvarImportPipeline
         private readonly SeasonvarImportRunRecorder $runRecorder,
         private readonly ContentRequestImportRunLinker $contentRequests,
         private readonly SeasonvarImportEventRecorder $eventRecorder,
+        private readonly ReleaseCalendarCacheInvalidator $releaseCalendarCache,
+        private readonly CatalogCacheInvalidator $catalogCache,
     ) {}
 
     /**
@@ -782,12 +786,16 @@ class SeasonvarImportPipeline
                 break;
             }
 
-            $chunkResult = $this->importer->parsePages(
-                pages: $pages,
-                progress: $progress,
-                force: $force,
-                importRunId: $run->id,
-                shouldStop: fn (): bool => $this->stopRequested,
+            $chunkResult = $this->catalogCache->deferPublicInvalidation(
+                fn (): array => $this->releaseCalendarCache->deferPublicInvalidation(
+                    fn (): array => $this->importer->parsePages(
+                        pages: $pages,
+                        progress: $progress,
+                        force: $force,
+                        importRunId: $run->id,
+                        shouldStop: fn (): bool => $this->stopRequested,
+                    ),
+                ),
             );
             $selected += $chunkResult['selected'];
             $chunkCounters = [

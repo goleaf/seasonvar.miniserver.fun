@@ -44,14 +44,7 @@ final class PublicPageCacheWarmer
     public function warm(iterable $titleIds = []): array
     {
         if (! (bool) config('cache-architecture.page_cache.warming_enabled', true)) {
-            return [
-                'attempted' => 0,
-                'succeeded' => 0,
-                'failed' => 0,
-                'skipped' => 0,
-                'limited' => false,
-                'errors' => [],
-            ];
+            return $this->emptyResult();
         }
 
         $baseUrl = $this->baseUrl();
@@ -78,6 +71,40 @@ final class PublicPageCacheWarmer
     }
 
     /**
+     * @return array{
+     *     attempted: int,
+     *     succeeded: int,
+     *     failed: int,
+     *     skipped: int,
+     *     limited: bool,
+     *     errors: list<array{fingerprint: string, status: int|null, exception: string|null}>
+     * }
+     */
+    public function warmHomepages(): array
+    {
+        if (! (bool) config('cache-architecture.page_cache.warming_enabled', true)) {
+            return $this->emptyResult();
+        }
+
+        $targets = collect($this->homepageUrls())
+            ->filter(fn (string $url): bool => str_starts_with($url, '/')
+                && ! str_starts_with($url, '//'))
+            ->unique()
+            ->values()
+            ->map(fn (string $relativeUrl): PublicCacheWarmTarget => new PublicCacheWarmTarget($relativeUrl));
+
+        return $this->executeTargets(
+            $targets,
+            failFast: false,
+            baseUrl: $this->baseUrl(),
+            budgetSeconds: max(1, (int) config(
+                'cache-architecture.page_cache.import_safe_homepage_warm_budget_seconds',
+                30,
+            )),
+        );
+    }
+
+    /**
      * @param  iterable<array-key, PublicCacheWarmTarget>  $targets
      * @return array{
      *     attempted: int,
@@ -91,14 +118,7 @@ final class PublicPageCacheWarmer
     public function warmTargets(iterable $targets): array
     {
         if (! (bool) config('cache-architecture.page_cache.warming_enabled', true)) {
-            return [
-                'attempted' => 0,
-                'succeeded' => 0,
-                'failed' => 0,
-                'skipped' => 0,
-                'limited' => false,
-                'errors' => [],
-            ];
+            return $this->emptyResult();
         }
 
         return $this->executeTargets($targets, failFast: false, baseUrl: $this->baseUrl());
@@ -108,11 +128,7 @@ final class PublicPageCacheWarmer
     private function criticalUrls(): array
     {
         return [
-            route('home', [], false),
-            ...collect((array) config('catalog-collections.supported_locales', []))
-                ->filter(fn (mixed $locale): bool => is_string($locale) && $locale !== '')
-                ->map(fn (string $locale): string => route('localized.home', ['locale' => $locale], false))
-                ->all(),
+            ...$this->homepageUrls(),
             route('stats', [], false),
             route('titles.index', [], false),
             ...collect(CatalogDirectoryRegistry::routeMap())
@@ -136,6 +152,18 @@ final class PublicPageCacheWarmer
                         'type' => $type->value,
                     ], false))
                     ->all())
+                ->all(),
+        ];
+    }
+
+    /** @return list<string> */
+    private function homepageUrls(): array
+    {
+        return [
+            route('home', [], false),
+            ...collect((array) config('catalog-collections.supported_locales', []))
+                ->filter(fn (mixed $locale): bool => is_string($locale) && $locale !== '')
+                ->map(fn (string $locale): string => route('localized.home', ['locale' => $locale], false))
                 ->all(),
         ];
     }
@@ -184,6 +212,28 @@ final class PublicPageCacheWarmer
         }
 
         return $configuredOrigin;
+    }
+
+    /**
+     * @return array{
+     *     attempted: int,
+     *     succeeded: int,
+     *     failed: int,
+     *     skipped: int,
+     *     limited: bool,
+     *     errors: list<array{fingerprint: string, status: int|null, exception: string|null}>
+     * }
+     */
+    private function emptyResult(): array
+    {
+        return [
+            'attempted' => 0,
+            'succeeded' => 0,
+            'failed' => 0,
+            'skipped' => 0,
+            'limited' => false,
+            'errors' => [],
+        ];
     }
 
     /**

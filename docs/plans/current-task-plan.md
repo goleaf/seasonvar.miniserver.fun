@@ -7718,6 +7718,172 @@ production-runtime files не входят в Task 55.
 | Commit/push in `main` | `unresolved` | Existing Task 55 commits remain in `main`; parallel Task 56 commit `ab55891` advanced HEAD during verification, а затем появились foreign Task 57/58 staged, unstaged и untracked изменения. Настоящий hardening commit изолирует ровно девять allowlisted Task 55 paths/section через alternate index; реальный mixed index и чужой working tree не входят в commit и сохраняются. The only doctor failure is the unchanged HTTPS credential mechanism, while exact canonical SSH read still returns `Permission denied (publickey)`. Strict clean-tree `pre-push` cannot run and no bypass is allowed |
 
 
+## Task 57 — import-safe response warm главной страницы
+
+Статус: `implementation_verified_delivery_pending`.
+
+Дата начала: 26.07.2026.
+
+Approved design:
+[`2026-07-26-homepage-import-safe-response-warm-design.md`](../superpowers/specs/2026-07-26-homepage-import-safe-response-warm-design.md).
+
+Implementation plan:
+[`2026-07-26-homepage-import-safe-response-warm.md`](../superpowers/plans/2026-07-26-homepage-import-safe-response-warm.md).
+
+### Цель и подтверждённая причина
+
+Устранить первый медленный visitor MISS после Vite/deploy fingerprint во
+время активного полного импорта, не возвращая тяжёлый stats/facets warm и не
+меняя семантику versioned cache.
+
+Read-only evidence разделило две причины:
+
+- `seasonvar-import` worker запущены до Task 56 и как долгоживущие процессы
+  продолжили выполнять старый invalidation code до graceful restart;
+- новый Vite manifest создаёт новый public response-cache namespace, но
+  active-import ветка `WarmCatalogCaches` откладывает весь self-warm.
+
+После первой GREEN реализации и graceful worker restart live samples
+выявили третий путь: `Homepage`, `ReleaseCalendar` и `Sitemap` получили один
+`lastModified`, тогда как `Collections` не менялся.
+`ReleaseCalendarCacheInvalidator::scheduleChanged()` напрямую bump-ит три
+public domains из release observation/episode/media observers на каждой
+записи полного импорта и поэтому обходит общую invalidation telemetry.
+
+После release-scope worker rotation второй live interval показал
+синхронные `Homepage`/`ReleaseCalendar`/`Sitemap`/`Collections` bumps и
+рост общей invalidation telemetry. Точный import caller:
+`CatalogRelationSyncer::afterTagChanges()` →
+`TagCacheInvalidator::publicChanged()` →
+`CatalogCacheInvalidator::catalogChanged()` для каждой страницы с
+изменёнными тегами.
+
+Текущий direct builder не является постоянным bottleneck: RU/EN одинаково
+выполняют 57 queries примерно за `0,37 s`, safe uncached HTTP после data-cache
+занимает `0,508–0,560 s`, first cold — `1,269–1,329 s`, hot —
+`0,062–0,096 s`.
+
+### Утверждённое решение
+
+1. Выполнить Laravel `queue:restart`, чтобы worker завершили текущую job,
+   безопасно перезапустились process manager и загрузили Task 56.
+2. Добавить `PublicPageCacheWarmer::warmHomepages()` только для `/` и
+   configured localized home routes с отдельным 30-second budget.
+3. Добавить `CatalogCacheWarmer::warmHomepageResponses()` без data-cache
+   targets и без записи полного `CacheWarmingState`.
+4. Active-import ветка job выполняет только homepage response warm, не
+   claim-ит durable intent и ставит прежний unique delayed tail.
+5. Inactive full warm, cache keys/versions/TTL, scheduler и queue contracts
+   остаются без изменений.
+6. Laravel hidden `Context` подавляет record-level calendar/home/sitemap
+   version bumps только внутри full/global import apply; terminal
+   `catalogChanged()` публикует одну coherent generation.
+7. Targeted visitor refresh, URL import и admin/editor изменения остаются
+   вне scope и инвалидируют public domains немедленно.
+8. Тот же full/global import scope подавляет per-page
+   `CatalogCacheInvalidator::catalogChanged()` от tag/taxonomy sync;
+   terminal global finalizer остаётся единственным владельцем общего bump.
+
+### Ожидаемые изменяемые файлы
+
+- `app/Services/Catalog/PublicPageCacheWarmer.php`;
+- `app/Services/Catalog/CatalogCacheWarmer.php`;
+- `app/Services/Catalog/CatalogCacheInvalidator.php`;
+- `app/Jobs/WarmCatalogCaches.php`;
+- `app/Jobs/FinalizeSeasonvarImportTitleGroup.php`;
+- `app/Services/ReleaseCalendar/ReleaseCalendarCacheInvalidator.php`;
+- `app/Services/Seasonvar/SeasonvarImportPipeline.php`;
+- `config/cache-architecture.php`;
+- `tests/Feature/PublicPageCacheWarmerTest.php`;
+- `tests/Feature/CacheWarmJobTest.php`;
+- `tests/Feature/CatalogCacheInvalidatorTest.php`;
+- `tests/Feature/SeasonvarReleaseObservationSynchronizerTest.php`;
+- `tests/Feature/SeasonvarImportTitleGroupFinalizerTest.php`;
+- `docs/caching.md`, `docs/performance.md`, `docs/importer.md`,
+  `docs/queues.md`, `docs/release-calendar.md`;
+- approved design, execution plan и эта task section;
+- `README.md`;
+- `CHANGELOG.md`.
+
+### Сохраняемые public contracts
+
+- `routes/web.php`, `routes/api.php`, route names, status/body/locale/SEO;
+- одна public import command `php artisan seasonvar:import`;
+- queue name/connection, serialized job payload, unique ID, timeout,
+  retry/backoff и overlap lock;
+- cache domains, keys, version scopes, TTL, stale behavior и invalidation;
+- schema/data/migrations/import states и provider/media boundaries;
+- auth, authorization, privacy, Premium, region/legal, player, search,
+  sitemap, API/mobile и translations;
+- no dependency, `.env`, secret, queue/cache clear или manual claim mutation.
+
+### Cross-feature и production risks
+
+| Domain | Статус | Решение |
+| --- | --- | --- |
+| Guest homepage response | `affected` | Background заполняет новый asset namespace до первого visitor MISS |
+| Homepage data cache | `unchanged` | Active path не вызывает stats/metrics/snapshot/facets |
+| Import throughput | `bounded_affected` | Только query-free home URLs, общий 30 s и существующие HTTP timeout/retry |
+| Full cache warm | `compatible` | Durable intent остаётся pending; delayed recovery сохраняется |
+| Worker lifecycle | `affected` | Только graceful exit after current job через официальную Laravel boundary |
+| Release/tag import | `affected` | Full import coalesces release и tag/taxonomy public bumps до terminal global invalidation |
+| Visitor/admin calendar writes | `compatible` | Вне hidden Context immediate invalidation сохраняется |
+| Routes/locales/SEO | `compatible` | Используются существующие named home routes |
+| Auth/privacy/permissions | `unchanged` | Public same-origin GET без cookies и Authorization |
+| Migration/data/dependency/env | `not_applicable` | DDL/DML/package/env отсутствуют |
+| Rollback | `completed` | Code/config revert + graceful restart; data/cache restore не нужен |
+| Shared Git index | `risk_recorded` | Foreign collection scope не reset/stash/unstage/overwrite; delivery path-limited |
+
+### Task-specific requirement-compliance matrix
+
+| Requirement/domain | Статус | Evidence / следующий gate |
+| --- | --- | --- |
+| Root/index/canonical requirements fresh read | `completed` | Выполнено 26.07.2026 до code edits |
+| Related cache/performance/import/queue/data docs | `completed` | Canonical owners и protected contracts перечитаны |
+| Installed versions | `completed` | PHP 8.5.8, Laravel 13.22.0, Boost 2.4.13, Livewire 4.3.3, PHPUnit 12.5.32 |
+| Official Laravel 13 contracts | `completed` | Boost docs: long-lived worker restart, unique-until-processing и HTTP fake/assertions |
+| Existing implementation first | `completed` | Middleware/policy/tiered cache/warmer/job/request store/import activity traced |
+| Read-only root cause evidence | `completed` | PID start times, manifest mtime, version samples, cache telemetry, direct builder и HTTP timings |
+| Alternatives and user approval | `completed` | Restart-only и cross-generation stale отклонены; пользователь заранее разрешил выполнить выбранную рекомендацию |
+| Approved design spec | `completed` | Scope/data flow/errors/rollback/acceptance записаны и self-reviewed |
+| Expected/protected files and risks | `completed` | Manifest и matrices выше |
+| Detailed unlimited TDD plan | `completed` | Exact RED/GREEN, worker activation, live acceptance, docs/audit и delivery gates записаны и перечитаны |
+| TDD RED before implementation | `completed` | Три RED подтвердили отсутствующие homepage/release/catalog scopes и production-shaped version bumps |
+| Minimal GREEN | `completed` | Homepage-only warm плюс release/tag global coalescing реализованы без schema/key/payload |
+| Graceful production activation | `completed` | Два поэтапных `queue:restart`; final PID rotation 01:22:36 без clear/claim mutation |
+| Focused/broad/static/live verification | `completed` | 112 tests/642 assertions, PHPStan 0 errors; full minus exact GD: 1811/1798 passed/11 skipped и два known unrelated blockers; 233 imported pages без version churn |
+| Canonical docs/README/CHANGELOG | `completed` | Cache/performance/import/queue/calendar owners, visitor history и датированный changelog обновлены |
+| Final requirements/legacy scan | `completed` | Requirements/spec/plan/Task 57 перечитаны; callers calendar/catalog invalidation, warm URL ownership, scheduler refresh, stale config/key, Blade/inline и unfinished markers repository-wide классифицированы |
+| Commit/push in `main` | `pending` | Exact task scope; внешний auth/blocker фиксируется честно |
+
+### Безлимитный execution order
+
+1. Перечитать approved design и detailed TDD plan.
+2. RED: exact homepage URL set, deduplication и budget.
+3. GREEN: `PublicPageCacheWarmer::warmHomepages()`.
+4. RED: active import вызывает только response warm, сохраняет intent/state и
+   delayed tail.
+5. GREEN: orchestration boundary и job integration.
+6. Проверить inactive full-warm и queue/HTTP error regressions.
+7. RED: full-import release observation сохраняет schedule entry, но пока
+   bump-ит Homepage/ReleaseCalendar/Sitemap.
+8. GREEN: hidden Context boundary в invalidator, non-visitor queue finalizer
+   и synchronous global sitemap import; targeted/admin behavior неизменно.
+9. RED/GREEN: импортированный tag сохраняется без per-page
+   `CatalogCacheInvalidator::catalogChanged()`; terminal/targeted paths
+   сохраняются.
+10. Pint, focused/adjacent suites, PHPStan и config/docs checks.
+11. Graceful restart worker; дождаться подтверждённой PID rotation без ручной
+   mutation jobs/claims.
+12. Проверить generation stability одновременно для
+    Homepage/ReleaseCalendar/Sitemap, queue/backlog health и live cold/hot
+    timings без broad cache clear.
+13. Обновить canonical owners, README, CHANGELOG и compliance evidence.
+14. Перечитать requirements/spec/plan; выполнить repository-wide scan
+    duplicate/stale/broad warm paths.
+15. Exact path/hunk delivery в `main`; push result записать честно.
+
+
 ## Task 58 — объяснимость рекомендаций и двусторонний feedback
 
 Статус: `approved_plan_reread_ready_for_tdd`.

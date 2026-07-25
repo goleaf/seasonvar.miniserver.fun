@@ -398,16 +398,59 @@ finalizer обновляет dependent public domains один раз. Targeted 
 visitor visibility не меняются. Эти значения являются read-only operational
 observations, а не p95/SLA.
 
-После естественной ротации long-lived import workers десять последовательных
-samples за 30 секунд сохранили `Homepage` generation `57424` и счётчик
-invalidation `424` неизменными при продолжающемся run `#1255`. Следующий
+Следующий cache/import contention audit показал, что рабочий homepage уже
+даёт `MISS` за `1,32 s` и повторные `HIT` за `0,07–0,08 s`, но background
+metrics фиксировали средний `CatalogStats` rebuild `54,16 s`, homepage
+rebuild `4,14 s` и 2 722 title-detail rebuilds при активном полном импорте.
+Регулярный critical schedule поэтому больше не форсирует `--refresh`, exact
+home metrics используют 30-минутное fresh/24-часовое stale окно stats, а
+`WarmCatalogCaches` сохраняет intent и откладывает работу до terminal import.
+Title groups полного run выполняют scoped invalidation без proactive HTTP
+warm и без повторного collection-derived bump `Homepage`; terminal global
+finalizer обновляет dependent public domains один раз. Targeted visitor run
+сохраняет немедленные collection scopes и warm. Routes, cache keys, schema и
+visitor visibility не меняются. Эти значения являются read-only operational
+observations, а не p95/SLA.
+
+Короткая серия до production activation сохранила `Homepage` generation
+`57424` и счётчик invalidation `424` неизменными 30 секунд, а следующий
 HTTPS-проход дал `MISS 1,287 s`, затем `HIT 0,062 s` и `HIT 0,073 s`.
-Штатный `cache:warm-catalog --queue` во время того же run оставил pending
-`refresh=true`, перевёл работу в delayed очередь и не увеличил
-`CatalogStats`: 18 rebuilds / 974 874 ms до и после проверки. Это bounded
-operational evidence одной рабочей серии, не p95/SLA; оно закрывает текущий
-gate `<1,5 s cold / <=0,1 s hot`, поэтому materialized read model без новой
-измеренной причины не добавляется.
+Последующий lifecycle audit доказал, что это не было достаточным evidence
+rollout: четыре import worker стартовали в `23:58`, до commit исправления в
+`00:10`, и как long-lived процессы продолжали исполнять старый код. В
+`00:44:24` они снова одновременно изменили Homepage/CatalogStats generation.
+
+После официального `php artisan queue:restart` все import/title/cache worker
+получили новые PID в `00:44:41`. Завершившиеся перед exit старые jobs довели
+Homepage до generation `58690`; затем десять samples за 30 секунд сохранили
+generation и invalidations `481` неизменными при продолжающемся run `#1255`.
+Active-import `WarmCatalogCaches` выполнил новый homepage-only pass по `/`,
+`/ru`, `/en` за `3 570 ms` суммарно без failures/skips, не claim-ил full warm
+intent и не публиковал ложный полный warming state. После pass прямой
+cache-bypass render дал RU `0,500–0,571 s`, EN `0,541–0,637 s`; девять
+последовательных response-cache `HIT` дали `0,065–0,144 s`, восемь из девяти
+не превысили `0,1 s`. Это bounded operational evidence, не p95/SLA:
+materialized read model и previous-generation stale fallback без новой
+измеренной причины не добавляются.
+
+Fresh-process follow-up после первого restart обнаружил два оставшихся
+import-owned invalidation path, которые короткий sample не покрывал.
+`ReleaseCalendarCacheInvalidator::scheduleChanged()` bump-ил
+calendar/home/sitemap для каждой новой observation/episode/media записи, а
+`CatalogRelationSyncer::afterTagChanges()` через `TagCacheInvalidator`
+вызывал общий `CatalogCacheInvalidator::catalogChanged()` для каждой страницы
+с изменёнными тегами. Full/global queued и synchronous sitemap apply теперь
+выполняются внутри двух hidden Laravel `Context` scopes: authoritative
+calendar/tag rows, corrections и notifications сохраняются, но record-level
+public version bumps coalesced до существующей terminal global invalidation.
+Targeted/visitor/admin paths и scoped `TitleDetail` остаются immediate.
+После второго graceful `queue:restart` replacement PID при продолжающемся
+run `#1255` обработали минимум 233 страницы (`16443→16676`) за 4 минуты
+43 секунды, тогда как
+`Homepage=59247`, `ReleaseCalendar=21125`, `Sitemap=59245`,
+`Collections=10875` и общий invalidation counter `549` остались неизменны в
+fresh-process samples. Это bounded operational evidence, а не p95/SLA; новый
+read model, schema или cache key не добавлены.
 
 Следующий bounded follow-up локализовал тот же pattern в обычной выдаче `/titles`: при idle import queue natural `/titles?per_page=96` `MISS` занял `20,72 s`, а последующие `HIT` — `0,10–0,14 s`. Direct `CatalogTitlesPageBuilder` profile занимал `5 478,85 ms`; один hydration query с тремя correlated `withCount()` subquery — `5 177,83 ms`. После первой доставки builder заполняет все три card attributes общим grouped loader по не более чем 96 ID. Последующий count-sort follow-up убрал и оставшийся correlated ordering aggregate: `episodes_desc`, `seasons_desc` и `with_video` присоединяют один visibility-aware grouped subquery через `leftJoinSub()`, сохраняют zero-count titles через `COALESCE` и применяются одинаково к default и FTS-ranked веткам.
 

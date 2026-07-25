@@ -83,16 +83,27 @@ Sync CLI/legacy wrapper, `/admin/imports`, cron/CLI `--queued` и retry испо
 
 Preparation выполняет HTTP, parser и проверку внешних media до catalog write; durable payload не содержит credentials и не требует повторного сетевого запроса при apply/retry. Finalizer строит общий source manifest и не удаляет локальные сезоны, серии или media, которых нет в provider snapshot. Ошибка или warning отдельной страницы делает группу `partial`, сохраняя успешно подготовленные данные; exact verified duplicates сезонного семейства объединяются с сохранением slug redirects. Global queued importer использует тот же group pipeline, но после всех terminal groups дополнительно выполняет catalog-wide maintenance, media checks, merge, recommendations и stats refresh.
 
-После успешного apply title-group всегда bump-ит scoped `TitleDetail` и
-зависимые публичные collection scopes. Targeted URL/visitor run дополнительно
-ставит proactive warm конкретной карточки. Группа массового global run его не
-ставит: terminal global finalizer выполняет общую catalog invalidation и
-единый coalesced warm, поэтому промежуточный per-title HTML иначе сразу
-становился бы недостижимым. Пока global run остаётся `queued|running`, общий
-`WarmCatalogCaches` не claim-ит durable intent и откладывается на
-существующее bounded import-pause окно. Та же пауза применяется при другом
-активном targeted Seasonvar run, как и в остальных public warm jobs.
-Invalidation при этом не теряется, queue/cache clear не требуется.
+После успешного apply title-group всегда bump-ит scoped `TitleDetail`.
+Targeted URL/visitor run дополнительно инвалидирует зависимые публичные
+collection scopes и ставит proactive warm конкретной карточки. Группа
+массового global run применяет prepared payload внутри автоматически
+восстанавливаемого hidden `Context`: release observations и импортированные
+теги сохраняются как обычно, но их record-level
+`ReleaseCalendarCacheInvalidator::scheduleChanged()` и
+`CatalogCacheInvalidator::catalogChanged()` не меняют public generations на
+каждой странице. Terminal global finalizer выполняет одну общую catalog
+invalidation и единый coalesced warm; sync sitemap pipeline использует ту же
+границу до своего terminal handoff. Targeted import, visitor refresh,
+admin/editor writes, scoped `importedTitleChanged()` и playback invalidation
+в scope не входят. Пока global run остаётся `queued|running`, общий
+`WarmCatalogCaches` не claim-ит durable intent и не запускает
+stats/facets/home-data или широкий public warm. Чтобы новый namespace после
+сборки assets не строил первый посетитель, job выполняет только exact-origin
+`/` и localized home routes с отдельным 30-секундным бюджетом, затем
+откладывается на существующее bounded import-pause окно. Та же граница
+применяется при другом активном targeted Seasonvar run. Invalidation при этом
+не теряется, полный warming state не получает ложный terminal status,
+queue/cache clear не требуется.
 
 Queue jobs принимают только IDs, lease token, canonical group key и force flag. Provider HTML/JSON, credentials и URLs в queue payload не кладутся. Preparation после release claim посылает deduplicated group signal; terminal group посылает global signal. Оба finalizer реализуют `ShouldBeUniqueUntilProcessing`: ожидающий job удерживает unique key, перед обработкой key освобождается, поэтому более поздний terminal event может поставить следующий wake-up. Перед fan-in group finalizer освобождает exact same-run claim только у уже terminal staging-row через полную пару page/run/token; это закрывает окно, в котором base dispatcher успел claim-ить уже подготовленный sibling season. Claim незавершённой строки и claim другого run остаются блокирующими. Если другие siblings/claims ещё живы, finalizer обновляет heartbeat и завершает job без `release()`/polling; это не расходует queue attempts. Redis group/apply lock защищает единственное применение. Global finalizer аналогично ждёт terminal state всех групп, а Redis lock `seasonvar-import-finalizer` сериализует catalog-wide cleanup, media maintenance, merge и recommendation rebuild между runs; только редкая конкуренция за apply/global lock использует delayed release.
 
@@ -260,7 +271,7 @@ Technical issue workflow не создаёт второй importer и не вы�
 
 ## Синхронизация календаря релизов
 
-Импорт не получает второй command или pipeline. After-commit observers продолжают синхронизировать непустой `Episode::released_at` и реальную publication episode-bound `LicensedMedia`; portal, translation и subtitle events разделены. Дополнительно importer synchronizer принимает только нормализованный сезонный provider observation, где одновременно доказаны валидная гражданская дата, положительный номер серии и существующая canonical `Episode`. Перевод/субтитры не смешиваются с оригинальным `episode_release`, а raw text, technical timestamps, неполные и невалидные наблюдения не становятся календарной датой. Stable logical key делает повтор идемпотентным, manual lock и более сильный источник сохраняют правку, а cache/notification side effects запускаются только после committed material change. Полный source hierarchy и ограничения normalization — в [`release-calendar.md`](release-calendar.md).
+Импорт не получает второй command или pipeline. After-commit observers продолжают синхронизировать непустой `Episode::released_at` и реальную publication episode-bound `LicensedMedia`; portal, translation и subtitle events разделены. Дополнительно importer synchronizer принимает только нормализованный сезонный provider observation, где одновременно доказаны валидная гражданская дата, положительный номер серии и существующая canonical `Episode`. Перевод/субтитры не смешиваются с оригинальным `episode_release`, а raw text, technical timestamps, неполные и невалидные наблюдения не становятся календарной датой. Stable logical key делает повтор идемпотентным, manual lock и более сильный источник сохраняют правку, а cache/notification side effects запускаются только после committed material change. В full/global import public version bumps coalesced до terminal catalog invalidation через scoped hidden `Context`; сама запись события и notification logic не подавляются. Targeted/visitor/admin изменения остаются immediate. Полный source hierarchy и ограничения normalization — в [`release-calendar.md`](release-calendar.md).
 
 Для контролируемого one-time refresh существующая публичная команда поддерживает queued forced selection последних `1..1000` serial URL из конца актуального XML: `php artisan seasonvar:import --queued --force --sitemap-tail=1000`. Режим всегда заново зеркалирует разрешённую robots/sitemap boundary, сохраняет обычную source discovery, выбирает только serial URL в исходном XML-порядке и использует существующие claims/title groups/finalizers. Он несовместим с URL, `--no-discovery`, `--forever`, `--sleep`, inventory/status/media-size режимами и non-serial `--page-type`; второй importer, отдельная команда или обход global single-flight не создаются.
 

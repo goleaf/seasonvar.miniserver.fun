@@ -17,6 +17,7 @@ use App\Models\CatalogCollection;
 use App\Models\CatalogCollectionItem;
 use App\Models\CatalogTitle;
 use App\Models\LicensedMedia;
+use App\Models\ReleaseScheduleEntry;
 use App\Models\Season;
 use App\Models\SeasonvarImportPreparedPage;
 use App\Models\Source;
@@ -268,11 +269,27 @@ class SeasonvarImportTitleGroupFinalizerTest extends TestCase
             'catalog_title_id' => $title->id,
             'position' => 1,
         ]);
-        $this->prepareAllRows($group->preparedPages()->with('sourcePage')->get(), [1 => 2]);
+        $this->prepareRow(
+            $group->preparedPages()->with('sourcePage')->firstOrFail(),
+            1,
+            2,
+            releaseStatus: [
+                'latest_episode_released_at' => '2026-07-19',
+                'translation_name' => 'Coldfilm',
+                'release_status_text' => '19.07.2026 2 серия (Coldfilm) из 2',
+            ],
+            taxonomies: [[
+                'type' => 'tag',
+                'name' => 'Быстрый полный импорт',
+                'source_external_id' => 'seasonvar-fast-full-import',
+            ]],
+        );
         $versions = app(CacheVersionRegistry::class);
         $titleVersion = $versions->version(CacheDomain::TitleDetail, 'title:'.$title->id);
         $homepageVersion = $versions->version(CacheDomain::Homepage);
         $collectionsVersion = $versions->version(CacheDomain::Collections);
+        $releaseCalendarVersion = $versions->version(CacheDomain::ReleaseCalendar);
+        $sitemapVersion = $versions->version(CacheDomain::Sitemap);
 
         $this->app->call([
             (new FinalizeSeasonvarImportTitleGroup($group->id))->withFakeQueueInteractions(),
@@ -283,10 +300,59 @@ class SeasonvarImportTitleGroupFinalizerTest extends TestCase
             $titleVersion,
             $versions->version(CacheDomain::TitleDetail, 'title:'.$title->id),
         );
+        $this->assertGreaterThanOrEqual(1, ReleaseScheduleEntry::query()->count());
+        $this->assertTrue(ReleaseScheduleEntry::query()
+            ->where('catalog_title_id', $title->id)
+            ->where('translation_name', 'Coldfilm')
+            ->exists());
+        $this->assertSame(['Быстрый полный импорт'], $title->tags()->pluck('name')->all());
         $this->assertSame($homepageVersion, $versions->version(CacheDomain::Homepage));
         $this->assertSame($collectionsVersion, $versions->version(CacheDomain::Collections));
+        $this->assertSame(
+            $releaseCalendarVersion,
+            $versions->version(CacheDomain::ReleaseCalendar),
+        );
+        $this->assertSame($sitemapVersion, $versions->version(CacheDomain::Sitemap));
         $this->assertNull(app(CatalogCacheWarmRequestStore::class)->claim(10));
         Queue::assertNotPushed(WarmCatalogCaches::class);
+    }
+
+    public function test_visitor_finalizer_keeps_release_calendar_invalidation_immediate(): void
+    {
+        $title = $this->titleWithSeasonUrls([1]);
+        $group = app(SeasonvarImportTitleGroupDispatcher::class)
+            ->start($title, 'seasonvar-title-refresh');
+        $this->prepareRow(
+            $group->preparedPages()->with('sourcePage')->firstOrFail(),
+            1,
+            2,
+            releaseStatus: [
+                'latest_episode_released_at' => '2026-07-19',
+                'translation_name' => 'Coldfilm',
+                'release_status_text' => '19.07.2026 2 серия (Coldfilm) из 2',
+            ],
+        );
+        $versions = app(CacheVersionRegistry::class);
+        $releaseCalendarVersion = $versions->version(CacheDomain::ReleaseCalendar);
+        $homepageVersion = $versions->version(CacheDomain::Homepage);
+        $sitemapVersion = $versions->version(CacheDomain::Sitemap);
+
+        $this->app->call([
+            (new FinalizeSeasonvarImportTitleGroup($group->id))->withFakeQueueInteractions(),
+            'handle',
+        ]);
+
+        $this->assertGreaterThanOrEqual(1, ReleaseScheduleEntry::query()->count());
+        $this->assertTrue(ReleaseScheduleEntry::query()
+            ->where('catalog_title_id', $title->id)
+            ->where('translation_name', 'Coldfilm')
+            ->exists());
+        $this->assertGreaterThan(
+            $releaseCalendarVersion,
+            $versions->version(CacheDomain::ReleaseCalendar),
+        );
+        $this->assertGreaterThan($homepageVersion, $versions->version(CacheDomain::Homepage));
+        $this->assertGreaterThan($sitemapVersion, $versions->version(CacheDomain::Sitemap));
     }
 
     public function test_finalizer_applies_prepared_direct_media_without_provider_http(): void
@@ -574,12 +640,18 @@ class SeasonvarImportTitleGroupFinalizerTest extends TestCase
         }
     }
 
-    /** @param list<array<string, mixed>> $media */
+    /**
+     * @param  list<array<string, mixed>>  $media
+     * @param  array{latest_episode_released_at: string, translation_name: string, release_status_text: string}|null  $releaseStatus
+     * @param  list<array{type: string, name: string, source_external_id?: string}>  $taxonomies
+     */
     private function prepareRow(
         SeasonvarImportPreparedPage $row,
         int $seasonNumber,
         int $episodeCount,
         array $media = [],
+        ?array $releaseStatus = null,
+        array $taxonomies = [],
     ): void {
         $url = $row->sourcePage->url;
         $episodes = collect(range(1, $episodeCount))->map(fn (int $number): array => [
@@ -601,15 +673,15 @@ class SeasonvarImportTitleGroupFinalizerTest extends TestCase
                 'number' => $seasonNumber,
                 'title' => 'Сезон '.$seasonNumber,
                 'source_url' => $url,
-                'latest_episode_released_at' => null,
+                'latest_episode_released_at' => $releaseStatus['latest_episode_released_at'] ?? null,
                 'episodes_released' => $episodeCount,
                 'episodes_total' => $episodeCount,
-                'translation_name' => null,
-                'release_status_text' => null,
+                'translation_name' => $releaseStatus['translation_name'] ?? null,
+                'release_status_text' => $releaseStatus['release_status_text'] ?? null,
             ]],
             'episodes' => $episodes,
             'media' => $media,
-            'taxonomies' => [],
+            'taxonomies' => $taxonomies,
             'ratings' => [],
             'recommendation_signals' => [],
             'aliases' => [],

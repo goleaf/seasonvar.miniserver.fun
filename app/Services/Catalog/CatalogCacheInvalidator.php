@@ -9,12 +9,15 @@ use App\Services\Collections\CatalogCollectionCacheInvalidator;
 use App\Support\Cache\CacheDomain;
 use App\Support\Cache\CacheTelemetry;
 use App\Support\Cache\CacheVersionRegistry;
+use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
 final class CatalogCacheInvalidator
 {
+    private const DEFER_PUBLIC_INVALIDATION_CONTEXT = 'seasonvar.import.defer-catalog-public-invalidation';
+
     private const PUBLIC_DOMAINS = [
         CacheDomain::Homepage,
         CacheDomain::CatalogPages,
@@ -39,6 +42,10 @@ final class CatalogCacheInvalidator
     /** @param iterable<int, int|string> $titleIds */
     public function catalogChanged(iterable $titleIds = []): void
     {
+        if (Context::getHidden(self::DEFER_PUBLIC_INVALIDATION_CONTEXT, false) === true) {
+            return;
+        }
+
         $normalizedIds = collect($titleIds)
             ->filter(fn (int|string $id): bool => is_int($id) || ctype_digit($id))
             ->map(fn (int|string $id): int => (int) $id)
@@ -56,6 +63,20 @@ final class CatalogCacheInvalidator
         }
 
         $invalidate();
+    }
+
+    /**
+     * @template TResult
+     *
+     * @param  callable(): TResult  $callback
+     * @return TResult
+     */
+    public function deferPublicInvalidation(callable $callback): mixed
+    {
+        return Context::scope(
+            $callback,
+            hidden: [self::DEFER_PUBLIC_INVALIDATION_CONTEXT => true],
+        );
     }
 
     public function importedTitleChanged(

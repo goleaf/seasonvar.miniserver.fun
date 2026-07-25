@@ -40,6 +40,7 @@ return [
         'warm_url_limit' => (int) env('PUBLIC_PAGE_CACHE_WARM_URL_LIMIT', 100),
         'warm_title_limit' => (int) env('PUBLIC_PAGE_CACHE_WARM_TITLE_LIMIT', 250),
         'warm_budget_seconds' => (int) env('PUBLIC_PAGE_CACHE_WARM_BUDGET_SECONDS', 240),
+        'import_safe_homepage_warm_budget_seconds' => 30,
         'warm_connect_timeout_seconds' => (int) env('PUBLIC_PAGE_CACHE_WARM_CONNECT_TIMEOUT_SECONDS', 2),
         'warm_timeout_seconds' => (int) env('PUBLIC_PAGE_CACHE_WARM_TIMEOUT_SECONDS', 10),
         'warm_retry_times' => (int) env('PUBLIC_PAGE_CACHE_WARM_RETRY_TIMES', 2),
