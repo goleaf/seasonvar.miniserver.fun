@@ -7093,8 +7093,8 @@ Existing integration:
 - `resources/views/livewire/collections/catalog-collection-category-manager.blade.php`;
 - `lang/ru/collections.php`;
 - `lang/en/collections.php`;
-- `lang/ru/admin.php`;
-- `lang/en/admin.php`.
+- `lang/ru/administration.php`;
+- `lang/en/administration.php`.
 
 Tests:
 
@@ -7102,6 +7102,8 @@ Tests:
 - `tests/Feature/CatalogCollectionClassificationQueryTest.php`;
 - `tests/Feature/CatalogCollectionClassificationAdministrationTest.php`;
 - `tests/Unit/FrontendAssetContractTest.php`;
+- `tests/browser/prepare-fixtures.php`;
+- `tests/browser/discovery-collections.spec.js`;
 - existing category/discovery/cache/authorization/query-budget tests where
   the public contract is already owned.
 

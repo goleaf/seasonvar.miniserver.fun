@@ -69,18 +69,25 @@ Existing integration files:
 
 - `app/Services/Collections/CatalogCollectionCategoryService.php` —
   authoritative confirmation transaction.
+- `app/Services/Collections/CatalogCollectionQuery.php` — удаление
+  заменённой ручной admin queue.
+- `app/Enums/AdminAuditAction.php` — stable confirmation audit code.
 - `app/Livewire/Collections/CatalogCollectionCategoryManager.php` —
   URL filters, selection, overrides, preview and confirm orchestration.
 - `resources/views/livewire/collections/catalog-collection-category-manager.blade.php`
   — responsive classification UI inside existing admin page.
 - `lang/ru/collections.php`, `lang/en/collections.php` — labels, reasons,
   validation and status messages.
+- `lang/ru/administration.php`, `lang/en/administration.php` — audit labels.
 
 Tests:
 
 - `tests/Unit/CatalogCollectionCategorySuggestionServiceTest.php`.
 - `tests/Feature/CatalogCollectionClassificationQueryTest.php`.
 - `tests/Feature/CatalogCollectionClassificationAdministrationTest.php`.
+- `tests/Unit/FrontendAssetContractTest.php`.
+- `tests/browser/prepare-fixtures.php`.
+- `tests/browser/discovery-collections.spec.js`.
 - Existing category/discovery/query/cache/UI tests for regression coverage.
 
 ---
