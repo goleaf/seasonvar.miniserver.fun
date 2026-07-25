@@ -8637,12 +8637,15 @@ key/version/invalidation lifecycle.
 
 ## Task 64 — единый стандарт `lang/*` и проверка переводов
 
-Статус: `approved_design_detailed_plan_pending`.
+Статус: `approved_design_and_plan_tdd_pending`.
 
 Дата начала: 26.07.2026.
 
 Approved design:
 [`2026-07-26-translation-catalog-standardization-design.md`](../superpowers/specs/2026-07-26-translation-catalog-standardization-design.md).
+
+Detailed implementation plan:
+[`2026-07-26-translation-catalog-standardization.md`](../superpowers/plans/2026-07-26-translation-catalog-standardization.md).
 
 ### Цель и baseline
 
@@ -8711,7 +8714,7 @@ database row, storage object, queue или production DML не планируе�
 | Alternatives/user authorization | `completed` | Three approaches compared; user approved full recommended normalization |
 | Canonical permanent rule first | `completed` | Multilingual owner updated before application/test edits |
 | Approved design | `completed` | Linked design includes format, editorial, testing, device and rollback decisions |
-| Detailed unlimited plan | `pending` | Next required gate |
+| Detailed unlimited plan | `completed` | Linked seven-task TDD/format/editorial/device/docs/delivery plan self-reviewed |
 | TDD RED | `pending` | Global contract must fail on current 498 horizontal arrays/order/dialect |
 | Implementation | `pending` | No language source formatting before plan/RED |
 | Static/build/browser verification | `pending` | Exact matrix defined in design |
@@ -8725,8 +8728,8 @@ database row, storage object, queue или production DML не планируе�
 2. `[completed]` Full locale inventory and structural/editorial baseline.
 3. `[completed]` Compare approaches and obtain user approval.
 4. `[completed]` Update canonical rule and approved design.
-5. `[in_progress]` Self-review design and write exact detailed plan.
-6. `[pending]` TDD RED global structural/format/editorial contract.
+5. `[completed]` Self-review design and write exact detailed plan.
+6. `[in_progress]` TDD RED global structural/format/editorial contract.
 7. `[pending]` AST mechanical vertical normalization with semantic snapshot.
 8. `[pending]` Reviewed RU/EN editorial corrections and order repair.
 9. `[pending]` Focused/existing/static/build/device/browser verification.
