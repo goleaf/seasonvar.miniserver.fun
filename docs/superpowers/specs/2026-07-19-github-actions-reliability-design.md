@@ -16,7 +16,7 @@
 
 1. `scripts/ci-check.sh` получает отдельный read-only профиль `docs`. Он задаёт `DB_CONNECTION=sqlite` и `DB_DATABASE=:memory:` до Laravel boot и запускает канонический `project:docs-refresh --check` без записи в project files.
 2. Backend вызывает тот же `run_docs`, поэтому локальный hook и GitHub Actions не расходятся.
-3. `pre-commit` запускает `bash scripts/ci-check.sh docs` после guard проверок чистоты. Из-за existing no-unstaged/no-untracked contract рабочее дерево совпадает со staged snapshot, и stale managed block блокирует commit до его создания.
+3. `pre-commit` запускает `bash scripts/ci-check.sh docs` после branch/conflict/staged-path guards. С 25.07.2026 ordinary partial commit допускает посторонние unstaged/untracked файлы: профиль остаётся ранней проверкой текущего рабочего снимка, staged README/CHANGELOG проверяются отдельно, а окончательный целостный snapshot доказывает clean-tree `pre-push`.
 4. GitHub-hosted jobs используют явный `ubuntu-24.04` вместо мигрирующего `ubuntu-latest`.
 5. Существующие одобренные action majors не обновляются. Их текущие release commits закрепляются полными SHA, а комментарии сохраняют читаемую major-версию. Это исключает mutable tag drift и supply-chain подмену без package/runtime upgrade.
 6. `actions/checkout` не сохраняет credentials после извлечения: workflow имеет только `contents: read` и не выполняет Git-запись.

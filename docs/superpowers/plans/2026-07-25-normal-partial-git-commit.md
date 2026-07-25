@@ -37,9 +37,14 @@ commit: ветку, конфликты, опасные staged-пути, авто
 **Files:**
 
 - Modify: `AGENTS.md`
+- Restore: `.githooks/post-commit`
+- Restore: `.githooks/pre-push`
+- Restore: `.github/workflows/ci.yml`
 - Modify: `docs/development.md`
 - Modify: `docs/ci.md`
 - Modify: `docs/superpowers/specs/2026-07-25-automatic-russian-changelog-design.md`
+- Modify: `docs/superpowers/specs/2026-07-19-github-actions-reliability-design.md`
+- Modify: `docs/superpowers/specs/2026-07-16-canonical-ci-quality-gate-design.md`
 - Modify: `docs/plans/current-task-plan.md`
 
 **Interfaces:**
@@ -47,6 +52,16 @@ commit: ветку, конфликты, опасные staged-пути, авто
 - Produces: стандартный partial-commit contract для `pre-commit`.
 - Preserves: `main`, conflict/sensitive-path guards, staged README/CHANGELOG
   policies, clean-tree `pre-push`.
+
+- [ ] **Step 0: Восстановить удалённый concurrent commit baseline**
+
+Commit `1ec68b8` во время выполнения задачи удалил все versioned Git hooks и
+`.github/workflows/ci.yml`, хотя `core.hooksPath=.githooks` и канонические
+документы продолжают требовать эти файлы. Восстановить `post-commit`,
+`pre-push`, guard library и pinned CI workflow из проверенного parent snapshot.
+`pre-commit` восстановить в состоянии до Task 54: updater уже подключён, а два
+clean-tree guards ещё присутствуют, чтобы RED доказал именно меняемое
+поведение.
 
 - [ ] **Step 1: Обновить канонический owner**
 
@@ -70,6 +85,8 @@ commit: ветку, конфликты, опасные staged-пути, авто
 Заменить «исходную чистоту дерева» на «безопасность staged-путей»; updater
 по-прежнему отказывает только при отдельном unstaged-изменении самого
 `CHANGELOG.md`, потому что иначе targeted staging потерял бы авторский hunk.
+Historical CI designs получают датированное уточнение нового contract без
+переписывания прежнего evidence.
 
 - [ ] **Step 4: Перечитать подготовленный scope**
 
@@ -137,6 +154,8 @@ Expected: FAIL с `есть unstaged tracked changes` на старом hook.
 - Modify: `.githooks/pre-commit`
 - Modify: `.githooks/lib/git-guard.sh`
 - Modify: `tests/Unit/CiQualityGateContractTest.php`
+- Verify: `.githooks/pre-push`
+- Verify: `.github/workflows/ci.yml`
 
 **Interfaces:**
 
@@ -262,7 +281,7 @@ Run:
 
 ```bash
 bash -n .githooks/pre-commit .githooks/pre-push \
-  .githooks/lib/git-guard.sh
+  .githooks/post-commit .githooks/lib/git-guard.sh
 php artisan test tests/Unit/CiQualityGateContractTest.php \
   tests/Unit/AutomaticChangelogUpdateScriptTest.php \
   tests/Unit/ChangelogPolicyScriptTest.php
@@ -279,6 +298,9 @@ php artisan project:docs-refresh --check --no-interaction
 bash scripts/ci-check.sh docs
 git diff --check
 ```
+
+Contract test также обязан подтвердить восстановленный pinned workflow и
+clean-tree `pre-push`.
 
 - [ ] **Step 5: Воспроизвести успешный hook**
 

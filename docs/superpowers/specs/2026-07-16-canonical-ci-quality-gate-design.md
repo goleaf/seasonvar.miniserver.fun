@@ -109,7 +109,7 @@ Jobs сохраняют свои timeout, Redis/Memcached services, run-scoped c
 - `.githooks/pre-push` сначала выполняет существующий Git guard, затем `bash "$repo_root/scripts/ci-check.sh" pre-push`;
 - разработчик может вызвать любой профиль напрямую без скрытой альтернативной последовательности команд.
 
-Git guard остаётся владельцем branch, conflict, unsafe-path и clean-tree checks. Quality script не дублирует Git policy.
+Git guard остаётся владельцем branch, conflict и unsafe-path checks перед commit и clean-tree check перед push. Quality script не дублирует Git policy; unrelated unstaged/untracked files не блокируют обычный partial commit.
 
 ## Поток выполнения
 

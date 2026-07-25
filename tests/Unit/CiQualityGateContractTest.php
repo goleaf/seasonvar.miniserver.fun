@@ -232,11 +232,60 @@ final class CiQualityGateContractTest extends TestCase
         );
     }
 
+    public function test_pre_commit_allows_partial_commit_with_unrelated_dirty_files(): void
+    {
+        $repositoryPath = sys_get_temp_dir().'/seasonvar-partial-commit-'.bin2hex(random_bytes(6));
+
+        try {
+            File::ensureDirectoryExists($repositoryPath.'/.githooks/lib');
+            File::ensureDirectoryExists($repositoryPath.'/scripts');
+            File::put(
+                $repositoryPath.'/.githooks/pre-commit',
+                File::get(base_path('.githooks/pre-commit')),
+            );
+            File::put(
+                $repositoryPath.'/.githooks/lib/git-guard.sh',
+                File::get(base_path('.githooks/lib/git-guard.sh')),
+            );
+
+            foreach ([
+                'scripts/update-changelog-for-staged-code.sh',
+                'scripts/check-readme-policy.sh',
+                'scripts/check-changelog-policy.sh',
+            ] as $script) {
+                File::put($repositoryPath.'/'.$script, "#!/usr/bin/env bash\nexit 0\n");
+                chmod($repositoryPath.'/'.$script, 0755);
+            }
+
+            File::put($repositoryPath.'/scripts/ci-check.sh', "#!/usr/bin/env bash\nexit 0\n");
+            chmod($repositoryPath.'/.githooks/pre-commit', 0755);
+
+            $this->runGit($repositoryPath, 'init', '-b', 'main');
+            $this->runGit($repositoryPath, 'config', 'user.name', 'Seasonvar Test');
+            $this->runGit($repositoryPath, 'config', 'user.email', 'seasonvar@example.com');
+            File::put($repositoryPath.'/tracked.txt', "исходное состояние\n");
+            $this->runGit($repositoryPath, 'add', '--', 'tracked.txt');
+            $this->runGit($repositoryPath, 'commit', '-m', 'Исходное состояние');
+
+            File::put($repositoryPath.'/staged.txt', "подготовлено\n");
+            $this->runGit($repositoryPath, 'add', '--', 'staged.txt');
+            File::append($repositoryPath.'/tracked.txt', "не в индексе\n");
+            File::put($repositoryPath.'/untracked.txt', "не отслеживается\n");
+
+            $process = new Process(['bash', '.githooks/pre-commit'], $repositoryPath);
+            $process->run();
+
+            $this->assertTrue($process->isSuccessful(), $process->getErrorOutput());
+        } finally {
+            File::deleteDirectory($repositoryPath);
+        }
+    }
+
     public function test_automatic_changelog_update_runs_after_guards_and_before_validation(): void
     {
         $hook = File::get(base_path('.githooks/pre-commit'));
 
-        $guardPosition = strpos($hook, 'seasonvar_git_guard_require_no_untracked_files');
+        $guardPosition = strpos($hook, 'seasonvar_git_guard_require_safe_paths staged');
         $updaterPosition = strpos(
             $hook,
             '"$repo_root/scripts/update-changelog-for-staged-code.sh"',
@@ -254,6 +303,14 @@ final class CiQualityGateContractTest extends TestCase
         $this->assertTrue($updaterPosition < $documentationPosition);
         $this->assertTrue($updaterPosition < $readmePosition);
         $this->assertTrue($updaterPosition < $changelogPosition);
+        $this->assertStringNotContainsString(
+            'seasonvar_git_guard_require_no_unstaged_changes',
+            $hook,
+        );
+        $this->assertStringNotContainsString(
+            'seasonvar_git_guard_require_no_untracked_files',
+            $hook,
+        );
     }
 
     public function test_documentation_freshness_gate_runs_before_commit_and_in_backend_ci(): void
@@ -261,7 +318,7 @@ final class CiQualityGateContractTest extends TestCase
         $hook = File::get(base_path('.githooks/pre-commit'));
         $qualityGate = File::get(base_path('scripts/ci-check.sh'));
 
-        $guardPosition = strpos($hook, 'seasonvar_git_guard_require_no_untracked_files');
+        $guardPosition = strpos($hook, 'seasonvar_git_guard_require_safe_paths staged');
         $documentationPosition = strpos($hook, 'bash "$repo_root/scripts/ci-check.sh" docs');
         $readmePosition = strpos($hook, 'check-readme-policy.sh');
 
@@ -284,7 +341,18 @@ final class CiQualityGateContractTest extends TestCase
     public function test_pre_push_runs_the_same_local_quality_gate_before_upload(): void
     {
         $hook = File::get(base_path('.githooks/pre-push'));
+        $guard = File::get(base_path('.githooks/lib/git-guard.sh'));
 
+        $this->assertStringContainsString('seasonvar_git_guard_require_clean_tree', $hook);
+        $this->assertStringContainsString('seasonvar_git_guard_require_clean_tree()', $guard);
         $this->assertStringContainsString('bash "$repo_root/scripts/ci-check.sh" pre-push', $hook);
+        $this->assertStringNotContainsString('seasonvar_git_guard_require_no_unstaged_changes()', $guard);
+        $this->assertStringNotContainsString('seasonvar_git_guard_require_no_untracked_files()', $guard);
+    }
+
+    private function runGit(string $repositoryPath, string ...$arguments): void
+    {
+        $process = new Process(['git', ...$arguments], $repositoryPath);
+        $process->mustRun();
     }
 }

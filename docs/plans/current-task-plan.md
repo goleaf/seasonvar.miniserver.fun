@@ -6969,7 +6969,7 @@ Tests and documentation:
 
 ## Task 52 — центр полуавтоматической классификации подборок
 
-Статус: `implementation_plan_written_execution_authorized`.
+Статус: `implementation_complete_verification_in_progress`.
 
 Discovery 25.07.2026: существующая каноническая search boundary называется
 `App\Services\Catalog\Search\CatalogSearchNormalizer`, а не
@@ -7087,16 +7087,21 @@ TDD plan:
 Existing integration:
 
 - `app/Services/Collections/CatalogCollectionCategoryService.php`;
+- `app/Services/Collections/CatalogCollectionQuery.php`;
 - `app/Livewire/Collections/CatalogCollectionCategoryManager.php`;
+- `app/Enums/AdminAuditAction.php`;
 - `resources/views/livewire/collections/catalog-collection-category-manager.blade.php`;
 - `lang/ru/collections.php`;
-- `lang/en/collections.php`.
+- `lang/en/collections.php`;
+- `lang/ru/admin.php`;
+- `lang/en/admin.php`.
 
 Tests:
 
 - `tests/Unit/CatalogCollectionCategorySuggestionServiceTest.php`;
 - `tests/Feature/CatalogCollectionClassificationQueryTest.php`;
 - `tests/Feature/CatalogCollectionClassificationAdministrationTest.php`;
+- `tests/Unit/FrontendAssetContractTest.php`;
 - existing category/discovery/cache/authorization/query-budget tests where
   the public contract is already owned.
 
@@ -7112,6 +7117,7 @@ Documentation after product implementation:
 - `docs/frontend.md`;
 - `docs/requirements/system-wide-integration.md`;
 - `docs/deployment.md`;
+- `docs/README.md`;
 - `docs/plans/current-task-plan.md`;
 - `README.md`;
 - `CHANGELOG.md`.
@@ -7167,11 +7173,11 @@ real consumer. No migration/config/package/environment file is expected.
 | User review of written spec | `completed` | Пользователь повторно подтвердил рекомендованный scope и execution |
 | Detailed TDD implementation plan | `completed` | Task 52 plan written, spec coverage/type/placeholder self-review passed |
 | Expected/protected files | `completed` | Manifests recorded above |
-| Cross-feature impact | `completed_preliminary` | Public/admin/cache/import/API/SEO/privacy/mobile matrix recorded |
-| Migration/rollback/production assessment | `completed_preliminary` | No DDL/dependency/env; code rollback contract recorded |
-| TDD RED before code | `pending` | No Task 52 production code written |
-| Query budget and browser evidence | `pending` | Required during implementation |
-| Canonical docs/README/CHANGELOG | `pending` | Update only after visitor/product change exists |
+| Cross-feature impact | `completed` | Public/admin/cache/import/API/SEO/privacy/mobile contracts checked; no public route/API/schema change |
+| Migration/rollback/production assessment | `completed` | No DDL/dependency/env/provider/queue; code rollback and persisted assignment handling documented |
+| TDD RED before code | `completed` | Scoring, bounded query, confirmation, Livewire/UI and public reflection each failed before GREEN; thematic 60-point drift also reproduced and fixed |
+| Query budget and browser evidence | `in_progress` | 14-query cap and SQLite `EXPLAIN` completed; final Playwright matrix pending |
+| Canonical docs/README/CHANGELOG | `completed` | Owners, documentation map, visitor history and separate Russian changelog entry updated |
 | Final legacy/requirements reread | `pending` | Required before completion |
 | Commit/push in `main` | `unresolved_shared_index_collision` | Exact delivery depends on shared index safety |
 
@@ -7325,7 +7331,7 @@ production DML не ожидаются.
 
 ## Task 54 — нормальный частичный Git commit
 
-Статус: `root_cause_confirmed_plan_written`.
+Статус: `verified_ready_for_path_limited_delivery`.
 
 Дата начала: 25.07.2026.
 
@@ -7346,6 +7352,15 @@ blocker: staged `CHANGELOG.md` отклоняется русской policy на
 обычного английского текста `mode-specific`. Политика русского журнала не
 ослабляется; staged prose переводится, а точные identifiers сохраняются.
 
+Concurrent discovery в 22:55 EEST: commit `1ec68b8` был создан и отправлен
+внешним процессом во время RED-прогона. Он поглотил прежний staged scope,
+случайно удалил весь versioned `.githooks`, включая clean-tree `pre-push`, и
+`.github/workflows/ci.yml`, хотя `core.hooksPath=.githooks` и canonical
+CI/development contracts остались активными. Task 54 расширена только на
+восстановление последнего проверенного hook/CI baseline. Удалённый
+`.github/skills/impeccable` является отдельным external change и не
+восстанавливается.
+
 Выбран минимальный contract: `pre-commit` проверяет `main`, unresolved
 conflicts, staged temporary/credential paths, updater и staged documentation
 policies, но допускает unrelated unstaged/untracked files. Полностью clean
@@ -7356,11 +7371,16 @@ gate.
 
 - `.githooks/pre-commit`;
 - `.githooks/lib/git-guard.sh`;
+- `.githooks/post-commit`;
+- `.githooks/pre-push`;
+- `.github/workflows/ci.yml`;
 - `tests/Unit/CiQualityGateContractTest.php`;
 - `AGENTS.md`;
 - `docs/development.md`;
 - `docs/ci.md`;
 - `docs/superpowers/specs/2026-07-25-automatic-russian-changelog-design.md`;
+- `docs/superpowers/specs/2026-07-19-github-actions-reliability-design.md`;
+- `docs/superpowers/specs/2026-07-16-canonical-ci-quality-gate-design.md`;
 - `docs/superpowers/plans/2026-07-25-normal-partial-git-commit.md`;
 - `docs/plans/current-task-plan.md`;
 - `README.md`;
@@ -7391,6 +7411,7 @@ gate.
 | Staged security | `already_compatible` | Branch/conflict/safe-path guards не меняются |
 | README/CHANGELOG | `affected_compatible` | Staged policies и automatic updater сохраняются |
 | CI | `affected_compatible` | Commit docs gate и pre-push backend/frontend gate сохраняются |
+| Concurrent commit recovery | `affected` | Восстановить hooks и pinned CI workflow из parent; unrelated deleted skills не трогать |
 | Laravel/product | `not_applicable` | Application behavior не меняется |
 | Routes/migrations/data | `not_applicable` | Нет schema, route или DML изменений |
 | Translations/cache/permissions | `not_applicable` | Нет interface/domain state |
@@ -7408,13 +7429,38 @@ gate.
 | Existing implementation first | `completed` | Hook, guard library, updater, policies и contract tests traced |
 | Reproducible root cause | `completed` | Прямой hook exit 1 на unstaged tracked changes |
 | Secondary blocker | `completed` | Docs/policy sequence exit 1 на английской prose CHANGELOG |
+| Concurrent repository change | `completed` | `1ec68b8` pushed; hooks/workflow deleted and exact parent baseline inspected |
 | Expected/protected files | `completed` | Manifests recorded above |
 | Migration/route/cache/permission/production review | `completed` | Все `not_applicable`; pre-push remains strict |
-| Written plan reread | `pending` | Required before RED test |
-| TDD RED | `pending` | Integration test must fail on old hook |
-| Minimal GREEN | `pending` | Remove only two commit clean-tree guards |
-| Russian CHANGELOG policy | `pending` | Translate current violations without allowlist weakening |
-| Focused/docs/hook verification | `pending` | Exact commands in detailed plan |
-| README actuality | `completed_preliminary` | Git section needs update; visitor history must not receive fake product entry |
-| Final requirement/legacy reread | `pending` | Required before completion |
-| Commit/push in `main` | `pending_shared_index_review` | Exact coherent scope must be proven before delivery |
+| Written plan reread | `completed` | Detailed plan and Task 54 current scope reread before RED |
+| TDD RED | `completed` | Integration test failed with exact `есть unstaged tracked changes` diagnostic |
+| Minimal GREEN | `completed` | Removed only two commit clean-tree calls/helpers; integration test passes |
+| Russian CHANGELOG policy | `completed` | 25 violating lines translated; unchanged scanner exits 0 |
+| Focused/docs/hook verification | `completed` | 32 tests / 143 assertions, Pint, shell syntax, README/CHANGELOG policies, docs refresh/CI, diff check and staged real-hook run pass |
+| README actuality | `completed` | Git section updated; visitor history unchanged because product behavior did not change |
+| Final requirement/legacy reread | `completed` | Applicable canonical owners reread; removed helpers remain only in negative tests |
+| Commit/push in `main` | `unresolved` | Path-limited commit and configured push are the remaining delivery actions |
+
+### Verification evidence Task 54
+
+- RED: `php artisan test tests/Unit/CiQualityGateContractTest.php
+  --filter=partial_commit` завершился одним точным отказом
+  `есть unstaged tracked changes`.
+- GREEN: тот же test filter прошёл `1/1`; после расширения contracts
+  объединённый набор `CiQualityGateContractTest`,
+  `AutomaticChangelogUpdateScriptTest` и `ChangelogPolicyScriptTest` прошёл
+  32 теста и 143 утверждения.
+- `./vendor/bin/pint tests/Unit/CiQualityGateContractTest.php --format agent`
+  и `bash -n` для четырёх восстановленных hook/guard файлов завершились с
+  кодом 0.
+- Неизменённые `scripts/check-readme-policy.sh` и
+  `scripts/check-changelog-policy.sh` проходят. Последний сначала выявил 25
+  строк чужой новой английской прозы, после перевода прошёл без расширения
+  allowlist.
+- `php artisan project:docs-refresh --check --no-interaction`,
+  `bash scripts/ci-check.sh docs` и `git diff --check` завершились с кодом 0.
+- Настоящий `bash .githooks/pre-commit` завершился с кодом 0 на реальном
+  смешанном индексе с параллельными unstaged изменениями и не добавил их.
+- Parent snapshot восстановил pinned `.github/workflows/ci.yml`,
+  `post-commit`, clean-tree `pre-push` и guard library; contract test повторно
+  проверяет pinned actions и обязательный push clean-tree helper.
