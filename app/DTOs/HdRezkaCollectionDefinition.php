@@ -10,7 +10,6 @@ final readonly class HdRezkaCollectionDefinition
         public string $sourceKey,
         public string $name,
         public string $path,
-        public ?string $coverPath,
         public int $position,
     ) {}
 }

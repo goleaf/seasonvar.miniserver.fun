@@ -11,6 +11,7 @@ use App\Enums\CatalogCollectionVisibility;
 use App\Models\CatalogCollection;
 use App\Models\CatalogCollectionTranslation;
 use App\Models\User;
+use App\Services\Comments\CommentTargetLifecycleService;
 use App\Support\UserPlainText;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -24,6 +25,8 @@ final class CatalogCollectionService
         private readonly CatalogCollectionCacheInvalidator $cache,
         private readonly CatalogCollectionRateLimiter $rateLimiter,
         private readonly CatalogCollectionSchema $schema,
+        private readonly CatalogCollectionCategoryService $categories,
+        private readonly CommentTargetLifecycleService $comments,
     ) {}
 
     public function create(User $owner, CatalogCollectionData $data): CatalogCollection
@@ -73,11 +76,17 @@ final class CatalogCollectionService
             }
 
             $moderation = $this->initialModeration($data, $owner);
+            $category = $this->categories->resolveAssignment(
+                $data->categoryPublicId,
+                $data->visibility,
+                lockForUpdate: true,
+            );
 
             $collection = CatalogCollection::query()->firstOrCreate([
                 'public_id' => $publicId,
             ], [
                 'owner_id' => $owner->id,
+                'catalog_collection_category_id' => $category?->id,
                 'name' => $name,
                 'description' => $description,
                 'slug' => $this->slugs->generate($name, $publicId),
@@ -124,6 +133,11 @@ final class CatalogCollectionService
         $result = DB::transaction(function () use ($actor, $collection, $data, $expectedVersion, $name, $description, $seoTitle, $seoDescription): array {
             $locked = CatalogCollection::query()->lockForUpdate()->findOrFail($collection->id);
             Gate::forUser($actor)->authorize('update', $locked);
+            $category = $this->categories->resolveAssignment(
+                $data->categoryPublicId,
+                $data->visibility,
+                lockForUpdate: true,
+            );
 
             $locale = $this->locale($data->contentLocale)
                 ?? (string) config('catalog-collections.default_locale', 'ru');
@@ -147,12 +161,14 @@ final class CatalogCollectionService
             $baseContentChanged = $updatesBaseContent
                 && ($locked->name !== $name || $locked->description !== $description);
             $visibilityChanged = $locked->visibility !== $data->visibility;
+            $categoryChanged = $locked->catalog_collection_category_id !== $category?->id;
             $sortChanged = $locked->sort_mode !== $data->sortMode;
             $nextContentLocale = $isEditorialTranslation ? $locked->content_locale : $this->locale($data->contentLocale);
             $contentLocaleChanged = $locked->content_locale !== $nextContentLocale;
             $publicContentChanged = $baseContentChanged
                 || $translationChanged
-                || $visibilityChanged;
+                || $visibilityChanged
+                || $categoryChanged;
             $nextModeration = $locked->moderation_status;
             $nextFeatured = $locked->is_featured;
 
@@ -176,6 +192,7 @@ final class CatalogCollectionService
             $contentChanged = $baseContentChanged
                 || $translationChanged
                 || $visibilityChanged
+                || $categoryChanged
                 || $sortChanged
                 || $contentLocaleChanged;
 
@@ -200,6 +217,7 @@ final class CatalogCollectionService
             $locked->fill([
                 'name' => $updatesBaseContent ? $name : $locked->name,
                 'description' => $updatesBaseContent ? $description : $locked->description,
+                'catalog_collection_category_id' => $category?->id,
                 'visibility' => $data->visibility,
                 'sort_mode' => $data->sortMode,
                 'content_locale' => $nextContentLocale,
@@ -301,12 +319,18 @@ final class CatalogCollectionService
         return $collection->refresh();
     }
 
-    public function forceDelete(User $actor, CatalogCollection $collection, CatalogCollectionCoverService $covers): void
+    public function forceDelete(User $actor, CatalogCollection $collection): void
     {
         Gate::forUser($actor)->authorize('forceDelete', $collection);
         $this->rateLimiter->ensure($actor, 'mutate');
         abort_unless($collection->trashed(), 404);
-        $covers->deleteWithCollection($collection);
+        $this->deletePermanently($collection);
+    }
+
+    public function pruneExpired(CatalogCollection $collection): void
+    {
+        abort_unless($collection->trashed(), 404);
+        $this->deletePermanently($collection);
     }
 
     private function initialModeration(CatalogCollectionData $data, User $owner): CatalogCollectionModerationStatus
@@ -318,6 +342,21 @@ final class CatalogCollectionService
         return $data->visibility === CatalogCollectionVisibility::Private
             ? CatalogCollectionModerationStatus::Approved
             : CatalogCollectionModerationStatus::Pending;
+    }
+
+    private function deletePermanently(CatalogCollection $collection): void
+    {
+        DB::transaction(function () use ($collection): void {
+            $locked = CatalogCollection::query()
+                ->withTrashed()
+                ->lockForUpdate()
+                ->findOrFail($collection->id);
+            abort_unless($locked->trashed(), 404);
+            $this->comments->retireCollection($locked);
+            $locked->forceDelete();
+        }, attempts: 3);
+
+        $this->cache->changed($collection);
     }
 
     private function validName(string $value): string

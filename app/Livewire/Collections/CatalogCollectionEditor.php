@@ -8,25 +8,23 @@ use App\DTOs\CatalogCollectionData;
 use App\DTOs\CatalogCollectionItemCriteria;
 use App\Enums\CatalogCollectionSort;
 use App\Enums\CatalogCollectionVisibility;
+use App\Livewire\Concerns\InteractsWithCatalogCollectionCategory;
 use App\Livewire\Concerns\InteractsWithCollectionLocale;
 use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Models\CatalogCollection;
 use App\Models\CatalogCollectionTranslation;
 use App\Models\User;
-use App\Services\Collections\CatalogCollectionCoverService;
+use App\Services\Collections\CatalogCollectionCategoryQuery;
 use App\Services\Collections\CatalogCollectionItemService;
 use App\Services\Collections\CatalogCollectionQuery;
 use App\Services\Collections\CatalogCollectionResolver;
 use App\Services\Collections\CatalogCollectionService;
-use App\Support\Uploads\PrivateImageUploadRules;
 use Illuminate\Contracts\View\View;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
-use Livewire\WithFileUploads;
 use Livewire\WithPagination;
 
 final class CatalogCollectionEditor extends Component
@@ -35,9 +33,9 @@ final class CatalogCollectionEditor extends Component
 
     private const ITEMS_PER_PAGE = 24;
 
+    use InteractsWithCatalogCollectionCategory;
     use InteractsWithCollectionLocale;
     use InteractsWithPaginationIslands;
-    use WithFileUploads;
     use WithPagination;
 
     #[Locked]
@@ -61,8 +59,6 @@ final class CatalogCollectionEditor extends Component
 
     public string $seoDescription = '';
 
-    public mixed $cover = null;
-
     public ?string $status = null;
 
     public function mount(string $collectionPublicId, CatalogCollectionResolver $resolver): void
@@ -84,6 +80,8 @@ final class CatalogCollectionEditor extends Component
             'description' => ['nullable', 'string', 'max:10000'],
             'visibility' => ['required', Rule::enum(CatalogCollectionVisibility::class)],
             'sortMode' => ['required', Rule::enum(CatalogCollectionSort::class)],
+            'categoryRootPublicId' => ['nullable', 'uuid'],
+            'categoryPublicId' => ['nullable', 'uuid'],
             'seoTitle' => ['nullable', 'string', 'max:180'],
             'seoDescription' => ['nullable', 'string', 'max:500'],
         ], [
@@ -91,6 +89,8 @@ final class CatalogCollectionEditor extends Component
             'description.*' => __('collections.validation.description'),
             'visibility.*' => __('collections.validation.visibility'),
             'sortMode.*' => __('collections.validation.sort'),
+            'categoryRootPublicId.*' => __('collections.validation.category'),
+            'categoryPublicId.*' => __('collections.validation.category'),
             'seoTitle.*' => __('collections.validation.seo_title'),
             'seoDescription.*' => __('collections.validation.seo_description'),
         ]);
@@ -110,28 +110,10 @@ final class CatalogCollectionEditor extends Component
             seoDescription: $collection->type->value === 'editorial' && $validated['seoDescription'] !== ''
                 ? $validated['seoDescription']
                 : null,
+            categoryPublicId: $this->selectedCategoryPublicId(),
         ), $this->contentVersion);
         $this->fillCollection($updated);
         $this->status = __('collections.status.updated');
-    }
-
-    public function uploadCover(CatalogCollectionResolver $resolver, CatalogCollectionCoverService $covers): void
-    {
-        $this->validate(['cover' => PrivateImageUploadRules::required()], [
-            'cover.*' => __('collections.validation.cover'),
-        ]);
-        abort_unless($this->cover instanceof UploadedFile, 422);
-        $collection = $covers->replace($this->user(), $resolver->byPublicId($this->collectionPublicId), $this->cover);
-        $this->cover = null;
-        $this->contentVersion = $collection->content_version;
-        $this->status = __('collections.status.cover_updated');
-    }
-
-    public function removeCover(CatalogCollectionResolver $resolver, CatalogCollectionCoverService $covers): void
-    {
-        $collection = $covers->remove($this->user(), $resolver->byPublicId($this->collectionPublicId));
-        $this->contentVersion = $collection->content_version;
-        $this->status = __('collections.status.cover_removed');
     }
 
     public function removeItem(int $catalogTitleId, CatalogCollectionResolver $resolver, CatalogCollectionItemService $items): void
@@ -195,7 +177,7 @@ final class CatalogCollectionEditor extends Component
     public function render(
         CatalogCollectionResolver $resolver,
         CatalogCollectionQuery $query,
-        CatalogCollectionCoverService $covers,
+        CatalogCollectionCategoryQuery $categories,
     ): View {
         $collection = $query->summary($resolver->byPublicId($this->collectionPublicId));
         Gate::authorize('update', $collection);
@@ -219,6 +201,10 @@ final class CatalogCollectionEditor extends Component
             ]).' — '.__('collections.actions.move_down'));
         }
         $isEditorial = $collection->type->value === 'editorial';
+        $collection->loadMissing([
+            'category:id,public_id,parent_id,slug,position,is_active',
+            'category.parent:id,public_id,parent_id,slug,position,is_active',
+        ]);
 
         return view('livewire.collections.catalog-collection-editor', [
             'collection' => $collection,
@@ -230,7 +216,6 @@ final class CatalogCollectionEditor extends Component
             'isEditorial' => $isEditorial,
             'isPendingModeration' => $collection->moderation_status->value === 'pending',
             'canOpenPublicPage' => $collection->isPubliclyViewable(),
-            'hasCover' => is_string($collection->cover_path) && $collection->cover_path !== '',
             'itemsTitle' => trans_choice('collections.page.items', $totalItems, ['count' => $totalItems]),
             'visibilityOptions' => array_map(static fn (CatalogCollectionVisibility $option): array => [
                 'value' => $option->value,
@@ -240,8 +225,7 @@ final class CatalogCollectionEditor extends Component
                 'value' => $option->value,
                 'label' => $option->label(),
             ], CatalogCollectionSort::cases()),
-            'coverUrl' => $covers->url($collection),
-            'maximumCoverMegabytes' => round((int) config('uploads.max_image_kilobytes', 2048) / 1024, 1),
+            ...$this->categorySelectionViewData($categories, $collection->category),
         ])->extends('layouts.app', [
             'title' => __('collections.actions.edit').' — '.$collection->display_name,
             'seo' => [
@@ -269,6 +253,7 @@ final class CatalogCollectionEditor extends Component
         $this->visibility = $collection->visibility->value;
         $this->sortMode = $collection->sort_mode->value;
         $this->contentVersion = $collection->content_version;
+        $this->fillCategorySelection($collection);
     }
 
     private function user(): User

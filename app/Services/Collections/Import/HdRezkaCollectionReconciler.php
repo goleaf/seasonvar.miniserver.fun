@@ -78,7 +78,6 @@ final readonly class HdRezkaCollectionReconciler
             $source->catalog_collection_id = $collection->id;
             $source->source_path = $definition->path;
             $source->remote_name = $name;
-            $source->cover_source_path = $definition->coverPath;
             $source->semantic_content_hash = $this->semanticHash($resolvedItems);
             $source->last_seen_run_id = $run->id;
             $source->missing_since_at = null;
@@ -250,7 +249,6 @@ final readonly class HdRezkaCollectionReconciler
             'sort_mode' => CatalogCollectionSort::Manual,
             'content_locale' => 'ru',
             'is_featured' => false,
-            'cover_version' => 0,
             'content_version' => 1,
             'published_at' => $publiclyListed ? now() : null,
         ]);

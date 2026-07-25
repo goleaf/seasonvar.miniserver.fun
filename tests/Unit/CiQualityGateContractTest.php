@@ -232,6 +232,30 @@ final class CiQualityGateContractTest extends TestCase
         );
     }
 
+    public function test_automatic_changelog_update_runs_after_guards_and_before_validation(): void
+    {
+        $hook = File::get(base_path('.githooks/pre-commit'));
+
+        $guardPosition = strpos($hook, 'seasonvar_git_guard_require_no_untracked_files');
+        $updaterPosition = strpos(
+            $hook,
+            '"$repo_root/scripts/update-changelog-for-staged-code.sh"',
+        );
+        $documentationPosition = strpos($hook, 'bash "$repo_root/scripts/ci-check.sh" docs');
+        $readmePosition = strpos($hook, 'check-readme-policy.sh');
+        $changelogPosition = strpos($hook, 'check-changelog-policy.sh');
+
+        $this->assertIsInt($guardPosition);
+        $this->assertIsInt($updaterPosition);
+        $this->assertIsInt($documentationPosition);
+        $this->assertIsInt($readmePosition);
+        $this->assertIsInt($changelogPosition);
+        $this->assertTrue($guardPosition < $updaterPosition);
+        $this->assertTrue($updaterPosition < $documentationPosition);
+        $this->assertTrue($updaterPosition < $readmePosition);
+        $this->assertTrue($updaterPosition < $changelogPosition);
+    }
+
     public function test_documentation_freshness_gate_runs_before_commit_and_in_backend_ci(): void
     {
         $hook = File::get(base_path('.githooks/pre-commit'));

@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\PruneSeasonvarImportStorage;
 use App\Jobs\WakeSeasonvarImportFinalizers;
 use App\Services\Media\LicensedMediaFileSizeBackfillSchedule;
 use Illuminate\Support\Facades\Schedule;
@@ -43,6 +44,14 @@ Schedule::job(new WakeSeasonvarImportFinalizers)
     ->name('seasonvar-import-finalization-watchdog')
     ->withoutOverlapping(10)
     ->onOneServer();
+
+Schedule::job(new PruneSeasonvarImportStorage)
+    ->dailyAt((string) config('seasonvar.import.storage_maintenance_schedule', '04:17'))
+    ->name('seasonvar-import-storage-prune')
+    ->withoutOverlapping(10)
+    ->onOneServer()
+    ->when(static fn (): bool => (bool) config('seasonvar.import.storage_maintenance_enabled', true)
+        && (bool) config('seasonvar.import.storage_maintenance_scheduled_enabled', false));
 
 $mediaFileSizeBackfillSchedule = LicensedMediaFileSizeBackfillSchedule::fromConfig();
 

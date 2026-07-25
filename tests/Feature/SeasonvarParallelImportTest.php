@@ -1006,7 +1006,9 @@ class SeasonvarParallelImportTest extends TestCase
         $run = $this->queuedRun();
         $run->update([
             'summary' => array_merge($run->summary ?? [], ['dispatch_completed' => false]),
+            'last_heartbeat_at' => now()->subHour(),
         ]);
+        $heartbeat = $run->fresh()->last_heartbeat_at;
         $pipeline = Mockery::mock(SeasonvarImportPipeline::class);
         $pipeline->shouldNotReceive('finalizeQueuedRun');
         $job = (new FinalizeSeasonvarQueuedImport($run->id))->withFakeQueueInteractions();
@@ -1020,6 +1022,7 @@ class SeasonvarParallelImportTest extends TestCase
 
         $job->assertNotReleased();
         $this->assertSame('running', $run->fresh()->status);
+        $this->assertTrue($heartbeat->equalTo($run->fresh()->last_heartbeat_at));
     }
 
     public function test_dispatcher_rejects_premature_run_recovery_when_another_global_run_is_active(): void

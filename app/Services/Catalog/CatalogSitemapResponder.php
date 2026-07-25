@@ -100,7 +100,7 @@ class CatalogSitemapResponder
     {
         return response()->stream(function (): void {
             echo '<?xml version="1.0" encoding="UTF-8"?>'."\n";
-            echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'."\n";
+            echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">'."\n";
             $this->writeSitemapUrl(route('home'), now(), 'daily', '1.0');
 
             foreach (config('catalog-collections.supported_locales', ['ru']) as $locale) {
@@ -350,7 +350,7 @@ class CatalogSitemapResponder
 
         return response()->stream(function () use ($page): void {
             echo '<?xml version="1.0" encoding="UTF-8"?>'."\n";
-            echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">'."\n";
+            echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'."\n";
 
             $this->titles->visibleTo(null)
                 ->select(['id', 'slug', 'title', 'poster_url', 'updated_at', 'indexed_at'])
@@ -377,25 +377,17 @@ class CatalogSitemapResponder
     {
         return response()->stream(function (): void {
             echo '<?xml version="1.0" encoding="UTF-8"?>'."\n";
-            echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">'."\n";
+            echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'."\n";
 
             if ($this->collectionSchema->available()) {
                 $this->collections->publicSitemapQuery()
                     ->cursor()
                     ->each(function (CatalogCollection $collection): void {
-                        $cover = $collection->cover_path !== null && $collection->cover_version > 0
-                            ? route('collections.cover', [
-                                'publicId' => $collection->public_id,
-                                'version' => $collection->cover_version,
-                            ])
-                            : null;
-                        $this->writeSitemapUrlWithImage(
+                        $this->writeSitemapUrl(
                             route('collections.show', ['collectionSlug' => $collection->slug]),
                             $collection->updated_at,
                             'weekly',
                             $collection->is_featured ? '0.8' : '0.6',
-                            $cover,
-                            $cover === null ? null : $collection->name,
                         );
                     });
             }

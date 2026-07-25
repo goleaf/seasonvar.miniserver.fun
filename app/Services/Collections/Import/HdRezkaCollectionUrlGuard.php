@@ -12,8 +12,6 @@ final class HdRezkaCollectionUrlGuard
 
     public const string PURPOSE_COLLECTION = 'collection';
 
-    public const string PURPOSE_COVER = 'cover';
-
     public const string PURPOSE_DETAIL = 'detail';
 
     private const string BASE_URL = 'https://hdrezka.my';
@@ -48,10 +46,6 @@ final class HdRezkaCollectionUrlGuard
             self::PURPOSE_INDEX => $decodedPath === '/collections.html',
             self::PURPOSE_COLLECTION => preg_match(
                 '~^/xfsearch/collections/[\p{L}\p{M}\p{N} +()&.,:;!_-]+/(?:page/[1-9][0-9]*/)?$~u',
-                $decodedPath,
-            ) === 1,
-            self::PURPOSE_COVER => preg_match(
-                '~^/uploads/mini/(?:[a-z0-9_-]+/){1,4}[a-z0-9._-]+\.(?:jpe?g|png|webp)$~i',
                 $decodedPath,
             ) === 1,
             self::PURPOSE_DETAIL => preg_match(

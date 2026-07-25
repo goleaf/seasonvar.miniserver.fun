@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Collections;
 
+use App\Enums\AdminPermission;
 use App\Enums\CatalogCollectionModerationStatus;
 use App\Enums\CatalogCollectionReportStatus;
 use App\Enums\CatalogCollectionType;
@@ -15,6 +16,8 @@ use App\Services\Collections\CatalogCollectionModerationService;
 use App\Services\Collections\CatalogCollectionQuery;
 use App\Services\Collections\CatalogCollectionResolver;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Number;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -106,6 +109,43 @@ final class CatalogCollectionAdministrationManager extends Component
                 ])
                 ->values()
                 ->all();
+            $sourceSyncSummary['health_metrics'] = [
+                [
+                    'label' => __('collections.sync.health.empty_collections'),
+                    'value' => $sourceSyncSummary['diagnostics']['empty_collections'],
+                ],
+                [
+                    'label' => __('collections.sync.health.actionable_empty_collections'),
+                    'value' => $sourceSyncSummary['diagnostics']['actionable_empty_collections'],
+                ],
+                [
+                    'label' => __('collections.sync.health.unsupported_empty_collections'),
+                    'value' => $sourceSyncSummary['diagnostics']['unsupported_empty_collections'],
+                ],
+                [
+                    'label' => __('collections.sync.health.match_coverage'),
+                    'value' => Number::percentage(
+                        $sourceSyncSummary['diagnostics']['match_coverage_percent'],
+                        maxPrecision: 2,
+                        locale: app()->currentLocale(),
+                    ),
+                ],
+            ];
+            $sourceSyncSummary['scope_metrics'] = collect($sourceSyncSummary['diagnostics']['source_scopes'])
+                ->map(fn (int $value, string $key): array => [
+                    'label' => __('collections.sync.source_scopes.'.$key),
+                    'value' => $value,
+                ])
+                ->values()
+                ->all();
+            $sourceSyncSummary['match_metrics'] = collect($sourceSyncSummary['diagnostics']['match_methods'])
+                ->filter(fn (int $value): bool => $value > 0)
+                ->map(fn (int $value, string $key): array => [
+                    'label' => __('collections.sync.match_methods.'.$key),
+                    'value' => $value,
+                ])
+                ->values()
+                ->all();
         }
 
         foreach ($paginator->getCollection() as $collection) {
@@ -145,6 +185,7 @@ final class CatalogCollectionAdministrationManager extends Component
         return view('livewire.collections.catalog-collection-administration-manager', [
             'collections' => $paginator,
             'sourceSyncSummary' => $sourceSyncSummary,
+            'canModerateCollections' => Gate::allows(AdminPermission::CollectionsModerate->value),
         ]);
     }
 

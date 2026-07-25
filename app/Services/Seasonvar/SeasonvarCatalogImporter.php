@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\Seasonvar;
 
-use App\Actions\Media\InspectLicensedMediaFileSize;
 use App\Actions\Seasonvar\RecordSeasonvarPageFailure;
 use App\DTOs\MediaHealthCheckResultData;
 use App\DTOs\Seasonvar\SeasonvarCatalogData;
@@ -27,7 +26,6 @@ use App\Models\CatalogTitleSlug;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\Season;
-use App\Models\SeasonvarImportEvent;
 use App\Models\SourcePage;
 use App\Models\SourcePageSnapshot;
 use App\Services\Api\V1\Sync\CatalogSyncChangePublisher;
@@ -64,10 +62,8 @@ class SeasonvarCatalogImporter
         private readonly SeasonvarCatalogIdentityResolver $identityResolver,
         private readonly SeasonvarEditorialFieldResolver $editorialFields,
         private readonly ExternalPlaylistImporter $playlistImporter,
-        private readonly SeasonvarMediaAvailabilityChecker $mediaAvailabilityChecker,
         private readonly MediaSourceHealthManager $mediaHealth,
         private readonly ExternalMediaMetadata $mediaMetadata,
-        private readonly InspectLicensedMediaFileSize $inspectFileSize,
         private readonly SeasonvarCatalogRelationSyncer $relationSyncer,
         private readonly SeasonvarRelationMetadataNormalizer $relationMetadata,
         private readonly SeasonvarDatabaseTransaction $databaseTransaction,
@@ -78,6 +74,7 @@ class SeasonvarCatalogImporter
         private readonly CatalogSearchIndexer $searchIndexer,
         private readonly CatalogSyncChangePublisher $syncChanges,
         private readonly CatalogRecommendationDirtyTitleTracker $recommendationDirtyTitles,
+        private readonly SeasonvarImportEventRecorder $eventRecorder,
     ) {}
 
     /**
@@ -480,7 +477,7 @@ class SeasonvarCatalogImporter
     }
 
     /**
-     * Apply a network-free prepared payload to one canonical catalog title.
+     * Apply a prepared payload to one canonical title without provider HTTP requests.
      *
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
      * @param  (callable(CatalogTitle): void)|null  $afterCatalogCommit
@@ -586,7 +583,6 @@ class SeasonvarCatalogImporter
             $transactionResult['seasons'],
             $data->media,
             $progress,
-            allowNetwork: false,
         );
         $this->syncMediaTranslations($catalogTitle, $progress);
         $catalogTitle->update([
@@ -1265,6 +1261,8 @@ class SeasonvarCatalogImporter
     }
 
     /**
+     * Persist only prepared media and availability; remote file sizes belong to the backlog lane.
+     *
      * @param  array<int, Season>  $seasons
      * @param  list<array{url: string, title: string|null, season_number: int|null, episode_number: int|null, source_url: string|null, kind: string, storage_disk?: string, availability?: array<string, mixed>}>  $mediaItems
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
@@ -1275,7 +1273,6 @@ class SeasonvarCatalogImporter
         array $seasons,
         array $mediaItems,
         ?callable $progress = null,
-        bool $allowNetwork = true,
     ): array {
         $result = $this->emptyMediaResult();
 
@@ -1396,7 +1393,6 @@ class SeasonvarCatalogImporter
             if ($wasExisting
                 && ! $this->mediaAttributesChanged($media, $mediaUpdates)
                 && ! $this->mediaAvailabilityCheckDue($media)
-                && ! $this->inspectFileSize->shouldInspect($media)
             ) {
                 $result['skipped']++;
                 $this->report($progress, 'seasonvar-media-skipped', [
@@ -1423,19 +1419,10 @@ class SeasonvarCatalogImporter
             if ($media->health_status !== MediaHealthStatus::Disabled) {
                 $availability = $this->preparedMediaAvailability($item);
 
-                if ($availability !== null || $allowNetwork) {
-                    $media = $this->mediaHealth->record(
-                        $media,
-                        $availability ?? $this->checkMediaUrl($playbackUrl, $progress),
-                    );
+                if ($availability !== null) {
+                    $media = $this->mediaHealth->record($media, $availability);
                 }
             }
-
-            $this->inspectFileSize->execute($media, $progress, context: [
-                'catalog_title' => $catalogTitle->title,
-                'season_number' => $season?->number,
-                'episode_number' => $episode?->number,
-            ]);
 
             $result[$wasExisting ? 'updated' : 'attached']++;
             $this->report($progress, $media->wasRecentlyCreated ? 'seasonvar-media-attached' : 'seasonvar-media-updated', [
@@ -1537,11 +1524,6 @@ class SeasonvarCatalogImporter
     private function mediaTranslationName(?string $title, ?string $sourceUrl): ?string
     {
         return $this->mediaMetadata->translationName($title, $sourceUrl);
-    }
-
-    private function checkMediaUrl(string $url, ?callable $progress = null): MediaHealthCheckResultData
-    {
-        return $this->mediaAvailabilityChecker->check($url, $progress);
     }
 
     /** @param array<string, mixed> $item */
@@ -1797,13 +1779,12 @@ class SeasonvarCatalogImporter
     /** @param array<string, mixed> $context */
     private function recordPageEvent(SourcePage $page, ?int $importRunId, string $event, array $context): void
     {
-        SeasonvarImportEvent::query()->create([
-            'seasonvar_import_run_id' => $importRunId,
-            'source_page_id' => $page->id,
-            'event' => $event,
-            'level' => str_contains($event, 'failure') ? 'warning' : 'info',
-            'context' => $context,
-        ]);
+        $this->eventRecorder->record(
+            event: $event,
+            context: $context,
+            importRunId: $importRunId,
+            sourcePageId: (int) $page->id,
+        );
     }
 
     /**

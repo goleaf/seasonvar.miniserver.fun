@@ -10,6 +10,7 @@ use App\Enums\PremiumFeature;
 use App\Models\PremiumEntitlement;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Collection;
 
 final class PremiumAccessResolver
 {
@@ -34,6 +35,27 @@ final class PremiumAccessResolver
         return $summary->active && in_array($feature->value, $summary->features, true);
     }
 
+    /**
+     * @param  Collection<int, PremiumEntitlement>  $entitlements
+     */
+    public function resolveLoaded(
+        User $user,
+        Collection $entitlements,
+        CarbonImmutable $at,
+    ): PremiumAccessSummary {
+        if (! $this->schema->ready()) {
+            return PremiumAccessSummary::inactive();
+        }
+
+        return $this->resolved[$user->id] ??= $this->summarize(
+            $entitlements->filter(
+                static fn (PremiumEntitlement $entitlement): bool => $entitlement->user_id === $user->id
+                    && $entitlement->isActiveAt($at),
+            ),
+            $at,
+        );
+    }
+
     public function forget(User $user): void
     {
         unset($this->resolved[$user->id]);
@@ -46,12 +68,21 @@ final class PremiumAccessResolver
             ->whereBelongsTo($user)
             ->activeAt($now)
             ->with('subscription:id,status,current_period_end,grace_ends_at,cancel_at_period_end')
-            ->orderBy('starts_at')
             ->get([
                 'id', 'user_id', 'premium_subscription_id', 'feature_code', 'source',
                 'starts_at', 'ends_at', 'is_lifetime',
             ]);
 
+        return $this->summarize($entitlements, $now);
+    }
+
+    /**
+     * @param  Collection<int, PremiumEntitlement>  $entitlements
+     */
+    private function summarize(
+        Collection $entitlements,
+        CarbonImmutable $now,
+    ): PremiumAccessSummary {
         if ($entitlements->isEmpty()) {
             return PremiumAccessSummary::inactive();
         }

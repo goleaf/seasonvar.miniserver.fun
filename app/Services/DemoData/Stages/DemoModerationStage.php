@@ -150,7 +150,7 @@ final readonly class DemoModerationStage implements DemoDataStage
                     'details' => $this->text->report($persona, 'публичную подборку', $collectionOrdinal + 200),
                     'status' => $status->value,
                     'resolution_note' => $status === CatalogCollectionReportStatus::Open
-                        ? null : 'Название, описание, обложка и состав подборки проверены модератором.',
+                        ? null : 'Название, описание и состав подборки проверены модератором.',
                     'deduplication_key' => $this->stable->hash("moderation:collection-report:{$collectionOrdinal}"),
                     'resolved_at' => $status === CatalogCollectionReportStatus::Open ? null : $createdAt->addDay(),
                     'created_at' => $createdAt,

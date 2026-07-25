@@ -1,7 +1,7 @@
 # Центральные touch-controls проигрывателя — design
 
 Дата: 24.07.2026
-Статус: `approved_by_user`, готово к TDD-реализации как Task 21 безлимитного player roadmap.
+Статус: `implemented_and_verified_local` как Task 21 безлимитного player roadmap; commit/push и production activation остаются отдельными gate.
 
 ## Пользовательский результат
 

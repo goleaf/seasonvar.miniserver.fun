@@ -11,6 +11,7 @@ use App\Models\AdminOperationalEvent;
 use App\Models\AdminRole;
 use App\Models\AdminUserRole;
 use App\Models\CatalogCollection;
+use App\Models\CatalogCollectionCategory;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleReview;
 use App\Models\CatalogTitleReviewReport;
@@ -43,6 +44,7 @@ final class AdminAuditRecorder
         Episode::class => 'episode',
         LicensedMedia::class => 'licensed_media',
         CatalogCollection::class => 'catalog_collection',
+        CatalogCollectionCategory::class => 'catalog_collection_category',
         Comment::class => 'comment',
         CommentReport::class => 'comment_report',
         CommentRestriction::class => 'comment_restriction',
@@ -115,6 +117,10 @@ final class AdminAuditRecorder
         'assigned_at',
         'cache_version',
         'index_version',
+        'parent',
+        'position',
+        'is_active',
+        'collections',
     ];
 
     /** @param array<int, mixed> $changedFields */

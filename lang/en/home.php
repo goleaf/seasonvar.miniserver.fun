@@ -39,6 +39,7 @@ return [
         'format' => 'Format: :format',
         'translation' => 'Audio translation: :translation',
         'published_at' => 'Published: :date',
+        'more_on_title' => 'More episodes and videos are available on the series page.',
     ],
     'update_types' => [
         'new_episode' => 'New episode',

@@ -19,6 +19,10 @@ session lifecycle.
 Tailwind CSS 4.3.2, Vite 8.1.4, Plyr 3.8.4, HLS.js 1.6.16,
 FontAwesome 7.3.0, Playwright projects `1440×1200`, `390×844`, `768×1024`.
 
+**Status:** `implemented_and_verified_local`; commit остаётся
+`unresolved_shared_worktree`, push дополнительно `unresolved_auth`,
+production activation не заявляется.
+
 ## Global Constraints
 
 - Этот finite work item является `Task 21` безлимитного master plan
@@ -100,17 +104,17 @@ No change expected:
 Modify `tests/browser/player-lifecycle.spec.js` with one scenario executed by
 Desktop, Mobile and Tablet Chromium:
 
-- [ ] Open deterministic MP4 player fixture.
-- [ ] Assert `[data-player-center-controls]` contains exactly ordered
+- [x] Open deterministic MP4 player fixture.
+- [x] Assert `[data-player-center-controls]` contains exactly ordered
    `rewind`, `toggle`, `forward` buttons.
-- [ ] Assert side buttons are at least `56×56`, center at least `68×68` and larger
+- [x] Assert side buttons are at least `56×56`, center at least `68×68` and larger
    than side buttons.
-- [ ] Assert all button vertical centers match and the toggle center matches the
+- [x] Assert all button vertical centers match and the toggle center matches the
    `.plyr` center within `2 px`.
-- [ ] Assert no horizontal document overflow.
-- [ ] Instrument media time/play/pause as the existing keyboard test does.
-- [ ] Click rewind and forward, proving exact `50→40→50`.
-- [ ] Click toggle twice, proving play then pause plus RU/EN-derived dynamic
+- [x] Assert no horizontal document overflow.
+- [x] Instrument media time/play/pause as the existing keyboard test does.
+- [x] Click rewind and forward, proving exact `50→40→50`.
+- [x] Click toggle twice, proving play then pause plus RU/EN-derived dynamic
    `aria-label`.
 
 Run:
@@ -129,13 +133,13 @@ Extend
 `FrontendAssetContractTest::test_player_assets_define_one_cleanup_safe_livewire_session_lifecycle`
 to require:
 
-- [ ] Require `data-player-center-controls`.
-- [ ] Require `initializeCenterControls()`.
-- [ ] Require `syncCenterPlaybackControl()`.
-- [ ] Require exact `seekMediaBy(-10)` and `seekMediaBy(10)`.
-- [ ] Require the CSS ready marker to hide only
+- [x] Require `data-player-center-controls`.
+- [x] Require `initializeCenterControls()`.
+- [x] Require `syncCenterPlaybackControl()`.
+- [x] Require exact `seekMediaBy(-10)` and `seekMediaBy(10)`.
+- [x] Require the CSS ready marker to hide only
   `.plyr__control--overlaid`.
-- [ ] Assert that a second `new this.Plyr` is absent.
+- [x] Assert that a second `new this.Plyr` is absent.
 
 Run:
 
@@ -149,18 +153,18 @@ Expected RED: only the new control contract assertions fail.
 
 Modify `resources/js/player.js`:
 
-- [ ] Add bounded seek-label formatter replacing `{seektime}` with `10`.
-- [ ] Add session fields for center cluster/toggle/icon.
-- [ ] Call `initializeCenterControls()` immediately after Plyr construction.
-- [ ] Create one wrapper and three native buttons with local FontAwesome classes,
+- [x] Format bounded seek labels by replacing `{seektime}` with `10`.
+- [x] Add session fields for center cluster/toggle/icon.
+- [x] Call `initializeCenterControls()` immediately after Plyr construction.
+- [x] Create one wrapper and three native buttons with local FontAwesome classes,
    visible `10` on side controls and localized `aria-label`/`title`.
-- [ ] Bind clicks with the existing abort signal and stop propagation.
-- [ ] Use `seekMediaBy(-10)`, `Plyr.togglePlay()` and `seekMediaBy(10)`.
-- [ ] Update toggle icon/label from actual paused/ended state in initial,
+- [x] Bind clicks with the existing abort signal and stop propagation.
+- [x] Use `seekMediaBy(-10)`, `Plyr.togglePlay()` and `seekMediaBy(10)`.
+- [x] Update toggle icon/label from actual paused/ended state in initial,
    `handlePlay()`, `handlePause()` and `handleEnded()`.
-- [ ] Mark the Plyr container ready only after all controls are appended.
-- [ ] Remove wrapper/ready marker in `destroy()` before `plyr.destroy()`.
-- [ ] Do not add listener, player, timer, mutation observer, device sniffing or
+- [x] Mark the Plyr container ready only after all controls are appended.
+- [x] Remove wrapper/ready marker in `destroy()` before `plyr.destroy()`.
+- [x] Do not add listener, player, timer, mutation observer, device sniffing or
     new exported API.
 
 Run:
@@ -174,14 +178,14 @@ php artisan test --filter=FrontendAssetContractTest
 
 Modify `resources/css/app.css` next to the current Plyr rules:
 
-- [ ] Add absolute inset/flex centering and a non-blocking wrapper.
-- [ ] Apply the exact bounded side/center sizes and gap from the design.
-- [ ] Add contrast, visible focus, active feedback and
+- [x] Add absolute inset/flex centering and a non-blocking wrapper.
+- [x] Apply the exact bounded side/center sizes and gap from the design.
+- [x] Add contrast, visible focus, active feedback and
   `touch-action: manipulation`.
-- [ ] Enable `pointer-events` only on buttons.
-- [ ] Hide the old overlay only under the ready marker.
-- [ ] Follow `.plyr--hide-controls`, while focus restores visibility.
-- [ ] Add safe horizontal padding, reduced motion and no overflow.
+- [x] Enable `pointer-events` only on buttons.
+- [x] Hide the old overlay only under the ready marker.
+- [x] Follow `.plyr--hide-controls`, while focus restores visibility.
+- [x] Add safe horizontal padding, reduced motion and no overflow.
 
 Run:
 
@@ -195,32 +199,32 @@ Expected GREEN: Desktop/Mobile/Tablet pass geometry and actions.
 
 ## Task 5: Run affected regression
 
-- [ ] Run the focused PHP/static matrix:
+- [x] Run the focused PHP/static matrix:
 
 ```bash
 php artisan test --filter='FrontendAssetContractTest|CatalogPlayerCopyTest|LivewireWireIgnoreContractTest|CatalogVisualSystemTest'
 ```
 
-- [ ] Build matching frontend assets:
+- [x] Build matching frontend assets:
 
 ```bash
 npm run build
 ```
 
-- [ ] Run the complete player browser matrix:
+- [x] Run the complete player browser matrix:
 
 ```bash
 npx playwright test tests/browser/player-lifecycle.spec.js
 ```
 
-- [ ] Inspect screenshots for `1440×1200`, `390×844`, `768×1024` and store
+- [x] Inspect screenshots for `1440×1200`, `390×844`, `768×1024` and store
 task evidence under ignored `output/playwright/`. Verify one video/Plyr,
 first-party request/console/page errors, no overflow, standard fullscreen,
 menu, keyboard, hot swap and cleanup.
 
 ## Task 6: Update owners and visitor documentation
 
-- [ ] Update:
+- [x] Update:
 
 - playback audit with exact three-control contract and acceptance;
 - frontend lifecycle with JS ownership/cleanup;
@@ -229,9 +233,9 @@ menu, keyboard, hot swap and cleanup.
 - Russian CHANGELOG with a separate 24.07.2026 entry;
 - current plan and unlimited master ledger with Task 21 evidence.
 
-- [ ] Re-read all applicable requirement owners.
+- [x] Re-read all applicable requirement owners.
 
-- [ ] Run the documentation and policy gates:
+- [x] Run the documentation and policy gates:
 
 ```bash
 php artisan project:docs-refresh --check
@@ -242,7 +246,7 @@ git diff --check
 
 ## Task 7: Delivery gate
 
-- [ ] Review exact task diff and branch:
+- [x] Review exact task diff and branch:
 
 ```bash
 git status --short --branch
@@ -256,6 +260,11 @@ hook rejects any remaining unstaged/untracked file, so commit/push stay
 `unresolved_shared_worktree` unless the foreign owners first deliver and clean
 their scopes. If the tree becomes clean, stage only the exact Task 21 manifest,
 commit directly on existing `main`, then ordinary push without force.
+
+Actual delivery gate: direct canonical pre-commit returned the expected
+unstaged/untracked blocker; ordinary `git push origin main` additionally
+returned `could not read Username for 'https://github.com'`. No hook bypass,
+force push or history rewrite was used.
 
 ## Rollback
 
@@ -275,3 +284,26 @@ queue restart, provider change or environment edit is required.
   production claim is present.
 - [x] Task 21 remains finite; future evidence-driven work belongs to
   `Task 22+` in the existing master plan.
+
+## Execution evidence
+
+- RED static boundary: independent pre-change `HEAD` inspection missed all
+  five new JavaScript contracts.
+- RED browser: saved Desktop/Mobile/Tablet artifacts show `26.5..34 px`
+  controls before responsive CSS, below the required `56 px` minimum.
+- GREEN static: `6` tests, `335` assertions.
+- Affected PHP/static matrix: `42` tests, `764` assertions; targeted Pint
+  passed.
+- GREEN browser: focused geometry/action contract — `3/3`; full
+  `player-lifecycle.spec.js` — `18` passed, `12` expected skips.
+- Vite production build transformed `24` modules; `node --check` passed.
+- Visual evidence inspected at `1440×1200`, `768×1024` and `390×844` under
+  ignored `output/playwright/player-touch-controls-*.png`.
+- Managed docs, README policy and `git diff --check` passed. Общий CHANGELOG
+  policy принял новую строку Task 21 и затем остановился на отдельной foreign
+  importer-строке с обычным `network-free`; чужой текст не переписывался.
+- Legacy/duplicate scan подтвердил один `new this.Plyr`, один center-control
+  initializer и отсутствие второго Blade/route/player implementation.
+- Runtime code, local verification and documentation are complete. Commit is
+  `unresolved_shared_worktree`, push is also `unresolved_auth`, and production
+  activation remains an independent unresolved gate.

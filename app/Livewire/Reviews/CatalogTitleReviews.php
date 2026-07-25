@@ -525,6 +525,11 @@ final class CatalogTitleReviews extends Component
         ]);
     }
 
+    public function placeholder(): View
+    {
+        return view('livewire.reviews.catalog-title-reviews-placeholder');
+    }
+
     private function title(): CatalogTitle
     {
         return $this->titles->visibleTo($this->user())->findOrFail($this->catalogTitleId);

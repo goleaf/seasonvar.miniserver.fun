@@ -468,7 +468,7 @@ final class CatalogPublicDiscoveryQuery
             return [];
         }
 
-        $limit = min($this->candidateLimit(), max(1, $context->boundedPerPage() + 1));
+        $limit = min($this->candidateLimit(), $context->boundedPerPage());
         $probeSize = max(1, min(24, (int) config('recommendations.random.probe_size', 8)));
         $maximumProbes = max(1, min(24, (int) config('recommendations.random.maximum_probes', 12)));
         $seed = $context->seed ?? bin2hex(random_bytes(16));
@@ -492,6 +492,18 @@ final class CatalogPublicDiscoveryQuery
             }
 
             $ids = $ids->merge($probeIds)->unique()->take($limit);
+        }
+
+        if ($ids->count() < $limit) {
+            $remaining = (clone $query)
+                ->when(
+                    $ids->isNotEmpty(),
+                    fn (Builder $query): Builder => $query->whereKeyNot($ids->all()),
+                )
+                ->orderBy('catalog_titles.id')
+                ->limit($limit - $ids->count())
+                ->pluck('catalog_titles.id');
+            $ids = $ids->merge($remaining)->unique()->take($limit);
         }
 
         return $ids

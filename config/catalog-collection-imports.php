@@ -23,13 +23,5 @@ return [
             'timeout' => (int) env('HDREZKA_COLLECTION_RECOMMENDATION_TIMEOUT', 900),
             'unique_seconds' => (int) env('HDREZKA_COLLECTION_RECOMMENDATION_UNIQUE_SECONDS', 21_600),
         ],
-        'cover' => [
-            'max_source_bytes' => (int) env('HDREZKA_COLLECTION_COVER_MAX_SOURCE_BYTES', 2_097_152),
-            'max_source_dimension' => (int) env('HDREZKA_COLLECTION_COVER_MAX_SOURCE_DIMENSION', 8000),
-            'max_source_pixels' => (int) env('HDREZKA_COLLECTION_COVER_MAX_SOURCE_PIXELS', 32_000_000),
-            'max_width' => (int) env('HDREZKA_COLLECTION_COVER_MAX_WIDTH', 1280),
-            'max_height' => (int) env('HDREZKA_COLLECTION_COVER_MAX_HEIGHT', 720),
-            'quality' => (int) env('HDREZKA_COLLECTION_COVER_WEBP_QUALITY', 82),
-        ],
     ],
 ];

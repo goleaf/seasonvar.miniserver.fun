@@ -56,11 +56,6 @@ final readonly class DemoUserPortalRepairer
                 $userIds,
             ),
             'invalid_profile_images' => $users->filter(fn (User $user): bool => ! $this->validProfileImages($user))->count(),
-            'invalid_collection_images' => CatalogCollection::query()
-                ->whereIn('owner_id', $userIds)
-                ->get(['public_id', 'cover_disk', 'cover_path', 'cover_mime_type'])
-                ->filter(fn (CatalogCollection $collection): bool => ! $this->validCollectionImage($collection))
-                ->count(),
         ];
     }
 
@@ -72,8 +67,7 @@ final readonly class DemoUserPortalRepairer
         $before = $this->inspect();
         $needsProfileImages = $before['invalid_profile_images'] > 0;
         $needsOrganization = $before['users_without_personal_tags'] > 0
-            || $before['users_without_collections'] > 0
-            || $before['invalid_collection_images'] > 0;
+            || $before['users_without_collections'] > 0;
         $needsCatalogActivity = $before['users_without_library'] > 0;
         $needsContentRequests = $before['users_without_requests'] > 0;
         $stageCounters = [];
@@ -205,13 +199,5 @@ final readonly class DemoUserPortalRepairer
             && str_starts_with((string) $profile->cover_path, $prefix.'cover/')
             && Storage::disk((string) $profile->avatar_disk)->exists((string) $profile->avatar_path)
             && Storage::disk((string) $profile->cover_disk)->exists((string) $profile->cover_path);
-    }
-
-    private function validCollectionImage(CatalogCollection $collection): bool
-    {
-        return $collection->cover_disk === config('uploads.disk')
-            && $collection->cover_mime_type === 'image/webp'
-            && str_starts_with((string) $collection->cover_path, 'catalog-collections/'.$collection->public_id.'/')
-            && Storage::disk((string) $collection->cover_disk)->exists((string) $collection->cover_path);
     }
 }

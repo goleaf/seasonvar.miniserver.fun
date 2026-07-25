@@ -9,6 +9,7 @@ use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Services\Auth\AccountDateTimeFormatter;
+use App\Services\Catalog\CatalogHomeContentAdditionQuery;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\View\Component;
@@ -35,6 +36,8 @@ class LatestMediaCard extends Component
 
     public string $displayTitle;
 
+    public bool $hasMore;
+
     /**
      * @param  Collection<int, Episode>  $episodes
      * @param  Collection<int, LicensedMedia>  $media
@@ -45,13 +48,21 @@ class LatestMediaCard extends Component
         public Collection $media,
         private readonly AccountDateTimeFormatter $dates,
         public ?string $timezone = null,
+        bool $hasMore = false,
     ) {
         $this->titleUrl = route('titles.show', $title);
         $this->displayTitle = filled($title->display_title)
             ? (string) $title->display_title
             : __('catalog.title.untitled');
         $this->posterAlt = __('catalog.seo.poster_alt', ['title' => $this->displayTitle]);
-        $this->items = $this->releaseItems();
+        $releaseItems = $this->releaseItems();
+        $this->hasMore = $hasMore
+            || count($releaseItems) > CatalogHomeContentAdditionQuery::RELEASE_ITEMS_PER_TITLE;
+        $this->items = array_slice(
+            $releaseItems,
+            0,
+            CatalogHomeContentAdditionQuery::RELEASE_ITEMS_PER_TITLE,
+        );
     }
 
     /**

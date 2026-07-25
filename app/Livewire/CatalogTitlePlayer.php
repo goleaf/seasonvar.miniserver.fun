@@ -39,6 +39,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Schema;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Renderless;
@@ -114,6 +115,9 @@ class CatalogTitlePlayer extends Component
 
     /** @var Collection<int, Season>|null */
     protected ?Collection $resolvedSeasons = null;
+
+    /** @var array<string, mixed>|null */
+    protected ?array $playerNavigationIslandViewData = null;
 
     #[Locked]
     public ?string $personalPlaybackNotice = null;
@@ -411,7 +415,6 @@ class CatalogTitlePlayer extends Component
     }
 
     /** @return array<string, mixed> */
-    #[Renderless]
     public function commitPlayerTransition(mixed $episodeId, mixed $mediaId): array
     {
         $episodeId = $this->positiveId($episodeId);
@@ -469,6 +472,38 @@ class CatalogTitlePlayer extends Component
             'status' => 'ready',
             'query' => $query,
         ];
+    }
+
+    /**
+     * @return array{
+     *     selectedEpisode: Episode|null,
+     *     episodeNavigation: CatalogEpisodeNavigation,
+     *     previousUrl: string|null,
+     *     nextUrl: string|null
+     * }
+     */
+    #[Computed]
+    public function playerNavigationIslandPage(): array
+    {
+        if ($this->playerNavigationIslandViewData !== null) {
+            return $this->playerNavigationIslandViewData;
+        }
+
+        $title = $this->title();
+        $user = $this->user();
+        $episodeId = $this->positiveId($this->episode);
+        $selectedEpisode = $episodeId === null
+            ? null
+            : $this->playback->watchableEpisode($title, $user, $episodeId);
+        $navigation = $selectedEpisode === null
+            ? new CatalogEpisodeNavigation
+            : $this->playback->navigationForEpisode($title, $user, $selectedEpisode);
+
+        return $this->playerNavigationIslandViewData = $this->navigationIslandData(
+            $title,
+            $selectedEpisode,
+            $navigation,
+        );
     }
 
     #[Renderless]
@@ -694,6 +729,11 @@ class CatalogTitlePlayer extends Component
                 $seasons,
             )
             : new CatalogEpisodeNavigation;
+        $this->playerNavigationIslandViewData = $this->navigationIslandData(
+            $title,
+            $selectedEpisode,
+            $episodeNavigation,
+        );
         $mediaItems = $selectedEpisode !== null && $activeSeason !== null
             ? $this->playback->mediaForEpisode($title, $activeSeason, $selectedEpisode, $user)
             : collect();
@@ -1006,6 +1046,45 @@ class CatalogTitlePlayer extends Component
         $this->variant = $profile['variant'];
         $this->quality = $profile['quality'];
         $this->format = $profile['format'];
+    }
+
+    /**
+     * @return array{
+     *     selectedEpisode: Episode|null,
+     *     episodeNavigation: CatalogEpisodeNavigation,
+     *     previousUrl: string|null,
+     *     nextUrl: string|null
+     * }
+     */
+    private function navigationIslandData(
+        CatalogTitle $title,
+        ?Episode $selectedEpisode,
+        CatalogEpisodeNavigation $navigation,
+    ): array {
+        return [
+            'selectedEpisode' => $selectedEpisode,
+            'episodeNavigation' => $navigation,
+            'previousUrl' => $this->navigationEpisodeUrl($title, $navigation->previous),
+            'nextUrl' => $this->navigationEpisodeUrl($title, $navigation->next),
+        ];
+    }
+
+    private function navigationEpisodeUrl(CatalogTitle $title, ?Episode $episode): ?string
+    {
+        if (! $episode instanceof Episode) {
+            return null;
+        }
+
+        $query = collect([
+            'catalogTitle' => $title,
+            'season' => (int) $episode->season_id,
+            'episode' => $episode->id,
+            'variant' => $this->normalizedVariant(),
+            'quality' => $this->normalizedQuality(),
+            'format' => $this->normalizedFormat(),
+        ])->filter(fn (CatalogTitle|int|string|null $value): bool => $value instanceof CatalogTitle || $value !== null);
+
+        return route('titles.show', $query->all()).'#player';
     }
 
     private function normalizedProfileValue(?string $value, int $maxLength): ?string

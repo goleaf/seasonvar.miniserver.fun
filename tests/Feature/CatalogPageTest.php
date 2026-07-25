@@ -2371,6 +2371,7 @@ class CatalogPageTest extends TestCase
         $season = Season::factory()->create(['catalog_title_id' => $catalogTitle->id]);
         $firstEpisode = Episode::factory()->create(['season_id' => $season->id, 'number' => 1]);
         $secondEpisode = Episode::factory()->create(['season_id' => $season->id, 'number' => 2]);
+        $thirdEpisode = Episode::factory()->create(['season_id' => $season->id, 'number' => 3]);
         $firstMedia = LicensedMedia::factory()->create([
             'catalog_title_id' => $catalogTitle->id,
             'season_id' => $season->id,
@@ -2387,6 +2388,13 @@ class CatalogPageTest extends TestCase
             'variant_key' => 'voiceover-studio',
             'quality' => '1080p',
             'format' => 'm3u8',
+        ]);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'season_id' => $season->id,
+            'episode_id' => $thirdEpisode->id,
+            'status' => 'published',
+            'published_at' => now(),
         ]);
         $component = Livewire::withQueryParams([
             'season' => $season->id,
@@ -2424,6 +2432,17 @@ class CatalogPageTest extends TestCase
             ->assertSet('failedMediaIds', [])
             ->assertSet('authorizationVersion', 0)
             ->assertDispatched('discussion-target-selected');
+
+        $navigationMatched = preg_match(
+            '/<nav[^>]*aria-label="'.preg_quote(__('catalog.player.episode_navigation'), '/').'"[^>]*>(.*?)<\/nav>/s',
+            $component->html(),
+            $navigation,
+        );
+        $this->assertSame(1, $navigationMatched);
+        $this->assertStringContainsString(
+            'data-player-transition-episode="'.$thirdEpisode->id.'"',
+            $navigation[1],
+        );
 
         $component
             ->call('commitPlayerTransition', $firstEpisode->id, $secondMedia->id)

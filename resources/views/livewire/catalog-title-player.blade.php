@@ -281,13 +281,13 @@
                     @endif
                 @endif
 
+                @island(name: 'catalog-player-navigation', always: true, with: $this->playerNavigationIslandPage)
                 @if ($selectedEpisode && ($episodeNavigation->previous || $episodeNavigation->next))
                     <nav class="mt-3 grid gap-2 sm:grid-cols-2" aria-label="{{ __('catalog.player.episode_navigation') }}">
                         @if ($episodeNavigation->previous)
                             <a
-                                href="{{ route('titles.show', $showView->episodeQuery($episodeNavigation->previous)).'#player' }}"
+                                href="{{ $previousUrl }}"
                                 wire:key="episode-navigation-previous-{{ $episodeNavigation->previous->id }}"
-                                wire:click.prevent="selectEpisode({{ $episodeNavigation->previous->id }})"
                                 data-catalog-history
                                 data-player-previous-episode
                                 data-player-transition-episode="{{ $episodeNavigation->previous->id }}"
@@ -303,9 +303,8 @@
 
                         @if ($episodeNavigation->next)
                             <a
-                                href="{{ route('titles.show', $showView->episodeQuery($episodeNavigation->next)).'#player' }}"
+                                href="{{ $nextUrl }}"
                                 wire:key="episode-navigation-next-{{ $episodeNavigation->next->id }}"
-                                wire:click.prevent="selectEpisode({{ $episodeNavigation->next->id }})"
                                 data-catalog-history
                                 data-player-next-episode
                                 data-player-transition-episode="{{ $episodeNavigation->next->id }}"
@@ -320,6 +319,7 @@
                         @endif
                     </nav>
                 @endif
+                @endisland
             </div>
 
             <section data-player-personal class="rounded-lg bg-slate-50 p-4" aria-label="{{ __('catalog.player.personal_state') }}">

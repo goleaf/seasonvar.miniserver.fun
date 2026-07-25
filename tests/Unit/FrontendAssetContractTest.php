@@ -79,8 +79,8 @@ class FrontendAssetContractTest extends TestCase
             ->mapWithKeys(fn (\SplFileInfo $file): array => [$file->getPathname() => File::get($file->getPathname())])
             ->filter(fn (string $contents): bool => str_contains($contents, '->links('));
 
-        $this->assertCount(40, $templates);
-        $this->assertSame(54, $templates->sum(fn (string $contents): int => substr_count($contents, '->links(')));
+        $this->assertCount(41, $templates);
+        $this->assertSame(55, $templates->sum(fn (string $contents): int => substr_count($contents, '->links(')));
 
         foreach ($templates as $path => $contents) {
             preg_match_all("/->links\\(data: \\['region' => '([^']+)'/", $contents, $matches);
@@ -153,15 +153,68 @@ class FrontendAssetContractTest extends TestCase
         $this->assertFileDoesNotExist(resource_path('views/catalog/show.blade.php'));
     }
 
+    public function test_collection_classification_template_has_no_inline_business_or_image_markup(): void
+    {
+        $template = File::get(resource_path(
+            'views/livewire/collections/catalog-collection-category-manager.blade.php',
+        ));
+
+        $this->assertStringContainsString('data-collection-classification', $template);
+        $this->assertStringContainsString('data-classification-summary', $template);
+        $this->assertStringContainsString('data-classification-row', $template);
+        $this->assertStringContainsString('data-classification-preview', $template);
+        $this->assertStringNotContainsString('@php', $template);
+        $this->assertStringNotContainsString('<script', $template);
+        $this->assertStringNotContainsString('<style', $template);
+        $this->assertStringNotContainsString('<img', $template);
+        $this->assertStringNotContainsString('poster', $template);
+    }
+
     public function test_player_assets_define_one_cleanup_safe_livewire_session_lifecycle(): void
     {
         $app = File::get(resource_path('js/app.js'));
         $player = File::get(resource_path('js/player.js'));
+        $css = File::get(resource_path('css/app.css'));
         $playerView = File::get(resource_path('views/livewire/catalog-title-player.blade.php'));
 
         $this->assertStringContainsString('class CatalogPlayerSession', $player);
         $this->assertStringContainsString('const playerSessions = new WeakMap()', $player);
+        $this->assertSame(1, substr_count($player, 'new this.Plyr'));
         $this->assertStringContainsString('new AbortController()', $player);
+        $this->assertStringContainsString('data-player-center-controls', $player);
+        $this->assertStringContainsString('initializeCenterControls()', $player);
+        $this->assertStringContainsString('syncCenterPlaybackControl()', $player);
+        $this->assertStringContainsString('this.seekMediaBy(-10)', $player);
+        $this->assertStringContainsString('this.seekMediaBy(10)', $player);
+        $this->assertStringContainsString(
+            '.plyr[data-player-center-controls-ready] > .plyr__control--overlaid',
+            $css,
+        );
+        foreach ([
+            '--catalog-player-primary: #1877f2;',
+            '--catalog-player-primary-hover: #166fe5;',
+            '--catalog-player-primary-soft: #e7f3ff;',
+            '--catalog-player-surface: #f0f2f5;',
+            '--catalog-player-surface-strong: #e4e6eb;',
+            '--catalog-player-border: #ccd0d5;',
+            '--catalog-player-text: #1c1e21;',
+            '--catalog-player-muted: #65676b;',
+            '--catalog-player-success: #42b72a;',
+            '--catalog-player-warning: #f7b928;',
+            '--catalog-player-danger: #fa383e;',
+            '--catalog-player-white: #ffffff;',
+            '--catalog-player-fullscreen: #000000;',
+        ] as $playerColorToken) {
+            $this->assertStringContainsString($playerColorToken, $css);
+        }
+        $this->assertStringContainsString('.plyr:-webkit-full-screen', $css);
+        $this->assertStringContainsString('.plyr--fullscreen-fallback', $css);
+        $this->assertStringContainsString('video.js-catalog-player:-webkit-full-screen', $css);
+        $this->assertStringContainsString('video.js-catalog-player::backdrop', $css);
+        $this->assertStringContainsString(
+            'background: var(--catalog-player-fullscreen);',
+            $css,
+        );
         $this->assertStringContainsString('PROGRESS_HEARTBEAT_MS = 30_000', $player);
         $this->assertStringContainsString('STABLE_SEEK_DELAY_MS = 750', $player);
         $this->assertStringContainsString('this.progressSequence = 0', $player);

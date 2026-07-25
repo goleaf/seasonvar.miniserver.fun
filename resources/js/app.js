@@ -262,6 +262,124 @@ const syncCatalogAnchor = (hash = window.location.hash, options = {}) => {
     });
 };
 
+const titleQuickNavigationSessions = new Map();
+
+const setCurrentTitleSection = (navigation, targetId) => {
+    navigation.querySelectorAll('[data-title-quick-link]').forEach((link) => {
+        const linkTargetId = decodeHashTarget(new URL(link.href).hash);
+
+        if (linkTargetId === targetId) {
+            link.setAttribute('aria-current', 'location');
+            return;
+        }
+
+        link.removeAttribute('aria-current');
+    });
+};
+
+const syncTitleQuickNavigationFromHash = (hash = window.location.hash) => {
+    const requestedTargetId = decodeHashTarget(hash);
+
+    titleQuickNavigationSessions.forEach((session, navigation) => {
+        const targetId = session.targets.has(requestedTargetId)
+            ? requestedTargetId
+            : session.defaultTargetId;
+
+        setCurrentTitleSection(navigation, targetId);
+    });
+};
+
+const destroyTitleQuickNavigation = (navigation) => {
+    const session = titleQuickNavigationSessions.get(navigation);
+
+    if (!session) {
+        return;
+    }
+
+    session.observer?.disconnect();
+    titleQuickNavigationSessions.delete(navigation);
+};
+
+const destroyTitleQuickNavigationWithin = (root) => {
+    titleQuickNavigationSessions.forEach((_session, navigation) => {
+        if (root === navigation || root.contains?.(navigation)) {
+            destroyTitleQuickNavigation(navigation);
+        }
+    });
+};
+
+const initializeTitleQuickNavigation = (root = document) => {
+    const navigations = [
+        ...(root instanceof Element && root.matches('[data-title-quick-navigation]') ? [root] : []),
+        ...(root.querySelectorAll?.('[data-title-quick-navigation]') ?? []),
+    ];
+
+    navigations.forEach((navigation) => {
+        const links = [...navigation.querySelectorAll('[data-title-quick-link]')];
+        const targets = new Map(links.map((link) => {
+            const targetId = decodeHashTarget(new URL(link.href).hash);
+
+            return [targetId, targetId ? document.getElementById(targetId) : null];
+        }).filter((entry) => entry[0] && entry[1]));
+        const existingSession = titleQuickNavigationSessions.get(navigation);
+        const targetsAreCurrent = existingSession
+            && targets.size === existingSession.targets.size
+            && [...targets].every(([targetId, target]) => existingSession.targets.get(targetId) === target);
+
+        if (targetsAreCurrent) {
+            return;
+        }
+
+        destroyTitleQuickNavigation(navigation);
+
+        if (targets.size === 0) {
+            return;
+        }
+
+        const defaultTargetId = targets.has('player') ? 'player' : targets.keys().next().value;
+        const session = {
+            defaultTargetId,
+            observer: null,
+            targets,
+            visibility: new Map(),
+        };
+
+        if ('IntersectionObserver' in window) {
+            const topOffset = Math.ceil(paginationHeaderOffset());
+
+            session.observer = new IntersectionObserver((entries) => {
+                entries.forEach((entry) => {
+                    const targetId = entry.target.id;
+
+                    if (targetId) {
+                        session.visibility.set(targetId, entry);
+                    }
+                });
+
+                const visible = [...session.visibility.entries()]
+                    .filter(([, entry]) => entry.isIntersecting)
+                    .sort(([, left], [, right]) => (
+                        Math.abs(left.boundingClientRect.top - topOffset)
+                        - Math.abs(right.boundingClientRect.top - topOffset)
+                    ));
+
+                if (visible[0]) {
+                    setCurrentTitleSection(navigation, visible[0][0]);
+                }
+            }, {
+                rootMargin: `${-topOffset}px 0px -55% 0px`,
+                threshold: [0, 0.01, 0.25],
+            });
+
+            targets.forEach((target) => session.observer.observe(target));
+        }
+
+        titleQuickNavigationSessions.set(navigation, session);
+    });
+
+    syncTitleQuickNavigationFromHash();
+};
+
 const loadCatalogSeasonAnchors = () => {
     syncCatalogAnchor(window.location.hash, { animate: true });
 
@@ -294,10 +412,12 @@ const loadCatalogSeasonAnchors = () => {
         event.preventDefault();
         window.history.pushState(null, '', url.hash);
         syncCatalogAnchor(url.hash, { animate: true });
+        syncTitleQuickNavigationFromHash(url.hash);
     });
 
     window.addEventListener('hashchange', () => {
         syncCatalogAnchor(window.location.hash, { animate: true });
+        syncTitleQuickNavigationFromHash();
     });
 };
 
@@ -458,6 +578,7 @@ const flushPaginationScroll = () => {
 const loadCatalogInterfaces = () => {
     loadCatalogFilterSearch();
     loadPaginationScroll();
+    initializeTitleQuickNavigation();
     initializeHeaderSearchInterfaces();
     initializeMobileRuntime();
     void loadPlayerNavigation();
@@ -524,6 +645,7 @@ document.addEventListener('livewire:init', () => {
     window.Livewire.hook('morph.removing', ({ el }) => {
         destroyCatalogPlayersWithin(el);
         destroyPlayerNavigationWithin(el);
+        destroyTitleQuickNavigationWithin(el);
     });
 });
 
@@ -533,6 +655,7 @@ document.addEventListener('livewire:navigating', () => {
     flushCatalogPlayersWithin(document, 'navigation');
     destroyCatalogPlayersWithin(document, { flush: false });
     destroyPlayerNavigationWithin(document);
+    destroyTitleQuickNavigationWithin(document);
 });
 
 document.addEventListener('livewire:navigated', () => {
@@ -546,6 +669,7 @@ window.addEventListener('pagehide', () => {
     flushCatalogPlayersWithin(document, 'pagehide');
     destroyCatalogPlayersWithin(document, { flush: false });
     destroyPlayerNavigationWithin(document);
+    destroyTitleQuickNavigationWithin(document);
 });
 
 window.addEventListener('pageshow', (event) => {

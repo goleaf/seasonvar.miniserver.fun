@@ -50,6 +50,64 @@ final class ReleaseCalendarDefaultViewTest extends TestCase
             ->assertSee('"@type":"ItemList"', false);
     }
 
+    public function test_calendar_index_shows_the_newest_recent_date_first_but_honors_an_explicit_earliest_sort(): void
+    {
+        $this->createReleasedEntry(
+            'Сериал за 28 мая',
+            CarbonImmutable::parse('2026-05-28 12:00:00 UTC'),
+        );
+        $this->createReleasedEntry(
+            'Сериал за 29 мая',
+            CarbonImmutable::parse('2026-05-29 12:00:00 UTC'),
+        );
+
+        $this->get('/calendar')
+            ->assertOk()
+            ->assertSeeInOrder(['29 мая 2026', '28 мая 2026']);
+
+        $this->get('/calendar?sort=earliest')
+            ->assertOk()
+            ->assertSeeInOrder(['28 мая 2026', '29 мая 2026']);
+    }
+
+    public function test_invalid_recent_sort_falls_back_to_latest(): void
+    {
+        $this->createReleasedEntry(
+            'Старый релиз при неверной сортировке',
+            CarbonImmutable::parse('2026-05-28 12:00:00 UTC'),
+        );
+        $this->createReleasedEntry(
+            'Новый релиз при неверной сортировке',
+            CarbonImmutable::parse('2026-05-29 12:00:00 UTC'),
+        );
+
+        $this->get('/calendar?sort=invalid')
+            ->assertOk()
+            ->assertSeeInOrder([
+                'Новый релиз при неверной сортировке',
+                'Старый релиз при неверной сортировке',
+            ]);
+    }
+
+    public function test_upcoming_calendar_keeps_the_earliest_default(): void
+    {
+        $this->createScheduledEntry(
+            'Ближайший подтверждённый релиз',
+            CarbonImmutable::parse('2026-07-20 12:00:00 UTC'),
+        );
+        $this->createScheduledEntry(
+            'Поздний подтверждённый релиз',
+            CarbonImmutable::parse('2026-07-21 12:00:00 UTC'),
+        );
+
+        $this->get('/calendar/upcoming')
+            ->assertOk()
+            ->assertSeeInOrder([
+                'Ближайший подтверждённый релиз',
+                'Поздний подтверждённый релиз',
+            ]);
+    }
+
     public function test_upcoming_calendar_does_not_mix_in_past_publications(): void
     {
         $this->createReleasedEntry('Только прошедший релиз');
@@ -109,15 +167,17 @@ final class ReleaseCalendarDefaultViewTest extends TestCase
         $this->assertSame(route('calendar.index'), $notifications->first()?->url);
     }
 
-    private function createReleasedEntry(string $titleText): ReleaseScheduleEntry
-    {
+    private function createReleasedEntry(
+        string $titleText,
+        ?CarbonImmutable $publishedAt = null,
+    ): ReleaseScheduleEntry {
         $title = CatalogTitle::factory()->create([
             'title' => $titleText,
             'slug' => 'calendar-'.str()->uuid(),
         ]);
         $season = Season::factory()->for($title)->create(['number' => 1]);
         $episode = Episode::factory()->for($season)->create(['number' => 1]);
-        $publishedAt = CarbonImmutable::now()->subDay();
+        $publishedAt ??= CarbonImmutable::now()->subDay();
         $media = LicensedMedia::withoutEvents(fn (): LicensedMedia => LicensedMedia::factory()->create([
             'catalog_title_id' => $title->id,
             'season_id' => $season->id,
@@ -144,6 +204,35 @@ final class ReleaseCalendarDefaultViewTest extends TestCase
             'is_public' => true,
             'notifications_enabled' => true,
             'released_at' => $publishedAt,
+        ]);
+    }
+
+    private function createScheduledEntry(
+        string $titleText,
+        CarbonImmutable $startsAt,
+    ): ReleaseScheduleEntry {
+        $title = CatalogTitle::factory()->create([
+            'title' => $titleText,
+            'slug' => 'calendar-scheduled-'.str()->uuid(),
+        ]);
+        $season = Season::factory()->for($title)->create(['number' => 1]);
+        $episode = Episode::factory()->for($season)->create(['number' => 1]);
+
+        return ReleaseScheduleEntry::query()->create([
+            'logical_key' => 'episode-release-test-'.$episode->id,
+            'entry_type' => ReleaseScheduleEntryType::EpisodeRelease,
+            'status' => ReleaseScheduleStatus::Confirmed,
+            'precision' => ReleaseDatePrecision::ExactDateTime,
+            'source' => ReleaseScheduleSource::Official,
+            'catalog_title_id' => $title->id,
+            'season_id' => $season->id,
+            'episode_id' => $episode->id,
+            'season_number' => 1,
+            'episode_number' => 1,
+            'starts_at' => $startsAt,
+            'original_timezone' => 'UTC',
+            'is_public' => true,
+            'notifications_enabled' => false,
         ]);
     }
 }

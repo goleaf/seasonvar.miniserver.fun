@@ -4,8 +4,10 @@ namespace Tests\Feature;
 
 use App\Services\ProjectDocumentation\ProjectDocumentationRefresher;
 use App\Services\ProjectDocumentation\ProjectDocumentationRefreshResult;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class RefreshProjectDocsCommandTest extends TestCase
@@ -41,6 +43,35 @@ class RefreshProjectDocsCommandTest extends TestCase
         $this->artisan('project:docs-refresh --check')
             ->expectsOutputToContain('Документация требует обновления: README.md')
             ->assertExitCode(1);
+    }
+
+    /**
+     * @param  array<string, bool>  $parameters
+     */
+    #[DataProvider('currentDocumentationCommands')]
+    public function test_it_is_silent_when_documentation_is_current(array $parameters, bool $check): void
+    {
+        $this->mock(ProjectDocumentationRefresher::class, function ($mock) use ($check): void {
+            $mock
+                ->shouldReceive('refresh')
+                ->once()
+                ->with($check)
+                ->andReturn(new ProjectDocumentationRefreshResult([], []));
+        });
+
+        $this->withoutMockingConsoleOutput();
+
+        $this->assertSame(0, $this->artisan('project:docs-refresh', $parameters));
+        $this->assertSame('', Artisan::output());
+    }
+
+    /**
+     * @return iterable<string, array{array<string, bool>, bool}>
+     */
+    public static function currentDocumentationCommands(): iterable
+    {
+        yield 'refresh' => [['--no-ansi' => true], false];
+        yield 'check' => [['--check' => true, '--no-ansi' => true], true];
     }
 
     public function test_check_mode_fails_with_the_owning_file_and_broken_relative_path(): void

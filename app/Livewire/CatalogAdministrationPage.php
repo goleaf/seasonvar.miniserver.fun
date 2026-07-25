@@ -41,6 +41,7 @@ final class CatalogAdministrationPage extends Component
 
         return view('livewire.catalog-administration-page', [
             'canModerateCollections' => $access->allows($user, AdminPermission::CollectionsModerate),
+            'canManageCollectionCategories' => $access->allows($user, AdminPermission::ContentManage),
             'canImport' => $access->allows($user, AdminPermission::ImportsExecute),
         ])->extends('layouts.app', [
             'title' => __('collections.admin.catalog_and_collections'),
@@ -54,6 +55,7 @@ final class CatalogAdministrationPage extends Component
     private function normalizeSection(): void
     {
         $allowed = Gate::allows(AdminPermission::CollectionsModerate->value)
+            || Gate::allows(AdminPermission::ContentManage->value)
             ? ['catalog', 'collections']
             : ['catalog'];
         $this->section = in_array($this->section, $allowed, true) ? $this->section : 'catalog';

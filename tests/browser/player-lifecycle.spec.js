@@ -375,7 +375,7 @@ test('player hot swaps episodes and translations without replacing its media own
     const dialog = page.getByRole('dialog', { name: copy.menu.title });
     const episodeOptions = dialog.locator('[data-player-menu-section="episodes"] [role="option"]');
 
-    await expect(episodeOptions).toHaveCount(2);
+    await expect(episodeOptions).toHaveCount(3);
     await episodeOptions.nth(1).click();
     await expect(currentVideo(page)).not.toHaveAttribute('data-progress-episode', initialEpisodeId);
     await expect(dialog).toBeHidden();
@@ -522,7 +522,7 @@ test('responsive episode menu stays within the viewport with reachable touch con
     const dialog = page.getByRole('dialog', { name: copy.menu.title });
 
     await expect(dialog).toBeVisible();
-    await expect(dialog.locator('[data-player-menu-section="episodes"] [role="option"]')).toHaveCount(2);
+    await expect(dialog.locator('[data-player-menu-section="episodes"] [role="option"]')).toHaveCount(3);
 
     const geometry = await dialog.evaluate((menu) => {
         const panel = menu.querySelector('.catalog-player-menu__panel');
@@ -597,6 +597,20 @@ test('fullscreen identity survives an in-player episode transition', async ({ pa
     await waitForPlayer(page);
     await setAutoplayPreference(page, false);
 
+    const normalBackground = await page.evaluate(() => {
+        const player = document.querySelector('[data-player-shell] .plyr');
+        const wrapper = player?.querySelector('.plyr__video-wrapper');
+        const video = player?.querySelector('video.js-catalog-player');
+
+        return [player, wrapper, video].map((node) => getComputedStyle(node).backgroundColor);
+    });
+
+    expect(normalBackground).toEqual([
+        'rgb(0, 0, 0)',
+        'rgb(0, 0, 0)',
+        'rgb(0, 0, 0)',
+    ]);
+
     const enteredFullscreen = await page.evaluate(async () => {
         const player = document.querySelector('[data-player-shell] .plyr');
 
@@ -617,6 +631,20 @@ test('fullscreen identity survives an in-player episode transition', async ({ pa
 
     test.skip(!enteredFullscreen, 'The browser did not grant standard fullscreen.');
 
+    const fullscreenBackground = await page.evaluate(() => {
+        const player = document.fullscreenElement;
+        const wrapper = player?.querySelector('.plyr__video-wrapper');
+        const video = player?.querySelector('video.js-catalog-player');
+
+        return [player, wrapper, video].map((node) => getComputedStyle(node).backgroundColor);
+    });
+
+    expect(fullscreenBackground).toEqual([
+        'rgb(0, 0, 0)',
+        'rgb(0, 0, 0)',
+        'rgb(0, 0, 0)',
+    ]);
+
     const copy = await playerCopy(page);
 
     await page.getByRole('button', { name: copy.menu.open }).click();
@@ -628,13 +656,151 @@ test('fullscreen identity survives an in-player episode transition', async ({ pa
     const episodeOptions = dialog.locator('[data-player-menu-section="episodes"] [role="option"]');
     const currentEpisodeId = await currentVideo(page).getAttribute('data-progress-episode');
 
-    await expect(episodeOptions).toHaveCount(2);
-    await dialog.locator('[data-player-menu-section="episodes"] [role="option"]:not([aria-current="true"])').click();
+    await expect(episodeOptions).toHaveCount(3);
+    await dialog.locator('[data-player-menu-section="episodes"] [role="option"]:not([aria-current="true"])').first().click();
     await expect(currentVideo(page)).not.toHaveAttribute('data-progress-episode', currentEpisodeId);
     expect(await page.evaluate(() => (
         document.fullscreenElement === window.__fullscreenPlayerIdentity
     ))).toBe(true);
     expect(await page.evaluate(() => document.fullscreenElement?.querySelectorAll('video').length)).toBe(1);
+    expect(await page.evaluate(() => {
+        const player = document.fullscreenElement;
+        const wrapper = player?.querySelector('.plyr__video-wrapper');
+        const video = player?.querySelector('video.js-catalog-player');
+
+        return [player, wrapper, video].map((node) => getComputedStyle(node).backgroundColor);
+    })).toEqual([
+        'rgb(0, 0, 0)',
+        'rgb(0, 0, 0)',
+        'rgb(0, 0, 0)',
+    ]);
+    assertNoBrowserErrors(errors);
+});
+
+test('center touch controls stay aligned and seek exactly ten seconds', async ({ page, baseURL }) => {
+    test.setTimeout(90_000);
+
+    const errors = await installBrowserGuard(page, baseURL);
+
+    await installPlayerMediaFixtures(page);
+    await login(page);
+    await page.goto('/titles/browser-smoke?episode=1&format=mp4');
+    await waitForPlayer(page);
+    await setAutoplayPreference(page, false);
+
+    const copy = await playerCopy(page);
+    const controls = page.locator('[data-player-center-controls]');
+    const buttons = controls.locator('button');
+    const rewind = controls.locator('[data-player-center-control="rewind"]');
+    const toggle = controls.locator('[data-player-center-control="toggle"]');
+    const forward = controls.locator('[data-player-center-control="forward"]');
+    const rewindLabel = copy.controls.rewind.replace('{seektime}', '10');
+    const forwardLabel = copy.controls.fastForward.replace('{seektime}', '10');
+
+    await expect(controls).toHaveCount(1);
+    await expect(buttons).toHaveCount(3);
+    await expect(rewind).toHaveAttribute('type', 'button');
+    await expect(toggle).toHaveAttribute('type', 'button');
+    await expect(forward).toHaveAttribute('type', 'button');
+    await expect(rewind).toHaveAttribute('aria-label', rewindLabel);
+    await expect(toggle).toHaveAttribute('aria-label', copy.controls.play);
+    await expect(forward).toHaveAttribute('aria-label', forwardLabel);
+
+    const geometry = await page.evaluate(() => {
+        const player = document.querySelector('[data-player-shell] .plyr');
+        const controlsNode = player?.querySelector('[data-player-center-controls]');
+        const orderedControls = [...(controlsNode?.querySelectorAll('[data-player-center-control]') || [])];
+        const playerBox = player?.getBoundingClientRect();
+        const boxes = orderedControls.map((control) => {
+            const box = control.getBoundingClientRect();
+
+            return {
+                kind: control.dataset.playerCenterControl,
+                width: box.width,
+                height: box.height,
+                centerX: box.left + (box.width / 2),
+                centerY: box.top + (box.height / 2),
+            };
+        });
+
+        return {
+            overflow: document.documentElement.scrollWidth - window.innerWidth,
+            playerCenterX: playerBox ? playerBox.left + (playerBox.width / 2) : null,
+            playerCenterY: playerBox ? playerBox.top + (playerBox.height / 2) : null,
+            boxes,
+        };
+    });
+
+    expect(geometry.overflow).toBeLessThanOrEqual(1);
+    expect(geometry.boxes.map(({ kind }) => kind)).toEqual(['rewind', 'toggle', 'forward']);
+    expect(geometry.boxes[0].width).toBeGreaterThanOrEqual(56);
+    expect(geometry.boxes[0].height).toBeGreaterThanOrEqual(56);
+    expect(geometry.boxes[1].width).toBeGreaterThanOrEqual(68);
+    expect(geometry.boxes[1].height).toBeGreaterThanOrEqual(68);
+    expect(geometry.boxes[1].width).toBeGreaterThan(geometry.boxes[0].width);
+    expect(Math.abs(geometry.boxes[0].centerY - geometry.boxes[1].centerY)).toBeLessThanOrEqual(1);
+    expect(Math.abs(geometry.boxes[2].centerY - geometry.boxes[1].centerY)).toBeLessThanOrEqual(1);
+    expect(Math.abs(geometry.boxes[1].centerX - geometry.playerCenterX)).toBeLessThanOrEqual(2);
+    expect(Math.abs(geometry.boxes[1].centerY - geometry.playerCenterY)).toBeLessThanOrEqual(2);
+
+    await currentVideo(page).evaluate((video) => {
+        const state = {
+            currentTime: 50,
+            duration: 120,
+            paused: true,
+            plays: 0,
+            pauses: 0,
+        };
+
+        window.__playerCenterControlState = state;
+        Object.defineProperties(video, {
+            currentTime: {
+                configurable: true,
+                get: () => state.currentTime,
+                set: (value) => {
+                    state.currentTime = Number(value);
+                },
+            },
+            duration: {
+                configurable: true,
+                get: () => state.duration,
+            },
+            ended: {
+                configurable: true,
+                get: () => false,
+            },
+            paused: {
+                configurable: true,
+                get: () => state.paused,
+            },
+        });
+        video.play = () => {
+            state.paused = false;
+            state.plays += 1;
+            video.dispatchEvent(new Event('play'));
+
+            return Promise.resolve();
+        };
+        video.pause = () => {
+            state.paused = true;
+            state.pauses += 1;
+            video.dispatchEvent(new Event('pause'));
+        };
+    });
+
+    await rewind.click();
+    expect(await page.evaluate(() => window.__playerCenterControlState.currentTime)).toBe(40);
+    await forward.click();
+    expect(await page.evaluate(() => window.__playerCenterControlState.currentTime)).toBe(50);
+
+    await toggle.click();
+    await expect.poll(() => page.evaluate(() => window.__playerCenterControlState.plays)).toBe(1);
+    await expect(toggle).toHaveAttribute('aria-label', copy.controls.pause);
+
+    await toggle.click();
+    await expect.poll(() => page.evaluate(() => window.__playerCenterControlState.pauses)).toBe(1);
+    await expect(toggle).toHaveAttribute('aria-label', copy.controls.play);
+
     assertNoBrowserErrors(errors);
 });
 

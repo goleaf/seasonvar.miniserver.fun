@@ -112,7 +112,7 @@
 
 ## Public collections v1
 
-- `GET /api/v1/collections` принимает validated `q`, `sort=featured|recent|title`, `per_page=12|18|24|36` и обычный `page`. Возвращаются только approved public non-deleted collections с public UUID/slug, original-or-editorial display text, visible item count, safe owner public UUID/name, cover web URL и canonical web/API links.
+- `GET /api/v1/collections` принимает validated `q`, `sort=featured|recent|title`, `per_page=12|18|24|36` и обычный `page`. Возвращаются только approved public non-deleted collections с public UUID/slug, original-or-editorial display text, visible item count, safe owner public UUID/name, публичной category shape (`slug`, `name`, nullable `parent`) и canonical web/API links. Deprecated `cover_url` временно сохраняется только как `null`, без route/storage metadata.
 - `GET /api/v1/collections/{collectionSlug}` возвращает paginated visible serial items (`page`, `per_page` 6–48) и отдельный safe `collection` object. Private, unlisted, pending, rejected, hidden, archived и deleted collections отвечают `not_found`; API не является способом чтения intended unlisted links.
 - `GET /api/v1/titles/{titleSlug}/collections` возвращает bounded public approved collections, содержащие guest-visible title. Membership current user, owner controls, unavailable items и private item counts не сериализуются.
 - Collection Resources не отдают numeric collection/user IDs, `owner_id`, storage disk/path, report/moderation notes, membership attribution, content/cache versions или source/media URLs. Pagination query-object общий с web, но API явно использует conventional `page`, а не Livewire key `collectionsPage`.

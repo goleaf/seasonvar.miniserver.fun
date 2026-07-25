@@ -61,6 +61,12 @@
                         <x-form.input-error for="sortMode" />
                     </div>
                 </div>
+                <x-collections.category-fields
+                    :root-options="$categoryRootOptions"
+                    :child-options="$categoryChildOptions"
+                    :assignment-archived="$categoryAssignmentArchived"
+                    id-prefix="collection-edit-category"
+                />
                 @if ($isEditorial)
                     <div class="grid gap-4 rounded-control bg-slate-50 p-4">
                         <h3 class="font-black text-slate-800">{{ __('collections.editorial.seo_fields') }}</h3>
@@ -81,34 +87,6 @@
         </x-ui.panel>
 
         <div class="space-y-5">
-            <x-ui.panel :title="__('collections.form.cover')" icon="fa-solid fa-image">
-                <x-ui.poster-frame
-                    :src="$coverUrl"
-                    :alt="__('collections.accessibility.collection_cover', ['name' => $collection->display_name])"
-                    :empty-label="__('collections.page.cover_missing')"
-                    class="aspect-[16/9] w-full rounded-control bg-slate-100"
-                />
-                <p class="mt-3 text-xs leading-5 text-slate-500">{{ __('collections.form.cover_hint', ['size' => $maximumCoverMegabytes]) }}</p>
-                <form wire:submit="uploadCover" class="mt-4 space-y-3">
-                    <input type="file" wire:model="cover" accept="image/jpeg,image/png,image/webp" class="block w-full text-sm text-slate-600 file:mr-3 file:min-h-11 file:rounded-control file:border-0 file:bg-slate-100 file:px-3 file:py-2.5 file:font-bold file:text-slate-700 hover:file:bg-slate-200">
-                    <x-form.input-error for="cover" />
-                    <button type="submit" wire:loading.attr="disabled" wire:target="cover,uploadCover" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-slate-800 px-3 py-2.5 text-sm font-bold text-white hover:bg-slate-700 disabled:cursor-wait disabled:opacity-60">
-                        <x-ui.icon name="fa-solid fa-upload" wire:loading.remove wire:target="cover,uploadCover" />
-                        <x-ui.icon name="fa-solid fa-spinner fa-spin" wire:loading wire:target="cover,uploadCover" />
-                        <span wire:loading.remove wire:target="cover,uploadCover">{{ __('collections.actions.upload_cover') }}</span>
-                        <span wire:loading wire:target="cover,uploadCover">{{ __('collections.page.loading') }}</span>
-                    </button>
-                </form>
-                @if ($hasCover)
-                    <button type="button" wire:click="removeCover" wire:confirm="{{ __('collections.confirmations.remove_cover') }}" wire:loading.attr="disabled" wire:target="removeCover" class="mt-2 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-rose-50 px-3 py-2.5 text-sm font-bold text-rose-700 hover:bg-rose-100 disabled:cursor-wait disabled:opacity-60">
-                        <x-ui.icon name="fa-solid fa-trash-can" wire:loading.remove wire:target="removeCover" />
-                        <x-ui.icon name="fa-solid fa-spinner fa-spin" wire:loading wire:target="removeCover" />
-                        <span wire:loading.remove wire:target="removeCover">{{ __('collections.actions.remove_cover') }}</span>
-                        <span wire:loading wire:target="removeCover">{{ __('collections.page.loading') }}</span>
-                    </button>
-                @endif
-            </x-ui.panel>
-
             <section class="rounded-panel border border-rose-200 bg-white p-4 shadow-panel">
                 <h2 class="font-black text-rose-800">{{ __('collections.actions.delete') }}</h2>
                 <p class="mt-2 text-xs leading-5 text-slate-600">{{ __('collections.confirmations.delete') }}</p>

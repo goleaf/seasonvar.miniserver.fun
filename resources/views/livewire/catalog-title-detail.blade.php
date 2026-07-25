@@ -20,23 +20,23 @@
                     </div>
                 </div>
                 <div class="space-y-4 p-4">
-                    <nav aria-label="{{ __('catalog.title.quick_navigation') }}" class="-mx-2 grid gap-1">
-                        <a data-title-quick-link href="#player" class="relative inline-flex min-h-11 items-center gap-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-black text-emerald-700 before:absolute before:inset-y-2 before:left-0 before:w-1 before:rounded-full before:bg-emerald-600 hover:bg-emerald-100">
+                    <nav aria-label="{{ __('catalog.title.quick_navigation') }}" data-title-quick-navigation class="-mx-2 grid gap-1">
+                        <a data-title-quick-link href="#player" class="relative inline-flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-bold text-slate-600 transition before:absolute before:inset-y-2 before:left-0 before:w-1 before:rounded-full before:bg-transparent hover:bg-slate-50 hover:text-emerald-700 aria-[current=location]:bg-emerald-50 aria-[current=location]:font-black aria-[current=location]:text-emerald-700 aria-[current=location]:before:bg-emerald-600">
                             <x-ui.icon name="fa-solid fa-circle-play" />
                             <span>{{ __('catalog.title.watch') }}</span>
                         </a>
 
-                        <a data-title-quick-link href="#seasons" class="inline-flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 hover:text-emerald-700">
+                        <a data-title-quick-link href="#seasons" class="relative inline-flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-bold text-slate-600 transition before:absolute before:inset-y-2 before:left-0 before:w-1 before:rounded-full before:bg-transparent hover:bg-slate-50 hover:text-emerald-700 aria-[current=location]:bg-emerald-50 aria-[current=location]:font-black aria-[current=location]:text-emerald-700 aria-[current=location]:before:bg-emerald-600">
                             <x-ui.icon name="fa-solid fa-layer-group text-slate-400" />
                             <span>{{ __('catalog.title.seasons') }}</span>
                         </a>
 
-                        <a data-title-quick-link href="#data-title-reference" class="inline-flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 hover:text-emerald-700">
+                        <a data-title-quick-link href="#data-title-reference" class="relative inline-flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-bold text-slate-600 transition before:absolute before:inset-y-2 before:left-0 before:w-1 before:rounded-full before:bg-transparent hover:bg-slate-50 hover:text-emerald-700 aria-[current=location]:bg-emerald-50 aria-[current=location]:font-black aria-[current=location]:text-emerald-700 aria-[current=location]:before:bg-emerald-600">
                             <x-ui.icon name="fa-solid fa-circle-info text-slate-400" />
                             <span>{{ __('catalog.title.about') }}</span>
                         </a>
 
-                        <a data-title-quick-link href="#reviews" class="inline-flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 hover:text-emerald-700">
+                        <a data-title-quick-link href="#reviews" class="relative inline-flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-bold text-slate-600 transition before:absolute before:inset-y-2 before:left-0 before:w-1 before:rounded-full before:bg-transparent hover:bg-slate-50 hover:text-emerald-700 aria-[current=location]:bg-emerald-50 aria-[current=location]:font-black aria-[current=location]:text-emerald-700 aria-[current=location]:before:bg-emerald-600">
                             <x-ui.icon name="fa-solid fa-star-half-stroke text-slate-400" />
                             <span>{{ __('reviews.section.label') }}</span>
                         </a>
@@ -47,7 +47,7 @@
                         <span>{{ __('requests.actions.request_for_title') }}</span>
                     </a>
 
-                    <a href="{{ $releaseCalendarUrl }}" wire:navigate class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800 hover:bg-emerald-100">
+                    <a href="{{ $releaseCalendarUrl }}" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800 hover:bg-emerald-100">
                         <x-ui.icon name="fa-regular fa-calendar-days" />
                         <span>{{ __('calendar.open_title_schedule') }}</span>
                     </a>
@@ -178,7 +178,7 @@
                 :wire:key="'catalog-title-player-'.$title->id"
             />
 
-            <x-ui.panel data-title-reference :title="__('catalog.title.about')" icon="fa-solid fa-circle-info">
+            <x-ui.panel id="data-title-reference" data-title-reference :title="__('catalog.title.about')" icon="fa-solid fa-circle-info" class="scroll-mt-40 sm:scroll-mt-44 lg:scroll-mt-48">
                 @if ($actors->isNotEmpty())
                     <div>
                         <div class="inline-flex items-center gap-2 text-sm font-bold text-slate-700">

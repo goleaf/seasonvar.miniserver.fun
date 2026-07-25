@@ -10,6 +10,10 @@ Allowed context is stable IDs/codes, bounded counters, timestamps and exception 
 
 Log access is shell/panel operational access. No unrestricted browser log viewer, arbitrary path, `.env` editor, SQL or Artisan shell is provided.
 
+Импортёр не использует число строк `seasonvar_import_events` как точный счётчик выполненной работы. Warning/error и lifecycle/terminal events сохраняются полностью, высокочастотные success events попадают в bounded `seasonvar-import-events-aggregated`, часть диагностических событий выбирается детерминированно, а transient details остаются только в текущем CLI callback. Aggregate содержит только event counters/total и очищается тем же семидневным retention; успешная порция flush-ится каждые `SEASONVAR_IMPORT_EVENT_AGGREGATE_FLUSH_SIZE=100` событий и на queue/sync terminal boundary. Sample divisor по умолчанию равен `100`.
+
+Для расследования оператор сначала использует точные counters/status/heartbeat из `seasonvar_import_runs`, затем durable failures и aggregate telemetry. Ни admin, ни CLI не должны представлять sampled/aggregate rows как полный список обработанных media/pages. Любой event context проходит sanitization до записи, а отказ telemetry storage не должен останавливать импорт.
+
 ## Public health boundary
 
 `GET /health/ready` performs lightweight read-only checks for database plus critical Redis session/queue/lock connections. Response is only:

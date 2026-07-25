@@ -25,6 +25,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property int $id
  * @property string $public_id
  * @property int|null $owner_id
+ * @property int|null $catalog_collection_category_id
  * @property string $name
  * @property string|null $description
  * @property string $slug
@@ -34,9 +35,6 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property CatalogCollectionSort $sort_mode
  * @property string|null $content_locale
  * @property bool $is_featured
- * @property string|null $cover_disk
- * @property string|null $cover_path
- * @property int $cover_version
  * @property int $content_version
  * @property CarbonImmutable|null $published_at
  * @property CarbonImmutable|null $updated_at
@@ -45,7 +43,6 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property-read string|null $display_description
  * @property-read string|null $display_seo_title
  * @property-read string|null $display_seo_description
- * @property-read string|null $fallback_poster_url
  * @property-read bool $contains_title
  * @property-read bool $has_import_source
  * @property-read bool $is_restorable
@@ -56,6 +53,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 #[Fillable([
     'public_id',
     'owner_id',
+    'catalog_collection_category_id',
     'name',
     'description',
     'slug',
@@ -65,11 +63,6 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'sort_mode',
     'content_locale',
     'is_featured',
-    'cover_disk',
-    'cover_path',
-    'cover_mime_type',
-    'cover_size',
-    'cover_version',
     'content_version',
     'published_at',
 ])]
@@ -82,6 +75,12 @@ final class CatalogCollection extends Model
     public function owner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'owner_id');
+    }
+
+    /** @return BelongsTo<CatalogCollectionCategory, $this> */
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(CatalogCollectionCategory::class, 'catalog_collection_category_id');
     }
 
     /** @return HasMany<CatalogCollectionItem, $this> */
@@ -191,8 +190,6 @@ final class CatalogCollection extends Model
             'moderation_status' => CatalogCollectionModerationStatus::class,
             'sort_mode' => CatalogCollectionSort::class,
             'is_featured' => 'boolean',
-            'cover_size' => 'integer',
-            'cover_version' => 'integer',
             'content_version' => 'integer',
             'published_at' => 'immutable_datetime',
         ];

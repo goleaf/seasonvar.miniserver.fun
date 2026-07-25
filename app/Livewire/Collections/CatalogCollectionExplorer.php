@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Livewire\Collections;
 
 use App\Livewire\Concerns\InteractsWithPaginationIslands;
+use App\Models\CatalogCollectionCategory;
+use App\Services\Collections\CatalogCollectionCategoryQuery;
 use App\Services\Collections\CatalogCollectionQuery;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
@@ -24,9 +26,15 @@ final class CatalogCollectionExplorer extends Component
     #[Url(as: 'collections_sort', history: true, except: 'featured')]
     public string $sort = 'featured';
 
-    public function mount(): void
+    #[Url(as: 'collections_category', history: true, except: '')]
+    public string $category = '';
+
+    #[Url(as: 'collections_subcategory', history: true, except: '')]
+    public string $subcategory = '';
+
+    public function mount(CatalogCollectionCategoryQuery $categories): void
     {
-        $this->normalize();
+        $this->normalize($categories);
     }
 
     public function updated(string $property): void
@@ -35,6 +43,19 @@ final class CatalogCollectionExplorer extends Component
             $this->normalize();
             $this->resetPage(pageName: 'collectionsPage');
         }
+    }
+
+    public function updatedCategory(CatalogCollectionCategoryQuery $categories): void
+    {
+        $this->subcategory = '';
+        $this->normalize($categories);
+        $this->resetPage(pageName: 'collectionsPage');
+    }
+
+    public function updatedSubcategory(CatalogCollectionCategoryQuery $categories): void
+    {
+        $this->normalize($categories);
+        $this->resetPage(pageName: 'collectionsPage');
     }
 
     public function applySearch(): void
@@ -49,12 +70,64 @@ final class CatalogCollectionExplorer extends Component
         $this->resetPage(pageName: 'collectionsPage');
     }
 
-    public function render(CatalogCollectionQuery $collections): View
+    public function resetFilters(): void
     {
+        $this->search = '';
+        $this->sort = 'featured';
+        $this->category = '';
+        $this->subcategory = '';
+        $this->resetPage(pageName: 'collectionsPage');
+    }
+
+    public function render(
+        CatalogCollectionQuery $collections,
+        CatalogCollectionCategoryQuery $categories,
+    ): View {
         $authenticated = Auth::check();
+        $directory = $categories->publicDirectoryTree();
+        $selectedRoot = $directory['tree']->firstWhere('slug', $this->category);
+        $categoryNavigation = $directory['tree']
+            ->map(fn (CatalogCollectionCategory $root): array => [
+                'slug' => $root->slug,
+                'label' => $root->display_name,
+                'count' => (int) $root->getAttribute('public_branch_collections_count'),
+                'children' => $root->children
+                    ->map(fn (CatalogCollectionCategory $child): array => [
+                        'slug' => $child->slug,
+                        'label' => $child->display_name,
+                        'count' => (int) $child->getAttribute('public_collections_count'),
+                    ])
+                    ->values()
+                    ->all(),
+            ])
+            ->values()
+            ->all();
 
         return view('livewire.collections.catalog-collection-explorer', [
-            'collections' => $collections->publicDirectory($this->search, $this->sort, 12),
+            'collections' => $collections->publicDirectory(
+                search: $this->search,
+                sort: $this->sort,
+                perPage: 12,
+                category: $this->category !== '' ? $this->category : null,
+                subcategory: $this->subcategory !== '' ? $this->subcategory : null,
+            ),
+            'categoryNavigation' => $categoryNavigation,
+            'subcategoryOptions' => $selectedRoot instanceof CatalogCollectionCategory
+                ? $selectedRoot->children
+                    ->map(fn (CatalogCollectionCategory $child): array => [
+                        'slug' => $child->slug,
+                        'label' => $child->display_name,
+                        'count' => (int) $child->getAttribute('public_collections_count'),
+                    ])
+                    ->values()
+                    ->all()
+                : [],
+            'uncategorizedCount' => $directory['uncategorized'],
+            'totalCount' => $directory['total'],
+            'hasActiveFilters' => $this->search !== ''
+                || $this->sort !== 'featured'
+                || $this->category !== ''
+                || $this->subcategory !== '',
             'sortOptions' => [
                 'featured' => __('collections.directory.sort_featured'),
                 'recent' => __('collections.directory.sort_recent'),
@@ -68,9 +141,16 @@ final class CatalogCollectionExplorer extends Component
         ]);
     }
 
-    private function normalize(): void
+    private function normalize(?CatalogCollectionCategoryQuery $categories = null): void
     {
         $this->search = Str::limit(Str::squish($this->search), 100, '');
         $this->sort = in_array($this->sort, ['featured', 'recent', 'title'], true) ? $this->sort : 'featured';
+
+        if ($categories !== null) {
+            [$this->category, $this->subcategory] = $categories->normalizeDirectorySelection(
+                $this->category,
+                $this->subcategory,
+            );
+        }
     }
 }

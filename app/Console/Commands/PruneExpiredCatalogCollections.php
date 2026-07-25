@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\CatalogCollection;
-use App\Services\Collections\CatalogCollectionCoverService;
+use App\Services\Collections\CatalogCollectionService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -16,7 +16,7 @@ final class PruneExpiredCatalogCollections extends Command
 
     protected $description = 'Permanently prune catalog collections after their documented restoration window';
 
-    public function handle(CatalogCollectionCoverService $covers): int
+    public function handle(CatalogCollectionService $collections): int
     {
         if (! Schema::hasTable('catalog_collections')) {
             return self::SUCCESS;
@@ -38,7 +38,7 @@ final class PruneExpiredCatalogCollections extends Command
         $pruned = 0;
 
         foreach ($ids as $id) {
-            $deleted = DB::transaction(function () use ($covers, $cutoff, $id): bool {
+            $deleted = DB::transaction(function () use ($collections, $cutoff, $id): bool {
                 $collection = CatalogCollection::query()
                     ->withTrashed()
                     ->whereKey((int) $id)
@@ -50,7 +50,7 @@ final class PruneExpiredCatalogCollections extends Command
                     return false;
                 }
 
-                $covers->deleteWithCollection($collection);
+                $collections->pruneExpired($collection);
 
                 return true;
             }, attempts: 3);

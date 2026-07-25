@@ -11,7 +11,6 @@ use App\Enums\CatalogCollectionVisibility;
 use App\Livewire\Concerns\InteractsWithCollectionLocale;
 use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Models\User;
-use App\Services\Collections\CatalogCollectionCoverService;
 use App\Services\Collections\CatalogCollectionItemService;
 use App\Services\Collections\CatalogCollectionQuery;
 use App\Services\Collections\CatalogCollectionReportService;
@@ -174,7 +173,6 @@ final class CatalogCollectionPage extends Component
     public function render(
         CatalogCollectionResolver $resolver,
         CatalogCollectionQuery $query,
-        CatalogCollectionCoverService $covers,
         CatalogCollectionSeoPresenter $seoPresenter,
     ): View {
         $collection = $query->summary($resolver->byPublicId($this->collectionPublicId));
@@ -220,6 +218,12 @@ final class CatalogCollectionPage extends Component
             CatalogCollectionVisibility::Public => ['fa-solid fa-earth-europe text-slate-400', __('collections.page.public_notice')],
         };
         $ownerPublicId = $collection->owner?->getAttribute('public_id');
+        $category = $collection->category;
+        $categoryParent = $category?->parent;
+        $categoryLabel = collect([
+            $categoryParent?->display_name,
+            $category?->display_name,
+        ])->filter()->implode(' › ');
 
         return view('livewire.collections.catalog-collection-page', [
             'collection' => $collection,
@@ -254,7 +258,9 @@ final class CatalogCollectionPage extends Component
             'relatedCollections' => $collection->visibility === CatalogCollectionVisibility::Public
                 ? $query->related($collection, $viewer)
                 : collect(),
-            'coverUrl' => $covers->url($collection) ?? $collection->getAttribute('fallback_poster_url'),
+            'collectionCategoryLabel' => $categoryLabel !== ''
+                ? $categoryLabel
+                : __('collections.directory.uncategorized'),
             'canonicalUrl' => $usesLocalizedEditorialCanonical
                 ? route('localized.collections.show', [
                     'locale' => $this->interfaceLocale,

@@ -9,8 +9,6 @@ use App\DTOs\HdRezkaCollectionDefinition;
 use App\Enums\CatalogCollectionSourceMatchStatus;
 use App\Enums\CatalogCollectionSyncStatus;
 use App\Jobs\RebuildCatalogRecommendationsAfterCollectionSync;
-use App\Models\CatalogCollection;
-use App\Models\CatalogCollectionSource;
 use App\Models\CatalogCollectionSyncRun;
 use App\Services\Catalog\CatalogRecommendationDirtyTitleTracker;
 use App\Services\Crawler\PoliteHttpClient;
@@ -29,7 +27,6 @@ final readonly class HdRezkaCollectionSyncService
         private HdRezkaCollectionUrlGuard $urlGuard,
         private HdRezkaCollectionParser $parser,
         private HdRezkaCollectionMatcher $matcher,
-        private HdRezkaCollectionCoverImporter $covers,
         private HdRezkaCollectionReconciler $reconciler,
         private HdRezkaCollectionSignalSynchronizer $signals,
         private PoliteHttpClient $http,
@@ -366,8 +363,6 @@ final readonly class HdRezkaCollectionSyncService
             'created' => 0,
             'membership_changed' => 0,
             'removed' => 0,
-            'covers_updated' => 0,
-            'covers_failed' => 0,
             'detail_failures' => $detailFailures,
             'sources_reactivated' => 0,
             'sources_missing' => 0,
@@ -384,31 +379,6 @@ final readonly class HdRezkaCollectionSyncService
                 || $reconciliation['membership_changed']
                 || $reconciliation['source_reactivated'];
 
-            if ($definition->coverPath !== null) {
-                try {
-                    $preparedCover = $this->covers->prepare($definition->coverPath);
-
-                    if ($preparedCover === null) {
-                        throw new RuntimeException('Обложка источника не прошла проверку.');
-                    }
-
-                    $collection = CatalogCollection::query()->findOrFail($reconciliation['collection_id']);
-                    $coverChanged = $this->covers->apply($collection, $preparedCover);
-                    $counters['covers_updated'] += $coverChanged ? 1 : 0;
-                    $materialChanged = $materialChanged || $coverChanged;
-                    CatalogCollectionSource::query()
-                        ->where('provider', $run->provider)
-                        ->where('source_key', $definition->sourceKey)
-                        ->update([
-                            'cover_path' => $collection->fresh()?->cover_path,
-                            'cover_content_hash' => $preparedCover->contentHash,
-                            'updated_at' => now(),
-                        ]);
-                } catch (Throwable) {
-                    $counters['covers_failed']++;
-                    $errors[] = "Подборка №{$collectionPosition}: обложка не обновлена.";
-                }
-            }
         }
 
         $matchedTitleIds = collect($resolved)
@@ -533,8 +503,6 @@ final readonly class HdRezkaCollectionSyncService
             'created' => 0,
             'membership_changed' => 0,
             'removed' => 0,
-            'covers_updated' => 0,
-            'covers_failed' => 0,
             'detail_failures' => 0,
             'sources_reactivated' => 0,
             'sources_missing' => 0,

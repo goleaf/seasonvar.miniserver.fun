@@ -1,6 +1,6 @@
 # Производительность запросов
 
-Обновлено: 19.07.2026
+Обновлено: 25.07.2026
 
 ## Обязательный integration performance audit
 
@@ -96,6 +96,7 @@
 
 - `seasonvar:import` обновляет счетчики активного запуска после каждого обработанного chunk страницы или отдельного URL.
 - Queued-режим пишет задания в Redis-очередь `seasonvar-import`; десять workers не резервируют jobs в SQLite и выполняют внешние HTTP-запросы вне catalog transactions.
+- Recovery активного queued run выбирает due `queued|preparing` строки по `(seasonvar_import_run_id, status, updated_at, id)`, читает одну дополнительную sentinel-row и не выполняет второй prepared-ledger `exists()` для полного пакета. Read-only профиль 25.07.2026 на таблице из `187 293` строк показал прежний `SCAN` и p50 `124,902 ms` / p95 `128,302 ms` для 30 последовательных выборок. На согласованной reflink-копии additive index строился `20,634 s`, после чего тот же query выбрал индекс и дал p50 `2,518 ms` / p95 `2,897 ms`; это локальная диагностика, а не production SLA. Наблюдавшиеся 80–95 повторных group `find()` на пакет также устранены повторным использованием одной eager-loaded projection. Индекс рабочей SQLite применяется только после verified backup, проверки места, остановки writers и integrity/EXPLAIN gate.
 - Диспетчер может запускаться десять раз в сутки, но живые lease и 24-часовой freshness interval не позволяют повторно ставить или скачивать свежую страницу при каждом cron tick.
 - Импорт одного URL выполняет только targeted page/season pipeline, отмечает канонический title в bounded recommendation dirty queue и не запускает глобальные relation cleanup, media metadata/source-key backlog, merge или rebuild. Scoped/full обработка очереди остаётся в full/sitemap cycle и queued finalizer.
 - Catalog-wide queued finalization сериализована отдельным Redis lock `seasonvar-import-finalizer`: разные runs не выполняют одновременно cleanup, media backlog, merge и recommendation rebuild. TTL lock равен job timeout плюс 300 секунд; успешный или исключительный выход освобождает lock через `finally`, а аварийно убитый worker не оставляет вечную блокировку.
@@ -118,6 +119,9 @@
 - Абсолютный `retryUntil` page job не короче настроенного claim lease: большой Redis backlog не завершает job до первого `handle()`. Уже сериализованные payload сохраняют старый deadline; после его истечения `failed()` освобождает claim, и следующий queued cron выбирает страницу повторно.
 - Queue jobs отправляются только after commit. Worker запускается с PHP `memory_limit=256M`, Laravel recycle threshold `--memory=192`, `--max-time=3600` и `--max-jobs=1000`; `Restart=always` возвращает процесс после штатного lifecycle exit. Раздельные hard/recycle limits оставляют recommendation rebuild bounded запас памяти и не позволяют следующим finalizer jobs бесконечно накапливать allocator baseline.
 - `seasonvar:import --status` использует Laravel 13 queue inspection methods и показывает pending, delayed, reserved, oldest pending job, общее число живых claims, число running runs и dominant run с максимальным backlog claims. Если active runs нет, показывается последний queued run.
+- Потеря Redis transport при сохранённой SQLite staging восстанавливается ограниченными пакетами по `SEASONVAR_QUEUE_FINALIZER_WATCHDOG_BATCH_SIZE` (по умолчанию 250). Один scan выбирает только старые `queued|preparing` строки по run/status/updated order, применяет compare-and-swap к timestamp попытки и отправляет ID-only jobs after commit. Следующий reconciliation envelope стоит в той же очереди за уже отправленной page work, поэтому backlog растёт с backpressure, а не одним fan-out на десятки тысяч сообщений. Немедленный повтор не дублирует свежую попытку; повтор разрешается только после `max(retry_after, worker timeout + 60)`.
+- Heartbeat recovery-run обновляется только после реального barrier transition или успешного batch re-dispatch. Наблюдение `--status`, watchdog wake-up и ранний выход global finalizer при `dispatch_completed=false` не считаются durable прогрессом.
+- Stale-run lookup выполняет indexed relation existence checks только для старых `running` queue-runs: live claim либо nonterminal prepared/group row исключает destructive terminalization. Он не загружает rows в PHP и не сканирует payload; действительно пустой stale run по-прежнему закрывается одним bounded update.
 - Тот же `--status` и `/admin/imports` читают global file-size backlog через `LicensedMediaFileSizeBacklog`, а pipeline использует его eligibility/due query вместо копии условий. Status строится одним conditional aggregate без hydration media rows; поскольку production SQLite выполняет полный scan 873k eligible строк, snapshot хранится в existing operational `TieredCache` пятнадцать минут и может безопасно обслуживаться из bounded stale copy. Наблюдавшийся read-only профиль при разной concurrent backfill нагрузке: cold command 4,67–9,53 секунды / около 82 MB RSS, immediate cache hit 0,36–0,65 секунды / около 80 MB RSS. Cache-lock имеет bounded пятисекундное ожидание; Livewire poll не инвалидирует snapshot и не выполняет network inspection.
 - Проверка зависшего sync-lock распознаёт только Linux-процесс, чья command line начинается с PHP executable и `artisan seasonvar:import`; `watch ... --status`, `--queued`, `--help` и текст других процессов не считаются активным импортом.
 - Страница состояния не должна ждать завершения длинного цикла, чтобы показать выбранные, обработанные, ошибочные и добавленные видео.
@@ -176,16 +180,17 @@
 
 ## Query contract коллекций
 
-- Summary cards используют один `CatalogCollectionQuery::summaryQuery`: owner и active/fallback editorial translations eager-loaded, total/guest-visible counts — correlated grouped counts, fallback poster — bounded subquery. Blade/card component не выполняет дополнительных reads.
+- Public directory использует two-phase `CatalogCollectionQuery::publicDirectory()`: первая indexed выборка пагинирует только eligible IDs с root/child/uncategorized predicate и deterministic order, вторая загружает owner, category/editorial translations и grouped visible/total counts только для IDs текущей страницы. Cover/fallback-poster subquery отсутствует; Blade/card component не выполняет reads.
 - Title membership selector выполняет один owner-scoped collection query с `withExists`; Apply locks one manageable set, reads one current membership snapshot, one grouped count/max set, then bulk insert/delete. Нет запроса на checkbox и загрузки всех collection items; после commit один `changedMany()` invalidates shared domains once и только уникальные changed collection scopes вместо повторного global bump на каждую checkbox membership.
 - Item page joins unique pivot once, reuses `CatalogTitleQuery::visibleTo`, taxonomy card loads and grouped title counts, then `CatalogUserCardStateLoader` once for the authenticated viewer. Search/filter remain SQL-scoped; pagination is 24 by default, deterministic secondary keys prevent skip/duplicate. Guest-visible IDs alone drive related-collection similarity, so hidden membership is neither hydrated nor used as a discovery signal.
 - Public directory/profile/sitemap/recommendations filter visibility/moderation/deleted before hydration. Visible count and unavailable owner list are separate, so guest pages do not hydrate hidden rows. Related collections use a title subquery and bounded limit rather than loading membership IDs in PHP.
-- Popularity ranking агрегирует watchlist, distinct meaningful watchers, published reviews и provider votes один раз в четырёх grouped source subqueries и присоединяет их к bounded visible-title candidate query. Коррелированные scalar subqueries на каждый `catalog_titles` row запрещены; прежние веса `35/45/8` и provider vote buckets сохранены. Объединённая discovery-страница выводит только 12 collection cards за страницу и использует отдельный paginator.
+- Popularity ranking агрегирует watchlist, distinct meaningful watchers, published reviews и provider votes один раз в четырёх grouped source subqueries и присоединяет их к bounded visible-title candidate query. Коррелированные scalar subqueries на каждый `catalog_titles` row запрещены; прежние веса `35/45/8` и provider vote buckets сохранены. Объединённая discovery-страница выводит только 12 text-only collection cards за страницу и использует отдельный paginator.
 - Title merge reconciles collection membership with `eachById(500)` inside the existing merge transaction rather than materializing every affected collection. Earliest addition/lowest position semantics remain unchanged, positions normalize per touched collection and one post-commit public-domain invalidation replaces one callback per membership.
 - HDRezka index и pagination ограничены configured maxima для подборок/страниц/items, response body и crawl delay. Source/item persistence использует grouped reads, chunked `upsert` и indexed last-seen reconciliation; complete snapshot может удалить только отсутствующие source-owned rows, а partial snapshot не выполняет stale delete.
 - Matcher не делает fuzzy/full-table title scan: exact primary/original/approved-alias keys обслуживаются search-document indexes, hard year/type conflicts отсекаются до ranking, а один remote item укладывается не более чем в пять SQL-запросов. Recommendation profile индексирует максимум 32 положительных editorial collection signals на тайтл; pair scorer учитывает максимум три общих ключа с frequency penalty и общим score cap.
-- Public summary добавляет source marker через один `withExists`, только когда rolling schema доступна. Admin directory читает один latest run с allowlisted counters; source URL/items/error body не eager-load-ятся и не создают N+1. Blade остаётся query-free.
-- Actual collection indexes and exact query ownership are documented in `DATA_RELATIONS.md`. No likes/follows/collaborator/popularity indexes or expensive request-time collage/popularity aggregate were added because corresponding product signals do not exist.
+- Public summary добавляет source marker через один `withExists`, только когда rolling schema доступна. Admin directory читает один latest run с allowlisted counters и выполняет три независимых bounded aggregate: empty membership использует provider index источников и `catalog_collection_items_collection_title_unique`; scope группируется по source/type последнего run через `catalog_collection_source_items_reconcile_idx` и тем же covering membership index определяет пустое состояние; status/method breakdown использует reconcile index через indexed provider source-ID subquery. В PHP остаются только bounded distinct source/type groups и allowlisted counts, а не 5 633 source rows; source URL/title/reasons/error body и неизвестные raw codes не передаются в presentation, Blade остаётся query-free. Фактический SQLite `EXPLAIN QUERY PLAN` подтвердил provider, reconcile и membership indexes; временная B-tree ограничена grouped source/type cardinality, production latency/SLA из этого не выводятся.
+- Root/category counts строятся одним grouped aggregate по public predicate; child counts не выполняют запрос на каждую категорию. Пустой category result не запускает вторую summary hydration. `catalog_collections_category_public_order_idx` обслуживает category/public/order shape; exact plan и query-budget закреплены feature tests.
+- Actual collection indexes and exact query ownership are documented in `DATA_RELATIONS.md`. No likes/follows/collaborator/popularity indexes, cover hydration или request-time collage aggregate существуют.
 
 Static acceptance must inspect generated SQL and SQLite `EXPLAIN QUERY PLAN` against a migrated disposable database with representative rows before claiming production timings. Task 10 intentionally does not create/run automated tests; the final evidence therefore records syntax/routes/schema/index/query and browser/manual observations, not invented benchmark numbers.
 
@@ -223,14 +228,28 @@ Static acceptance must inspect generated SQL and SQLite `EXPLAIN QUERY PLAN` aga
 
 ## Query contract рекомендаций и discovery
 
-- Public/person queries begin with one visibility builder; watchable types use correlated media `EXISTS`, not a materialized full ID list or per-card check. Candidate pools cap at 180, personal source history at 120 titles and stored similarity rows at 24/source. Random uses at most 12 indexed range probes ×8, never catalogue-wide random sort.
+- Public/person queries begin with one visibility builder; watchable types use correlated media `EXISTS`, not a materialized full ID list or per-card check. Candidate pools cap at 180, personal source history at 120 titles and stored similarity rows at 24/source. Random uses at most 12 indexed range probes ×8 and один bounded indexed fill оставшихся ID, никогда не выполняя catalogue-wide random sort.
 - Popularity is one canonical ordered builder reused by discovery and catalogue popularity sort. Meaningful distinct viewers exclude zero/accidental progress. Trending aggregates indexed recent progress/watchlist/review/comment events for a bounded 1/7/30-day window and never reads title `updated_at`.
 - Title hydration selects card fields/active relations once, loads user card overlay once and computes episode/media/review counts through three grouped queries. Diversity uses two bounded pivot queries plus optional explicit-franchise query. Facet controls use one UNION batch for seven canonical taxonomies. Blade adds zero queries.
 - Additive indexes and rationale are in `DATA_RELATIONS.md`; live inspection confirmed no duplicate index prefix with the existing user-first owner paths. SQLite remains the SQL baseline; no engine-specific random/window/vector function was added.
 
-Server-seeded refresh/repeat-aware discovery bypasses shared `TieredCache` instead of hashing a per-session recently shown set into high-cardinality global keys. Stable anonymous SSR discovery and homepage contexts remain unseeded and cacheable; authenticated homepage personalization already bypasses shared results and now records only its rendered eight IDs for the next bounded request. An isolated in-memory store inspection rebuilt one stable public request once, rebuilt two seeded requests twice and kept the key count unchanged (`15` before and after the seeded calls), proving that they added no shared entry. A read-only cold-start sequence returned trending IDs `[151,11446,22692]`, recorded them in an array-backed session and then returned `[34144,32264,32177]` with zero overlap; public fallback retains watching/completed/dropped exclusions and only relaxes the recent set when necessary.
+Deterministic guest discovery, включая server-seeded refresh, читает один
+канонический scalar pool из `TieredCache` namespace `discovery-ids-v3`.
+Session recent IDs фильтруются после cache lookup, поэтому они не создают
+high-cardinality keys. Authenticated, personalized и random paths остаются
+uncached. Livewire initial render и refresh выполняют по одному
+`CatalogRecommendationService::discover()`; action передаёт готовый
+request-local result render без второго query cycle. Регрессионная проверка на
+25 кандидатах доказала один popularity rebuild для двух guest seed при разных
+recent exclusions, а lifecycle-проверка — один random bounds-query на initial
+render и один на refresh. Это query-count evidence, не latency SLA.
 
-Livewire lifecycle inspection then found that the primary discovery page seeded every initial mount and therefore never reached that stable public path. The real component now maps initial deterministic public transport seed `''` to context `null`; initial `random` and `personalized` seeds remain 32-character opaque values. An isolated component-plus-array-cache probe rebuilt two reads of the initial public context once, rebuilt two reads of an explicit refreshed context twice and held 15 store keys before and after refresh. This verifies cache reuse/isolation only; it is not a latency SLA.
+Cold-start больше не останавливается на первом непустом source. Он
+накапливает до требуемого окна уникальные IDs из editorial, выбранного
+trending period, отдельного monthly fallback и popular. Random context
+нормализует page к 1, query ограничен `perPage`, а недостаток probe-уникальности
+дополняется одним bounded indexed чтением; `hasMore` не вычисляется из
+контрольной 25-й строки.
 
 Read-only cold observations on the current 32.9k-title/13 GiB SQLite database after `task18-v5` key change: trending 4.255s, popular 5.686s, top-rated 4.434s, recently-added 4.200s, recently-updated 8.953s and seeded random 7.167s for three hydrated rows. Candidate-only portions are shorter and subsequent public requests use scalar-ID cache. These are single local cold diagnostics, not p95/SLA.
 
@@ -282,9 +301,47 @@ Livewire catalog сохраняет scalar/array Form state, paginated results, 
 
 ## Query contract Premium
 
-Resolver выполняет один indexed запрос active entitlements пользователя и eager-load только status/period/grace/cancellation subscription fields; feature не запрашивается отдельно. Account payment history детерминированно пагинируется по 15 строк, refund totals eager-loaded; audit/history также bounded. Public plan query выбирает только active/public rows, provider API на render не вызывается.
+Resolver выполняет один indexed запрос active entitlements пользователя и
+eager-load только status/period/grace/cancellation subscription fields;
+feature не запрашивается отдельно. Settings использует отдельный prepared
+account snapshot: один projected entitlement SELECT охватывает все active и
+последние `25` rows, одна projected subscription-выборка — связанные и latest
+relationship. Payment history использует full pagination с compatible
+`premiumPaymentsPage`, `15` rows по умолчанию, hard maximum `50`, explicit
+columns, immutable DTO и deterministic `(created_at,id) DESC`; refund total
+берётся из reconciled payment row. Audit/history также bounded. Public plan
+query выбирает явной проекцией `13` полей не более `48`
+SQL-safe candidates, стабильно сортирует их по `(display_order, id)` и после
+server-side registry/locale/region/capability validation возвращает не более
+`12` тарифов. Unsupported locale и неготовый commerce завершаются до plan SQL;
+provider API на render не вызывается.
 
-Индексы соответствуют active entitlement, user/status/time histories, provider object/event identity и retry/admin audit lookups; webhook list не загружает raw payload, потому что raw payload вообще не сохраняется. Provider call разрешён только checkout/mutation/explicit reconciliation. Подробные uniqueness/index основания — [`premium.md`](premium.md).
+Административную страницу обслуживает один `PremiumAdministrationQuery`.
+Normal path поиска разделён на index-backed `public_id` и точный
+нормализованный `email`; только отсутствующий exact email вызывает совместимый
+legacy `lower(email)` fallback. Selected user выбирается двумя presentation
+полями, entitlement history — девятью полями с пределом `30`, promotions —
+шестью полями и aggregate redemption count с пределом `20`, audit — пятью
+полями, projected actor и full paginator `20`. Capability, которого нет у
+оператора, возвращает пустой section без запроса к его domain table; Blade и
+Livewire не запускают дополнительные reads.
+
+Read-only SQLite plan выбирает существующий
+`premium_plans_public_order_idx`, а owner payment page —
+`premium_payments_user_time_idx`; новая migration без material dataset
+evidence не нужна. Account entitlement history пока использует bounded
+temporary sort на пустом production snapshot, поэтому новый индекс не
+добавляется без material rows/latency evidence. Для administrative identity
+read `EXPLAIN QUERY PLAN` выбирает `users_public_id_unique` и
+`users_email_unique`; только legacy lower-case fallback остаётся scan.
+Production-like snapshot содержит `102` users, `0` ненормализованных email и
+пустые Premium entitlement/promotion/audit tables, поэтому expression index,
+новая identity column и time-order indexes не обоснованы. Индексы соответствуют active entitlement,
+user/status/time histories, provider object/event identity и retry/admin audit
+lookups; webhook list не загружает raw payload, потому что raw payload вообще
+не сохраняется. Provider call разрешён только
+checkout/mutation/explicit reconciliation. Подробные uniqueness/index
+основания — [`premium.md`](premium.md).
 
 ## Query budget центра помощи
 

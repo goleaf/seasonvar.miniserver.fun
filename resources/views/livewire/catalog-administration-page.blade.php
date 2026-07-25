@@ -11,13 +11,13 @@
         </div>
         <nav class="mt-5 flex flex-wrap gap-2" aria-label="{{ __('collections.admin.sections') }}">
             <button type="button" wire:click="setSection('catalog')" @class(['inline-flex min-h-11 items-center gap-2 rounded-control px-4 py-2 text-sm font-bold', 'bg-emerald-700 text-white' => $section === 'catalog', 'bg-slate-100 text-slate-700 hover:bg-slate-200' => $section !== 'catalog']) @if ($section === 'catalog') aria-current="page" @endif><x-ui.icon name="fa-solid fa-film" /><span>{{ __('collections.admin.catalog_section') }}</span></button>
-            @if ($canModerateCollections)
+            @if ($canModerateCollections || $canManageCollectionCategories)
                 <button type="button" wire:click="setSection('collections')" @class(['inline-flex min-h-11 items-center gap-2 rounded-control px-4 py-2 text-sm font-bold', 'bg-emerald-700 text-white' => $section === 'collections', 'bg-slate-100 text-slate-700 hover:bg-slate-200' => $section !== 'collections']) @if ($section === 'collections') aria-current="page" @endif><x-ui.icon name="fa-solid fa-layer-group" /><span>{{ __('collections.admin.collections_section') }}</span></button>
             @endif
         </nav>
     </header>
 
-    @if ($section === 'collections' && $canModerateCollections)
+    @if ($section === 'collections' && ($canModerateCollections || $canManageCollectionCategories))
         <livewire:collections.catalog-collection-administration-manager :key="'admin-collections'" />
     @else
         <livewire:catalog-administration-manager :key="'admin-catalog'" />

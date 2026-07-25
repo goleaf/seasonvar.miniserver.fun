@@ -20,5 +20,6 @@ final readonly class CatalogCollectionData
         public ?string $publicId = null,
         public ?string $seoTitle = null,
         public ?string $seoDescription = null,
+        public ?string $categoryPublicId = null,
     ) {}
 }

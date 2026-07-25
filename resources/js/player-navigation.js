@@ -28,14 +28,15 @@ const wireFor = (root) => {
     return componentId ? window.Livewire?.find(componentId) : null;
 };
 
-const callWire = async (root, method, args) => {
+const callWire = async (root, method, args, island = null) => {
     const wire = wireFor(root);
+    const target = island === null ? wire : wire?.$island?.(island);
 
-    if (!wire || typeof wire[method] !== 'function') {
+    if (!target || typeof target[method] !== 'function') {
         throw new Error('Player component is unavailable.');
     }
 
-    return wire[method](...args);
+    return target[method](...args);
 };
 
 const playerUrlForQuery = (query) => {
@@ -64,7 +65,7 @@ const pushPlayerHistory = (query) => {
     }
 };
 
-const runPlayerRequest = async (root, detail, method, args, onReady = null) => {
+const runPlayerRequest = async (root, detail, method, args, onReady = null, island = null) => {
     if (
         !detail
         || detail.sessionKey !== root.dataset.activePlayerSession
@@ -77,7 +78,7 @@ const runPlayerRequest = async (root, detail, method, args, onReady = null) => {
     }
 
     try {
-        const payload = await callWire(root, method, args);
+        const payload = await callWire(root, method, args, island);
 
         if (
             !root.isConnected
@@ -161,6 +162,7 @@ const bindRoot = (root) => {
             'commitPlayerTransition',
             [detail?.episodeId, detail?.mediaId],
             (payload) => pushPlayerHistory(payload.query),
+            'catalog-player-navigation',
         );
     }, { signal });
     root.addEventListener('catalog-progress', (event) => {

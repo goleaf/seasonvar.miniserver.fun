@@ -27,10 +27,6 @@ final class HdRezkaCollectionUrlGuardTest extends TestCase
             ),
         );
         $this->assertSame(
-            'https://hdrezka.my/uploads/mini/14/aa/cover.jpg',
-            $guard->absolute('/uploads/mini/14/aa/cover.jpg', HdRezkaCollectionUrlGuard::PURPOSE_COVER),
-        );
-        $this->assertSame(
             'https://hdrezka.my/668-mufasa-the-lion-king.html',
             $guard->absolute('/668-mufasa-the-lion-king.html', HdRezkaCollectionUrlGuard::PURPOSE_DETAIL),
         );
@@ -62,7 +58,7 @@ final class HdRezkaCollectionUrlGuardTest extends TestCase
         yield 'query string' => ['https://hdrezka.my/collections.html?token=secret', HdRezkaCollectionUrlGuard::PURPOSE_INDEX];
         yield 'fragment' => ['https://hdrezka.my/collections.html#part', HdRezkaCollectionUrlGuard::PURPOSE_INDEX];
         yield 'protocol-relative' => ['//example.test/collections.html', HdRezkaCollectionUrlGuard::PURPOSE_INDEX];
-        yield 'encoded traversal' => ['/uploads/mini/%2e%2e/cover.jpg', HdRezkaCollectionUrlGuard::PURPOSE_COVER];
+        yield 'encoded traversal' => ['/uploads/mini/%2e%2e/cover.jpg', HdRezkaCollectionUrlGuard::PURPOSE_COLLECTION];
         yield 'encoded nul' => ['/xfsearch/collections/films%00/', HdRezkaCollectionUrlGuard::PURPOSE_COLLECTION];
         yield 'double encoded nul' => ['/xfsearch/collections/films%2500/', HdRezkaCollectionUrlGuard::PURPOSE_COLLECTION];
         yield 'double encoded traversal' => ['/xfsearch/collections/%252e%252e/', HdRezkaCollectionUrlGuard::PURPOSE_COLLECTION];

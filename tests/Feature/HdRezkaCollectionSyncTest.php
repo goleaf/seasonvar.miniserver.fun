@@ -43,16 +43,11 @@ final class HdRezkaCollectionSyncTest extends TestCase
             'catalog-collection-imports.hdrezka.max_collections' => 10,
             'catalog-collection-imports.hdrezka.lock_store' => 'array',
             'catalog-collection-imports.hdrezka.lock_seconds' => 300,
-            'uploads.runtime_group' => '',
-            'catalog-collection-imports.hdrezka.cover.max_source_bytes' => 1_000_000,
-            'catalog-collection-imports.hdrezka.cover.max_width' => 320,
-            'catalog-collection-imports.hdrezka.cover.max_height' => 180,
-            'catalog-collection-imports.hdrezka.cover.quality' => 82,
             'recommendations.similarity_v6.editorial_collection_signal_weight' => 280,
         ]);
     }
 
-    public function test_full_two_page_sync_reconciles_all_items_cover_signals_and_defers_warm_until_recommendations_activate(): void
+    public function test_full_two_page_sync_reconciles_all_items_signals_and_defers_warm_until_recommendations_activate(): void
     {
         Queue::fake();
         $titles = [
@@ -74,7 +69,8 @@ final class HdRezkaCollectionSyncTest extends TestCase
         $this->assertSame(3, $result->counters['matched']);
         $this->assertSame(0, $result->counters['ambiguous']);
         $this->assertSame(0, $result->counters['unmatched']);
-        $this->assertSame(1, $result->counters['covers_updated']);
+        $this->assertArrayNotHasKey('covers_updated', $result->counters);
+        $this->assertArrayNotHasKey('covers_failed', $result->counters);
         $this->assertSame([], $result->errors);
         $this->assertDatabaseCount('catalog_collections', 1);
         $this->assertDatabaseCount('catalog_collection_sources', 1);
@@ -84,15 +80,14 @@ final class HdRezkaCollectionSyncTest extends TestCase
         $this->assertDatabaseCount('catalog_recommendation_dirty_titles', 3);
         $collection = CatalogCollection::query()->firstOrFail();
         $this->assertSame(array_column($titles, 'id'), $collection->items()->pluck('catalog_title_id')->all());
-        $this->assertSame('image/webp', $collection->cover_mime_type);
-        Storage::disk('uploads')->assertExists((string) $collection->cover_path);
         $this->assertSame(
             CatalogCollectionSyncStatus::Completed,
             CatalogCollectionSyncRun::query()->findOrFail($result->runId)->status,
         );
         $this->assertNull(app(CatalogCacheWarmRequestStore::class)->claim(10));
         Queue::assertPushed(RebuildCatalogRecommendationsAfterCollectionSync::class, 1);
-        Http::assertSentCount(4);
+        Http::assertSentCount(3);
+        Http::assertNotSent(fn ($request): bool => str_contains($request->url(), '/uploads/mini/'));
     }
 
     public function test_dry_run_parses_and_matches_without_database_or_cover_mutations(): void
@@ -167,9 +162,6 @@ final class HdRezkaCollectionSyncTest extends TestCase
             'https://hdrezka.my/xfsearch/collections/films/page/2/' => Http::sequence()
                 ->push($pageTwo, 200, ['Content-Type' => 'text/html'])
                 ->push('Ошибка', 500),
-            'https://hdrezka.my/uploads/mini/14/aa/cover.png' => Http::sequence()
-                ->pushResponse($this->imageResponse())
-                ->pushResponse($this->imageResponse()),
         ]);
         $initial = app(HdRezkaCollectionSyncService::class)->sync();
         $this->assertSame(
@@ -239,7 +231,7 @@ final class HdRezkaCollectionSyncTest extends TestCase
         $this->assertDatabaseCount('catalog_collection_items', 1);
     }
 
-    public function test_cover_storage_failure_keeps_committed_membership_dirty_tracking_and_recommendation_dispatch(): void
+    public function test_remote_collection_image_is_ignored_without_affecting_membership_or_recommendation_dispatch(): void
     {
         Queue::fake();
         $titles = [
@@ -248,14 +240,13 @@ final class HdRezkaCollectionSyncTest extends TestCase
             $this->indexedTitle('Третий фильм', 2022),
         ];
         $this->fakeFullSource();
-        config(['filesystems.disks.uploads.driver' => 'unsupported-for-imported-cover']);
 
         $result = app(HdRezkaCollectionSyncService::class)->sync();
 
         $this->assertSame(CatalogCollectionSyncStatus::Completed, $result->status);
-        $this->assertSame(1, $result->counters['covers_failed']);
+        $this->assertArrayNotHasKey('covers_failed', $result->counters);
         $this->assertSame(0, $result->counters['collection_failures']);
-        $this->assertNotEmpty($result->errors);
+        $this->assertSame([], $result->errors);
         $this->assertDatabaseCount('catalog_collection_items', 3);
         $this->assertDatabaseCount('catalog_title_recommendation_signals', 3);
 
@@ -267,6 +258,7 @@ final class HdRezkaCollectionSyncTest extends TestCase
 
         $this->assertNull(app(CatalogCacheWarmRequestStore::class)->claim(10));
         Queue::assertPushed(RebuildCatalogRecommendationsAfterCollectionSync::class, 1);
+        Http::assertNotSent(fn ($request): bool => str_contains($request->url(), '/uploads/mini/'));
     }
 
     public function test_completed_index_marks_a_disappeared_source_missing_and_removes_only_its_public_membership(): void
@@ -386,7 +378,6 @@ final class HdRezkaCollectionSyncTest extends TestCase
             'https://hdrezka.my/xfsearch/collections/films/page/2/' => $this->htmlResponse(
                 $this->pageHtml([$this->card('103', 'Третий фильм', 2022)], 2, null),
             ),
-            'https://hdrezka.my/uploads/mini/14/aa/cover.png' => $this->imageResponse(),
         ]);
     }
 
@@ -458,22 +449,6 @@ final class HdRezkaCollectionSyncTest extends TestCase
         return Http::response($html, 200, [
             'Content-Type' => 'text/html; charset=UTF-8',
             'Content-Length' => (string) strlen($html),
-        ]);
-    }
-
-    private function imageResponse(): PromiseInterface|Response
-    {
-        $image = imagecreatetruecolor(640, 360);
-        imagefill($image, 0, 0, imagecolorallocate($image, 35, 90, 160));
-        ob_start();
-        imagepng($image, null, 6);
-        $bytes = ob_get_clean();
-        imagedestroy($image);
-        $this->assertIsString($bytes);
-
-        return Http::response($bytes, 200, [
-            'Content-Type' => 'image/png',
-            'Content-Length' => (string) strlen($bytes),
         ]);
     }
 }

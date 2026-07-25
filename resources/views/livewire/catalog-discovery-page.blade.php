@@ -10,7 +10,7 @@
         <span>{{ __('recommendations.page.loading') }}</span>
     </div>
 
-    <header class="overflow-hidden rounded-panel bg-white shadow-panel">
+    <header data-discovery-heading class="overflow-hidden rounded-panel border border-slate-200 bg-white shadow-panel">
         <div class="border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-6">
             <nav aria-label="{{ __('recommendations.page.breadcrumbs') }}" class="flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-500">
                 <a href="{{ route('home') }}" class="min-h-11 py-3 hover:text-emerald-700">{{ __('catalog.navigation.home') }}</a>
@@ -18,7 +18,7 @@
                 <span aria-current="page" class="py-3 text-slate-700">{{ __('recommendations.navigation.discover') }}</span>
             </nav>
         </div>
-        <div class="grid gap-5 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end lg:px-8 lg:py-8">
+        <div class="px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
             <div class="max-w-4xl">
                 <div class="inline-flex items-center gap-2 text-sm font-black uppercase tracking-[0.14em] text-emerald-700">
                     <x-ui.icon name="fa-solid fa-compass" />
@@ -27,51 +27,54 @@
                 <h1 class="mt-3 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl lg:text-5xl">{{ $presentation['title'] }}</h1>
                 <p class="mt-3 max-w-3xl text-base leading-7 text-slate-600 sm:text-lg">{{ $presentation['description'] }}</p>
             </div>
-            <button
-                type="button"
-                wire:click="refreshRecommendations"
-                wire:loading.attr="disabled"
-                class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-600 disabled:cursor-wait disabled:opacity-60"
-            >
-                <x-ui.icon name="fa-solid fa-arrows-rotate" />
-                <span>{{ $type === 'random' ? __('recommendations.page.show_another') : __('recommendations.page.refresh') }}</span>
-            </button>
         </div>
     </header>
 
-    <nav aria-label="{{ __('recommendations.navigation.all') }}" class="flex flex-wrap gap-2 rounded-panel bg-white p-3 shadow-sm shadow-slate-200/70">
-        @foreach ($typeLinks as $typeLink)
-            <a
-                href="{{ $typeLink['url'] }}"
-                wire:navigate
-                @class([
-                    'inline-flex min-h-11 items-center rounded-control px-4 py-2 text-sm font-bold focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200',
-                    'bg-emerald-700 text-white' => $typeLink['active'],
-                    'bg-slate-50 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700' => ! $typeLink['active'],
-                ])
-                @if ($typeLink['active']) aria-current="page" @endif
-            >{{ $typeLink['label'] }}</a>
-        @endforeach
+    <nav aria-label="{{ __('recommendations.navigation.all') }}" class="rounded-panel border border-slate-200 bg-white p-2 shadow-sm shadow-slate-200/70">
+        <div class="flex flex-wrap gap-1">
+            @foreach ($typeLinks as $typeLink)
+                <a
+                    href="{{ $typeLink['url'] }}"
+                    wire:navigate
+                    data-discovery-type-link="{{ $typeLink['type']->value }}"
+                    @class([
+                        'inline-flex min-h-11 items-center rounded-control px-4 py-2 text-sm font-bold focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200',
+                        'bg-emerald-700 text-white' => $typeLink['active'],
+                        'text-slate-700 hover:bg-emerald-50 hover:text-emerald-700' => ! $typeLink['active'],
+                    ])
+                    @if ($typeLink['active']) aria-current="page" @endif
+                >{{ $typeLink['label'] }}</a>
+            @endforeach
+        </div>
     </nav>
 
-    <section aria-labelledby="discovery-filters" class="rounded-panel bg-white p-4 shadow-sm shadow-slate-200/70 sm:p-6">
-        <div class="flex flex-wrap items-start justify-between gap-3">
-            <div>
-                <h2 id="discovery-filters" class="flex items-center gap-2 text-lg font-black text-slate-900">
-                    <x-ui.icon name="fa-solid fa-sliders text-emerald-700" />
-                    <span>{{ __('recommendations.page.filters') }}</span>
-                </h2>
-                <p class="mt-1 text-sm text-slate-600">{{ __('recommendations.page.controls') }}</p>
-            </div>
-            @if ($hasFilters)
-                <button type="button" wire:click="clearFilters" class="inline-flex min-h-11 items-center gap-2 rounded-control px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 hover:text-emerald-700">
-                    <x-ui.icon name="fa-solid fa-rotate-left" />
-                    <span>{{ __('recommendations.page.clear_filters') }}</span>
-                </button>
-            @endif
-        </div>
+    <details data-discovery-filters @if ($hasFilters) open @endif class="group rounded-panel border border-slate-200 bg-white shadow-sm shadow-slate-200/70">
+        <summary class="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 sm:px-6">
+            <span class="flex min-w-0 items-center gap-3">
+                <span class="grid h-9 w-9 shrink-0 place-items-center rounded-control bg-emerald-50 text-emerald-700">
+                    <x-ui.icon name="fa-solid fa-sliders" />
+                </span>
+                <span class="min-w-0">
+                    <span class="block text-base font-black text-slate-900">{{ __('recommendations.page.filters') }}</span>
+                    <span class="block text-sm font-medium text-slate-500">
+                        {{ $hasFilters ? __('recommendations.page.filters_active') : __('recommendations.page.filters_hint') }}
+                    </span>
+                </span>
+            </span>
+            <x-ui.icon name="fa-solid fa-chevron-down shrink-0 text-slate-400 transition group-open:rotate-180" />
+        </summary>
 
-        <div class="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+        <div class="border-t border-slate-200 p-4 sm:p-6">
+            @if ($hasFilters)
+                <div class="mb-4 flex justify-end">
+                    <button type="button" wire:click="clearFilters" class="inline-flex min-h-11 items-center gap-2 rounded-control px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 hover:text-emerald-700">
+                        <x-ui.icon name="fa-solid fa-rotate-left" />
+                        <span>{{ __('recommendations.page.clear_filters') }}</span>
+                    </button>
+                </div>
+            @endif
+
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
             <label class="text-sm font-bold text-slate-700">{{ __('recommendations.page.genre') }}
                 <select wire:model.live="genre" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2 font-normal text-slate-700 focus:border-emerald-600 focus:outline-none focus:ring-4 focus:ring-emerald-100">
                     <option value="">{{ __('recommendations.page.any') }}</option>
@@ -165,7 +168,8 @@
                 @endif
             </div>
         </details>
-    </section>
+        </div>
+    </details>
 
     @if ($notice)
         <div class="flex flex-wrap items-center justify-between gap-3 rounded-control bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800" role="status" aria-live="polite">
@@ -200,13 +204,26 @@
         <div class="rounded-panel border border-sky-200 bg-sky-50 p-4 text-sm leading-6 text-sky-900">{{ __('recommendations.page.upcoming_notice') }}</div>
     @endif
 
-    <section aria-labelledby="discovery-results" aria-busy="false" class="scroll-mt-40">
+    <section data-discovery-title-results aria-labelledby="discovery-results" aria-busy="false" class="scroll-mt-40 rounded-panel border border-slate-200 bg-slate-50/60 p-4 sm:p-6">
         <div class="flex flex-wrap items-end justify-between gap-3">
             <div>
-                <h2 id="discovery-results" class="text-xl font-black text-slate-900">{{ __('recommendations.page.results') }}</h2>
-                <p class="mt-1 text-sm text-slate-600">{{ trans_choice('recommendations.page.result_count', $viewItems->count()) }}</p>
+                <p class="text-sm font-black uppercase tracking-[0.12em] text-emerald-700">{{ __('recommendations.page.series_section_eyebrow') }}</p>
+                <h2 id="discovery-results" class="mt-1 text-2xl font-black tracking-tight text-slate-900">{{ __('recommendations.page.series_section_title') }}</h2>
+                <p class="mt-1 max-w-2xl text-sm leading-6 text-slate-600">
+                    {{ $type === 'popular' ? __('recommendations.page.series_section_description') : $presentation['description'] }}
+                </p>
+                <p class="mt-2 text-sm font-semibold text-slate-500">{{ trans_choice('recommendations.page.result_count', $viewItems->count()) }} · {{ __('recommendations.page.page_number', ['page' => $result->page]) }}</p>
             </div>
-            <span class="text-sm font-semibold text-slate-500">{{ __('recommendations.page.page_number', ['page' => $result->page]) }}</span>
+            <button
+                type="button"
+                wire:click="refreshRecommendations"
+                wire:loading.attr="disabled"
+                data-discovery-refresh-secondary
+                class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:border-emerald-300 hover:text-emerald-700 disabled:cursor-wait disabled:opacity-60"
+            >
+                <x-ui.icon name="fa-solid fa-arrows-rotate" />
+                <span>{{ $type === 'random' ? __('recommendations.page.show_another') : __('recommendations.page.refresh') }}</span>
+            </button>
         </div>
 
         @if ($viewItems->isEmpty())
@@ -265,6 +282,8 @@
     </section>
 
     @if ($type === 'popular')
-        <livewire:collections.catalog-collection-explorer :key="$collectionExplorerKey" />
+        <div data-discovery-collection-results>
+            <livewire:collections.catalog-collection-explorer :key="$collectionExplorerKey" />
+        </div>
     @endif
 </div>

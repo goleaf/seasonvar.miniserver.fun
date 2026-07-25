@@ -1940,6 +1940,7 @@ class CatalogStatsPageBuilder
             'seasonvar_import_events.event.seasonvar-import-complete' => 'Обновление каталога завершено',
             'seasonvar_import_events.event.seasonvar-import-cycle-complete' => 'Цикл обновления завершен',
             'seasonvar_import_events.event.seasonvar-import-cycle-stopped' => 'Цикл обновления остановлен безопасно',
+            'seasonvar_import_events.event.seasonvar-import-events-aggregated' => 'Сводка событий обновления',
             'seasonvar_import_events.event.seasonvar-import-cycle-started' => 'Цикл обновления начался',
             'seasonvar_import_events.event.seasonvar-import-failed' => 'Обновление каталога завершилось ошибкой',
             'seasonvar_import_events.event.seasonvar-import-season-url-failed' => 'Страница сезона завершилась ошибкой',

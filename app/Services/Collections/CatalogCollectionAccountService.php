@@ -8,16 +8,12 @@ use App\Enums\CatalogCollectionVisibility;
 use App\Models\CatalogCollection;
 use App\Models\User;
 use App\Services\Comments\CommentTargetLifecycleService;
-use App\Services\Storage\PrivateUploadStorage;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Throwable;
 
 final class CatalogCollectionAccountService
 {
     public function __construct(
         private readonly CatalogCollectionCacheInvalidator $cache,
-        private readonly PrivateUploadStorage $uploads,
         private readonly CommentTargetLifecycleService $comments,
         private readonly CatalogCollectionSchema $schema,
     ) {}
@@ -34,6 +30,10 @@ final class CatalogCollectionAccountService
             ->where('owner_id', $user->id)
             ->with([
                 'translations:id,catalog_collection_id,locale,name,description,seo_title,seo_description',
+                'category:id,public_id,parent_id,slug,position,is_active',
+                'category.translations:id,catalog_collection_category_id,locale,name',
+                'category.parent:id,public_id,parent_id,slug,position,is_active',
+                'category.parent.translations:id,catalog_collection_category_id,locale,name',
                 'items' => fn ($query) => $query
                     ->select(['id', 'catalog_collection_id', 'catalog_title_id', 'position', 'created_at'])
                     ->with('catalogTitleWithTrashed:id,slug,title,original_title')
@@ -58,6 +58,14 @@ final class CatalogCollectionAccountService
                     'moderation_status' => $collection->moderation_status->value,
                     'sort_mode' => $collection->sort_mode->value,
                     'content_locale' => $collection->content_locale,
+                    'category' => $collection->category === null ? null : [
+                        'slug' => $collection->category->slug,
+                        'name' => $collection->category->display_name,
+                        'parent' => $collection->category->parent === null ? null : [
+                            'slug' => $collection->category->parent->slug,
+                            'name' => $collection->category->parent->display_name,
+                        ],
+                    ],
                     'translations' => $collection->translations->map(fn ($translation): array => [
                         'locale' => $translation->locale,
                         'name' => $translation->name,
@@ -94,7 +102,7 @@ final class CatalogCollectionAccountService
         $collections = CatalogCollection::query()
             ->withTrashed()
             ->where('owner_id', $user->id)
-            ->select(['id', 'cover_disk', 'cover_path'])
+            ->select('id')
             ->lockForUpdate()
             ->get();
 
@@ -105,20 +113,6 @@ final class CatalogCollectionAccountService
             ->whereKey($collections->modelKeys())
             ->forceDelete();
 
-        $covers = $collections
-            ->filter(fn (CatalogCollection $collection): bool => $collection->cover_disk === config('uploads.disk') && filled($collection->cover_path))
-            ->map(fn (CatalogCollection $collection): string => (string) $collection->cover_path)
-            ->all();
-
-        DB::afterCommit(function () use ($covers): void {
-            foreach ($covers as $cover) {
-                try {
-                    $this->uploads->delete($cover);
-                } catch (Throwable $exception) {
-                    report($exception);
-                }
-            }
-        });
         $this->cache->changed();
     }
 

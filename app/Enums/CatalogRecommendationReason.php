@@ -30,6 +30,7 @@ enum CatalogRecommendationReason: string
     case RelatedStory = 'related_story';
     case Editorial = 'editorial';
     case Trending = 'trending';
+    case TrendingPeriod = 'trending_period';
     case Popular = 'popular';
     case TopRated = 'top_rated';
     case RecentlyAdded = 'recently_added';

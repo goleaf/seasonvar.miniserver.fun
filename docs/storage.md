@@ -1,6 +1,6 @@
 # Хранилище и uploads
 
-Обновлено: 18.07.2026
+Обновлено: 25.07.2026
 
 ## Текущее состояние
 
@@ -36,11 +36,19 @@
 - Проверяйте, что сохраненный путь не содержит клиентское имя файла.
 - Проверяйте private visibility и cleanup через `Storage::disk('uploads')->assertExists()` / `assertMissing()`.
 
-## Обложки коллекций
+## Удалённые обложки подборок
 
-Collection cover хранится только через `PrivateUploadStorage` в `catalog-collections/{public_uuid}/` на `config('uploads.disk')`. В БД находятся disk/path/MIME/size и monotonic `cover_version`; client filename и public storage URL не сохраняются. Разрешены те же validated raster formats, что задаёт `PrivateImageUploadRules`; collage generation, signed provider image и request-time image processing не добавлены.
+Подборки больше не принимают, не импортируют, не хранят и не выдают собственные изображения. В интерфейсе используется только текстовая карточка; постеры тайтлов, avatar/cover профиля и другие upload-домены не входят в эту границу.
 
-`GET /collections/covers/{publicId}/{version}` не является публичным disk route: controller повторно разрешает collection policy, exact current version, configured disk, owned prefix и traversal guards, затем отдаёт `private, no-store`, `nosniff`, `noindex`. При replace предыдущий реально locked path удаляется после commit; ошибка DB удаляет только новый orphan. Remove/force delete/account delete удаляют owned file, но не fallback poster и не shared catalog media.
+Для контролируемого удаления прежних данных существует `php artisan catalog-collections:purge-covers`. Без параметров команда выполняет только dry-run и выводит агрегированные количества файлов, байт и строк без private paths. Необратимое удаление требует явного `--execute`, использует жёстко заданные disk `uploads` и prefix `catalog-collections/`, очищает legacy metadata подборок/источников bounded-пакетами и не создаёт backup/trash-копию. После выполнения команда должна подтвердить готовность к удалению legacy-колонок; при любой storage/database ошибке она возвращает ненулевой код, и schema migration продолжать нельзя. Повторный запуск безопасен и должен быть no-op.
+
+Проверка после операции:
+
+```bash
+php artisan catalog-collections:purge-covers
+```
+
+Ожидаются нулевые `Файлов`, `Байт`, `Строк подборок` и `Строк источников`, а также `Готовность к удалению колонок: да`. Путь `storage/app/private/uploads/catalog-collections` не восстанавливается rollback-кодом: возврат удалённых изображений возможен только из отдельно существовавшего внешнего backup, который эта операция по прямому продуктовому правилу не создаёт.
 
 ## Avatar и cover профиля
 

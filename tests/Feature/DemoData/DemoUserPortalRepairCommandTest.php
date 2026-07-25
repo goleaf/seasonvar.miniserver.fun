@@ -116,7 +116,7 @@ final class DemoUserPortalRepairCommandTest extends TestCase
         $this->assertSame(0, CatalogTitleUserState::query()->count());
     }
 
-    public function test_repair_detects_missing_collections_and_null_collection_covers(): void
+    public function test_repair_detects_and_restores_missing_collections_without_images(): void
     {
         Queue::fake();
 
@@ -125,32 +125,19 @@ final class DemoUserPortalRepairCommandTest extends TestCase
 
         $ownerIds = CatalogCollection::query()->distinct()->orderBy('owner_id')->pluck('owner_id');
         CatalogCollection::query()->where('owner_id', $ownerIds->first())->delete();
-        CatalogCollection::query()
-            ->where('owner_id', $ownerIds->last())
-            ->firstOrFail()
-            ->forceFill([
-                'cover_disk' => null,
-                'cover_path' => null,
-                'cover_mime_type' => null,
-                'cover_size' => null,
-            ])
-            ->save();
 
         $before = app(DemoUserPortalRepairer::class)->inspect();
         $this->assertSame(1, $before['users_without_collections']);
-        $this->assertSame(1, $before['invalid_collection_images']);
+        $this->assertArrayNotHasKey('invalid_collection_images', $before);
 
         $this->artisan('demo:repair-user-portal', ['--force' => true, '--json' => true])
             ->assertSuccessful();
 
         $after = app(DemoUserPortalRepairer::class)->inspect();
         $this->assertSame(0, $after['users_without_collections']);
-        $this->assertSame(0, $after['invalid_collection_images']);
+        $this->assertArrayNotHasKey('invalid_collection_images', $after);
 
         $this->assertSame(4, CatalogCollection::query()->count());
-        CatalogCollection::query()->each(function (CatalogCollection $collection): void {
-            $this->assertSame('image/webp', $collection->cover_mime_type);
-            Storage::disk($this->uploadDisk)->assertExists((string) $collection->cover_path);
-        });
+        Storage::disk($this->uploadDisk)->assertMissing('catalog-collections');
     }
 }

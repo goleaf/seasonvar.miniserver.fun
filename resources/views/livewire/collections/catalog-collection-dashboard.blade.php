@@ -48,6 +48,11 @@
                     </div>
                     <x-form.input-error for="visibility" />
                 </fieldset>
+                <x-collections.category-fields
+                    :root-options="$categoryRootOptions"
+                    :child-options="$categoryChildOptions"
+                    id-prefix="new-collection-category"
+                />
                 @if ($showTypeSelector)
                     <div>
                         <label for="new-collection-type" class="block text-sm font-bold text-slate-700">{{ __('collections.form.type') }}</label>

@@ -27,6 +27,8 @@ use App\Models\Season;
 use App\Models\User;
 use App\Models\UserTag;
 use App\Services\Catalog\CatalogRecommendationCache;
+use App\Services\Catalog\CatalogRecommendationRepeatSuppressor;
+use App\Services\Catalog\CatalogRecommendationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -60,6 +62,105 @@ final class CatalogRecommendationPrivacyTest extends TestCase
 
         $this->assertSame($expected, $actual);
         Cache::shouldNotHaveReceived('store');
+    }
+
+    public function test_deterministic_guest_cache_is_shared_without_sharing_recent_title_exclusions(): void
+    {
+        foreach (range(1, 25) as $index) {
+            $title = CatalogTitle::factory()->create(['title' => "Общий кандидат {$index}"]);
+            LicensedMedia::factory()->for($title)->create([
+                'status' => 'published',
+                'published_at' => now(),
+            ]);
+        }
+        $firstExcludedId = (int) CatalogTitle::query()->min('id');
+        $secondExcludedId = (int) CatalogTitle::query()->max('id');
+        $popularQueries = 0;
+        DB::listen(function ($query) use (&$popularQueries): void {
+            if (str_contains(strtolower($query->sql), 'popularity_watchlists')) {
+                $popularQueries++;
+            }
+        });
+        $repeats = app(CatalogRecommendationRepeatSuppressor::class);
+        $service = app(CatalogRecommendationService::class);
+        $repeats->remember(null, [$firstExcludedId]);
+
+        $first = $service->discover($this->guestPopularContext('session-a'));
+        session()->forget('catalog.recommendations.recent.v1');
+        $repeats->remember(null, [$secondExcludedId]);
+        $second = $service->discover($this->guestPopularContext('session-b'));
+
+        $this->assertFalse($first->items->pluck('title.id')->contains($firstExcludedId));
+        $this->assertTrue($second->items->pluck('title.id')->contains($firstExcludedId));
+        $this->assertFalse($second->items->pluck('title.id')->contains($secondExcludedId));
+        $this->assertSame(1, $popularQueries);
+    }
+
+    public function test_authenticated_personalized_and_random_contexts_bypass_shared_result_cache(): void
+    {
+        $cache = app(CatalogRecommendationCache::class);
+        $calls = 0;
+        $rebuild = static function () use (&$calls): array {
+            $calls++;
+
+            return [[
+                'id' => $calls,
+                'score' => 100,
+                'source' => CatalogRecommendationSource::Popularity->value,
+                'reason' => CatalogRecommendationReason::Popular->value,
+            ]];
+        };
+        $contexts = [
+            new CatalogRecommendationContext(
+                CatalogRecommendationType::Popular,
+                (new User)->forceFill(['id' => 101]),
+                'ru',
+            ),
+            new CatalogRecommendationContext(
+                CatalogRecommendationType::Personalized,
+                null,
+                'ru',
+            ),
+            new CatalogRecommendationContext(
+                CatalogRecommendationType::Random,
+                null,
+                'ru',
+                seed: 'private-random',
+            ),
+        ];
+
+        foreach ($contexts as $context) {
+            $cache->rememberPublic($context, $rebuild);
+            $cache->rememberPublic($context, $rebuild);
+        }
+
+        $this->assertSame(6, $calls);
+    }
+
+    public function test_authenticated_public_refresh_keeps_recent_title_suppression_private(): void
+    {
+        $user = User::factory()->create();
+
+        foreach (range(1, 25) as $index) {
+            $title = CatalogTitle::factory()->create(['title' => "Личный repeat {$index}"]);
+            LicensedMedia::factory()->for($title)->create([
+                'status' => 'published',
+                'published_at' => now(),
+            ]);
+        }
+        $recentId = (int) CatalogTitle::query()->max('id');
+        app(CatalogRecommendationRepeatSuppressor::class)->remember($user, [$recentId]);
+
+        $result = app(CatalogRecommendationService::class)->discover(
+            new CatalogRecommendationContext(
+                type: CatalogRecommendationType::Popular,
+                user: $user,
+                locale: 'ru',
+                seed: 'authenticated-refresh',
+            ),
+        );
+
+        $this->assertFalse($result->items->pluck('title.id')->contains($recentId));
     }
 
     public function test_rendered_personalized_page_and_public_api_do_not_expose_private_profile_inputs(): void
@@ -208,5 +309,15 @@ final class CatalogRecommendationPrivacyTest extends TestCase
                 'watch_status_updated_at' => now(),
             ]);
         }
+    }
+
+    private function guestPopularContext(string $seed): CatalogRecommendationContext
+    {
+        return new CatalogRecommendationContext(
+            type: CatalogRecommendationType::Popular,
+            user: null,
+            locale: 'ru',
+            seed: $seed,
+        );
     }
 }

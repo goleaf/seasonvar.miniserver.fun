@@ -32,8 +32,6 @@ class RefreshProjectDocs extends Command
         }
 
         if (! $result->hasChanges()) {
-            $this->info('Документация уже актуальна.');
-
             return self::SUCCESS;
         }
 

@@ -188,7 +188,6 @@ final class HdRezkaCollectionReconciliationTest extends TestCase
             sourceKey: $this->definition()->sourceKey,
             name: 'Новое удалённое имя',
             path: '/xfsearch/collections/love/',
-            coverPath: '/uploads/mini/14/aa/love.jpg',
             position: 1,
         );
 
@@ -308,7 +307,6 @@ final class HdRezkaCollectionReconciliationTest extends TestCase
             sourceKey: hash('sha256', 'love'),
             name: 'Про любовь',
             path: '/xfsearch/collections/love/',
-            coverPath: '/uploads/mini/14/aa/love.jpg',
             position: 1,
         );
     }

@@ -1,15 +1,9 @@
 <div class="space-y-5">
     <article class="overflow-hidden rounded-panel border border-slate-200 bg-white shadow-panel">
-        <div class="grid min-w-0 gap-5 p-5 sm:p-6 lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-start">
-            <x-ui.poster-frame
-                :src="$coverUrl"
-                :alt="__('collections.accessibility.collection_cover', ['name' => $collection->display_name])"
-                :empty-label="__('collections.page.cover_missing')"
-                loading="eager"
-                class="aspect-[16/9] w-full rounded-panel bg-slate-100"
-            />
-            <div class="min-w-0">
+        <div class="min-w-0 p-5 sm:p-6">
+            <div class="min-w-0 max-w-5xl">
                 <div class="flex flex-wrap gap-2">
+                    <x-ui.status-pill variant="success" icon="fa-solid fa-folder-tree">{{ $collectionCategoryLabel }}</x-ui.status-pill>
                     @if ($collection->is_featured)
                         <x-ui.status-pill variant="warning">{{ __('collections.page.featured') }}</x-ui.status-pill>
                     @endif

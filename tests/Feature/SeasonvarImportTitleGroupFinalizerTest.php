@@ -6,10 +6,13 @@ namespace Tests\Feature;
 
 use App\DTOs\Seasonvar\SeasonvarCatalogData;
 use App\DTOs\Seasonvar\SeasonvarPreparedCatalogPage;
+use App\Enums\MediaFileSizeCheckStatus;
+use App\Enums\MediaHealthStatus;
 use App\Jobs\FinalizeSeasonvarImportTitleGroup;
 use App\Jobs\WarmCatalogCaches;
 use App\Models\ApiSyncChange;
 use App\Models\CatalogTitle;
+use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Models\SeasonvarImportPreparedPage;
 use App\Models\Source;
@@ -20,6 +23,7 @@ use App\Services\Seasonvar\SeasonvarCatalogParser;
 use App\Services\Seasonvar\SeasonvarImportTitleGroupDispatcher;
 use App\Services\Seasonvar\SeasonvarPageClaimManager;
 use App\Services\Seasonvar\SeasonvarTitleMerger;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -229,6 +233,48 @@ class SeasonvarImportTitleGroupFinalizerTest extends TestCase
         $this->assertNotNull($warmWork);
         $this->assertSame([$title->id], $warmWork->titleIds);
         Queue::assertPushed(WarmCatalogCaches::class, 1);
+    }
+
+    public function test_finalizer_applies_prepared_direct_media_without_provider_http(): void
+    {
+        $title = $this->titleWithSeasonUrls([1]);
+        $group = app(SeasonvarImportTitleGroupDispatcher::class)
+            ->start($title, 'seasonvar-title-refresh');
+        $row = $group->preparedPages()->with('sourcePage')->firstOrFail();
+        $this->prepareRow($row, 1, 1, [[
+            'url' => 'https://media.example.com/ryzhaya-s01e01-1080p.mp4',
+            'title' => '1 серия 1080p',
+            'season_number' => 1,
+            'episode_number' => 1,
+            'source_url' => 'https://seasonvar.ru/playls2/serial-24212/plist.txt',
+            'kind' => 'file',
+            'storage_disk' => 'seasonvar_parsed',
+            'availability' => [
+                'available' => true,
+                'check_status' => 'reachable',
+                'http_status' => 206,
+                'checked_at' => '2026-07-24T10:00:00+03:00',
+                'latency_ms' => 37,
+                'error_category' => null,
+                'permanent_failure' => false,
+            ],
+        ]]);
+
+        $this->app->call([
+            (new FinalizeSeasonvarImportTitleGroup($group->id))->withFakeQueueInteractions(),
+            'handle',
+        ]);
+
+        $media = LicensedMedia::query()->sole();
+
+        Http::assertNothingSent();
+        $this->assertSame('completed', $group->fresh()->status->value);
+        $this->assertSame('published', $media->status);
+        $this->assertSame('reachable', $media->check_status);
+        $this->assertSame(206, $media->last_http_status);
+        $this->assertSame(MediaHealthStatus::Active, $media->health_status);
+        $this->assertSame(MediaFileSizeCheckStatus::Pending, $media->file_size_check_status);
+        $this->assertNull($media->file_size_bytes);
     }
 
     public function test_finalizer_resumes_after_an_applied_page_without_applying_or_counting_it_twice(): void
@@ -462,6 +508,10 @@ class SeasonvarImportTitleGroupFinalizerTest extends TestCase
         $this->assertSame('failed', $unrelated->fresh()->status->value);
     }
 
+    /**
+     * @param  Collection<int, SeasonvarImportPreparedPage>  $rows
+     * @param  array<int, int>  $episodesBySeason
+     */
     private function prepareAllRows($rows, array $episodesBySeason): void
     {
         foreach ($rows->shuffle() as $row) {
@@ -470,8 +520,13 @@ class SeasonvarImportTitleGroupFinalizerTest extends TestCase
         }
     }
 
-    private function prepareRow(SeasonvarImportPreparedPage $row, int $seasonNumber, int $episodeCount): void
-    {
+    /** @param list<array<string, mixed>> $media */
+    private function prepareRow(
+        SeasonvarImportPreparedPage $row,
+        int $seasonNumber,
+        int $episodeCount,
+        array $media = [],
+    ): void {
         $url = $row->sourcePage->url;
         $episodes = collect(range(1, $episodeCount))->map(fn (int $number): array => [
             'season_number' => $seasonNumber,
@@ -499,7 +554,7 @@ class SeasonvarImportTitleGroupFinalizerTest extends TestCase
                 'release_status_text' => null,
             ]],
             'episodes' => $episodes,
-            'media' => [],
+            'media' => $media,
             'taxonomies' => [],
             'ratings' => [],
             'recommendation_signals' => [],

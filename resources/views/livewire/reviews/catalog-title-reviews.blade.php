@@ -1,4 +1,4 @@
-<section id="reviews" aria-labelledby="reviews-title" class="scroll-mt-24 space-y-5">
+<section id="reviews" aria-labelledby="reviews-title" class="scroll-mt-40 space-y-5 sm:scroll-mt-44 lg:scroll-mt-48">
     <header class="rounded-panel border border-slate-200 bg-white p-4 shadow-panel sm:p-5">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div class="min-w-0">

@@ -21,6 +21,7 @@ use App\Services\Seasonvar\CatalogTitleRefreshStateStore;
 use App\Services\Seasonvar\SeasonvarCatalogImporter;
 use App\Services\Seasonvar\SeasonvarCatalogParser;
 use App\Services\Seasonvar\SeasonvarImportErrorSanitizer;
+use App\Services\Seasonvar\SeasonvarImportEventRecorder;
 use App\Services\Seasonvar\SeasonvarImportFinalizationDispatcher;
 use App\Services\Seasonvar\SeasonvarImportGroupKey;
 use App\Services\Seasonvar\SeasonvarImportRunRecorder;
@@ -89,6 +90,7 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
         SeasonvarImportFinalizationDispatcher $finalizers,
         SeasonvarImportTitleGroupReconciler $reconciler,
         SeasonvarPageClaimManager $claims,
+        SeasonvarImportEventRecorder $eventRecorder,
     ): void {
         $group = $this->group();
 
@@ -143,6 +145,7 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
 
         $catalogTitleForSync = null;
         $syncChangePublished = false;
+        $importRunId = (int) $group->seasonvar_import_run_id;
 
         try {
             $group = $this->group();
@@ -263,6 +266,7 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
 
             throw $exception;
         } finally {
+            $eventRecorder->flushRun($importRunId);
             $lock->release();
         }
     }

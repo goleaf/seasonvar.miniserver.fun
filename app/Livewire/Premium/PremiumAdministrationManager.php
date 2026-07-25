@@ -8,17 +8,15 @@ use App\Enums\PremiumEntitlementSource;
 use App\Enums\PremiumFeature;
 use App\Enums\PremiumGrantReason;
 use App\Livewire\Concerns\InteractsWithPaginationIslands;
-use App\Models\PremiumAuditEvent;
 use App\Models\PremiumEntitlement;
 use App\Models\PremiumPromotion;
 use App\Models\User;
+use App\Services\Premium\PremiumAdministrationQuery;
 use App\Services\Premium\PremiumEntitlementService;
 use App\Services\Premium\PremiumPaymentGatewayRegistry;
 use App\Services\Premium\PremiumPromotionService;
-use App\Services\Premium\PremiumSchema;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
@@ -67,24 +65,20 @@ final class PremiumAdministrationManager extends Component
         Gate::authorize('view-premium-administration');
     }
 
-    public function findUser(): void
+    public function findUser(PremiumAdministrationQuery $query): void
     {
         Gate::authorize('manage-premium-grants');
         $this->throttleAdministration();
         $validated = $this->validate(['userSearch' => ['required', 'string', 'max:191']]);
         $identity = trim($validated['userSearch']);
-        $user = User::query()
-            ->where(function ($query) use ($identity): void {
-                $query->where('public_id', $identity)->orWhereRaw('lower(email) = ?', [Str::lower($identity)]);
-            })
-            ->first();
+        $user = $query->findUser($identity);
 
-        if (! $user instanceof User) {
+        if ($user === null) {
             throw ValidationException::withMessages(['userSearch' => [__('premium.errors.user_not_found')]]);
         }
 
-        $this->selectedUserPublicId = $user->public_id;
-        $this->userSearch = $user->email;
+        $this->selectedUserPublicId = $user['public_id'];
+        $this->userSearch = $user['email'];
         $this->statusMessage = '';
         $this->actionError = '';
     }
@@ -203,54 +197,27 @@ final class PremiumAdministrationManager extends Component
         $this->actionError = '';
     }
 
-    public function render(PremiumSchema $schema, PremiumPaymentGatewayRegistry $gateways): View
-    {
+    public function render(
+        PremiumAdministrationQuery $query,
+        PremiumPaymentGatewayRegistry $gateways,
+    ): View {
         Gate::authorize('view-premium-administration');
         $canManageGrants = Gate::allows('manage-premium-grants');
-        $selected = $canManageGrants && $this->selectedUserPublicId !== ''
-            ? User::query()->where('public_id', $this->selectedUserPublicId)->first()
-            : null;
-        $entitlements = $selected instanceof User && $schema->ready()
-            ? PremiumEntitlement::query()->whereBelongsTo($selected)->latest('starts_at')->limit(30)->get()
-                ->map(fn (PremiumEntitlement $entitlement): array => [
-                    'public_id' => $entitlement->public_id,
-                    'feature' => $entitlement->feature_code->label(),
-                    'source' => $entitlement->source->label(),
-                    'period' => $entitlement->is_lifetime
-                        ? __('premium.settings.lifetime')
-                        : __('premium.settings.active_until', ['date' => $entitlement->ends_at?->translatedFormat('j F Y, H:i')]),
-                    'can_revoke' => $entitlement->revoked_at === null
-                        && ($entitlement->source->isAdministrative() || $entitlement->source === PremiumEntitlementSource::Promotion),
-                ])
-            : collect();
         $canManagePromotions = Gate::allows('manage-premium-promotions');
         $canViewAudit = Gate::allows('view-premium-billing-audit');
-        $promotions = $schema->ready() && $canManagePromotions
-            ? PremiumPromotion::query()->withCount('redemptions')->latest('created_at')->limit(20)->get()
-                ->map(fn (PremiumPromotion $promotion): array => [
-                    'public_id' => $promotion->public_id,
-                    'code' => $promotion->code,
-                    'redemptions' => $promotion->redemptions_count,
-                    'limit' => $promotion->total_limit !== null ? (string) $promotion->total_limit : '∞',
-                    'duration' => trans_choice('premium.duration_days', $promotion->duration_days, ['count' => $promotion->duration_days]),
-                ])
-            : collect();
-        $audits = $schema->ready() && $canViewAudit
-            ? PremiumAuditEvent::query()->with(['actor:id,name', 'user:id,name'])->latest('occurred_at')->paginate(20, pageName: 'premiumAuditPage')
-                ->through(fn (PremiumAuditEvent $event): array => [
-                    'action' => $event->action->label(),
-                    'occurred_at' => $event->occurred_at->translatedFormat('j F Y, H:i'),
-                    'actor' => $event->actor_id !== null ? $event->actor->name : __('premium.admin.system_actor'),
-                    'resource_type' => $event->resource_type,
-                ])
-            : new LengthAwarePaginator([], 0, 20, 1, ['pageName' => 'premiumAuditPage']);
+        $page = $query->page(
+            $this->selectedUserPublicId,
+            $canManageGrants,
+            $canManagePromotions,
+            $canViewAudit,
+        );
 
         return view('livewire.premium.administration-manager', [
-            'schemaReady' => $schema->ready(),
-            'selectedUser' => $selected instanceof User ? ['name' => $selected->name, 'email' => $selected->email] : null,
-            'entitlements' => $entitlements,
-            'promotions' => $promotions,
-            'audits' => $audits,
+            'schemaReady' => $page['schema_ready'],
+            'selectedUser' => $page['selected_user'],
+            'entitlements' => $page['entitlements'],
+            'promotions' => $page['promotions'],
+            'audits' => $page['audits'],
             'reasonOptions' => collect(PremiumGrantReason::cases())->map(fn (PremiumGrantReason $reason): array => ['value' => $reason->value, 'label' => $reason->label()])->all(),
             'providerCodes' => $gateways->codes(),
             'canManageGrants' => $canManageGrants,

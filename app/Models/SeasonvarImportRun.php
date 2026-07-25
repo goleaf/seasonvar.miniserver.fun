@@ -13,6 +13,7 @@ use Illuminate\Support\Carbon;
 
 /**
  * @property array<string, mixed>|null $summary
+ * @property Carbon|null $last_progress_at
  * @property Carbon|null $last_heartbeat_at
  * @property Carbon|null $cancel_requested_at
  * @property Carbon|null $started_at
@@ -50,6 +51,7 @@ use Illuminate\Support\Carbon;
     'last_error',
     'requested_by_user_id',
     'retry_of_run_id',
+    'last_progress_at',
     'last_heartbeat_at',
     'cancel_requested_at',
     'started_at',
@@ -162,6 +164,7 @@ class SeasonvarImportRun extends Model
             'media_size_checks_failed' => 'integer',
             'media_size_known_bytes' => 'integer',
             'summary' => 'array',
+            'last_progress_at' => 'datetime',
             'last_heartbeat_at' => 'datetime',
             'cancel_requested_at' => 'datetime',
             'started_at' => 'datetime',

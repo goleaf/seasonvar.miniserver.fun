@@ -6,7 +6,6 @@ namespace App\Services\Seasonvar;
 
 use App\DTOs\Seasonvar\SeasonvarMetadataPageData;
 use App\DTOs\Seasonvar\SeasonvarPageHandlerResult;
-use App\Models\SeasonvarImportEvent;
 use App\Models\SourcePage;
 use App\Services\Catalog\CatalogRelationNameSanitizer;
 use App\Services\Catalog\CatalogRelationSourceIdentityRegistry;
@@ -23,6 +22,7 @@ final readonly class SeasonvarTaxonomyPageImporter
         private SeasonvarDiscoveredPageStore $pages,
         private SeasonvarDatabaseTransaction $transactions,
         private TagImportSynchronizer $tagImports,
+        private SeasonvarImportEventRecorder $eventRecorder,
     ) {}
 
     /**
@@ -154,13 +154,12 @@ final readonly class SeasonvarTaxonomyPageImporter
     /** @param array<string, mixed> $context */
     private function recordEvent(SourcePage $page, ?int $importRunId, string $event, array $context): void
     {
-        SeasonvarImportEvent::query()->create([
-            'seasonvar_import_run_id' => $importRunId,
-            'source_page_id' => $page->id,
-            'event' => $event,
-            'level' => 'info',
-            'context' => $context,
-        ]);
+        $this->eventRecorder->record(
+            event: $event,
+            context: $context,
+            importRunId: $importRunId,
+            sourcePageId: (int) $page->id,
+        );
     }
 
     /**

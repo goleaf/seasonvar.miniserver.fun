@@ -44,10 +44,11 @@
 ## Модели коллекций
 
 - `CatalogCollection` — единственная aggregate root именованного списка. Numeric ID — relational identity, UUID — external identity; global current slug и `CatalogCollectionSlug` history являются mutable URL projection. SoftDeletes сохраняет recovery window.
+- `CatalogCollectionCategory` и `CatalogCollectionCategoryTranslation` образуют один управляемый двухуровневый справочник root/child. Stable UUID/slug не переводятся; `parent_id`, active state и deterministic position задают структуру, а одна nullable category FK классифицирует подборку без polymorphic relation.
 - `CatalogCollectionItem` — explicit serial-only child с unique collection/title, position, added-by и timestamps. Он не копирует title/poster/year/genre metadata и не использует morph type.
 - `CatalogCollectionTranslation` применяется только к editorial content; display accessors выбирают уже eager-loaded active/fallback row. User text остаётся в base name/description и не переводится автоматически.
 - `CatalogCollectionReport` сохраняет stable collection UUID/content version даже после nullable target FK; `CatalogCollection::comments()` переиспользует explicit enum-based generic comment target, а не Eloquent morph.
-- `CatalogCollectionQuery` обязан eager-load owner/translations/counts/fallback and paginated title card relations до Blade/Resource. `display_name`, `display_description`, `display_seo_*`, visibility/moderation predicates не выполняют query.
+- `CatalogCollectionQuery` обязан eager-load owner/translations/category path/counts and paginated title card relations до Blade/Resource. `display_name`, `display_description`, `display_seo_*`, visibility/moderation predicates не выполняют query; собственных image fields/fallback у модели нет.
 
 ## Модели обсуждений
 

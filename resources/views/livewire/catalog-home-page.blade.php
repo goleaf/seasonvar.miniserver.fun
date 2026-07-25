@@ -73,6 +73,7 @@
                                 :episodes="$releaseGroup['episodes']"
                                 :media="$releaseGroup['media']"
                                 :timezone="$accountTimezone"
+                                :has-more="$releaseGroup['has_more']"
                             />
                         @empty
                             <div class="p-6 text-sm text-slate-500">

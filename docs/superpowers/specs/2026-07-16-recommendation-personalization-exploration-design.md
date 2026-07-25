@@ -1,10 +1,18 @@
 # Персонализация и безопасное исследование рекомендаций
 
-## Статус реализации на 16 июля 2026 года
+## Статус реализации на 25 июля 2026 года
 
 Контракт реализован за выключенным rollout-флагом. Профиль имеет уровни `cold/low/medium/high`, объединяет bounded evidence с давностью и глубиной, использует только активную совместимую шкалу similarity `v6`, осторожно ослабляет признаки после минимум трёх независимых отрицательных тайтлов и резервирует не более 15% слотов для детерминированного релевантного исследования. Старый ranking остаётся rollback-путём при `0%`.
 
 По умолчанию `RECOMMENDATIONS_PERSONALIZED_V2_ENABLED=false` и `RECOMMENDATIONS_PERSONALIZED_V2_PERCENT=0`. Частная выдача не использует shared cache; regression-тест проверяет отсутствие user/source IDs, точного прогресса, названий личных коллекций/тегов и negative feature keys в URL, HTML, Livewire snapshot и публичном API. Включение разрешено только после активной `v6`-сборки с `score_min/score_median/score_p95` и проходит этапы `0 → internal fixture → 10 → 50 → 100` с немедленным возвратом к `0` при нарушении privacy, exact exclusions, watchability или relevance floor.
+
+Гостевой cold-start и mixed fallback теперь набирают уникальные строки до
+полного окна по цепочке
+`editorial → weekly trending → monthly trending → popular`. Месячная строка
+сохраняет отдельную локализованную причину периода и не выдаётся за недельную
+активность. Deterministic public seed использует общий scalar cache pool, но
+recent IDs текущей сессии применяются только после чтения; authenticated,
+personalized и random results остаются вне shared cache.
 
 ## Цель
 
@@ -59,7 +67,8 @@
 
 Profile получает уровень:
 
-- `cold`: нет meaningful evidence — честный `editorial → trending → popular` fallback;
+- `cold`: нет meaningful evidence — честный
+  `editorial → weekly trending → monthly trending → popular` fallback;
 - `low`: один слабый source — публичная основа с небольшим personal boost, display type не обещает глубокую персонализацию;
 - `medium`: несколько evidence или один сильный source — смешанная персональная выдача;
 - `high`: несколько независимых сильных source-title — основной personalized ranking.

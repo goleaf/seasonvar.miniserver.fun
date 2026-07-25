@@ -28,7 +28,7 @@ final class HdRezkaCollectionParserTest extends TestCase
             '/xfsearch/collections/%D0%A4%D0%B8%D0%BB%D1%8C%D0%BC%D1%8B%20%D0%BF%D1%80%D0%BE%20%D0%BB%D1%8E%D0%B1%D0%BE%D0%B2%D1%8C/',
             $collections[0]->path,
         );
-        $this->assertSame('/uploads/mini/14/b1/c7cf54f9c99caa7918118d120a9987.jpg', $collections[0]->coverPath);
+        $this->assertFalse(property_exists($collections[0], 'coverPath'));
         $this->assertSame(1, $collections[0]->position);
         $this->assertMatchesRegularExpression('/^[a-f0-9]{64}$/', $collections[0]->sourceKey);
         $this->assertNotSame($collections[0]->sourceKey, $collections[1]->sourceKey);

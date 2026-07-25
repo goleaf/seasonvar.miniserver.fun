@@ -72,14 +72,18 @@ final class CatalogHomeSnapshotCache
             ->pluck('id')
             ->map(fn (mixed $id): int => (int) $id)
             ->all();
-        $videoTitleIds = $this->titles->visibleTo(null)
-            ->whereIn(
+        $media = new LicensedMedia;
+        $availableMedia = LicensedMedia::query()
+            ->published()
+            ->forAvailableReleases(null)
+            ->whereColumn(
+                $media->qualifyColumn('catalog_title_id'),
                 'catalog_titles.id',
-                LicensedMedia::query()
-                    ->published()
-                    ->forAvailableReleases(null)
-                    ->select('licensed_media.catalog_title_id'),
             )
+            ->selectRaw('1')
+            ->toBase();
+        $videoTitleIds = $this->titles->visibleTo(null)
+            ->whereExists($availableMedia)
             ->latest('indexed_at')
             ->orderByDesc('id')
             ->limit(8)

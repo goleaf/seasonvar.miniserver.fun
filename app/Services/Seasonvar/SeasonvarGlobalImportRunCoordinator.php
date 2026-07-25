@@ -232,6 +232,20 @@ final class SeasonvarGlobalImportRunCoordinator
             ->whereDoesntHave('claimedSourcePages', function (Builder $query): void {
                 $query->whereNotNull('import_claim_token')
                     ->where('import_claim_expires_at', '>', now());
+            })
+            ->whereDoesntHave('preparedPages', function (Builder $query): void {
+                $query->whereIn('status', [
+                    SeasonvarPreparedPageStatus::Queued->value,
+                    SeasonvarPreparedPageStatus::Preparing->value,
+                    SeasonvarPreparedPageStatus::Prepared->value,
+                ]);
+            })
+            ->whereDoesntHave('titleGroups', function (Builder $query): void {
+                $query->whereIn('status', [
+                    SeasonvarImportTitleGroupStatus::Discovering->value,
+                    SeasonvarImportTitleGroupStatus::Running->value,
+                    SeasonvarImportTitleGroupStatus::Finalizing->value,
+                ]);
             });
     }
 

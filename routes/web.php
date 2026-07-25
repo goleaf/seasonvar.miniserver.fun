@@ -73,7 +73,6 @@ use App\Services\Catalog\CatalogDirectoryRegistry;
 use App\Services\Catalog\CatalogPlaybackSourceResponder;
 use App\Services\Catalog\CatalogSitemapResponder;
 use App\Services\Catalog\CatalogStatsPosterResponder;
-use App\Services\Collections\CatalogCollectionCoverResponder;
 use App\Services\Comments\CommentDirectLinkResponder;
 use App\Services\Media\LicensedMediaDownloadResponder;
 use App\Services\Operations\InfrastructureHealthResponder;
@@ -370,10 +369,6 @@ Route::get('/requests/{contentRequest}', ContentRequestDetailPage::class)
     ->middleware('public.page:requests')
     ->name('requests.show');
 
-Route::get('/collections/covers/{publicId}/{version}', fn (Request $request, string $publicId, int $version, CatalogCollectionCoverResponder $covers) => $covers->response($request, $publicId, $version))
-    ->whereUuid('publicId')
-    ->whereNumber('version')
-    ->name('collections.cover');
 Route::get('/collections/{collectionSlug}', CatalogCollectionPage::class)
     ->where('collectionSlug', '[^/]+')
     ->middleware('collection.response')

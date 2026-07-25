@@ -6,7 +6,6 @@ namespace App\Services\Seasonvar;
 
 use App\DTOs\Seasonvar\SeasonvarSourceInventoryResult;
 use App\Enums\SeasonvarPageType;
-use App\Models\SeasonvarImportEvent;
 use App\Models\SeasonvarImportRun;
 use Illuminate\Support\Collection;
 use Throwable;
@@ -21,7 +20,7 @@ final class SeasonvarSourceInventory
         private readonly SeasonvarUrl $urls,
         private readonly SeasonvarSourceParityRegistry $parity,
         private readonly SeasonvarImportErrorSanitizer $errors,
-        private readonly SeasonvarImportStorageMaintenance $storageMaintenance,
+        private readonly SeasonvarImportEventRecorder $eventRecorder,
     ) {}
 
     /**
@@ -253,12 +252,11 @@ final class SeasonvarSourceInventory
     /** @param array<string, mixed> $context */
     private function recordEvent(SeasonvarImportRun $run, string $event, array $context): void
     {
-        SeasonvarImportEvent::query()->create([
-            'seasonvar_import_run_id' => $run->id,
-            'event' => $event,
-            'level' => str_contains($event, 'failed') ? 'warning' : 'info',
-            'context' => $this->storageMaintenance->sanitizeEventContext($context),
-        ]);
+        $this->eventRecorder->record(
+            event: $event,
+            context: $context,
+            importRunId: (int) $run->id,
+        );
     }
 
     /**

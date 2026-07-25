@@ -2501,7 +2501,8 @@ evidence, security requirement, совместимое изменение provid
 | Rolling roadmap update | `not_applicable_to_runtime` | `completed` | `a14cdf5` | `unresolved_auth` | `not_applicable` |
 | Task 20: Shift+E interaction boundaries | `completed_local` | `completed` | `d781661` | `unresolved_auth` | `not_claimed` |
 | Task 21 planning + Task 22+ intake pointer | `planning_complete` | `completed` | `56ac94d` | `unresolved_auth` | `not_applicable` |
-| Task 21: centered touch controls | `in_progress` | `red_pending` | `unresolved_shared_worktree` | `unresolved_shared_worktree` | `not_claimed` |
+| Task 21: centered touch controls | `completed_local` | `completed` | `unresolved_shared_worktree` | `unresolved_shared_worktree/auth` | `not_claimed` |
+| Task 22: black fullscreen + scoped Facebook palette | `completed_local` | `completed_local` | `unresolved_shared_worktree` | `unresolved_shared_worktree/auth` | `not_activated_old_asset_observed` |
 
 Статусы независимы. `completed` code не означает published remote, deployed
 production или проверенный native iOS. Отсутствующий внешний evidence никогда
@@ -2509,10 +2510,12 @@ production или проверенный native iOS. Отсутствующий 
 
 ### Текущий указатель безлимитного intake
 
-- `Task 21` остаётся единственной активной player-задачей и имеет отдельный
-  конечный TDD-план центральных touch-controls.
-- Следующий свободный указатель — `Task 22+`. Это не созданная заранее задача
-  и не обещание конкретной функции: номер получает только новый work item,
+- `Task 22` принят из датированного пользовательского запроса и browser/CSS
+  evidence: application-owned `.plyr`/`video` остаются прозрачными либо slate,
+  а black standard fullscreen сейчас зависит от bundled Plyr CSS. Его finite
+  scope — явный black media/fullscreen contract и scoped player palette.
+- Следующий свободный указатель — `Task 23+`. Это не созданная заранее задача
+  и не обещание конкретной функции: номер получает только следующий work item,
   прошедший `Definition of Ready` по датированному evidence.
 - Верхнего номера и конечной даты roadmap нет. Одновременно каждая принятая
   задача остаётся bounded, тестируемой, обратимой и получает независимые
@@ -2520,16 +2523,17 @@ production или проверенный native iOS. Отсутствующий 
   real-device/provider evidence.
 - Tasks 16–19 сохраняют внешние prerequisites; они не перенумеровываются и не
   маскируются локальным выполнением Tasks 20–21.
-- Пока `Task 21` меняет общие player JS/CSS/tests, новый implementation Task с
-  пересекающимися файлами не переводится в `in_progress`. Read-only discovery
-  может лишь добавить датированный candidate evidence без application edits.
+- Пока `Task 22` меняет общий player CSS/browser/static contract, другой
+  implementation Task с пересекающимися файлами не переводится в
+  `in_progress`. Read-only discovery может лишь добавить датированный
+  candidate evidence без application edits.
 
 ### Монотонная нумерация и intake
 
 - Tasks 1–15 никогда не перенумеровываются и не переписываются под новый scope.
 - Следующий принятый work item получает первый свободный номер начиная с
   `Task 16`; удалённый кандидат не освобождает и не переиспользует номер.
-- `Task 22+` создаётся только после датированного evidence. Линия roadmap может
+- `Task 23+` создаётся только после датированного evidence. Линия roadmap может
   быть без верхнего предела, но в `in_progress` находится не более одной
   player-задачи, если две задачи меняют общие PHP/JavaScript/Blade/CSS contracts.
 - Независимый read-only browser/provider audit может идти рядом только когда он
@@ -3054,7 +3058,9 @@ cache, queues, provider state и `.env` не затрагиваются.
 
 ### Task 21: Центральные touch-controls `−10 / play·pause / +10`
 
-**Status:** `in_progress`.
+**Status:** `implemented_and_verified_local`; commit —
+`unresolved_shared_worktree`, push — `unresolved_shared_worktree/auth`,
+production activation — `not_claimed`.
 
 **Dated evidence (24.07.2026):** пользователь прямо запросил увеличить
 основные player buttons примерно втрое для удобного нажатия на телефоне и
@@ -3084,7 +3090,114 @@ existing translations/routes/schema/cache/queues/dependencies. Старый
 **Delivery:** matching Vite code/manifest/assets обязательны. Активные
 посторонние importer/collection/system изменения не stage/reset/stash/delete;
 commit/push остаются `unresolved_shared_worktree`, пока canonical hook не
-получит чистое дерево.
+получит чистое дерево. Фактический canonical pre-commit подтвердил этот
+blocker; обычный push без force дополнительно остановился на отсутствующей
+HTTPS-аутентификации GitHub.
+
+**Verification evidence:** независимая проверка pre-change `HEAD` подтвердила
+отсутствие всех пяти новых JS-контрактов; сохранённый browser RED во всех трёх
+проектах показал прежние цели размером только `26.5..34 px` при требовании не
+меньше `56 px`. После GREEN static contract прошёл `6` тестов и `335`
+утверждений, связанный PHPUnit-набор — `42` теста и `764` утверждения, focused
+Desktop/Mobile/Tablet — `3/3`, полный
+`player-lifecycle.spec.js` — `18` сценариев при `12` ожидаемых skips, а Vite
+собрал `24` модуля. Скриншоты `1440×1200`, `768×1024` и `390×844`
+подтвердили один центрированный ряд и читаемые targets; native iOS fullscreen
+остаётся `unresolved_device`.
+
+---
+
+### Task 22: Чёрный fullscreen и scoped Facebook-палитра
+
+**Status:** `implemented_verified_local`; пользователь утвердил player-only
+вариант и прямо поручил начать программирование. Commit/push остаются
+`unresolved_shared_worktree`, live HTTPS обслуживает прежний hashed CSS asset,
+поэтому production activation — `not_activated_old_asset_observed`, native
+iOS fullscreen — `unresolved_device`.
+
+**Dated evidence (24.07.2026):**
+
+- пользователь видит белый фон при полноэкранном просмотре и требует чистый
+  чёрный background;
+- Desktop Chromium standard Fullscreen API сейчас показывает чёрный только
+  благодаря bundled Plyr CSS;
+- до fullscreen computed `.plyr` прозрачен, native `<video>` использует slate,
+  а application CSS не владеет полным standard/WebKit/fallback/backdrop set;
+- пользователь попросил использовать полную Facebook palette; согласованный
+  scope ограничивает её существующим player и сохраняет общую emerald-тему.
+
+Approved design:
+[`2026-07-24-player-fullscreen-facebook-palette-design.md`](../specs/2026-07-24-player-fullscreen-facebook-palette-design.md).
+
+Executable TDD plan:
+[`2026-07-24-player-fullscreen-facebook-palette.md`](2026-07-24-player-fullscreen-facebook-palette.md).
+
+**Exact application/test files:**
+
+- `resources/css/app.css`;
+- `tests/Unit/FrontendAssetContractTest.php`;
+- `tests/browser/player-lifecycle.spec.js`.
+
+`resources/js/player.js`, player Blade/Livewire, translations, routes, schema,
+config, cache, queue и package manifests остаются неизменными.
+
+**Interfaces:**
+
+- consumes existing `[data-player-shell]`, `.plyr`,
+  `.plyr__video-wrapper`, `video.js-catalog-player`, `data-player-state`,
+  player menu and centered-control classes;
+- produces scoped `--catalog-player-*` tokens and application-owned black
+  media/fullscreen computed backgrounds;
+- preserves one video/Plyr/HLS/session, keyed `wire:ignore`, grants,
+  progress, hot swap, fullscreen identity, History API and accessibility.
+
+**Palette contract:** `#1877f2`, `#166fe5`, `#e7f3ff`, `#f0f2f5`,
+`#e4e6eb`, `#ccd0d5`, `#1c1e21`, `#65676b`, `#42b72a`, `#f7b928`,
+`#fa383e`, `#ffffff`, `#000000`, scoped only to player shell/menu.
+
+**TDD sequence:**
+
+1. static RED требует все exact tokens, WebKit/fallback/backdrop selectors и
+   black variable usage;
+2. Desktop Chromium RED требует black computed normal `.plyr`, wrapper и
+   native video до fullscreen;
+3. CSS GREEN задаёт black media roots и standard/WebKit/fallback fullscreen;
+4. scoped tokens заменяют player main/focus/menu/status/center colors;
+5. focused PHP, full player Playwright, Vite build, responsive screenshots,
+   docs/policy and legacy scans close verification.
+
+**Cross-feature matrix:**
+
+| Domain | Status |
+| --- | --- |
+| Player CSS/fullscreen | `completed_local` |
+| Mobile/desktop/a11y | `completed_local` |
+| One-player Livewire lifecycle | `already_compliant_preserve` |
+| Localization | `not_applicable_no_new_copy` |
+| Authorization/source/progress/privacy | `already_compliant_preserve` |
+| Routes/API/schema/cache/queue/import/admin | `not_applicable` |
+| Production assets | `built_local_not_activated` |
+| Native iOS system fullscreen | `unresolved_device` |
+
+**Rollback:** вернуть только Task 22 CSS/tests/docs и previous matching Vite
+assets. Migration, data repair, cache flush, queue action, dependency rollback
+и `.env` change отсутствуют.
+
+**Verification evidence (24.07.2026):**
+
+- static RED: `FrontendAssetContractTest` остановился на первом отсутствующем
+  palette token; browser RED получил transparent/slate normal media layers;
+- static GREEN: `6/6`, `353` assertions; связанный PHPUnit: `45/45`, `801`
+  assertion;
+- full `player-lifecycle.spec.js`: `18` passed, `12` expected platform skips;
+- Vite: `24` modules; desktop/tablet/mobile visual review: `3/3`;
+- свежий полный PHPUnit после отдельного успешного повтора случайно
+  столкнувшегося factory-теста: `1572` tests, `1561` passed, `11` skipped,
+  `123934` assertions;
+- normal, standard fullscreen и after-transition `.plyr`, wrapper и video
+  вычисляются как `rgb(0, 0, 0)`;
+- live HTTPS не активирован: он обслуживает `app-BNI4GkbQ.css`, а локальный
+  matching build содержит `app-BLl6ilyS.css`.
 
 ---
 
@@ -3096,7 +3209,7 @@ commit/push остаются `unresolved_shared_worktree`, пока canonical ho
   evidence are separate statuses.
 - [x] Initial Tasks 16–19 are finite, ordered and blocked honestly where
   external prerequisites are absent.
-- [x] `Task 22+` has no artificial ceiling and is created only from dated
+- [x] `Task 23+` has no artificial ceiling and is created only from dated
   evidence through Definition of Ready.
 - [x] Permanent lanes cover correctness, security/privacy, browser/platform,
   media capabilities, progress, UX/a11y/localization, performance, provider

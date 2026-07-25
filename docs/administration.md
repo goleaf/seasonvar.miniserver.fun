@@ -1,6 +1,6 @@
 # Каноническая администрация портала
 
-Обновлено: 19.07.2026
+Обновлено: 25.07.2026
 
 ## System-wide administration integration
 
@@ -125,9 +125,11 @@ Rollback сначала возвращает предыдущий код, сох
 Текущие честные ограничения: advertiser/rights-holder case schemas, configured payment gateway, external search engine, generic redirect/settings/feature-flag store, impersonation, safe raw-log browser и deployment/restore orchestration отсутствуют; поэтому соответствующих routes и mutation controls нет. Core serial/season/episode localized metadata schema также отсутствует; interface и существующие editorial translation domains сохраняют RU/EN integration без fake translation studio.
 ## Модерация коллекций
 
-`/admin/catalog` — единственный full-page Livewire shell для управления сериалами и коллекциями и защищён stable permission `content.view`; mutations разделены между `content.*`, `sources.*`, `collections.moderate` и `recommendations.manage`, а `manage-catalog` остаётся compatibility alias для `content.manage`. Query-параметр `section=collections` требует `collections.moderate` и монтирует `CatalogCollectionAdministrationManager` как вложенный manager без собственного маршрута; `catalog_q`, `collection_admin_q`, `catalogAdminPage` и `collectionAdminPage` не конфликтуют. Manager показывает bounded pending/open-report queue, а `CatalogCollectionModerationService` является единственной write boundary для approved/rejected/hidden/archived и feature. Каждое material action повторно разрешает stable UUID и locked record including soft-deleted where appropriate, меняет content version, сбрасывает incompatible feature/publication state и атомарно пишет `AdminAuditRecorder` fingerprint в той же transaction; exact retry является no-op, а invalidation discovery/cache/sitemap выполняется after commit. Raw internal note пользователю не показывается.
+`/admin/catalog` — единственный full-page Livewire shell для управления сериалами и коллекциями и защищён stable permission `content.view`; mutations разделены между `content.*`, `sources.*`, `collections.moderate` и `recommendations.manage`, а `manage-catalog` остаётся compatibility alias для `content.manage`. Query-параметр `section=collections` требует `collections.moderate` и монтирует `CatalogCollectionAdministrationManager` как вложенный manager без собственного маршрута; `catalog_q`, `collection_admin_q`, `catalogAdminPage` и `collectionAdminPage` не конфликтуют. Manager показывает bounded pending/open-report queue, а `CatalogCollectionModerationService` является единственной write boundary для approved/rejected/hidden/archived и feature. Пользователь с `content.manage` дополнительно управляет двухуровневым category dictionary: stable slug/UUID, `ru|en` names, order, archive/restore и bulk assignment максимум 100 явно выбранных UUID. Каждое material action повторно разрешает stable UUID и locked record, пишет category/moderation audit в той же transaction и инвалидирует discovery/cache/sitemap after commit; browser не создаёт произвольную третью глубину и не передаёт «все строки».
 
 Feature разрешён только approved public editorial collection. Обычный user не может назначить editorial/system type, moderation state или feature. Collection reports используют stable reason/status values, sanitized details, per-user rate limit и deduplication key; reporter identity/moderation notes не публикуются. Admin action закрывает максимум 100 open reports за запрос и явно предлагает следующий пакет, сохраняя decision+audit атомарно. Permanent target deletion сохраняет report UUID/version evidence с nullable relation и privacy-retires generic comments.
+
+Сводка последней синхронизации редакционных подборок остаётся read-only частью того же manager. Первая строка сохраняет allowlisted run counters. Блок «Здоровье подборок» показывает фактическое число source-managed коллекций без membership, отдельно считает требующие сопоставления коллекции с поддерживаемым/неизвестным типом и коллекции только вне области каталога, а также долю `matched/items`. Блок области источника показывает только агрегаты `supported|unsupported|unknown`, а «Разбивка сопоставления» — только положительные counts известных пар status/method. Unknown type/method, source title/path/URL, `match_reasons`, `error_summary` и HTML источника не передаются в Livewire presentation; чтение не запускает sync, retry или mutation.
 
 Editorial editor в `/my/collections/{uuid}/edit` доступен только `manage-catalog`, хранит `ru/en` DB title/description/SEO rows и не копирует user-created text в translation catalog. Admin workflow не заменяет importer admin, title moderation или generic comment moderation.
 
@@ -184,6 +186,16 @@ Bulk ограничен 10 explicit selected tickets и только priority/as
 `/admin/premium` повторно использует private admin shell и stable permission `premium.view`; прежний `view-premium-administration` и отдельные Premium allowlists сохранены как узкие compatibility adapters. Action permissions `premium.grant`, `premium.promotions`, `billing.view` и `billing.reconcile` не следуют из общего admin access; legacy exact allowlists требуют соответственно `PREMIUM_GRANT_ADMIN_EMAILS`, `PREMIUM_PROMOTION_ADMIN_EMAILS`, `PREMIUM_BILLING_AUDIT_EMAILS` и `PREMIUM_RECONCILIATION_ADMIN_EMAILS`. Пустой список запрещает capability и скрывает control. Уполномоченный staff может найти account по public ID/email, выдать duration/lifetime `premium_access` с stable reason/private note, отозвать ровно одну administrative/promotion запись, создать campaign и одноразово получить generated coupon. Payment entitlements не отзываются manual action.
 
 Safe audit показывает stable action/resource/time; provider summary раскрывает только registered code. Environment, secrets и raw payload отсутствуют. Cancel/refund/replay/reconciliation controls не имитируются до появления реального adapter/policy. Полный least-privilege и rollout contract — [`premium.md`](premium.md).
+
+`PremiumAdministrationQuery` является единственной read-boundary этой
+страницы: он получает только server-side capability flags, возвращает
+prepared arrays и не принимает authorization decisions. User UUID/exact
+normalized email используют существующие unique indexes, legacy mixed-case
+email сохраняет fallback. Entitlements/promotions ограничены `30/20`, audit
+пагинирован по `20`; denied section не выполняет скрытый query. Livewire
+по-прежнему повторно проверяет action gate, rate limit и validation перед
+grant/revoke/promotion/coupon mutation, поэтому перенос read orchestration не
+ослабляет permissions или locked public identity.
 
 ## Редактура центра помощи
 

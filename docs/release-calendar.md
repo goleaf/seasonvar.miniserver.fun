@@ -1,6 +1,6 @@
 # Календарь релизов
 
-Обновлено: 20.07.2026.
+Обновлено: 25.07.2026.
 
 Этот документ — единственный владелец доменного контракта календаря релизов. Он описывает публичное расписание, личный календарь, редакционные правки, уведомления и синхронизацию с импортом. Общие правила публикации каталога остаются в [`DATA_RELATIONS.md`](DATA_RELATIONS.md), кеша — в [`caching.md`](caching.md), уведомлений — в [`notifications.md`](notifications.md), импорта — в [`importer.md`](importer.md).
 
@@ -85,6 +85,16 @@ Migration `2026_07_17_170000_create_release_calendar_domain.php` добавля�
 `ReleaseCalendarQuery` — единственная query boundary. Она применяет существующие publication/availability scopes тайтла, сезона и серии, eager loading, bounded окна, allowlisted filters/sorts и детерминированный `id` tie-break. Скрытые, неопубликованные, удалённые или недоступные записи не попадают в public/personal output. Текущая модель портала не имеет самостоятельных таблиц premium entitlement и region grant; календарь честно переиспользует каноническую audience/availability boundary и автоматически наследует будущую проверку из неё, не симулируя отсутствующие лицензии.
 
 Поддерживаются тип, статус и стабильный ID тайтла как фильтры, а также хронологическая сортировка в обоих направлениях и сортировка по названию. Произвольные SQL columns, ranges и timezone не принимаются. Окна ограничены `release-calendar.maximum_window_days`; date range выбирается по пересечению с окном, а не только по первому дню.
+
+Пустое состояние сортировки разрешается относительно route view: канонический
+`/calendar` (`recent`) по умолчанию использует `latest`, поэтому сначала
+показывает наиболее новые фактические даты; upcoming/day/week/month/personal
+по умолчанию сохраняют `earliest`. Явные `?sort=earliest|latest|title`
+продолжают иметь приоритет. Значение, совпадающее с route default, не
+загрязняет canonical URL, а изменение select проходит через один Livewire
+action и сбрасывает только calendar paginator. Хронологическое направление
+применяется в `ReleaseCalendarQuery` до `paginate()`, после чего Blade только
+группирует уже упорядоченную page collection с сохранением её порядка.
 
 ## Публичные маршруты
 

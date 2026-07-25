@@ -8,6 +8,7 @@ use App\Models\SeasonvarImportRun;
 use App\Models\SourcePage;
 use App\Services\Seasonvar\SeasonvarCatalogImporter;
 use App\Services\Seasonvar\SeasonvarImportErrorSanitizer;
+use App\Services\Seasonvar\SeasonvarImportEventRecorder;
 use App\Services\Seasonvar\SeasonvarImportFinalizationDispatcher;
 use App\Services\Seasonvar\SeasonvarImportGroupKey;
 use App\Services\Seasonvar\SeasonvarImportRunRecorder;
@@ -68,6 +69,7 @@ class ImportSeasonvarSourcePage implements ShouldQueue
         ?SeasonvarImportRunRecorder $runs = null,
         ?SeasonvarImportGroupKey $groupKeys = null,
         ?SeasonvarImportFinalizationDispatcher $finalizers = null,
+        ?SeasonvarImportEventRecorder $eventRecorder = null,
     ): void {
         $finalizers ??= app(SeasonvarImportFinalizationDispatcher::class);
         $run = SeasonvarImportRun::query()
@@ -107,6 +109,7 @@ class ImportSeasonvarSourcePage implements ShouldQueue
                 $runs ?? app(SeasonvarImportRunRecorder::class),
                 $groupKeys ?? app(SeasonvarImportGroupKey::class),
                 $finalizers,
+                $eventRecorder ?? app(SeasonvarImportEventRecorder::class),
             );
 
             return;
@@ -128,6 +131,7 @@ class ImportSeasonvarSourcePage implements ShouldQueue
         SeasonvarImportRunRecorder $runs,
         SeasonvarImportGroupKey $groupKeys,
         SeasonvarImportFinalizationDispatcher $finalizers,
+        SeasonvarImportEventRecorder $eventRecorder,
     ): void {
         if (! $claims->extend(
             $page->id,
@@ -169,6 +173,8 @@ class ImportSeasonvarSourcePage implements ShouldQueue
             ]);
             $releaseClaim = true;
         } finally {
+            $eventRecorder->flushRun($this->importRunId);
+
             if ($releaseClaim) {
                 $claims->release($page->id, $this->importRunId, $this->claimToken);
                 $finalizers->signalGlobalRun($run);

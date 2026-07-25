@@ -121,7 +121,7 @@ class CatalogHomePageBuilder
             ->all();
         $recommendationType = $user !== null
             ? CatalogRecommendationType::Personalized
-            : CatalogRecommendationType::Trending;
+            : CatalogRecommendationType::RecentlyAdded;
         $recommendationResult = $this->recommendations->discover(new CatalogRecommendationContext(
             type: $recommendationType,
             user: $user,
@@ -130,16 +130,6 @@ class CatalogHomePageBuilder
             perPage: 8,
             seed: $user !== null ? 'home' : null,
         ));
-
-        if ($recommendationResult->items->isEmpty() && $recommendationType === CatalogRecommendationType::Trending) {
-            $recommendationResult = $this->recommendations->discover(new CatalogRecommendationContext(
-                type: CatalogRecommendationType::Popular,
-                user: null,
-                locale: app()->currentLocale(),
-                excludedTitleIds: $excludedRecommendationIds,
-                perPage: 8,
-            ));
-        }
 
         if ($user !== null) {
             $this->recommendations->rememberShown($recommendationResult, $user);

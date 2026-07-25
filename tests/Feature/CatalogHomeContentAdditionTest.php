@@ -6,6 +6,7 @@ use App\Models\CatalogTitle;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\Season;
+use App\Services\Catalog\CatalogHomeContentAdditionQuery;
 use App\Services\Catalog\CatalogHomeSnapshotCache;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
@@ -215,6 +216,85 @@ class CatalogHomeContentAdditionTest extends TestCase
             ->assertSeeText('Сериал со свежим видео')
             ->assertSeeText('Старая серия с новым видео')
             ->assertSeeText('1080P');
+    }
+
+    public function test_home_bounds_mass_import_release_groups_and_links_to_the_full_title(): void
+    {
+        $this->travelTo(now()->setDate(2026, 7, 25)->setTime(12, 0));
+
+        $catalogTitle = CatalogTitle::factory()->create([
+            'title' => 'Сериал с массовым обновлением',
+            'slug' => 'serial-s-massovym-obnovleniem',
+            'indexed_at' => now(),
+        ]);
+        $season = Season::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'number' => 1,
+        ]);
+        $episodeIds = [];
+
+        foreach (range(1, 10) as $number) {
+            $createdAt = now()->subMinutes(10 - $number);
+            $episode = Episode::factory()->create([
+                'season_id' => $season->id,
+                'number' => $number,
+                'title' => "Массовая серия {$number}",
+                'created_at' => $createdAt,
+                'updated_at' => $createdAt,
+            ]);
+            $episodeIds[] = $episode->id;
+            LicensedMedia::factory()->create([
+                'catalog_title_id' => $catalogTitle->id,
+                'season_id' => $season->id,
+                'episode_id' => $episode->id,
+                'status' => 'published',
+                'published_at' => $createdAt,
+                'created_at' => $createdAt,
+                'updated_at' => $createdAt,
+            ]);
+        }
+
+        $updates = app(CatalogHomeContentAdditionQuery::class)->latestTitleUpdates();
+        $groups = app(CatalogHomeContentAdditionQuery::class)->latestReleaseGroups(
+            collect([$catalogTitle]),
+            $updates,
+        );
+        $group = $groups->sole();
+
+        $this->assertCount(8, $group['episodes']);
+        $this->assertCount(8, $group['media']);
+        $this->assertSame(
+            array_reverse(array_slice($episodeIds, -8)),
+            $group['episodes']->pluck('id')->all(),
+        );
+        $this->assertTrue($group['has_more']);
+
+        app(CatalogHomeSnapshotCache::class)->refresh();
+
+        $this->get(route('home'))
+            ->assertOk()
+            ->assertSeeText('На странице сериала доступны остальные серии и видео.')
+            ->assertSee(route('titles.show', $catalogTitle), false)
+            ->assertSeeText('Массовая серия 3')
+            ->assertSeeText('Массовая серия 10');
+    }
+
+    public function test_home_release_group_does_not_mark_a_small_update_as_truncated(): void
+    {
+        $catalogTitle = CatalogTitle::factory()->create();
+        $season = Season::factory()->create(['catalog_title_id' => $catalogTitle->id]);
+        Episode::factory()->create([
+            'season_id' => $season->id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $updates = app(CatalogHomeContentAdditionQuery::class)->latestTitleUpdates();
+        $group = app(CatalogHomeContentAdditionQuery::class)
+            ->latestReleaseGroups(collect([$catalogTitle]), $updates)
+            ->sole();
+
+        $this->assertFalse($group['has_more']);
     }
 
     public function test_home_content_addition_queries_have_covering_indexes(): void

@@ -9,6 +9,7 @@ use App\DTOs\CatalogRecommendationExplanation;
 use App\DTOs\CatalogRecommendationItem;
 use App\DTOs\CatalogRecommendationResult;
 use App\Enums\CatalogPersonalizationConfidence;
+use App\Enums\CatalogPopularityPeriod;
 use App\Enums\CatalogRecommendationReason;
 use App\Enums\CatalogRecommendationSource;
 use App\Enums\CatalogRecommendationType;
@@ -42,9 +43,17 @@ final class CatalogRecommendationService
     public function discover(CatalogRecommendationContext $context): CatalogRecommendationResult
     {
         $baseHardExclusions = $this->exclusions->hardExclusions($context);
-        $hardExclusions = $context->seed !== null
-            ? $this->exclusions->hardExclusions($context, includeRecent: true)
-            : $baseHardExclusions;
+        $recentExclusions = $context->seed !== null
+            ? $this->exclusions->recentExclusions($context)
+            : [];
+        $usesSharedGuestPool = $context->user === null
+            && ! in_array($context->type, [
+                CatalogRecommendationType::Personalized,
+                CatalogRecommendationType::Random,
+            ], true);
+        $hardExclusions = $usesSharedGuestPool
+            ? $baseHardExclusions
+            : array_values(array_unique([...$baseHardExclusions, ...$recentExclusions]));
         $coldStart = false;
         $personalized = false;
         $displayType = $context->type;
@@ -146,13 +155,22 @@ final class CatalogRecommendationService
                 }
             }
         } else {
+            $publicQueryExclusions = $usesSharedGuestPool
+                ? $baseHardExclusions
+                : $hardExclusions;
             $candidates = $this->cache->rememberPublic(
                 $context,
-                fn (): array => $this->public->candidates($context, $hardExclusions),
-                $hardExclusions,
+                fn (): array => $this->public->candidates($context, $publicQueryExclusions),
+                $publicQueryExclusions,
             );
 
-            if ($candidates === [] && $hardExclusions !== $baseHardExclusions) {
+            if ($usesSharedGuestPool && $recentExclusions !== []) {
+                $recentLookup = array_fill_keys($recentExclusions, true);
+                $candidates = array_values(array_filter(
+                    $candidates,
+                    static fn (array $candidate): bool => ! isset($recentLookup[(int) $candidate['id']]),
+                ));
+            } elseif ($candidates === [] && $hardExclusions !== $baseHardExclusions) {
                 $candidates = $this->cache->rememberPublic(
                     $context,
                     fn (): array => $this->public->candidates($context, $baseHardExclusions),
@@ -259,26 +277,58 @@ final class CatalogRecommendationService
      */
     private function coldStartCandidates(CatalogRecommendationContext $context, array $excludedIds): array
     {
-        foreach ([CatalogRecommendationType::Editorial, CatalogRecommendationType::Trending, CatalogRecommendationType::Popular] as $type) {
-            $fallback = new CatalogRecommendationContext(
-                type: $type,
-                user: $context->user,
-                locale: $context->locale,
-                excludedTitleIds: $context->excludedTitleIds,
-                filters: $context->filters,
-                period: $context->period,
-                ratingSource: $context->ratingSource,
-                page: 1,
-                perPage: max($context->boundedPerPage(), (int) config('recommendations.personalized.public_fallback_limit', 24)),
-            );
-            $rows = $this->public->candidates($fallback, $excludedIds);
+        $through = min(
+            max(24, min(500, (int) config('recommendations.candidate_limit', 180))),
+            ($context->boundedPage() * $context->boundedPerPage()) + 1,
+        );
+        $rowsById = [];
+        $sources = [
+            [$context->withType(CatalogRecommendationType::Editorial), false],
+            [$context->withType(CatalogRecommendationType::Trending), false],
+        ];
 
-            if ($rows !== []) {
-                return $rows;
+        if ($context->period !== CatalogPopularityPeriod::Month) {
+            $sources[] = [
+                $context->withTypeAndPeriod(
+                    CatalogRecommendationType::Trending,
+                    CatalogPopularityPeriod::Month,
+                ),
+                true,
+            ];
+        }
+
+        $sources[] = [$context->withType(CatalogRecommendationType::Popular), false];
+
+        foreach ($sources as [$fallbackContext, $monthlyFallback]) {
+            foreach ($this->public->candidates($fallbackContext, $excludedIds) as $row) {
+                $id = (int) $row['id'];
+
+                if (isset($rowsById[$id])) {
+                    continue;
+                }
+
+                if ($monthlyFallback) {
+                    $row['reason'] = CatalogRecommendationReason::TrendingPeriod->value;
+                    $row['reasons'] = [[
+                        'reason' => CatalogRecommendationReason::TrendingPeriod->value,
+                        'parameters' => [
+                            'period' => trans(
+                                'recommendations.page.period_month',
+                                locale: $context->locale,
+                            ),
+                        ],
+                    ]];
+                }
+
+                $rowsById[$id] = $row;
+
+                if (count($rowsById) >= $through) {
+                    break 2;
+                }
             }
         }
 
-        return [];
+        return array_values($rowsById);
     }
 
     /**

@@ -8,10 +8,32 @@ use App\DTOs\Premium\PremiumPlanData;
 use App\Enums\PremiumPlanType;
 use App\Models\PremiumPlan;
 use App\ValueObjects\Money;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Lang;
 
 final class PremiumPlanQuery
 {
+    private const int MAX_PUBLIC_PLANS = 12;
+
+    private const int MAX_PUBLIC_PLAN_CANDIDATES = 48;
+
+    /** @var list<string> */
+    private const array PLAN_COLUMNS = [
+        'id',
+        'code',
+        'type',
+        'duration_days',
+        'billing_interval',
+        'amount_minor',
+        'currency',
+        'entitlement_codes',
+        'provider_code',
+        'provider_product_id',
+        'provider_price_id',
+        'region_codes',
+        'display_order',
+    ];
+
     public function __construct(
         private readonly PremiumSchema $schema,
         private readonly PremiumPaymentGatewayRegistry $gateways,
@@ -21,22 +43,22 @@ final class PremiumPlanQuery
     /** @return list<PremiumPlanData> */
     public function publicPlans(string $locale): array
     {
-        if (! $this->schema->ready()) {
+        if (! in_array($locale, $this->supportedLocales(), true)
+            || ! $this->commerceConfigured()
+            || ! $this->schema->ready()) {
             return [];
         }
 
-        return PremiumPlan::query()
-            ->purchasable()
-            ->whereNotNull('amount_minor')
-            ->whereNotNull('currency')
-            ->whereNotNull('provider_code')
+        return $this->publicCandidateQuery()
             ->orderBy('display_order')
             ->orderBy('id')
+            ->limit(self::MAX_PUBLIC_PLAN_CANDIDATES)
             ->get()
             ->filter(fn (PremiumPlan $plan): bool => $this->commerciallyValid($plan))
             ->filter(fn (PremiumPlan $plan): bool => $this->editoriallyComplete($plan))
             ->filter(fn (PremiumPlan $plan): bool => $this->regionEligible($plan))
             ->filter(fn (PremiumPlan $plan): bool => $this->gatewaySupports($plan))
+            ->take(self::MAX_PUBLIC_PLANS)
             ->map(fn (PremiumPlan $plan): PremiumPlanData => $this->present($plan, $locale))
             ->values()
             ->all();
@@ -44,11 +66,15 @@ final class PremiumPlanQuery
 
     public function purchasable(string $code): ?PremiumPlan
     {
-        if (! $this->schema->ready() || preg_match('/\A[a-z0-9][a-z0-9_-]{1,63}\z/', $code) !== 1) {
+        if (preg_match('/\A[a-z0-9][a-z0-9_-]{1,63}\z/', $code) !== 1
+            || ! $this->commerceConfigured()
+            || ! $this->schema->ready()) {
             return null;
         }
 
-        $plan = PremiumPlan::query()->purchasable()->where('code', $code)->first();
+        $plan = $this->publicCandidateQuery()
+            ->where('code', $code)
+            ->first();
 
         return $plan instanceof PremiumPlan
             && $this->commerciallyValid($plan)
@@ -60,6 +86,77 @@ final class PremiumPlanQuery
             && $this->gatewaySupports($plan)
                 ? $plan
                 : null;
+    }
+
+    /** @return Builder<PremiumPlan> */
+    private function publicCandidateQuery(): Builder
+    {
+        return PremiumPlan::query()
+            ->select(self::PLAN_COLUMNS)
+            ->purchasable()
+            ->where('amount_minor', '>', 0)
+            ->whereIn('currency', $this->supportedCurrencies())
+            ->whereIn('provider_code', $this->gateways->codes())
+            ->whereNotNull('provider_product_id')
+            ->whereNotNull('provider_price_id')
+            ->where(function (Builder $query): void {
+                $query
+                    ->where(function (Builder $query): void {
+                        $query
+                            ->where('type', PremiumPlanType::OneTimeDuration->value)
+                            ->whereBetween('duration_days', [1, 3650])
+                            ->whereNull('billing_interval');
+                    })
+                    ->orWhere(function (Builder $query): void {
+                        $query
+                            ->where('type', PremiumPlanType::RecurringSubscription->value)
+                            ->whereNull('duration_days')
+                            ->whereIn('billing_interval', ['month', 'quarter', 'year']);
+                    })
+                    ->orWhere(function (Builder $query): void {
+                        $query
+                            ->where('type', PremiumPlanType::Lifetime->value)
+                            ->whereNull('duration_days')
+                            ->whereNull('billing_interval');
+                    });
+            });
+    }
+
+    private function commerceConfigured(): bool
+    {
+        $currencies = array_values((array) config('premium.supported_currencies', []));
+
+        if ($this->gateways->codes() === [] || $currencies === []) {
+            return false;
+        }
+
+        foreach ($currencies as $currency) {
+            if (! is_string($currency) || preg_match('/\A[A-Z]{3}\z/', $currency) !== 1) {
+                return false;
+            }
+        }
+
+        return count(array_unique($currencies)) === count($currencies);
+    }
+
+    /** @return list<string> */
+    private function supportedCurrencies(): array
+    {
+        return array_values(array_filter(
+            (array) config('premium.supported_currencies', []),
+            static fn (mixed $currency): bool => is_string($currency)
+                && preg_match('/\A[A-Z]{3}\z/', $currency) === 1,
+        ));
+    }
+
+    /** @return list<string> */
+    private function supportedLocales(): array
+    {
+        return array_values(array_unique(array_filter(
+            (array) config('catalog-collections.supported_locales', []),
+            static fn (mixed $locale): bool => is_string($locale)
+                && preg_match('/\A[a-z]{2}\z/', $locale) === 1,
+        )));
     }
 
     private function regionEligible(PremiumPlan $plan): bool
@@ -104,43 +201,41 @@ final class PremiumPlanQuery
 
     private function commerciallyValid(PremiumPlan $plan): bool
     {
-        $currencies = array_values(array_filter(
-            (array) config('premium.supported_currencies', []),
-            static fn (mixed $currency): bool => is_string($currency) && preg_match('/\A[A-Z]{3}\z/', $currency) === 1,
-        ));
         $entitlements = array_values(array_filter(
             (array) $plan->entitlement_codes,
             fn (mixed $code): bool => is_string($code) && $this->features->supports($code),
         ));
-        $durationValid = $plan->type !== PremiumPlanType::OneTimeDuration
-            || (is_int($plan->duration_days) && $plan->duration_days >= 1 && $plan->duration_days <= 3650);
-        $billingValid = match ($plan->type) {
-            PremiumPlanType::RecurringSubscription => in_array($plan->billing_interval, ['month', 'quarter', 'year'], true),
-            PremiumPlanType::OneTimeDuration, PremiumPlanType::Lifetime => $plan->billing_interval === null,
+        $typeFieldsValid = match ($plan->type) {
+            PremiumPlanType::OneTimeDuration => is_int($plan->duration_days)
+                && $plan->duration_days >= 1
+                && $plan->duration_days <= 3650
+                && $plan->billing_interval === null,
+            PremiumPlanType::RecurringSubscription => $plan->duration_days === null
+                && in_array($plan->billing_interval, ['month', 'quarter', 'year'], true),
+            PremiumPlanType::Lifetime => $plan->duration_days === null
+                && $plan->billing_interval === null,
         };
-        $lifetimeValid = $plan->type !== PremiumPlanType::Lifetime || $plan->duration_days === null;
+        $providerProductValid = is_string($plan->provider_product_id)
+            && preg_match('/\A[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,190}\z/', $plan->provider_product_id) === 1;
         $providerPriceValid = is_string($plan->provider_price_id)
             && preg_match('/\A[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,190}\z/', $plan->provider_price_id) === 1;
 
-        return is_int($plan->amount_minor)
+        return preg_match('/\A[a-z0-9][a-z0-9_-]{1,63}\z/', $plan->code) === 1
+            && is_int($plan->amount_minor)
             && $plan->amount_minor > 0
             && is_string($plan->currency)
-            && in_array($plan->currency, $currencies, true)
+            && in_array($plan->currency, $this->supportedCurrencies(), true)
             && $entitlements !== []
             && count($entitlements) === count((array) $plan->entitlement_codes)
             && count(array_unique($entitlements)) === count($entitlements)
-            && $durationValid
-            && $billingValid
-            && $lifetimeValid
+            && $typeFieldsValid
+            && $providerProductValid
             && $providerPriceValid;
     }
 
     private function editoriallyComplete(PremiumPlan $plan): bool
     {
-        $locales = array_values(array_filter(
-            (array) config('catalog-collections.supported_locales', []),
-            static fn (mixed $locale): bool => is_string($locale) && preg_match('/\A[a-z]{2}\z/', $locale) === 1,
-        ));
+        $locales = $this->supportedLocales();
 
         return $locales !== [] && collect($locales)->every(fn (string $locale): bool => Lang::has("premium.plans.{$plan->code}.name", $locale)
             && Lang::has("premium.plans.{$plan->code}.description", $locale));

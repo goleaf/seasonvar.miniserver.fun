@@ -31,6 +31,11 @@ enum AdminAuditAction: string
     case CollectionModerated = 'collection.moderated';
     case CollectionFeatured = 'collection.featured';
     case CollectionReportResolved = 'collection.report_resolved';
+    case CollectionCategoryCreated = 'collection_category.created';
+    case CollectionCategoryUpdated = 'collection_category.updated';
+    case CollectionCategoryMoved = 'collection_category.moved';
+    case CollectionCategoryCollectionsAssigned = 'collection_category.collections_assigned';
+    case CollectionCategoryAssignmentsConfirmed = 'collection_category.assignments_confirmed';
     case CommentModerated = 'comment.moderated';
     case CommentReportResolved = 'comment.report_resolved';
     case CommentRestrictionApplied = 'comment.restriction_applied';

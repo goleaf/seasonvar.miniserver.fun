@@ -50,8 +50,8 @@ final class ReleaseCalendarPage extends Component
     #[Url(history: true, except: '')]
     public string $status = '';
 
-    #[Url(history: true, except: 'earliest')]
-    public string $sort = 'earliest';
+    #[Url(history: true, except: '')]
+    public string $sort = '';
 
     #[Url(as: 'title', history: true, except: '')]
     public string $catalogTitle = '';
@@ -84,7 +84,14 @@ final class ReleaseCalendarPage extends Component
     public function clearFilters(): void
     {
         $this->reset('type', 'status', 'catalogTitle');
-        $this->sort = ReleaseCalendarSort::Earliest->value;
+        $this->sort = '';
+        $this->resetPage(pageName: 'calendarPage');
+    }
+
+    public function changeSort(string $sort): void
+    {
+        $resolved = ReleaseCalendarSort::tryFrom($sort) ?? $this->defaultSort();
+        $this->sort = $resolved === $this->defaultSort() ? '' : $resolved->value;
         $this->resetPage(pageName: 'calendarPage');
     }
 
@@ -126,6 +133,7 @@ final class ReleaseCalendarPage extends Component
         $entries = $this->emptyPaginator();
         $monthGrid = null;
         $this->queryFailed = false;
+        $effectiveSort = $this->resolvedSort();
 
         try {
             $period = ReleaseCalendarPeriod::resolve($calendarView, $this->period, $timezone);
@@ -137,7 +145,7 @@ final class ReleaseCalendarPage extends Component
                     $period,
                     ReleaseScheduleEntryType::tryFrom($this->type),
                     ReleaseScheduleStatus::tryFrom($this->status),
-                    ReleaseCalendarSort::from($this->sort),
+                    $effectiveSort,
                     $locale,
                     $timezone,
                     $this->selectedCatalogTitleId(),
@@ -177,6 +185,7 @@ final class ReleaseCalendarPage extends Component
             'typeOptions' => $this->enumOptions(ReleaseScheduleEntryType::cases()),
             'statusOptions' => $this->enumOptions(ReleaseScheduleStatus::cases()),
             'sortOptions' => $this->enumOptions(ReleaseCalendarSort::cases()),
+            'effectiveSort' => $effectiveSort->value,
             'viewUrls' => $this->viewUrls($timezone),
             'previousUrl' => $this->adjacentUrl($calendarView, $period, -1),
             'nextUrl' => $this->adjacentUrl($calendarView, $period, 1),
@@ -189,11 +198,11 @@ final class ReleaseCalendarPage extends Component
                 $calendarView,
                 $this->period,
                 request()->query() !== []
-                    || $this->type !== ''
-                    || $this->status !== ''
-                    || $this->sort !== 'earliest'
-                    || $this->catalogTitle !== ''
-                    || $entries->currentPage() > 1,
+                || $this->type !== ''
+                || $this->status !== ''
+                || $this->sort !== ''
+                || $this->catalogTitle !== ''
+                || $entries->currentPage() > 1,
                 $this->locale,
                 $entries->getCollection(),
             ),
@@ -204,10 +213,25 @@ final class ReleaseCalendarPage extends Component
     {
         $this->type = ReleaseScheduleEntryType::tryFrom($this->type)?->value ?? '';
         $this->status = ReleaseScheduleStatus::tryFrom($this->status)?->value ?? '';
-        $this->sort = ReleaseCalendarSort::tryFrom($this->sort)?->value ?? ReleaseCalendarSort::Earliest->value;
+        $sort = ReleaseCalendarSort::tryFrom($this->sort);
+        $this->sort = $sort instanceof ReleaseCalendarSort && $sort !== $this->defaultSort()
+            ? $sort->value
+            : '';
         $this->catalogTitle = ctype_digit($this->catalogTitle) && (int) $this->catalogTitle > 0
             ? (string) (int) $this->catalogTitle
             : '';
+    }
+
+    private function defaultSort(): ReleaseCalendarSort
+    {
+        return ReleaseCalendarView::from($this->view) === ReleaseCalendarView::Recent
+            ? ReleaseCalendarSort::Latest
+            : ReleaseCalendarSort::Earliest;
+    }
+
+    private function resolvedSort(): ReleaseCalendarSort
+    {
+        return ReleaseCalendarSort::tryFrom($this->sort) ?? $this->defaultSort();
     }
 
     private function selectedCatalogTitleId(): ?int

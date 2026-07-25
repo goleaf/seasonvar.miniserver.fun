@@ -100,6 +100,10 @@ final class CatalogDiscoveryPage extends Component
 
     protected CatalogSeoBuilder $seo;
 
+    protected ?CatalogRecommendationResult $resolvedResult = null;
+
+    protected bool $resolvedResultPrepared = false;
+
     public function boot(
         CatalogRecommendationService $recommendations,
         CatalogRecommendationPresenter $presenter,
@@ -165,15 +169,18 @@ final class CatalogDiscoveryPage extends Component
 
     public function refreshRecommendations(): void
     {
+        $this->seed = bin2hex(random_bytes(16));
+        $this->page = 1;
+        $this->notice = null;
+        $this->resetErrorBag();
+        $this->resolvedResultPrepared = true;
+
         try {
-            $result = $this->recommendations->discover($this->context());
-            $this->recommendations->rememberShown($result, $this->user());
-            $this->seed = bin2hex(random_bytes(16));
-            $this->page = 1;
-            $this->notice = null;
-            $this->resetErrorBag();
+            $this->resolvedResult = $this->recommendations->discover($this->context());
+            $this->recommendations->rememberShown($this->resolvedResult, $this->user());
         } catch (Throwable $exception) {
             report($exception);
+            $this->resolvedResult = $this->emptyResult($this->selectedType());
             $this->addError('recommendations', __('recommendations.page.error'));
         }
     }
@@ -244,24 +251,19 @@ final class CatalogDiscoveryPage extends Component
         $this->normalizeState();
         $type = $this->selectedType();
 
-        try {
-            $result = $this->recommendations->discover($this->context());
-        } catch (Throwable $exception) {
-            report($exception);
-            $this->addError('recommendations', __('recommendations.page.error'));
-            $result = new CatalogRecommendationResult(
-                requestedType: $type,
-                displayType: $type,
-                items: collect(),
-                page: (int) $this->page,
-                perPage: max(1, (int) config('recommendations.page_size', 24)),
-                hasMore: false,
-                personalized: false,
-                coldStart: $type === CatalogRecommendationType::Personalized,
-            );
+        if ($this->resolvedResultPrepared) {
+            $result = $this->resolvedResult ?? $this->emptyResult($type);
+        } else {
+            try {
+                $result = $this->recommendations->discover($this->context());
+            } catch (Throwable $exception) {
+                report($exception);
+                $this->addError('recommendations', __('recommendations.page.error'));
+                $result = $this->emptyResult($type);
+            }
         }
 
-        $presentation = $this->presenter->type($result->displayType);
+        $presentation = $this->presenter->type($type);
         $discoveryFacets = $this->facets->taxonomyGroups(
             ['genre', 'country', 'tag', 'actor', 'director', 'translation', 'studio'],
             ['genre' => 60, 'country' => 60, 'tag' => 40, 'actor' => 40, 'director' => 40, 'translation' => 60, 'studio' => 40],
@@ -340,6 +342,20 @@ final class CatalogDiscoveryPage extends Component
         return CatalogRecommendationType::tryFrom($this->type) ?? CatalogRecommendationType::Popular;
     }
 
+    private function emptyResult(CatalogRecommendationType $type): CatalogRecommendationResult
+    {
+        return new CatalogRecommendationResult(
+            requestedType: $type,
+            displayType: $type,
+            items: collect(),
+            page: $type === CatalogRecommendationType::Random ? 1 : (int) $this->page,
+            perPage: max(1, (int) config('recommendations.page_size', 24)),
+            hasMore: false,
+            personalized: false,
+            coldStart: $type === CatalogRecommendationType::Personalized,
+        );
+    }
+
     private function user(): ?User
     {
         $user = Auth::user();
@@ -366,6 +382,10 @@ final class CatalogDiscoveryPage extends Component
         $this->ratingMin = $this->decimal($this->ratingMin, 0, 10);
         $this->votesMin = $this->integer($this->votesMin, 0, 100_000_000);
         $this->page = $this->integer($this->page, 1, 500) ?: 1;
+
+        if ($this->selectedType() === CatalogRecommendationType::Random) {
+            $this->page = 1;
+        }
 
         if ($this->yearFrom !== '' && $this->yearTo !== '' && (int) $this->yearFrom > (int) $this->yearTo) {
             $this->yearTo = $this->yearFrom;

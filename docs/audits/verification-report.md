@@ -62,7 +62,7 @@ The task explicitly prohibited creating or running automated tests, so its accep
 
 | Gate | Fresh evidence |
 | --- | --- |
-| Canonical routes | `/discover/popular` объединяет recommendation и collection directory, `/admin/catalog` объединяет оба manager workflow; detail/profile/cover/API routes сохранены. `/collections`, `/admin/collections`, `/discover`, `/recommendations`, `/lists`, `/selections` и `/my/lists` удалены без redirects и возвращают `404`; owner mutations остаются Livewire actions за authenticated policy checks. |
+| Canonical routes | `/discover/popular` объединяет recommendation и collection directory, `/admin/catalog` объединяет оба manager workflow; detail/profile/API routes сохранены, cover route удалён. `/collections`, `/admin/collections`, `/discover`, `/recommendations`, `/lists`, `/selections` и `/my/lists` удалены без redirects и возвращают `404`; owner mutations остаются Livewire actions за authenticated policy checks. |
 | Domain static analysis | Collection DTOs/enums/controllers/requests/resources/Livewire/models/policy/services pass focused Larastan with 0 diagnostics. The final run caught and fixed singular taxonomy relation names before acceptance. |
 | Syntax and formatting | Every changed or untracked PHP/Blade file passes `php -l`; `pint --dirty --format agent` exits 0. |
 | Translation and template boundaries | `lang/en/collections.php` и `lang/ru/collections.php` сохраняют одинаковые leaf keys и placeholders; мёртвые directory SEO keys удалены. Collection Blade не содержит `@php`, inline style/script, model query, facade, `auth()`, `config()` или `request()` calls. |
@@ -75,7 +75,7 @@ The task explicitly prohibited creating or running automated tests, so its accep
 | Framework compilation | Isolated configuration and routes cache successfully; all Blade templates compile through `view:cache`. |
 | Production assets | Vite 8.1.4 builds successfully: app CSS 167.03 kB / 34.94 gzip and app JS 14.59 / 5.27 gzip; lazy player/Plyr/HLS chunks remain split. |
 | Manual browser acceptance | Isolated Chromium covered guest/owner/second-user authorization; create/edit/sanitize/rename/history redirect; private/public/unlisted/editorial pages; staged multi-membership and create-and-add; duplicate apply; remove/re-add; manual move; soft-delete/restore; filters/no-results/pagination URL back-forward; report/deduplication; directory/profile eligibility; canonical/robots/JSON-LD/hreflang; desktop and 390×844 dialog/focus/overflow. Console, page and request failure counts were zero. |
-| Cache/privacy evidence | Private pages and covers возвращают `private, no-store`, unauthorized requests — безопасный 404. Public collection filters живут внутри discovery: `collections_q` bypass-ит shared page cache, bounded sort/page входят в allowlist, а collection mutation повышает Collections и CatalogPages generations без global flush. Detail scopes и прежние privacy boundaries сохранены. |
+| Cache/privacy evidence | Private pages возвращают `private, no-store`, unauthorized requests — безопасный 404. Собственного cover response/cache больше нет. Public collection filters живут внутри discovery: `collections_q` bypass-ит shared page cache, bounded sort/category/subcategory/page входят в allowlist, а collection mutation повышает Collections и CatalogPages generations без global flush. Detail scopes и прежние privacy boundaries сохранены. |
 
 ## Task 11 re-audit and hardening — 18.07.2026 (no automated tests)
 

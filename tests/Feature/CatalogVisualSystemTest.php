@@ -258,6 +258,51 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/\b(?:border|ring|outline)(?:-|\s)/', $navigation[1]);
     }
 
+    public function test_title_quick_navigation_targets_exist_in_the_initial_response(): void
+    {
+        $title = CatalogTitle::factory()->create();
+        $content = $this->get(route('titles.show', $title))->assertOk()->getContent();
+
+        preg_match_all('/data-title-quick-link href="#([^"]+)"/', $content, $matches);
+
+        $this->assertSame(['player', 'seasons', 'data-title-reference', 'reviews'], $matches[1]);
+
+        foreach ($matches[1] as $targetId) {
+            $this->assertSame(
+                1,
+                substr_count($content, sprintf('id="%s"', $targetId)),
+                sprintf('Quick-navigation target #%s must exist exactly once in the initial response.', $targetId),
+            );
+        }
+    }
+
+    public function test_guest_title_actions_preserve_the_content_request_and_use_a_canonical_calendar_link(): void
+    {
+        $title = CatalogTitle::factory()->create();
+        $requestUrl = route('requests.create', [
+            'type' => 'broken_content_restoration',
+            'catalog_title_id' => $title->id,
+        ]);
+        $calendarUrl = route('calendar.upcoming', ['title' => $title->id]);
+        $content = $this->get(route('titles.show', $title))->assertOk()->getContent();
+
+        $this->assertStringContainsString(e($requestUrl), $content);
+        $this->assertMatchesRegularExpression(
+            sprintf('/<a href="%s" class="[^"]*">/s', preg_quote(e($calendarUrl), '/')),
+            $content,
+        );
+
+        $this->get($requestUrl)->assertRedirect(route('login'));
+        $intendedUrl = session('url.intended');
+        $this->assertIsString($intendedUrl);
+        $this->assertSame(parse_url($requestUrl, PHP_URL_PATH), parse_url($intendedUrl, PHP_URL_PATH));
+        parse_str((string) parse_url($intendedUrl, PHP_URL_QUERY), $intendedQuery);
+        $this->assertSame([
+            'catalog_title_id' => (string) $title->id,
+            'type' => 'broken_content_restoration',
+        ], $intendedQuery);
+    }
+
     public function test_home_and_title_pages_each_render_only_the_layout_main_landmark(): void
     {
         $title = CatalogTitle::factory()->create();

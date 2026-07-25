@@ -28,8 +28,7 @@ final class CatalogRecommendationCache
     {
         if ($context->user !== null
             || $context->type === CatalogRecommendationType::Personalized
-            || $context->type === CatalogRecommendationType::Random
-            || $context->seed !== null) {
+            || $context->type === CatalogRecommendationType::Random) {
             return $rebuild();
         }
 
@@ -47,7 +46,7 @@ final class CatalogRecommendationCache
             ->all();
         $result = $this->cache->remember(
             CacheDomain::Recommendations,
-            'discovery-ids-v2',
+            'discovery-ids-v3',
             [
                 'type' => $context->type->value,
                 'locale' => $context->locale,

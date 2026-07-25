@@ -39,11 +39,13 @@ use App\Services\Premium\PremiumPaymentGatewayRegistry;
 use App\Services\Premium\PremiumSchema;
 use App\Services\ReleaseCalendar\ReleaseCalendarSchema;
 use App\Services\Reviews\ReviewSchema;
+use App\Services\Seasonvar\SeasonvarImportEventRecorder;
 use App\Services\Tags\TagSchema;
 use App\Services\TechnicalIssues\TechnicalIssueSchema;
 use App\Services\UserPortal\UserPortalCacheInvalidator;
 use App\Support\Cache\CacheEventReporter;
 use App\View\ViewData\AppLayoutData;
+use Illuminate\Auth\Middleware\EnsureEmailIsVerified;
 use Illuminate\Cache\Events\CacheFailedOver;
 use Illuminate\Cache\Events\CacheHit;
 use Illuminate\Cache\Events\CacheMissed;
@@ -81,6 +83,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->scopedIf(ContentRequestSchema::class);
         $this->app->scopedIf(ReviewSchema::class);
         $this->app->scopedIf(ReleaseCalendarSchema::class);
+        $this->app->scopedIf(SeasonvarImportEventRecorder::class);
         $this->app->scopedIf(HelpCenterSchema::class);
         $this->app->scopedIf(PremiumSchema::class);
         $this->app->scopedIf(PersonalLibrarySchema::class);
@@ -169,6 +172,7 @@ class AppServiceProvider extends ServiceProvider
                 ->middleware('web');
         });
         Livewire::addPersistentMiddleware(AuthenticateSession::class);
+        Livewire::addPersistentMiddleware(EnsureEmailIsVerified::class);
         Livewire::addPersistentMiddleware(EnsureAccountAccess::class);
         Livewire::addPersistentMiddleware(EnsureAdministrator::class);
 

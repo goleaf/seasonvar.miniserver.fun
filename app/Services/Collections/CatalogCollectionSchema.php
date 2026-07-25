@@ -15,6 +15,8 @@ final class CatalogCollectionSchema
         'catalog_collection_items',
         'catalog_collection_reports',
         'catalog_collection_translations',
+        'catalog_collection_categories',
+        'catalog_collection_category_translations',
     ];
 
     private ?bool $available = null;

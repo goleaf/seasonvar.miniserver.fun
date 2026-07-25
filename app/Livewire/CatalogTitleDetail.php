@@ -192,9 +192,10 @@ class CatalogTitleDetail extends Component
             'refreshStatus' => $this->refreshStatus($refreshState),
             'publicCollections' => $this->collections->publicForTitle($this->catalogTitleId),
             'reviewLocale' => App::getLocale(),
-            'contentRequestUrl' => $user instanceof User
-                ? route('requests.create', ['type' => 'broken_content_restoration', 'catalog_title_id' => $this->catalogTitleId])
-                : route('login'),
+            'contentRequestUrl' => route('requests.create', [
+                'type' => 'broken_content_restoration',
+                'catalog_title_id' => $this->catalogTitleId,
+            ]),
             'releaseCalendarUrl' => route('calendar.upcoming', ['title' => $this->catalogTitleId]),
             'shareData' => [
                 'url' => (string) ($seo['canonical'] ?? route('titles.show', $title)),

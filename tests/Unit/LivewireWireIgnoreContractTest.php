@@ -59,4 +59,50 @@ final class LivewireWireIgnoreContractTest extends TestCase
         $this->assertStringNotContainsString('startAutoplayCountdown', $runtime);
         $this->assertStringNotContainsString('countdownRemaining', $runtime);
     }
+
+    public function test_player_transition_commit_targets_only_the_navigation_island(): void
+    {
+        $component = File::get(app_path('Livewire/CatalogTitlePlayer.php'));
+        $player = File::get(resource_path('views/livewire/catalog-title-player.blade.php'));
+        $navigationRuntime = File::get(resource_path('js/player-navigation.js'));
+
+        $this->assertStringContainsString(
+            "@island(name: 'catalog-player-navigation', always: true, with: \$this->playerNavigationIslandPage)",
+            $player,
+        );
+        $this->assertStringContainsString(
+            'wire?.$island?.(island)',
+            $navigationRuntime,
+        );
+        $this->assertStringContainsString(
+            "'catalog-player-navigation',",
+            $navigationRuntime,
+        );
+        $this->assertStringNotContainsString(
+            "#[Renderless]\n    public function commitPlayerTransition",
+            $component,
+        );
+        $this->assertLessThan(
+            strpos($player, "@island(name: 'catalog-player-navigation'"),
+            strpos($player, 'wire:ignore'),
+        );
+    }
+
+    public function test_adjacent_episode_island_keeps_real_links_without_a_competing_livewire_action(): void
+    {
+        $player = File::get(resource_path('views/livewire/catalog-title-player.blade.php'));
+        $islandStart = strpos($player, "@island(name: 'catalog-player-navigation'");
+        $islandEnd = is_int($islandStart) ? strpos($player, '@endisland', $islandStart) : false;
+
+        $this->assertIsInt($islandStart);
+        $this->assertIsInt($islandEnd);
+
+        $navigationIsland = substr($player, $islandStart, $islandEnd - $islandStart);
+
+        $this->assertStringContainsString('href="{{ $previousUrl }}"', $navigationIsland);
+        $this->assertStringContainsString('href="{{ $nextUrl }}"', $navigationIsland);
+        $this->assertStringContainsString('data-player-previous-episode', $navigationIsland);
+        $this->assertStringContainsString('data-player-next-episode', $navigationIsland);
+        $this->assertStringNotContainsString('wire:click', $navigationIsland);
+    }
 }

@@ -2656,7 +2656,25 @@
                     "content_locale": {"type": ["string", "null"], "enum": ["ru", "en", null]},
                     "featured": {"type": "boolean"},
                     "sort": {"type": "string", "enum": ["manual", "added_desc", "added_asc", "title_asc", "year_desc", "rating_desc", "updated_desc"]},
-                    "cover_url": {"type": ["string", "null"], "format": "uri"},
+                    "cover_url": {"type": ["string", "null"], "format": "uri", "deprecated": true, "description": "Устаревшее поле совместимости. Обложки подборок удалены, значение всегда null."},
+                    "category": {
+                        "type": ["object", "null"],
+                        "properties": {
+                            "slug": {"type": "string", "maxLength": 120},
+                            "name": {"type": "string", "maxLength": 120},
+                            "parent": {
+                                "type": ["object", "null"],
+                                "properties": {
+                                    "slug": {"type": "string", "maxLength": 120},
+                                    "name": {"type": "string", "maxLength": 120}
+                                },
+                                "required": ["slug", "name"],
+                                "additionalProperties": false
+                            }
+                        },
+                        "required": ["slug", "name", "parent"],
+                        "additionalProperties": false
+                    },
                     "item_count": {"type": "integer", "minimum": 0},
                     "owner": {
                         "type": ["object", "null"],

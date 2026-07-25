@@ -22,7 +22,10 @@ final readonly class HdRezkaCollectionMatcher
 
     private const int MINIMUM_LEAD = 20;
 
-    public function __construct(private CatalogSearchNormalizer $normalizer) {}
+    public function __construct(
+        private CatalogSearchNormalizer $normalizer,
+        private HdRezkaCollectionTypeCompatibility $typeCompatibility,
+    ) {}
 
     /**
      * @param  array{original_title?: ?string, year?: ?int, type?: ?string, genres?: list<string>}|null  $detail
@@ -183,15 +186,16 @@ final readonly class HdRezkaCollectionMatcher
             return null;
         }
 
-        $sourceType = $this->canonicalType($item->type ?? ($detail['type'] ?? null));
-        $candidateType = $this->canonicalType($title->type);
+        $detailType = is_string($detail['type'] ?? null) ? $detail['type'] : null;
+        $sourceType = $item->type ?? $detailType;
+        $candidateType = (string) $title->type;
 
-        if ($sourceType !== null && $candidateType !== null && $sourceType !== $candidateType) {
+        if (! $this->typeCompatibility->compatible($sourceType, $candidateType)) {
             return null;
         }
 
         $yearScore = $sourceYear !== null && $candidateYear === $sourceYear ? 40 : 0;
-        $typeScore = $sourceType !== null && $candidateType === $sourceType ? 20 : 0;
+        $typeScore = $this->typeCompatibility->knownMatch($sourceType, $candidateType) ? 20 : 0;
         $sourceCountries = collect($item->countries)
             ->map(fn (string $country): string => $this->normalizer->key($country))
             ->filter()
@@ -240,23 +244,6 @@ final readonly class HdRezkaCollectionMatcher
             'alias' => false,
             'detail_original' => false,
         ];
-    }
-
-    private function canonicalType(mixed $type): ?string
-    {
-        if (! is_string($type)) {
-            return null;
-        }
-
-        return match ($this->normalizer->key($type)) {
-            'film', 'movie' => 'film',
-            'series', 'serial', 'tv series', 'tvseries' => 'series',
-            'cartoon', 'cartoons', 'animation', 'animated movie' => 'cartoon',
-            'anime' => 'anime',
-            'documentary' => 'documentary',
-            'show', 'tv show' => 'show',
-            default => null,
-        };
     }
 
     private function nullableInt(mixed $value): ?int

@@ -6,11 +6,13 @@ namespace App\Livewire\Collections;
 
 use App\DTOs\CatalogCollectionData;
 use App\Enums\CatalogCollectionVisibility;
+use App\Livewire\Concerns\InteractsWithCatalogCollectionCategory;
 use App\Models\CatalogCollection;
 use App\Models\CatalogTitle;
 use App\Models\User;
 use App\Services\Auth\AccountSettingsService;
 use App\Services\Catalog\CatalogTitleQuery;
+use App\Services\Collections\CatalogCollectionCategoryQuery;
 use App\Services\Collections\CatalogCollectionCreateWithTitleService;
 use App\Services\Collections\CatalogCollectionItemService;
 use App\Services\Collections\CatalogCollectionQuery;
@@ -22,6 +24,8 @@ use Livewire\Component;
 
 final class CatalogCollectionMembershipManager extends Component
 {
+    use InteractsWithCatalogCollectionCategory;
+
     #[Locked]
     public int $catalogTitleId;
 
@@ -52,6 +56,7 @@ final class CatalogCollectionMembershipManager extends Component
             ? $settings->resolve($user)->collectionDefaultVisibility
             : (string) config('catalog-collections.default_visibility', 'private');
         $this->newVisibility = $this->defaultVisibility;
+        $this->resetCategorySelection();
         $this->creationPublicId = (string) Str::uuid();
     }
 
@@ -94,10 +99,14 @@ final class CatalogCollectionMembershipManager extends Component
             'newName' => ['required', 'string', 'min:2', 'max:160'],
             'newDescription' => ['nullable', 'string', 'max:10000'],
             'newVisibility' => ['required', Rule::enum(CatalogCollectionVisibility::class)],
+            'categoryRootPublicId' => ['nullable', 'uuid'],
+            'categoryPublicId' => ['nullable', 'uuid'],
         ], [
             'newName.*' => __('collections.validation.name'),
             'newDescription.*' => __('collections.validation.description'),
             'newVisibility.*' => __('collections.validation.visibility'),
+            'categoryRootPublicId.*' => __('collections.validation.category'),
+            'categoryPublicId.*' => __('collections.validation.category'),
         ]);
         $user = $this->user();
         $creator->create($user, $this->title($titles, $user), new CatalogCollectionData(
@@ -106,13 +115,16 @@ final class CatalogCollectionMembershipManager extends Component
             visibility: CatalogCollectionVisibility::from($validated['newVisibility']),
             contentLocale: null,
             publicId: $this->creationPublicId,
+            categoryPublicId: $this->selectedCategoryPublicId(),
         ));
         $this->notice = __('collections.membership.created_and_added');
         $this->closeSelector();
     }
 
-    public function render(CatalogCollectionQuery $collections): View
-    {
+    public function render(
+        CatalogCollectionQuery $collections,
+        CatalogCollectionCategoryQuery $categories,
+    ): View {
         $user = auth()->user();
         $manageableCollections = $this->open && $user instanceof User
             ? $collections->manageableForTitle($user, $this->catalogTitleId)
@@ -121,6 +133,13 @@ final class CatalogCollectionMembershipManager extends Component
             'visibility_label',
             $collection->visibility->label(),
         ));
+        $categoryViewData = $this->open && $user instanceof User
+            ? $this->categorySelectionViewData($categories)
+            : [
+                'categoryRootOptions' => [],
+                'categoryChildOptions' => [],
+                'categoryAssignmentArchived' => false,
+            ];
 
         return view('livewire.collections.catalog-collection-membership-manager', [
             'authenticated' => $user instanceof User,
@@ -132,6 +151,7 @@ final class CatalogCollectionMembershipManager extends Component
                 'value' => $option->value,
                 'label' => $option->label(),
             ], CatalogCollectionVisibility::cases()),
+            ...$categoryViewData,
         ]);
     }
 

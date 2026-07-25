@@ -475,22 +475,6 @@ final class DemoDataAuditor
             }
         }
 
-        $collections = DB::table((new CatalogCollection)->getTable())
-            ->whereIn('owner_id', $userIds)
-            ->get(['public_id', 'cover_disk', 'cover_path', 'cover_mime_type']);
-
-        foreach ($collections as $collection) {
-            if ($collection->cover_disk !== $assetDisk
-                || $collection->cover_mime_type !== 'image/webp'
-                || ! str_starts_with((string) $collection->cover_path, 'catalog-collections/'.$collection->public_id.'/')) {
-                $violations[] = 'Демонстрационная коллекция содержит недоставляемую обложку.';
-            }
-
-            if ($collection->cover_disk === $assetDisk && is_string($collection->cover_path) && $collection->cover_path !== '') {
-                $assets[] = [$collection->cover_disk, $collection->cover_path];
-            }
-        }
-
         $attachments = DB::table((new TechnicalIssueAttachment)->getTable().' as attachments')
             ->join((new TechnicalIssue)->getTable().' as issues', 'issues.id', '=', 'attachments.technical_issue_id')
             ->whereIn('issues.requester_id', $userIds)

@@ -32,6 +32,65 @@ class SeasonvarPageClaimManager
         return $claimed === 1 ? $token : null;
     }
 
+    /**
+     * @param  list<int>  $pageIds
+     * @return array{token: string, page_ids: list<int>}
+     */
+    public function claimMany(array $pageIds, int $runId, ?int $seconds = null): array
+    {
+        $pageIds = collect($pageIds)
+            ->map(static fn (int $pageId): int => $pageId)
+            ->filter(static fn (int $pageId): bool => $pageId > 0)
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+        $token = Str::uuid()->toString();
+
+        if ($pageIds === []) {
+            return [
+                'token' => $token,
+                'page_ids' => [],
+            ];
+        }
+
+        $now = now();
+        $seconds = max(
+            60,
+            $seconds ?? (int) config('seasonvar.queue.claim_seconds', 86400),
+        );
+
+        SourcePage::query()
+            ->whereKey($pageIds)
+            ->where(function (Builder $query) use ($now): void {
+                $query->whereNull('import_claim_token')
+                    ->orWhereNull('import_claim_expires_at')
+                    ->orWhere('import_claim_expires_at', '<=', $now);
+            })
+            ->update([
+                'import_claim_token' => $token,
+                'import_claimed_at' => $now,
+                'import_claim_expires_at' => $now->copy()->addSeconds($seconds),
+                'import_claim_run_id' => $runId,
+                'updated_at' => $now,
+            ]);
+
+        $claimedPageIds = SourcePage::query()
+            ->whereKey($pageIds)
+            ->where('import_claim_run_id', $runId)
+            ->where('import_claim_token', $token)
+            ->where('import_claim_expires_at', '>', $now)
+            ->orderBy('id')
+            ->pluck('id')
+            ->map(static fn (mixed $pageId): int => (int) $pageId)
+            ->all();
+
+        return [
+            'token' => $token,
+            'page_ids' => $claimedPageIds,
+        ];
+    }
+
     public function owns(int $pageId, int $runId, string $token): bool
     {
         return $this->ownedQuery($pageId, $runId, $token)

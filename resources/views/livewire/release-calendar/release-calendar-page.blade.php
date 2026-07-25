@@ -36,12 +36,12 @@
         <div class="mt-4 grid gap-3 md:grid-cols-3">
             <label class="text-sm font-bold text-slate-700"><span>{{ __('calendar.filters.type') }}</span><select wire:model.live="type" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2"><option value="">{{ __('calendar.filters.all_types') }}</option>@foreach ($typeOptions as $option)<option value="{{ $option['value'] }}">{{ $option['label'] }}</option>@endforeach</select></label>
             <label class="text-sm font-bold text-slate-700"><span>{{ __('calendar.filters.status') }}</span><select wire:model.live="status" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2"><option value="">{{ __('calendar.filters.all_statuses') }}</option>@foreach ($statusOptions as $option)<option value="{{ $option['value'] }}">{{ $option['label'] }}</option>@endforeach</select></label>
-            <label class="text-sm font-bold text-slate-700"><span>{{ __('calendar.filters.sort') }}</span><select wire:model.live="sort" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2">@foreach ($sortOptions as $option)<option value="{{ $option['value'] }}">{{ $option['label'] }}</option>@endforeach</select></label>
+            <label class="text-sm font-bold text-slate-700"><span>{{ __('calendar.filters.sort') }}</span><select wire:change="changeSort($event.target.value)" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2">@foreach ($sortOptions as $option)<option value="{{ $option['value'] }}" @selected($effectiveSort === $option['value'])>{{ $option['label'] }}</option>@endforeach</select></label>
         </div>
-        @if ($type !== '' || $status !== '' || $sort !== 'earliest' || $catalogTitle !== '')
+        @if ($type !== '' || $status !== '' || $sort !== '' || $catalogTitle !== '')
             <button type="button" wire:click="clearFilters" wire:loading.attr="disabled" class="mt-3 min-h-11 rounded-control bg-slate-100 px-4 text-sm font-bold text-slate-700 hover:bg-slate-200">{{ __('calendar.filters.clear') }}</button>
         @endif
-        <div wire:loading.flex wire:target="type,status,sort,clearFilters" class="mt-3 items-center gap-2 text-sm font-bold text-emerald-700" role="status"><x-ui.icon name="fa-solid fa-spinner fa-spin" />{{ __('calendar.loading') }}</div>
+        <div wire:loading.flex wire:target="type,status,changeSort,clearFilters" class="mt-3 items-center gap-2 text-sm font-bold text-emerald-700" role="status"><x-ui.icon name="fa-solid fa-spinner fa-spin" />{{ __('calendar.loading') }}</div>
     </section>
 
     @if ($calendarView->value === 'month' && $monthGrid !== null)

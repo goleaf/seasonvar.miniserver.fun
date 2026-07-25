@@ -471,12 +471,11 @@ final class AccountSettingsPage extends Component
         $variantOptions = $active === AccountSettingsSection::Playback
             ? $playbackOptions->variants($this->preferredVariant !== '' ? $this->preferredVariant : null, $this->user())
             : [];
-        $premiumOverview = $active === AccountSettingsSection::Premium
-            ? $premium->overview($this->user(), $this->locale, $this->timezone)
+        $premiumSnapshot = $active === AccountSettingsSection::Premium
+            ? $premium->snapshot($this->user(), $this->locale, $this->timezone)
             : null;
-        $premiumPayments = $active === AccountSettingsSection::Premium
-            ? $premium->payments($this->user(), $this->locale, $this->timezone)
-            : null;
+        $premiumOverview = $premiumSnapshot['overview'] ?? null;
+        $premiumPayments = $premiumSnapshot['payments'] ?? null;
         $helpFeature = match ($active) {
             AccountSettingsSection::Playback => HelpFeature::Player,
             AccountSettingsSection::Premium => HelpFeature::Premium,

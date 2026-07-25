@@ -69,4 +69,10 @@
             </article>
         @endforeach
     </div>
+    @if ($hasMore)
+        <a href="{{ $titleUrl }}" class="relative z-10 mt-3 inline-flex min-h-11 items-center gap-2 rounded-control bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100">
+            <span>{{ __('home.updates.more_on_title') }}</span>
+            <x-ui.icon name="fa-solid fa-arrow-right" />
+        </a>
+    @endif
 </x-ui.poster-card>

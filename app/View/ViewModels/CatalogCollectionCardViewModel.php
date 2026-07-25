@@ -6,9 +6,9 @@ namespace App\View\ViewModels;
 
 use App\Enums\CatalogCollectionType;
 use App\Models\CatalogCollection;
+use App\Models\CatalogCollectionCategory;
 use App\Models\User;
 use App\Services\Auth\AccountDateTimeFormatter;
-use App\Services\Collections\CatalogCollectionCoverService;
 use App\Support\PlainText;
 use Illuminate\Support\Number;
 
@@ -17,8 +17,6 @@ final readonly class CatalogCollectionCardViewModel
     public string $url;
 
     public ?string $ownerUrl;
-
-    public ?string $imageUrl;
 
     public string $name;
 
@@ -44,9 +42,7 @@ final readonly class CatalogCollectionCardViewModel
 
     public ?string $ownerName;
 
-    public string $imageAlt;
-
-    public string $emptyImageLabel;
+    public string $categoryPath;
 
     public string $itemCountLabel;
 
@@ -56,7 +52,6 @@ final readonly class CatalogCollectionCardViewModel
 
     public function __construct(
         CatalogCollection $collection,
-        CatalogCollectionCoverService $covers,
         AccountDateTimeFormatter $dates,
         public bool $management = false,
         ?string $timezone = null,
@@ -69,8 +64,6 @@ final readonly class CatalogCollectionCardViewModel
         $this->ownerUrl = ! is_string($ownerPublicId) || $ownerPublicId === ''
             ? null
             : route('profiles.collections', ['userPublicId' => $ownerPublicId]);
-        $this->imageUrl = $covers->url($collection)
-            ?? (is_string($collection->getAttribute('fallback_poster_url')) ? $collection->getAttribute('fallback_poster_url') : null);
         $this->name = (string) $collection->display_name;
         $this->description = PlainText::clean($collection->display_description, 180);
         $this->itemCount = (int) ($management
@@ -91,12 +84,31 @@ final readonly class CatalogCollectionCardViewModel
         $this->moderationStatusLabel = $collection->moderation_status->label();
         $this->typeLabel = $collection->type->label();
         $this->ownerName = $owner instanceof User ? $owner->name : null;
-        $this->imageAlt = __('collections.accessibility.collection_cover', ['name' => $this->name]);
-        $this->emptyImageLabel = __('collections.page.cover_missing');
+        $this->categoryPath = $this->categoryPath($collection);
         $this->itemCountLabel = trans_choice('collections.page.items', $this->itemCount, [
             'count' => Number::format($this->itemCount, locale: app()->currentLocale()),
         ]);
         $this->featuredLabel = __('collections.page.featured');
         $this->importedLabel = __('collections.page.automatically_updated');
+    }
+
+    private function categoryPath(CatalogCollection $collection): string
+    {
+        $category = $collection->relationLoaded('category')
+            ? $collection->getRelation('category')
+            : null;
+
+        if (! $category instanceof CatalogCollectionCategory) {
+            return __('collections.directory.uncategorized');
+        }
+
+        $parent = $category->relationLoaded('parent')
+            ? $category->getRelation('parent')
+            : null;
+
+        return collect([
+            $parent instanceof CatalogCollectionCategory ? $parent->display_name : null,
+            $category->display_name,
+        ])->filter()->implode(' › ');
     }
 }

@@ -12,6 +12,7 @@ use App\Services\Catalog\CatalogCacheInvalidator;
 use App\Services\Media\LicensedMediaFileSizeBackfillBudget;
 use App\Services\Media\LicensedMediaFileSizeBackfillSchedule;
 use App\Services\Media\LicensedMediaFileSizeBacklog;
+use App\Services\Seasonvar\SeasonvarActiveRunReconciler;
 use App\Services\Seasonvar\SeasonvarGlobalImportRunCoordinator;
 use App\Services\Seasonvar\SeasonvarImportPipeline;
 use App\Services\Seasonvar\SeasonvarImportProcessInspector;
@@ -57,6 +58,7 @@ class ImportSeasonvar extends Command
         CatalogCacheInvalidator $cacheInvalidator,
         HumanFileSizeFormatter $fileSizes,
         LicensedMediaFileSizeBacklog $fileSizeBacklog,
+        SeasonvarActiveRunReconciler $activeRunReconciler,
     ): int {
         $pageTypes = $this->validatedPageTypes($pageHandlers);
 
@@ -113,6 +115,22 @@ class ImportSeasonvar extends Command
         try {
             $lockStore->put(self::LOCK_PROCESS_KEY, $process, $lockSeconds);
             $reservedRun = null;
+
+            if (! $inventoryOnly && ! $refreshMediaSizes && $this->argument('url') === null) {
+                $activeRun = $globalRuns->activeRun();
+
+                if ($activeRun !== null) {
+                    $reconciliation = $activeRunReconciler->reconcile($activeRun->id);
+
+                    if ($reconciliation->dispatchRecovered || $reconciliation->jobsDispatched > 0) {
+                        $this->warn(sprintf(
+                            'Восстановлена очередь активного запуска #%d: повторно поставлено задач — %d.',
+                            $activeRun->id,
+                            $reconciliation->jobsDispatched,
+                        ));
+                    }
+                }
+            }
 
             if (! $inventoryOnly && $this->argument('url') === null) {
                 $reservation = $globalRuns->acquireSync(

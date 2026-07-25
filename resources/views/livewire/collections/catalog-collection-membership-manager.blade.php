@@ -104,6 +104,11 @@
                             </select>
                             <x-form.input-error for="newVisibility" />
                         </div>
+                        <x-collections.category-fields
+                            :root-options="$categoryRootOptions"
+                            :child-options="$categoryChildOptions"
+                            id-prefix="collection-membership-category"
+                        />
                         <button type="submit" wire:loading.attr="disabled" wire:target="createAndAdd" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-slate-800 px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-700 disabled:cursor-wait disabled:opacity-60">
                             <x-ui.icon name="fa-solid fa-folder-plus" wire:loading.remove wire:target="createAndAdd" />
                             <x-ui.icon name="fa-solid fa-spinner fa-spin" wire:loading wire:target="createAndAdd" />

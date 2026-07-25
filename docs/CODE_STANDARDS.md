@@ -1,6 +1,6 @@
 # Стандарты кода
 
-Обновлено: 24.07.2026
+Обновлено: 25.07.2026
 
 ## Обязательный процесс
 
@@ -143,7 +143,7 @@
 - Новая collection behavior расширяет только `App\Services\Collections`, `CatalogCollectionQuery`, enums/models/policy/DTO и существующие catalog/account/cache/SEO boundaries. Не создавайте второй list/folder/playlist model, pivot, visibility mapper или cache infrastructure.
 - Все mutations принимают stable resolved record/UUID, берут actor/owner server-side, повторно authorizes и выполняют short transaction. Invalidation регистрируется after commit; membership не вызывает watchlist/rating/progress/history services.
 - User text проходит `UserPlainText`, остаётся plain original-language content и экранируется. Editorial translations живут в DB rows; visibility/type/moderation/sort codes никогда не переводятся в storage.
-- Query-object заранее готовит owner, translations, counts, cover fallback, permissions/state and paginated items. Blade не рассчитывает visibility/SEO/order/count, не вызывает relation lazy load и не конкатенирует collection URL.
+- Query-object заранее готовит owner, category path/translations, counts, permissions/state and paginated items. Blade не рассчитывает visibility/SEO/order/count, не вызывает relation lazy load и не конкатенирует collection URL.
 - Livewire хранит locked stable IDs/version и bounded scalar/UUID drafts, не full Eloquent graphs. Используются existing Vite/Tailwind/components, без Volt, `@php`, inline CSS и inline business JavaScript.
 
 ## Обсуждения

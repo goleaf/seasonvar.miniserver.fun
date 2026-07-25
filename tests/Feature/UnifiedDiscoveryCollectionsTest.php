@@ -82,7 +82,7 @@ final class UnifiedDiscoveryCollectionsTest extends TestCase
             'visibility' => CatalogCollectionVisibility::Public,
             'moderation_status' => CatalogCollectionModerationStatus::Approved,
             'sort_mode' => CatalogCollectionSort::Manual, 'content_locale' => 'ru',
-            'is_featured' => true, 'cover_version' => 0, 'content_version' => 1, 'published_at' => now(),
+            'is_featured' => true, 'content_version' => 1, 'published_at' => now(),
         ]);
     }
 }

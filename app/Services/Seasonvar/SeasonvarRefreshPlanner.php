@@ -6,6 +6,7 @@ namespace App\Services\Seasonvar;
 
 use App\Enums\SeasonvarPageType;
 use App\Enums\SeasonvarSourceAvailability;
+use App\Models\SeasonvarImportPreparedPage;
 use App\Models\SourcePage;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -191,6 +192,53 @@ final class SeasonvarRefreshPlanner
     }
 
     /**
+     * @param  list<int>  $sourcePageIds
+     * @param  (callable(string, array<string, mixed>): void)|null  $progress
+     * @return iterable<Collection<int, SourcePage>>
+     */
+    public function forcedPageChunksForIds(
+        array $sourcePageIds,
+        int $chunkSize,
+        ?int $importRunId = null,
+        ?callable $progress = null,
+    ): iterable {
+        $chunkSize = max(1, $chunkSize);
+        $orderedIds = collect($sourcePageIds)
+            ->map(static fn (int $id): int => $id)
+            ->filter(static fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values();
+        $pagesById = collect();
+
+        foreach ($orderedIds->chunk(500) as $ids) {
+            $this->forcedUrlQuery($importRunId)
+                ->whereKey($ids->all())
+                ->get()
+                ->each(fn (SourcePage $page) => $pagesById->put((int) $page->id, $page));
+        }
+
+        $selected = $orderedIds
+            ->map(fn (int $id): ?SourcePage => $pagesById->get($id))
+            ->filter(fn (?SourcePage $page): bool => $page instanceof SourcePage)
+            ->values();
+        $totalSelected = 0;
+
+        foreach ($selected->chunk($chunkSize) as $pages) {
+            $totalSelected += $pages->count();
+
+            $this->report($progress, 'seasonvar-refresh-candidates-selected', [
+                'reason' => 'forced_sitemap_tail',
+                'selected' => $pages->count(),
+                'reason_selected' => $totalSelected,
+                'total_selected' => $totalSelected,
+                'chunk_size' => $chunkSize,
+            ]);
+
+            yield $pages->values();
+        }
+    }
+
+    /**
      * @param  Collection<int, SourcePage>  $pages
      * @param  array<int, true>  $selectedIds
      * @return Collection<int, SourcePage>
@@ -265,6 +313,7 @@ final class SeasonvarRefreshPlanner
                     });
                 })
                 ->orderBy('id');
+            $query = $this->withoutPreparedLedgerRow($query, $importRunId);
 
             foreach ($query->lazyById($chunkSize)->chunk($chunkSize) as $pages) {
                 $pages = $pages->collect()->values();
@@ -286,7 +335,7 @@ final class SeasonvarRefreshPlanner
      */
     private function baseQuery(?int $importRunId): Builder
     {
-        return SourcePage::query()
+        $query = SourcePage::query()
             ->with('source:id,code,base_url,crawl_delay_seconds')
             ->where('page_type', 'serial')
             ->where(function (Builder $query): void {
@@ -306,12 +355,14 @@ final class SeasonvarRefreshPlanner
                         ->orWhere('last_import_run_id', '!=', $importRunId);
                 });
             });
+
+        return $this->withoutPreparedLedgerRow($query, $importRunId);
     }
 
     /** @return Builder<SourcePage> */
     private function forcedUrlQuery(?int $importRunId): Builder
     {
-        return SourcePage::query()
+        $query = SourcePage::query()
             ->with('source:id,code,base_url,crawl_delay_seconds')
             ->where('page_type', SeasonvarPageType::Serial->value)
             ->where(function (Builder $query): void {
@@ -325,6 +376,25 @@ final class SeasonvarRefreshPlanner
                         ->orWhere('last_import_run_id', '!=', $importRunId);
                 });
             });
+
+        return $this->withoutPreparedLedgerRow($query, $importRunId);
+    }
+
+    /** @return Builder<SourcePage> */
+    private function withoutPreparedLedgerRow(
+        Builder $query,
+        ?int $importRunId,
+    ): Builder {
+        if ($importRunId === null) {
+            return $query;
+        }
+
+        return $query->whereNotIn(
+            (new SourcePage)->qualifyColumn('id'),
+            SeasonvarImportPreparedPage::query()
+                ->select('source_page_id')
+                ->where('seasonvar_import_run_id', $importRunId),
+        );
     }
 
     /**

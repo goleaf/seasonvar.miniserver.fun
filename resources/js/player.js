@@ -345,6 +345,9 @@ class CatalogPlayerSession {
         this.dataSaver = this.connection?.saveData === true;
         this.lastMediaSessionPositionUpdate = 0;
         this.ownsMediaSession = false;
+        this.centerControls = null;
+        this.centerPlaybackButton = null;
+        this.centerPlaybackIcon = null;
         this.menu = null;
         this.menuGeneration = 0;
         this.transitionGeneration = 0;
@@ -444,6 +447,7 @@ class CatalogPlayerSession {
                 enabled: false,
             },
         });
+        this.initializeCenterControls();
         this.initializePlayerMenu();
         this.lastPreferenceFingerprint = `${this.preferences.volume}|${this.preferences.muted ? 1 : 0}|${Number(this.preferences.speed).toFixed(2)}`;
         this.initializeMediaSession();
@@ -452,6 +456,122 @@ class CatalogPlayerSession {
         if (this.transientResume?.notice) {
             this.showNotice(this.transientResume.notice);
         }
+    }
+
+    initializeCenterControls() {
+        const container = this.plyr?.elements?.container;
+        const signal = this.abortController.signal;
+        const rewindLabel = (this.copy.controls.rewind || '').replace('{seektime}', '10');
+        const playLabel = this.copy.controls.play || '';
+        const pauseLabel = this.copy.controls.pause || '';
+        const forwardLabel = (this.copy.controls.fastForward || '').replace('{seektime}', '10');
+
+        if (
+            !(container instanceof HTMLElement)
+            || !rewindLabel
+            || !playLabel
+            || !pauseLabel
+            || !forwardLabel
+        ) {
+            return;
+        }
+
+        container.removeAttribute('data-player-center-controls-ready');
+        container.querySelector('[data-player-center-controls]')?.remove();
+
+        const controls = document.createElement('div');
+
+        controls.className = 'catalog-player-center-controls';
+        controls.setAttribute('data-player-center-controls', '');
+
+        const createControl = ({ kind, label, icon, seconds = null, action }) => {
+            const button = document.createElement('button');
+            const iconNode = document.createElement('span');
+
+            button.type = 'button';
+            button.className = `catalog-player-center-control catalog-player-center-control--${kind}`;
+            button.setAttribute('data-player-center-control', kind);
+            button.setAttribute('aria-label', label);
+            button.title = label;
+            iconNode.className = `catalog-player-center-control__icon fa-solid ${icon}`;
+            iconNode.setAttribute('aria-hidden', 'true');
+            button.append(iconNode);
+
+            if (seconds !== null) {
+                const secondsNode = document.createElement('span');
+
+                secondsNode.className = 'catalog-player-center-control__seconds';
+                secondsNode.textContent = String(seconds);
+                secondsNode.setAttribute('aria-hidden', 'true');
+                button.append(secondsNode);
+            }
+
+            button.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                action();
+            }, { signal });
+
+            return { button, iconNode };
+        };
+
+        const rewind = createControl({
+            kind: 'rewind',
+            label: rewindLabel,
+            icon: 'fa-rotate-left',
+            seconds: 10,
+            action: () => this.seekMediaBy(-10),
+        });
+        const toggle = createControl({
+            kind: 'toggle',
+            label: playLabel,
+            icon: 'fa-play',
+            action: () => {
+                void Promise.resolve(this.plyr?.togglePlay()).catch(() => {});
+            },
+        });
+        const forward = createControl({
+            kind: 'forward',
+            label: forwardLabel,
+            icon: 'fa-rotate-right',
+            seconds: 10,
+            action: () => this.seekMediaBy(10),
+        });
+
+        controls.append(rewind.button, toggle.button, forward.button);
+        container.append(controls);
+        container.setAttribute('data-player-center-controls-ready', '1');
+        this.centerControls = controls;
+        this.centerPlaybackButton = toggle.button;
+        this.centerPlaybackIcon = toggle.iconNode;
+        this.syncCenterPlaybackControl();
+    }
+
+    syncCenterPlaybackControl() {
+        if (
+            !(this.centerPlaybackButton instanceof HTMLButtonElement)
+            || !(this.centerPlaybackIcon instanceof HTMLElement)
+        ) {
+            return;
+        }
+
+        const playing = !this.video.paused && !this.video.ended;
+        const label = playing ? this.copy.controls.pause : this.copy.controls.play;
+
+        this.centerPlaybackButton.setAttribute('aria-label', label);
+        this.centerPlaybackButton.title = label;
+        this.centerPlaybackButton.dataset.playerCenterState = playing ? 'pause' : 'play';
+        this.centerPlaybackIcon.className = `catalog-player-center-control__icon fa-solid ${playing ? 'fa-pause' : 'fa-play'}`;
+    }
+
+    destroyCenterControls() {
+        const container = this.plyr?.elements?.container;
+
+        this.centerControls?.remove();
+        container?.removeAttribute('data-player-center-controls-ready');
+        this.centerControls = null;
+        this.centerPlaybackButton = null;
+        this.centerPlaybackIcon = null;
     }
 
     initializePlayerMenu() {
@@ -951,6 +1071,7 @@ class CatalogPlayerSession {
     handlePlay() {
         this.clearBufferingTimer();
         this.hasStartedPlayback = true;
+        this.syncCenterPlaybackControl();
         this.hls?.startLoad?.();
         this.setStatus('playing', 'playing');
         this.syncMediaSessionPlaybackState('playing');
@@ -962,6 +1083,7 @@ class CatalogPlayerSession {
     handlePause() {
         this.stopHeartbeat();
         this.persistDevicePreferences();
+        this.syncCenterPlaybackControl();
 
         if (this.transitioning) {
             return;
@@ -1007,6 +1129,7 @@ class CatalogPlayerSession {
 
         this.completed = true;
         this.stopHeartbeat();
+        this.syncCenterPlaybackControl();
         this.dispatchProgress(true, true, 'ended');
         this.setStatus('ended', 'ended');
         this.syncMediaSessionPlaybackState('none');
@@ -2145,6 +2268,7 @@ class CatalogPlayerSession {
         this.abortController.abort();
         this.connection?.removeEventListener?.('change', this.connectionChangeHandler);
         this.clearMediaSession();
+        this.destroyCenterControls();
         this.syncPlyrOriginalMediaState();
         this.hls?.destroy();
         let restoredVideo = this.video;

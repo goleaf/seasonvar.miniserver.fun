@@ -6,7 +6,6 @@ namespace App\Services\Seasonvar;
 
 use App\DTOs\Seasonvar\SeasonvarPageHandlerResult;
 use App\Enums\SeasonvarPageType;
-use App\Models\SeasonvarImportEvent;
 use App\Models\SourcePage;
 use DOMDocument;
 use DOMXPath;
@@ -18,6 +17,7 @@ final readonly class SeasonvarRssFreshnessImporter
     public function __construct(
         private SeasonvarUrl $urls,
         private SeasonvarDiscoveredPageStore $pages,
+        private SeasonvarImportEventRecorder $eventRecorder,
     ) {}
 
     /** @param (callable(string, array<string, mixed>): void)|null $progress */
@@ -53,13 +53,12 @@ final readonly class SeasonvarRssFreshnessImporter
             'linked_serial_urls_found' => count($serialUrls),
             'structured_fields' => ['linked_serial_urls'],
         ];
-        SeasonvarImportEvent::query()->create([
-            'seasonvar_import_run_id' => $importRunId,
-            'source_page_id' => $page->id,
-            'event' => 'seasonvar-rss-freshness-recorded',
-            'level' => 'info',
-            'context' => $context,
-        ]);
+        $this->eventRecorder->record(
+            event: 'seasonvar-rss-freshness-recorded',
+            context: $context,
+            importRunId: $importRunId,
+            sourcePageId: (int) $page->id,
+        );
 
         if ($progress !== null) {
             $progress('seasonvar-rss-freshness-recorded', ['source_page_id' => $page->id, ...$context]);

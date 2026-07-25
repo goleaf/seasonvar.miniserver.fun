@@ -1,7 +1,153 @@
-# Текущая задача — безлимитная программа стабилизации, обновления и оптимизации
+# Текущая задача — безлимитный аудит и программа улучшения импортёра Seasonvar
 
 Дата: 24.07.2026
-Статус: master implementation plan актуализирован после выполнения Tasks 1–2: Task 3 остаётся безопасно остановлен перед production mutation gate, а измеренные delivery/concurrency/cross-plan discoveries добавлены как Tasks 29–31 и безлимитный rolling extension protocol. Application/runtime/data этой planning-актуализацией не меняются.
+Статус: importer Tasks 2–4 имеют `implementation_complete`, а общая Tasks 2–4 delivery остаётся `unresolved` до завершения unrelated dependency/system/player/collection/lease scopes, очистки shared worktree и повторной проверки snapshot. Production workers/scheduler/Redis/data не изменяются.
+
+## Активный аудит девяти `/discover/*` режимов — query, cache, UI и end-to-end
+
+Статус: `approved_master_plan_ready`; browser/SQLite evidence завершён, рекомендуемая hybrid architecture согласована, исполнимый TDD master plan записан в [`docs/superpowers/plans/2026-07-24-discovery-sections-end-to-end-improvement-master-plan.md`](../superpowers/plans/2026-07-24-discovery-sections-end-to-end-improvement-master-plan.md). Код, схема, данные, cache, queue, scheduler и production services на planning-only этапе не изменяются.
+
+### Scope
+
+- `/discover/personalized`
+- `/discover/trending`
+- `/discover/popular`
+- `/discover/top_rated`
+- `/discover/recently_added`
+- `/discover/recently_updated`
+- `/discover/upcoming`
+- `/discover/editorial`
+- `/discover/random`
+
+### Уже подтверждённые discovery
+
+- `CatalogDiscoveryPage::render()` на каждом render строит основной recommendation result и все семь taxonomy facet groups, независимо от активного режима и фактического раскрытия дополнительных фильтров.
+- `refreshRecommendations()` сначала повторно выполняет текущий discover query, затем меняет seed; последующий render выполняет новый query ещё раз. Refresh поэтому имеет лишнюю полную recommendation работу и remember-state не связан с фактически новым результатом.
+- Live refresh подтверждает user-visible дефекты: гостевой `personalized` меняется с `1` до `24` строк только после refresh и занимает `9.377 s`; `popular` refresh занимает `4.224 s`; `random` ошибочно показывает кнопку следующей страницы, где остаётся ровно `1` строка.
+- `personalized` cold-start останавливается на первом непустом fallback source: одна недельная trending-строка блокирует заполнение страницы из `popular`. Stable public refresh при этом записывает guest recent IDs, добавляет seed, обходит shared cache и заново считает ranking даже для seed-independent режимов.
+- Public query modes имеют разные bottlenecks: full grouped activity aggregates (`trending`/`popular`), PHP merge двух event windows по `10 000..20 000` rows (`recently_updated`), complex episode/title subqueries (`upcoming`), repeated visibility probes (`random`), пустой-data dependency (`editorial`) и private multi-source profile/scoring (`personalized`).
+- На production SQLite `27 GiB` (`32 970` titles, `1.60M` progress, `1.65M` title states, `1.72M` reviews, `3.71M` comments, `3.29M` collection items) raw candidate timings стабильны в повторных замерах: `trending 2.57–2.63 s / 1 row`, `popular 3.85–3.93 s / 180`, `top_rated 8 ms / 180`, `recently_added 267–273 ms / 180`, `recently_updated 56–58 ms / 180`, `upcoming 1.3 ms / 0`, `editorial 1.7 ms / 0`, `random 237–239 ms / 25`.
+- `EXPLAIN QUERY PLAN` подтверждает full aggregate/temp B-tree работу для `trending` и `popular`; `CatalogPopularityQuery::apply()` также принудительно добавляет `catalog_titles.*`, хотя discovery нужен только `id`. Shared popularity owner используется и каталогом `sort=popularity`, поэтому fix обязан быть cross-feature.
+- Первый page query встроенного popular collection explorer занимает `4.06 s`: correlated poster/count/visible-count subqueries выполняются до итогового `LIMIT` над `3.29M` memberships. Полный холодный popular page поэтому складывает два независимых multi-second owners.
+- Все `728 848` episodes имеют `released_at = null`; `release_schedule_entries` содержит `8 258` public rows, но `0` будущих, тогда как `747` незавершённых сезонов честно имеют `episodes_released < episodes_total` и последнюю известную дату. Текущий `upcoming` не использует канонический release-calendar domain и потому не имеет рабочего data path.
+- В БД есть `54` published/public/approved editorial collections и `91` уникальный title, но `0` collections отмечены `is_featured`; жёсткое требование `is_featured = true` делает весь editorial mode пустым.
+- Недельный trending имеет только одну eligible строку: за семь дней отсутствуют новые watchlist/comment события и provider reviews по `published_at`; month даёт полную страницу. Значит, UI обязан сохранять честную семантику периода, но bounded fill должен явно маркировать более широкий fallback source.
+- Legacy authenticated personalized на representative existing user возвращает `24` строк за `289–363 ms`, но делает `57` SQL queries. `personalized_v2` фактически выключен (`enabled=false`, rollout `0`), а все пять сохранённых shadow builds завершились `failed` из-за stale heartbeat; простое включение rollout запрещено до repair и quality gate.
+- Все девять live URLs возвращают `200`; desktop `1440×1200` и mobile `390×844` не имеют horizontal overflow, duplicate title links, first-party request/console/page errors или broken images. Axe не нашёл violations. Existing local authenticated personalized smoke прошёл на обоих viewport (`2` browser tests).
+- SEO boundary сейчас согласован с содержимым: stable non-empty modes indexable; personalized/random и пустые upcoming/editorial имеют `noindex,follow` и canonical URL.
+- Baseline Task 35: public scalar recommendation cache уже существовал;
+  authenticated, `personalized`, `random` и seeded refresh тогда обходили
+  shared result. Task 40 заменила только deterministic guest refresh на
+  канонический v3 pool с post-cache recent filtering, сохранив private bypass,
+  repeat suppression, targeted invalidation и authoritative fallback.
+
+### Утверждённое решение и порядок исполнения
+
+- Один Livewire interaction выполняет один discover: refresh сначала меняет seed, request-scoped result повторно используется render и только фактически показанный новый результат попадает в repeat suppressor.
+- Deterministic guest modes используют общий bounded scalar candidate pool; session recent-title IDs применяются после cache lookup. Authenticated, personalized и random results остаются private/uncached.
+- Cold-start заполняется последовательно из готовых featured editorial, trending выбранного периода, month trending и popular до полного page size с дедупликацией и честными source/reason.
+- `popular`/`trending` получают additive derived metrics projection с disabled-first rollout, atomic readiness и authoritative fallback; быстрые `top_rated`/`recently_updated` защищаются регрессиями без ненужной переписи.
+- Embedded collection explorer переходит на two-phase ID pagination и bounded summary только после освобождения общего `CatalogCollectionQuery` от параллельного ownership.
+- `upcoming` сначала использует canonical release calendar, затем незавершённые сезоны без выдуманной даты.
+- Editorial сохраняет canonical featured-only architecture. Unrestricted unfeatured fallback отклонён; рабочий путь — readiness gate и один реальный featured canary через существующий авторизованный workflow по editorial master plan.
+- Legacy personalized получает consolidated bounded signal snapshot; `personalized_v2` остаётся выключенным до восстановления shadow build и независимого quality gate.
+- Initial page загружает genre/country; дополнительные facets — только при раскрытии или активном URL filter.
+
+### Dependency
+
+- Главный план: [`2026-07-24-discovery-sections-end-to-end-improvement-master-plan.md`](../superpowers/plans/2026-07-24-discovery-sections-end-to-end-improvement-master-plan.md).
+- Editorial content/readiness owner: [`2026-07-24-editorial-collections-improvement-master-plan.md`](../superpowers/plans/2026-07-24-editorial-collections-improvement-master-plan.md), Tasks 8–9 и 15.
+- Personalized shadow/activation owner: [`2026-07-16-recommendation-similarity-v6.md`](../superpowers/plans/2026-07-16-recommendation-similarity-v6.md).
+
+### Ожидаемые файлы будущего design/implementation
+
+- Query owners: `app/Services/Catalog/CatalogPublicDiscoveryQuery.php`, `CatalogPopularityQuery.php`, `CatalogRecommendationVisibilityService.php`, `CatalogPersonalizedRecommendationQuery.php`.
+- Orchestration/cache/loading: `CatalogRecommendationService.php`, `CatalogRecommendationCache.php`, `CatalogRecommendationTitleLoader.php`, `CatalogFacetQuery.php`.
+- Page/UI: `app/Livewire/CatalogDiscoveryPage.php`, `resources/views/livewire/catalog-discovery-page.blade.php`, popular collection explorer files only when evidence confirms shared-page cost.
+- Configuration/schema: `config/recommendations.php`; additive index/projection migrations only after live `EXPLAIN QUERY PLAN`, database-size and rollback review.
+- Tests: existing recommendation privacy/personalized/list/API/title-loader/popularity/unified-discovery suites plus new mode-by-mode query-budget, refresh, empty/error, cache-HIT/MISS and browser contracts.
+- Docs: canonical recommendation/discovery plan, `docs/catalog-search.md`, `docs/performance.md`, `docs/caching.md`, applicable UI/architecture/operations owners, `README.md` only after real visitor change, `CHANGELOG.md`.
+
+### Совместимые contracts
+
+- Preserve route names/URLs, localized variants, enum values, URL filters, SEO/noindex/sitemap policy, public API shape and one full-page Livewire owner.
+- Preserve canonical title visibility/watchability, policies, feedback/undo, owner-only personalization, repeat suppression, Russian/English translation parity and private no-store behavior.
+- Preserve `CacheDomain::Recommendations`, scalar-only public payload, versioned/targeted invalidation, cache-outage authoritative fallback and no global flush.
+- Preserve `/discover/popular` embedded public collection explorer and existing detail/profile/cover/API contracts.
+- Preserve SQLite, existing public command/import integration, player/premium/region/legal access boundaries and after-commit recommendation invalidation.
+
+### Risks/gates
+
+- Migrations: additive indexes or bounded derived projection only; no table rewrite without backup/space/writer-pause evidence.
+- Routes: expected unchanged.
+- Translations: any new visible/error/empty label must be added to `ru` and `en` with exact parity.
+- Cache keys: ranking/projection semantic change requires new version; private user/seed/recent IDs never enter shared cache.
+- Permissions: feedback remains current-user interaction; no user ID in URL, state or cache; editorial management stays under existing catalogue gate.
+- Backward compatibility: rolling code must read current cache/persisted recommendation rows; no destructive rebuild or synchronous provider dependency.
+- Production: browser and read-only SQL are allowed; cache flush, data rewrite, migration, worker/provider action and production personalization rollout remain prohibited without a later approved implementation/rollout gate.
+
+### Requirement-compliance matrix
+
+| Requirement | Status | Evidence / boundary |
+| --- | --- | --- |
+| Fresh root/index/canonical/feature read | `completed` | Root instructions, mandatory requirements, UI/security/performance/cache/authorization/production/integration owners and recommendation/discovery plans reread 24.07.2026 |
+| Installed versions and official guidance | `completed` | Boost: PHP `8.5`, Laravel `13.21.1`, Livewire `4.3.3`, Boost `2.4.13`, PHPUnit `12.5.31`, Tailwind CSS `4.3.2`; Laravel 13/Livewire 4 query/cache/computed/lazy docs checked |
+| Existing implementation | `completed` | Route → Livewire → service → public/personalized queries → visibility → cache → loader → Blade call graph mapped |
+| Browser desktop/mobile | `completed` | Все девять live URLs проверены в Chromium `1440×1200` и `390×844`: HTTP/DOM/console/network/images/overflow/screenshots/Axe; local authenticated smoke `2/2` green |
+| Database/query plans/cardinality | `completed` | Read-only production SQLite cardinality, repeated raw timings, query counts, indexes and `EXPLAIN QUERY PLAN` сохранены в ignored `output/discovery-query-audit.json` |
+| Authentication/privacy | `completed` | Guest fallback/refresh проверены live; representative authenticated query read-only benchmark и local desktop/mobile login smoke выполнены; v2 rollout и failed builds проверены без mutation |
+| Cross-feature impact | `completed` | Подтверждены owners для catalog popularity sort, collection explorer, release calendar/import observations, cache/SEO/sitemap, availability, admin/editorial and recommendation builds |
+| Approved implementation architecture | `completed` | Hybrid cache/projection/fallback, one-discover refresh, multi-source cold-start, truthful upcoming, featured-only editorial and progressive facets зафиксированы в master plan |
+| Task-specific implementation plan | `completed` | 13 зависимых TDD tasks, exact files/interfaces/commands, acceptance gates, rollout и rollback записаны в discovery master plan |
+| README | `already_compliant` | Актуальность проверена; product/visitor state не менялся, фиктивная visitor-history entry запрещена |
+| Implementation/production mutation | `not_applicable` | Current phase is read-only audit/design; code, schema, data, cache and services are not changed |
+| Commit/push | `unresolved` | Shared `main` remains dirty with importer and unrelated work; exact delivery requires later clean ownership gate |
+
+## Активный read-only аудит `seasonvar:import` — transport loss и рекомендуемый план
+
+Статус: `completed_analysis`, delivery `unresolved_dirty_worktree`, production recovery `unresolved_requires_task_6_and_operator_gate`.
+
+### Подтверждённый вывод
+
+- Run `#1255` сохраняет `32 522` queued staging rows и `32 523` live claims при пустой Redis queue; после restart Redis загрузил старый RDB и потерял transport jobs/locks, тогда как SQLite ledger сохранился.
+- Watchdog/finalizer обновляет общий heartbeat при `dispatch_completed=false` без durable progress, поэтому run может бессрочно выглядеть свежим и не попадать в stale recovery.
+- Serial producer регистрирует десятки тысяч страниц часами, но administration coordinator ограничен `900` секундами и после перехода run в `running` не возобновляет оборванную регистрацию.
+- Глобальная finalization остаётся одним тяжёлым job с поздним общим checkpoint; catchable failure повторяет завершённые стадии.
+- Канонический importer master plan обновлён без дублирования transport/status/crash tasks: Tasks 6/14/16 повышены и уточнены, новый Task 19 добавлен только для durable per-stage finalization.
+
+### Ожидаемые файлы будущей реализации
+
+- Task 6: additive migration для dispatch progress, `SeasonvarQueuedImportDispatcher`, `StartSeasonvarQueuedImport`, `FinalizeSeasonvarQueuedImport`, новый active-run reconciler/job, queue contracts and recovery tests.
+- Task 14: queue status DTO/service, CLI/admin presentation and indexed truthful progress tests.
+- Task 19: additive finalization-stage metadata, enum/coordinator, pipeline/finalizer/run recorder, recovery tests and owner docs.
+- Preserve: public command/options, queue names and ID-only payloads, routes, policies, translations, cache identities, catalog/editorial identity, external URL-only media, network-free apply and partial snapshot behavior.
+
+### Файлы этого planning-only audit
+
+- Modify: `docs/superpowers/plans/2026-07-24-seasonvar-importer-improvement-master-plan.md`
+- Modify: `docs/maintenance/technical-debt.md`
+- Modify: `docs/plans/current-task-plan.md`
+- Modify: `CHANGELOG.md`
+- Preserve unchanged by this audit: application/config/routes/schema/data/cache/queues/workers/scheduler/environment/dependencies/assets and existing `README.md` content.
+
+### Requirement-compliance matrix
+
+| Requirement | Status | Evidence / boundary |
+| --- | --- | --- |
+| Mandatory requirement/docs read | `completed` | Fresh root/index/canonical/feature read выполнен до выводов |
+| Existing implementation and versions | `completed` | Полный call graph проверен; фактический Laravel `13.21.1`, PHP `8.5.8` и package inventory зафиксированы в importer master |
+| Read-only production evidence | `completed` | Проверены status, SQLite aggregates, Redis persistence/log, workers, scheduler owners and queue monitor history без mutation |
+| Tests/static analysis | `completed` | Seasonvar и full PHPUnit зелёные; три scoped PHPStan issue честно перенесены в implementation work |
+| Cross-feature/compatibility/rollback | `completed` | Полная матрица и порядок rollout записаны в Section 37 importer master |
+| README | `already_compliant` | Product/visitor behavior не менялось; фиктивная history entry запрещена |
+| Active run recovery | `unresolved` | Нельзя исправлять rows/claims вручную; сначала Task 6 and operator gate |
+| Commit/push | `unresolved` | Shared `main` содержит importer и unrelated dirty/untracked scopes; безопасный exact commit невозможен при текущем clean-worktree hook |
+
+### Canonical evidence
+
+- [`docs/superpowers/plans/2026-07-24-seasonvar-importer-improvement-master-plan.md`](../superpowers/plans/2026-07-24-seasonvar-importer-improvement-master-plan.md), Section 37.
+- Runtime owners: [`docs/importer.md`](../importer.md), [`docs/queues.md`](../queues.md), [`docs/operations/logging-and-health.md`](../operations/logging-and-health.md).
+- Запрещено до реализации: broad retry/flush, ручное удаление claims, ручная смена run status, увеличение timeout как единственный fix и production activation retention/codec.
 
 ## Параллельная безопасная подготовка — System Task 33: read-only current-plan policy
 
@@ -159,6 +305,477 @@ staged README/CHANGELOG policies и whitespace прошли. Commit `d781661` с
 но остановилась на отсутствующей GitHub-аутентификации. Production activation
 не выполнялась и не заявляется.
 
+## Активное исполнение — Importer Task 4: network-free prepared apply
+
+Прямое указание пользователя начать программирование перевело Task 4 из `next_code_candidate_after_delivery` в завершённую code preparation до delivery Tasks 2–3. Это не ослабляет clean-worktree, production или rollout gates: уже совместно присутствующие Tasks 2–4 после полной проверки могут быть доставлены только одним явно записанным атомарным importer commit.
+
+### Подготовка и решение
+
+- [x] Повторно прочитаны root instructions, canonical requirements, importer/data/queue/security/performance/production owners и Task 4 master plan.
+- [x] Применены `seasonvar-importer`, Laravel best practices, execution-plan, TDD и verification skills; worktree/subagents не используются из-за project/developer constraints.
+- [x] Laravel Boost подтвердил PHP `8.5`, Laravel `13.21.1`, SQLite, Livewire `4.3.3`, Boost `2.4.13`, Pint `1.29.3`, PHPUnit `12.5.31` и Tailwind CSS `4.3.2`.
+- [x] Actual call graph: все parsed pages проходят `prepareFetched() → applyPreparedPage() → syncParsedMedia()`. `allowNetwork: false` запрещает только fallback availability check, но `InspectLicensedMediaFileSize::execute()` вызывается безусловно после media save.
+- [x] `SeasonvarPreparedMediaResolver` уже получает bounded availability до apply. File-size metadata имеет отдельную existing backlog lane через `seasonvar:import --refresh-media-sizes`; новый job/command не нужен.
+- [x] Выбран минимальный вариант: `syncParsedMedia()` становится explicitly prepared-only, ambiguous `allowNetwork` удаляется, missing prepared availability не вызывает provider request, file-size inspection остаётся `pending` и выполняется только backlog lane.
+- [x] Реализация завершена минимальным diff: network dependencies/helper удалены только из `SeasonvarCatalogImporter`, preparation/resolver/action/job orchestration сохранены.
+
+### Expected files Task 4
+
+- Modify: `app/Services/Seasonvar/SeasonvarCatalogImporter.php`
+- Modify only if required by RED/refactor: `app/Services/Seasonvar/SeasonvarCatalogPagePreparer.php`
+- Modify only if required by RED/refactor: `app/Services/Seasonvar/SeasonvarPreparedMediaResolver.php`
+- Preserve backlog behavior: `app/Actions/Media/InspectLicensedMediaFileSize.php`
+- Preserve job orchestration unless test exposes a defect: `app/Jobs/FinalizeSeasonvarImportTitleGroup.php`
+- Modify: `tests/Feature/SeasonvarCatalogPreparedApplyTest.php`
+- Modify if needed: `tests/Feature/SeasonvarImportTitleGroupFinalizerTest.php`
+- Add after legacy-test scan found no direct coverage: `tests/Feature/ExternalMediaFileSizeInspectorTest.php`
+- Modify if needed: `tests/Feature/SeasonvarCatalogPagePreparationTest.php`
+- Modify if needed: `tests/Feature/SeasonvarImportMaintenanceTest.php`
+- Modify: `docs/importer.md`, `docs/architecture.md`, `docs/queues.md`
+- Modify: importer master plan, this plan, `README.md`, `CHANGELOG.md`
+
+### Protected contracts и compliance matrix Task 4
+
+| Область | Статус | Evidence / решение |
+| --- | --- | --- |
+| `seasonvar:import` | `already_compliant` | Единственная public command сохраняется; size-only options остаются в ней |
+| Prepared apply HTTP | `completed` | Prepared и finalizer tests под `Http::preventStrayRequests()` подтверждают zero HTTP и отсутствие size-start event |
+| Availability | `already_compliant` | Prepare phase сохраняет bounded checked availability payload; apply только записывает его |
+| File-size backlog | `already_compliant` | Existing inspector/action и bounded size-only lane сохраняются |
+| Changed URL | `completed` | Existing `resetFileSizeInspection()` сохранён; новый/изменённый direct media остаётся `pending` |
+| Direct/HLS media | `completed` | Direct media сохраняется; size-only test подтверждает HEAD/minimal Range, HLS — `unsupported` без HTTP/assembly |
+| Queue/retry/checkpoints | `already_compliant` | Job payloads, names, locks, attempts и staging checkpoints не меняются |
+| Search/cache/recommendations/calendar/API sync | `already_compliant` | Existing post-apply handoffs остаются без изменений |
+| Auth/player/premium/region/legal/privacy | `not_applicable` | Source selection, grants, entitlement и public payload не меняются |
+| Routes/translations/cache keys/permissions | `not_applicable` | Нет HTTP/UI/config identity change |
+| Migrations/schema/data | `not_applicable` | DDL/backfill/production DML не выполняются |
+| Dependencies | `not_applicable` | `composer.lock` остаётся unrelated и не поглощается |
+| Verification/docs | `completed` | Focused `69`, wide `270/1659`, full `1547/123832`, Pint, targeted PHPStan/Rector, docs-refresh, syntax, legacy scan и diff checks прошли |
+| Production activation | `unresolved` | Workers/scheduler/provider/production DB не запускаются; Task 1/system gates сохраняются |
+| Delivery | `unresolved` | Финальный preflight: `main` ahead `27`, index пуст, `46` tracked dirty и `9` untracked файлов из importer + active foreign dependency/system/player/collection/lease scopes; hook требует no-unstaged/no-untracked, поэтому commit/push не выполняются и чужие файлы не stage/reset/stash/delete |
+
+### RED → GREEN checklist Task 4
+
+- [x] RED: prepared direct media с `Http::preventStrayRequests()` не должен отправлять HTTP и не должен emit-ить `seasonvar-media-size-check-started`; наблюдаемое падение — только прежний size-start event.
+- [x] RED: новая/изменённая direct media сохраняется published с prepared availability и `file_size_check_status=pending`; до первого ожидаемого failure все state/assertNothingSent проверки дошли без ошибки.
+- [x] REGRESSION: existing size-only lane выполняет bounded `HEAD`/minimal `Range`; HLS complete-file size остаётся unsupported.
+- [x] GREEN: удалить `allowNetwork` и вызов `InspectLicensedMediaFileSize::execute()` из prepared apply path минимальным diff.
+- [x] REFACTOR: удалить только реально недостижимые dependency/helper paths; не переписывать media synchronizer.
+- [x] Проверить focused prepared/finalizer/preparation/maintenance tests (`69`), широкий Seasonvar набор (`270/1659`), полный snapshot (`1547` tests / `123832` assertions), Pint, targeted PHPStan/Rector.
+- [x] Обновить owner docs, README review, русский `CHANGELOG.md`, technical debt owner, master ledger и compliance evidence.
+
+## Активная волна — обновление безлимитного importer plan
+
+Главный документ: [`2026-07-24-seasonvar-importer-improvement-master-plan.md`](../superpowers/plans/2026-07-24-seasonvar-importer-improvement-master-plan.md), Sections 30–36.
+
+### Результат актуализации
+
+- [x] Tasks 1–18 сохранены без перенумерации; фиктивный Task 19 не создан.
+- [x] Code, delivery и production activation остаются отдельными статусами.
+- [x] Player runtime/evidence доставлены отдельными локальными commit’ами `1ded102`/`ab6532a`; system roadmap/evidence — `cb432c7`/`14203ec`. Они не входят в importer scope.
+- [x] Подтверждён обязательный Git contract: `pre-commit` запрещает unstaged tracked и untracked files.
+- [x] Для уже совместно присутствующих и проверенных Tasks 2–3 записано одно атомарное delivery-исключение. Разделить их на два commit’а без временного изъятия готовой Task 3 невозможно; такое изъятие не выполняется.
+- [x] Task 4 завершён: `allowNetwork`, availability fallback и size inspector удалены из prepared apply; focused/wide tests и owner docs подтверждают enforced network-free contract.
+- [x] После Task 4 следующий приоритет выбирается измерениями между Task 5 storage/codec и Task 6 dispatch, а не порядком удобства.
+- [x] Исторические и параллельные тела этого файла не удалялись: их lossless archive и будущий single-active-plan gate принадлежат system Tasks 27/33. Текущая волна остаётся первой секцией до выполнения этого отдельного документационного change set.
+
+### Подготовка и evidence
+
+- [x] Повторно прочитаны root `AGENTS.md`, `docs/requirements/index.md`, все обязательные canonical requirements и применимые importer/queue/environment/health/technical-debt owners.
+- [x] Проверены existing master/current plans, Git guards, actual Tasks 2–3 files, Task 4 services/actions/tests и параллельные local commits.
+- [x] Laravel Boost подтвердил PHP `8.5`, Laravel `13.21.1`, SQLite, Livewire `4.3.3`, Boost `2.4.13`, Pint `1.29.3`, PHPUnit `12.5.31` и Tailwind CSS `4.3.2`.
+- [x] Branch остаётся существующей `main`; точный ahead count повторно фиксируется на delivery preflight, потому что параллельные owners продолжают разрешённые commits.
+- [x] Предыдущий index после system owner освобождён. Unrelated `composer.lock` обновляет framework/dependency versions, а во время финальной проверки появились новые system/player plan и workspace-lease script/test diffs; все они остаются вне importer scope и не stage/reset/stash/delete этой задачей.
+- [x] README проверен и обновлён фактическим visitor/product результатом Task 4; production activation при этом не заявлена.
+
+### Следующая исполнимая очередь
+
+#### Wave A — delivery preflight Tasks 2–3
+
+- [ ] Дождаться отдельного решения владельца `composer.lock` и завершения active system/lease documentation scope; получить чистый shared worktree, не поглощая и не отменяя foreign diffs.
+- [ ] Повторно проверить `git status --short --branch`, отсутствие staged/untracked foreign paths и branch `main`.
+- [ ] Сверить Tasks 2–3 manifest по master plan; исключить `composer.lock`, system/player files и любые secrets/raw provider data.
+- [ ] Повторить recorder, retention, maintenance, parse, queue/finalizer, wide Seasonvar, Pint, targeted PHPStan/Rector, docs и diff checks.
+
+#### Wave B — единая code delivery Tasks 2–4
+
+- [ ] Stage только подтверждённый importer manifest и проверить `git diff --cached --name-status`/`--check`.
+- [ ] Создать один атомарный commit `feat: bound and streamline importer processing`; это записанное clean-hook delivery exception, а не объединение production activation.
+- [ ] Выполнить normal fast-forward push. HTTPS auth/remote failure отметить `unresolved`; force/history rewrite запрещены.
+- [ ] Не включать scheduled retention: default switch остаётся выключенным, production rows не удаляются.
+
+#### Wave C — Task 4 network-free prepared apply evidence
+
+- [x] RED: direct-media prepared finalization с `Http::preventStrayRequests()` завершается без HTTP, но ожидаемо упал на прежнем `seasonvar-media-size-check-started`.
+- [x] Удалить достижимость `InspectLicensedMediaFileSize::execute()` из prepared apply, сохранить `resetFileSizeInspection()` при смене effective URL и существующую bounded backlog lane.
+- [x] Проверить direct/HLS, availability, retry/counters и search/cache/recommendation/calendar/API-sync handoffs.
+- [x] Выполнить focused/wide tests и docs; commit/push выполняются только общей Wave B до любого production canary.
+
+#### Wave D — новый measured baseline
+
+- [ ] Измерить event rows/writes, retention preview, staging/snapshot bytes, SQLite/WAL/backup budget, dispatch time, pending/delayed slope и writer contention.
+- [ ] Выбрать Task 5 только при storage bottleneck и готовых backup/space/dual-read gates.
+- [ ] Выбрать Task 6 только при сохраняющемся dispatch bottleneck.
+- [ ] Добавлять Task 19+ только при новом датированном evidence, не покрытом Tasks 1–18 или technical-debt owner.
+
+### Expected files этого refresh
+
+- Modify: `SeasonvarCatalogImporter`, prepared/finalizer tests и canonical importer/architecture/queue/technical-debt documentation.
+- Add: `tests/Feature/ExternalMediaFileSizeInspectorTest.php`.
+- Modify: importer master/current plans, `README.md`, `CHANGELOG.md`.
+- Preserve unchanged: schema/config/runtime orchestration, `composer.lock`, system/player/collection plans, workspace-lease files и параллельные commits/diffs.
+
+### Protected contracts и compatibility
+
+| Область | Статус | Evidence / решение |
+| --- | --- | --- |
+| `php artisan seasonvar:import` | `already_compliant` | Остаётся единственной public import command |
+| `CatalogTitle → Season → Episode` | `already_compliant` | Сезонное семейство и slug identity не меняются |
+| External media boundary | `already_compliant` | Только URL/metadata, `HEAD`/minimal `Range`; полный файл и HLS assembly запрещены |
+| Queue/retry/checkpoint contracts | `already_compliant` | Planning refresh не меняет names, payloads, claims или durable checkpoints |
+| Search/cache/recommendations/calendar/API sync | `completed` | Task 4 обязан сохранить existing after-commit handoffs и invalidation identities |
+| Auth/player/premium/region/legal/privacy | `not_applicable` | Нет public/admin/access runtime change |
+| Routes/translations/cache keys/permissions | `not_applicable` | Planning-only diff |
+| Migrations/schema/data | `not_applicable` | DDL/DML, provider HTTP и production preview/apply не выполнялись |
+| Dependencies | `not_applicable` | Unrelated `composer.lock` не поглощается |
+| Current-plan archive/policy | `unresolved` | Lossless archive и автоматический single-active-plan gate остаются system Tasks 27/33; история не удаляется вручную |
+| Production operations | `unresolved` | Task 1/system Tasks 3–5, backup, owner, preview/canary остаются обязательными |
+| Delivery этого refresh | `unresolved` | Shared worktree содержит implementation Tasks 2–3 и unrelated dependency/system/lease diffs; clean-worktree guard не обходится |
+
+### Rollback и failure recovery
+
+- Planning rollback изменяет только этот active section, Sections 30/32/36 master plan и новую запись `CHANGELOG.md`.
+- Runtime/data rollback не требуется: приложение, `.env`, schema, rows, Redis, workers, scheduler и provider не менялись.
+- При новом ownership/scope evidence ledger и очередь обновляются немедленно; завершённые Task IDs не переписываются.
+
+### Verification evidence refresh
+
+- `php artisan project:docs-refresh --check` — документация актуальна.
+- `bash scripts/ci-check.sh docs` — документация актуальна.
+- `git diff --check` — ошибок whitespace нет.
+- Placeholder scan не обнаружил незаполненных `TBD`/`FIXME`/generic stubs; совпадения находятся только в историческом тексте прежних проверок.
+- Legacy/duplicate scan подтвердил один importer master, один исполнимый retention job/schedule и помеченный `superseded` старый command proposal; public import command остаётся одна.
+- Task 4 scan подтвердил единственный незакрытый network path: prepared apply передаёт `allowNetwork: false`, но `InspectLicensedMediaFileSize` всё ещё внедрён и вызывается из media sync.
+- Runtime tests не запускались повторно: этот refresh меняет только план/журнал, а существующее Tasks 2–3 verification evidence сохранено без объявления новой code verification.
+- Последний Git snapshot: существующая `main`, 21 локальный commit сверх `origin/main`, index пуст; importer implementation, unrelated `composer.lock` и active system/lease documentation changes остаются unstaged/untracked. Commit/push не выполнялись.
+
+## Историческое implementation evidence — Importer Task 3: independent bounded retention
+
+### Подготовка, discovery и решение
+
+- [x] Повторно прочитаны root instructions, canonical requirements, importer/queue/operations/security/performance/data owners и Tasks 3/29–35 master plan.
+- [x] Применены `seasonvar-importer`, `laravel-best-practices`, `executing-plans`, TDD и verification skills; project contract сохраняет существующую `main` без worktree/subagents.
+- [x] Laravel Boost подтвердил PHP `8.5`, Laravel `13.21.1`, SQLite, Laravel `13.21.1`, Livewire `4.3.3`, Boost `2.4.13`, Pint `1.29.3`, PHPUnit `12.5.31` и Tailwind CSS `4.3.2`.
+- [x] Официальная документация Laravel 13 подтверждает `Schedule::job()`, `withoutOverlapping()`, `onOneServer()`, unique job locks и `chunkById()` для изменяемых наборов.
+- [x] Существующий `SeasonvarImportStorageMaintenance::prune()` запускается только внутри full import, проходит все eligible rows и не имеет общего `max_chunks`, `max_rows` или monotonic time budget.
+- [x] Actual read-only baseline: `3 690 976` events (`937 934 848` table bytes), `161 343` snapshots (`7 144 165 376` bytes), `71 730` groups и `4 422 078 464` bytes prepared pages; по текущим cutoff eligible `1 323 367` events, `0` snapshots и `33 106` groups.
+- [x] Actual `EXPLAIN QUERY PLAN`: events и outer snapshot candidate scans остаются table scans; snapshot latest probe использует `source_page_snapshots_latest_idx`; groups используют watchdog status index и temporary B-tree для ID ordering.
+- [x] Новый production index не входит в этот code-preparation change: events/index build добавит ориентировочно сотни MiB и требует verified backup, writer pause, disposable before/after plan и отдельного activation gate. Bounded deletion исправляется без schema mutation; index decision остаётся `unresolved`.
+- [x] Scheduler entry регистрируется выключенным по умолчанию отдельным config flag. Код не запускает job, scheduler, queue worker или deletion против production database.
+- [x] Discovery: старый system-maintenance Task 7 описывает отдельную `app:seasonvar-storage-prune` command и другой DTO contract. Более новый importer master Task 3 и этот current plan являются владельцами текущей реализации: retention остаётся internal unique queued job без второй public importer/maintenance command; stale plan cross-reference будет актуализирован вместе с тематической документацией.
+
+### Expected files Task 3
+
+- Create: `app/DTOs/Seasonvar/SeasonvarImportStoragePreview.php`
+- Create: `app/Jobs/PruneSeasonvarImportStorage.php`
+- Modify: `app/Services/Seasonvar/SeasonvarImportStorageMaintenance.php`
+- Modify: `routes/console.php`
+- Modify: `config/seasonvar.php`
+- Modify: `.env.example`
+- Modify: `tests/Unit/SeasonvarImportStorageMaintenanceTest.php`
+- Modify: `tests/Unit/SeasonvarQueueJobContractTest.php`
+- Create: `tests/Feature/SeasonvarImportStoragePruneJobTest.php`
+- Modify: `docs/importer.md`, `docs/queues.md`, `docs/deployment.md`, `docs/environment.md`, `docs/architecture.md`, `docs/DATA_RELATIONS.md`
+- Modify: importer master plan, stale system-maintenance cross-reference, this plan, `README.md`, `CHANGELOG.md`
+
+### Protected contracts и compatibility risks Task 3
+
+| Область | Статус | Evidence / стратегия |
+| --- | --- | --- |
+| `seasonvar:import` | `already_compliant` | Единственная public command сохраняется; новая boundary — internal queued job |
+| Retention windows | `already_compliant` | Events `7` days, snapshots `14` days с latest-per-page, terminal prepared groups `7` days |
+| Active work | `completed` | Eligibility разрешает удаление только verified terminal run/group; `queued/running/discovering/finalizing` fail closed |
+| Bounded deletion | `completed` | Общие `max_chunks`, `max_rows`, chunk size и monotonic budget разделяются всеми категориями и покрыты unit/job tests |
+| Preview/privacy | `completed` | Typed preview возвращает только counts/bytes/oldest timestamps/active status; URL/body/payload/error text отсутствуют |
+| Queue serialization | `completed` | Новый job не принимает model/URL/payload; config-driven scalar limits разрешаются в service at execution |
+| Scheduler code contract | `completed` | Entry `04:17` имеет `withoutOverlapping`/`onOneServer` и dynamic disabled-by-default filter |
+| Production activation | `unresolved` | Backup/restore, single scheduler owner, writer pause, preview/canary и recovery evidence отсутствуют; job не запускался |
+| Migrations/indexes | `unresolved` | Schema не меняется; measured scans сохраняются до отдельного safe index change |
+| Routes/API/translations | `not_applicable` | HTTP routes, API response и user-facing UI не меняются |
+| Cache/search/recommendations/calendar/player | `not_applicable` | Удаляются только expired importer telemetry/staging; catalog identity/projections не меняются |
+| Authentication/permissions/premium/region/legal | `not_applicable` | Нет HTTP/admin mutation или access decision |
+| Backward compatibility | `completed` | `prune()` сохраняет прежние result keys и добавляет bounded metadata; pipeline call остаётся совместимым |
+| Rollback/data recovery | `completed` | Первый switch, partial-run recovery и backup-only restore описаны; production apply остаётся запрещён до prerequisite evidence |
+| Shared worktree/commit/push | `unresolved` | Player и Task 2 имеют overlapping dirty files; чужие изменения не stage/reset/stash |
+
+### RED → GREEN checklist Task 3
+
+- [x] RED: preview считает только expired rows verified terminal runs/groups и не возвращает raw data.
+- [x] RED: один prune удаляет не больше общих `max_rows`/`max_chunks` и останавливается по monotonic time budget.
+- [x] RED: latest snapshot сохраняется независимо от возраста.
+- [x] RED: active run/group/prepared rows никогда не удаляются.
+- [x] RED: terminal group cascade удаляет только принадлежащие ей prepared rows.
+- [x] RED: job unique, overlap-protected, использует configured Seasonvar queue/lock store и safe `failed()` context.
+- [x] RED: disabled scheduled maintenance не проходит scheduler filter.
+- [x] GREEN: реализовать минимальный DTO/job/service/config/schedule contract без migration/production activation.
+- [x] REFACTOR: переиспользовать единые eligibility builders между preview и prune.
+- [x] Проверить focused tests, queue/schedule contracts, Seasonvar suite, Pint, PHPStan/Rector/docs и доступный full suite.
+- [x] Повторно сверить README; операционный раздел обновлён, visitor-visible history не менялась из-за отсутствия visitor behavior change.
+- [x] Обновить canonical importer/queue/deployment/environment/architecture/data docs, master execution ledger, русский `CHANGELOG.md` и финальный compliance evidence.
+
+### Verification evidence Task 3
+
+- Перед финализацией повторно прочитаны root/index и применимые code/architecture/development/multilingual/security/performance/caching/production/maintenance/system-integration и feature-owner requirements; конфликтов с итоговым contract не обнаружено.
+- RED contracts наблюдались отдельными assertion failures для общего row budget, monotonic time, terminal group eligibility, missing preview method, missing job interface/handle/failed boundary и отсутствующего schedule.
+- Focused retention/job/queue contract: `16` тестов, `172` утверждения.
+- Existing importer maintenance: `43` теста, `256` утверждений.
+- Wide `php artisan test --filter=Seasonvar`: `268` тестов, `1642` утверждения.
+- Full `php artisan test`: `1510` тестов, `1499` passed, `11` skipped, `123588` утверждений.
+- Targeted PHPStan: без ошибок; targeted Rector dry-run: без изменений; targeted Pint исправил только импорт Carbon в новом feature test; read-only `./vendor/bin/pint --test --dirty --format agent` прошёл для всего shared dirty snapshot.
+- PHP syntax, `php artisan schedule:list`, `project:docs-refresh --check`, `scripts/ci-check.sh docs` и `git diff --check` прошли. Schedule list содержит `17 4 * * * seasonvar-import-storage-prune`.
+- Repository-wide legacy scan подтвердил один service class, один schedule entry и отсутствие исполнимой duplicate command; старый command-based system plan помечен `superseded`.
+- Dependency/lock/schema/HTTP route/cache/translation/UI contract этой задачей не менялся; production preview/apply, worker/scheduler/Redis action, provider HTTP, migration, compaction и data cleanup не выполнялись.
+- Git delivery не выполнялась: `main` находится ahead `17`, index уже содержит `35` staged player-файлов, а overlapping `.env.example`, `README.md`, `docs/architecture.md`, `docs/deployment.md` имеют staged player и unstaged importer hunks; дополнительно появился чужой `.codex-player-changelog.patch`. Stage/commit этих изменений смешал бы независимые scopes и нарушил clean-worktree hook, поэтому commit/push честно остаются `unresolved`.
+
+### Rollback и failure recovery Task 3
+
+- Scheduled delivery остаётся выключенной через `SEASONVAR_IMPORT_STORAGE_MAINTENANCE_SCHEDULED_ENABLED=false`; это первый rollback switch.
+- Job не выполняет provider HTTP, migrations, compaction, VACUUM, queue cleanup или cache flush.
+- Сбой между chunks сохраняет уже завершённые deletes и безопасно повторяет оставшийся eligibility set; latest snapshot и active work повторно проверяются каждым candidate query.
+- Один уже начатый bounded SQL batch может закончиться после time budget; новый batch после исчерпания времени не начинается.
+- Production enablement требует verified backup/restore evidence, idle writers, preview, один малый canary и DB/WAL/latency review. Без этого Task 3 production status остаётся `unresolved`.
+
+## Историческое implementation evidence — Importer Task 2: bounded event admission
+
+### Подготовка и scope
+
+- [x] Повторно прочитаны root instructions, canonical requirements, importer/queue/operations/security/performance owners и текущий master plan.
+- [x] Laravel Boost подтвердил PHP `8.5`, Laravel `13.21.1`, SQLite, Boost `2.4.13`, Livewire `4.3.3`, Pint `1.29.3` и PHPUnit `12.5.31`.
+- [x] Проверены все production application writers `seasonvar_import_events`, schema/model, top event distribution, run counters, retention и затронутые tests.
+- [x] Discovery расширил первоначальный file map: прямые writers присутствуют также в taxonomy/RSS importers, а общий recorder должен быть scoped в существующем provider.
+- [x] Worktree не создаётся: более приоритетный project contract и прямое разрешение пользователя требуют работать только в существующей `main`.
+- [x] RED: закрепить `always|aggregate|sampled|transient`, sanitization, best-effort failure, single-writer и queue-boundary contracts.
+- [x] GREEN: реализовать enum/recorder/config, заменить пять прямых application writers и flush-ить неполный aggregate на queue apply boundary.
+- [x] Запустить финальные focused importer tests, Pint, wider importer matrix и обязательные docs/static gates.
+- [x] Обновить owner docs, безлимитный rolling backlog, `CHANGELOG.md` и README.
+
+### Expected files Task 2
+
+- Create: `app/Enums/SeasonvarImportEventPersistence.php`
+- Create: `app/Services/Seasonvar/SeasonvarImportEventRecorder.php`
+- Modify: `app/Providers/AppServiceProvider.php`
+- Modify: `app/Services/Seasonvar/SeasonvarImportPipeline.php`
+- Modify: `app/Services/Seasonvar/SeasonvarCatalogImporter.php`
+- Modify: `app/Services/Seasonvar/SeasonvarSourceInventory.php`
+- Modify: `app/Services/Seasonvar/SeasonvarTaxonomyPageImporter.php`
+- Modify: `app/Services/Seasonvar/SeasonvarRssFreshnessImporter.php`
+- Modify: `app/Jobs/ImportSeasonvarSourcePage.php`, `app/Jobs/FinalizeSeasonvarImportTitleGroup.php`
+- Modify: `app/Services/Catalog/CatalogStatsPageBuilder.php` only if a new aggregate event label is rendered
+- Modify: `config/seasonvar.php`, `.env.example`
+- Create: `tests/Unit/SeasonvarImportEventRecorderTest.php`
+- Modify: `tests/Feature/SeasonvarImportMaintenanceTest.php`, `tests/Feature/SeasonvarParsePageCommandTest.php`
+- Modify: `docs/importer.md`, `docs/environment.md`, `docs/operations/logging-and-health.md`, importer master plan, this plan, `README.md`, `CHANGELOG.md`
+
+### Protected contracts Task 2
+
+- `seasonvar_import_events` schema, existing event codes/levels and relations remain readable; no migration or deletion is part of this change.
+- Failures, warnings, blocked/invalid/rejected outcomes, run lifecycle and terminal transitions remain durable.
+- Existing exact `seasonvar_import_runs` counters remain authoritative and are not replaced by sampled telemetry.
+- Progress callback and Russian CLI output keep receiving every event even when its durable policy is aggregate, sampled or transient.
+- URLs and credential-like context remain sanitized before persistence.
+- Import continues if optional telemetry persistence fails.
+- Command/options, routes, queue names/payloads/retries, claims, catalog/media data, search/cache/recommendation/calendar/API-sync and authorization do not change.
+
+### Risks и compliance Task 2
+
+| Область | Статус | Evidence / решение |
+| --- | --- | --- |
+| Requirements/current implementation | `completed` | Mandatory owners, Task 2, all five direct writers and event distribution inspected before code |
+| TDD | `completed` | Initial missing-class/single-writer RED, queue-boundary RED and focused GREEN evidence recorded |
+| Database/migrations | `not_applicable` | Existing table only; no schema/data cleanup |
+| Routes/API/translations/permissions | `not_applicable` | No public/admin surface or authorization change |
+| Cache/queue/job serialization | `already_compliant` | No cache key, queue name or job constructor change |
+| Security/privacy | `completed` | URL/message sanitization, one writer and persistence-failure isolation tests pass |
+| Performance | `completed` | 503 success events become six aggregate rows; exact run counter remains unchanged |
+| Production operations | `not_applicable` | No worker/process/Redis/data/.env action or production activation performed |
+| Dependencies | `not_applicable` | No Composer/npm change; existing dirty `composer.lock` remains unrelated |
+| README | `completed` | Importer contract and factual visitor-facing reliability result updated |
+| Commit/push | `unresolved` | Shared worktree содержит concurrent player code/assets/tests и overlapping README/current plan; clean-worktree pre-commit guard нельзя обходить |
+
+### Verification evidence Task 2
+
+- RED: missing enum/recorder дал шесть class errors, sole-writer contract перечислил пять прежних writers; отдельный queue-boundary RED подтвердил отсутствие flush в двух apply jobs; stable-identity sampling RED получил `17` строк вместо допустимых `0|40`.
+- GREEN: `SeasonvarImportEventRecorderTest` — `9` тестов / `24` утверждения; `SeasonvarImportMaintenanceTest` — `43` / `256`; `SeasonvarParsePageCommandTest` — `28` / `159`; `SeasonvarImportStorageMaintenanceTest` — `2` / `17`.
+- Queue compatibility: `SeasonvarQueueJobContractTest` — `2` / `66`; `SeasonvarImportTitleGroupFinalizerTest` + `SeasonvarParallelImportTest` — `64` / `347`.
+- Wide importer matrix: `php artisan test --filter=Seasonvar` — `256` / `1553`.
+- Architecture/config/stats: `AppServiceProviderArchitectureTest` + `ConfigurationEnvironmentTest` — `8` / `33`; два stats tests — `2` / `79`.
+- Targeted Pint, documentation refresh/check, docs CI, `git diff --check` и targeted PHPStan прошли.
+- Full `php artisan test`: `1474` из `1486` тестов прошли, один failure и `11` skipped; единственный failure относится к concurrent `FrontendAssetContractTest`/`resources/js/player.js`, не к importer scope.
+- Production/runtime/data activation, cleanup, migration, provider request и `.env` edit не выполнялись.
+
+## Предыдущее planning evidence — актуализация безлимитного importer plan
+
+Статус: `completed` для planning scope; application/runtime/data behavior этой актуализацией не меняется.
+
+### Выполненная актуализация
+
+- [x] Повторно прочитаны root/canonical requirements, importer/queue/operations/security/performance owners и существующий master plan.
+- [x] Laravel Boost подтвердил PHP `8.5`, Laravel `13.21.1`, SQLite, Livewire `4.3.3`, Boost `2.4.13`, Pint `1.29.3`, PHPUnit `12.5.31` и Tailwind CSS `4.3.2`.
+- [x] Выбран hybrid rolling model: Tasks 1–18 сохраняются как стабильный dependency graph, Tasks 19+ создаются только из нового измеренного evidence.
+- [x] Добавлен execution ledger с раздельными статусами code, delivery и production activation.
+- [x] Добавлены постоянные reliability/storage/throughput/correctness/integration/security/maintenance lanes.
+- [x] Зафиксирована следующая очередь: delivery Task 2 → code preparation Task 3 → network-free Task 4 → измеренный выбор Task 5 или Task 6.
+- [x] Добавлены Definition of Ready, Definition of Done и триггеры повторного аудита.
+- [x] Слово «безлимитный» явно не расширяет authority на `.env`, Redis, services, queue/data cleanup, migration, provider activation или destructive action.
+
+### Expected files этой planning-актуализации
+
+- Modify: `docs/superpowers/plans/2026-07-24-seasonvar-importer-improvement-master-plan.md`
+- Modify: `docs/plans/current-task-plan.md`
+- Modify: `CHANGELOG.md`
+
+`README.md` проверяется без изменения: planning-only актуализация не меняет visitor/product/development/deployment behavior. Importer code/config/tests текущего dirty worktree принадлежат уже завершённой implementation части Task 2, а player files остаются concurrent scope другого владельца.
+
+### Protected contracts и риски
+
+| Область | Статус | Evidence / ограничение |
+| --- | --- | --- |
+| Одна команда `seasonvar:import` | `already_compliant` | Новый plan не создаёт command/pipeline |
+| `CatalogTitle → Season → Episode` | `already_compliant` | Season-family identity остаётся protected contract |
+| External media only | `already_compliant` | Полное видео/HLS assembly по-прежнему запрещены |
+| Routes/API/translations/cache/permissions | `not_applicable` | Planning-only diff не меняет runtime contracts |
+| Database/migrations/data | `not_applicable` | Schema/rows/claims/events/failed jobs не изменяются |
+| Queue serialization/workers | `not_applicable` | Job payload/process state не изменяются |
+| Production operations | `not_applicable` | Read-only planning; Task 1 остаётся external gate |
+| Dependencies/runtime | `not_applicable` | Package manifests, lock files и services не меняются |
+| Shared worktree | `unresolved` | Concurrent player code/docs/tests не позволяют безопасный отдельный commit |
+| Push | `unresolved` | Нет task-owned commit и прежняя HTTPS-аутентификация remote отсутствует |
+
+### Requirement-compliance matrix planning-актуализации
+
+| Требование | Статус | Evidence |
+| --- | --- | --- |
+| Root instructions и canonical read order | `completed` | Перечитаны до изменения plan |
+| Applicable importer/operations/maintenance docs | `completed` | Сверены owners, technical debt и обе master programs |
+| Actual versions | `completed` | Laravel Boost `application_info` |
+| Existing plan/implementation review | `completed` | Tasks 1–18, Task 2 evidence, current dirty scope и recent commits проверены |
+| Expected files/protected contracts/risks | `completed` | Перечислены выше |
+| Cross-feature impact | `completed` | Rolling lanes включают search/cache/recommendations/calendar/API/player/premium/region/legal/SEO/privacy/admin |
+| TDD/rollback/production gates | `completed` | Definition of Ready/Done и wave queue добавлены |
+| README review | `already_compliant` | Поведение продукта не изменено |
+| CHANGELOG | `completed` | Добавляется отдельная русская planning-only запись |
+| Commit/push | `unresolved` | Shared dirty `main`; guards не обходятся |
+
+### Verification planning-актуализации
+
+- `php artisan project:docs-refresh --check` — документация актуальна.
+- `bash scripts/ci-check.sh docs` — документация актуальна.
+- `git diff --check` — ошибок whitespace нет.
+- Placeholder scan не нашёл незаполненных `TODO`/`TBD`/generic implementation stubs; совпадения `TODO/FIXME` относятся только к зафиксированному результату предыдущего repository-wide importer scan.
+- `git status --short --branch` подтвердил `main...origin/main [ahead 13]`, importer Task 2 и concurrent player scope остаются незакоммиченными; отдельный planning commit небезопасен до кооперативного завершения владельца overlapping files.
+
+## Цель и главный документ
+
+- [x] Перечитать корневой `AGENTS.md`, requirement index, обязательные canonical requirements и importer-related Markdown owners.
+- [x] Проверить фактические версии Laravel/PHP/packages, существующие services/jobs/models/migrations/tests и официальные Laravel 13 queue/transaction/upsert/HTTP contracts.
+- [x] Выполнить read-only проверку SQLite table/index/query-plan state, importer runs/groups/claims, Redis backlog, worker heartbeat и status latency.
+- [x] Сохранить сильные существующие boundaries: global single-flight, title-group fan-in, durable checkpoints, one-title family, partial-data preservation, external media metadata only.
+- [x] Выявить конкретные P0/P1 improvements вместо общего переписывания.
+- [x] Записать полный execution roadmap [`2026-07-24-seasonvar-importer-improvement-master-plan.md`](../superpowers/plans/2026-07-24-seasonvar-importer-improvement-master-plan.md).
+- [x] Начать безопасную code preparation отдельными TDD change sets; production activation остаётся запрещена до Phase 0 process/worker safety gate.
+
+## Главные findings
+
+- Intended `seasonvar-import`, `seasonvar-title-refresh` и `cache-warm-v2` consumers не имеют heartbeat; всего наблюдалось `43 102` pending и `29 045` delayed jobs.
+- Global run `#1254` сохранил `41 043` selected/claims и `0` parsed; serial dispatch занял около `2 ч 43 мин 36 с`.
+- `seasonvar_import_events` содержит `3 690 976` rows; durable per-item success telemetry создаёт лишние SQLite writes.
+- `source_page_snapshots` занимает около `7,14` GB, `seasonvar_import_prepared_pages` — около `4,42` GB; около `4,07` GB terminal payload уже попадает под существующее retention window.
+- `applyPreparedPage()` объявлен network-free, но media apply вызывает `InspectLicensedMediaFileSize`, который выполняет внешний `HEAD`/minimal `Range` внутри title finalizer lifecycle.
+- Cold `seasonvar:import --status` занял около `27` секунд; `EXPLAIN QUERY PLAN` подтвердил full scan `licensed_media` для file-size aggregate и due selector.
+- Крупные классы остаются слишком связанными: importer `1 834` LOC/26 dependencies, parser `1 788`, pipeline `1 715`, finalizer `622`.
+- `TD-013` остаётся открытым: checkpoints дают прогресс, но episode/media/dependent-domain merge всё ещё имеет per-row query/write amplification.
+
+## Порядок программы
+
+| Фаза | Результат |
+| --- | --- |
+| 0 | Один scheduler/process owner, контролируемое восстановление workers и отрицательный backlog trend без очистки Redis |
+| 1 | Event admission, независимый bounded retention, enforced network-free finalizer, compact staging |
+| 2 | Batch dispatch, durable cursor, SQLite writer admission, profiled title merge/media sync/file-size projection |
+| 3 | Parser fixtures, semantic fingerprints, section provenance и bounded class decomposition |
+| 4 | Fast truthful status/admin, security/failure/load matrix |
+| 5 | Optional source parity только после отдельной legal/publication authorization |
+| 6 | Canary/full rollout, cross-feature acceptance, documentation, commit/push evidence |
+
+Importer roadmap является дочерним implementation document общей operations-first программы ниже. Он не дублирует и не отменяет её Redis/backup/process gates. Application-level importer changes нельзя активировать поверх неизвестного persistence/process ownership.
+
+## Expected files этой planning-задачи
+
+- `docs/superpowers/plans/2026-07-24-seasonvar-importer-improvement-master-plan.md`
+- `docs/plans/current-task-plan.md`
+- `docs/maintenance/technical-debt.md`
+- `CHANGELOG.md`
+
+`README.md` проверяется, но не меняется: planning-only запрос не изменил visitor/product/development/deployment behavior. Application code, migrations, routes, config, environment, dependencies, lock files, assets, queues и database rows этой задачей не изменяются.
+
+## Protected compatibility contracts
+
+- Единственная публичная команда импорта `php artisan seasonvar:import`.
+- `CatalogTitle → Season → Episode`, route model binding по `slug` и один тайтл на сезонное семейство.
+- `SourcePage` identity/hash/status, current queue names, ID-only payloads, retries, claims и durable checkpoints.
+- Partial provider data не удаляет подтверждённые local/editorial relations, episodes или media.
+- Search, recommendations, release calendar, cache invalidation и API sync выполняются после committed state.
+- Только внешние media URL/metadata; без полного video download и HLS assembly.
+- Player grants, authentication/authorization, premium, region/rightsholder, privacy, public/API/SEO contracts.
+
+## Risks и compatibility
+
+| Область | Статус planning-задачи | Future gate |
+| --- | --- | --- |
+| Migrations/database | `not_applicable` | Additive-only, zero writers, verified backup/space, dual-read and rollback |
+| Routes/API | `not_applicable` | No new public route; admin remains authorized full-page Livewire |
+| Translations | `not_applicable` | RU/EN parity if admin/status copy changes |
+| Cache keys | `not_applicable` | Versioned operational snapshots; existing domain invalidation preserved |
+| Permissions | `already_compliant` | `imports.execute` remains canonical |
+| Queue compatibility | `not_applicable` now | Names and job constructors remain rolling-compatible |
+| Production operations | `unresolved` | Future Phase 0 cannot start until process owner/heartbeat and Redis/backup evidence |
+| Dependencies | `not_applicable` | No package addition/update planned |
+
+## Requirement-compliance matrix
+
+| Требование | Статус | Evidence / ограничение |
+| --- | --- | --- |
+| Root instructions и canonical read order | `completed` | Прочитаны заново до кода/плана |
+| Applicable importer/operations/security/performance docs | `completed` | Владельцы тем и previous importer plans сверены |
+| Actual versions и official Laravel behavior | `completed` | Boost/runtime/lock evidence |
+| Existing implementation/query plans/data state | `completed` | Services/jobs/models/migrations/tests + read-only SQL/status/health |
+| Legacy/duplicate/stale/unfinished importer scan | `completed` | Repository-wide search confirmed one public command, no importer TODO/FIXME markers or broad cache/queue clears; measured HTTP/query/storage issues are mapped to roadmap tasks |
+| Expected files/protected contracts/risks | `completed` | Перечислены выше и подробно в master plan |
+| Cross-feature impact | `completed` | Auth, admin, cache, search, recommendations, calendar, API sync, player, premium/region/legal, SEO, privacy, deployment included |
+| No provider/full-video boundary regression | `already_compliant` | Plan сохраняет `HEAD`/minimal `Range` и external URL only |
+| README review | `already_compliant` | Product/runtime behavior не изменилось |
+| CHANGELOG | `completed` | Добавлена отдельная русская planning-only запись за 24.07.2026 |
+| Commit in `main` | `unresolved` | Shared worktree содержит concurrent unrelated code, documentation, tests и lock-file changes |
+| Push | `unresolved` | Task-owned commit нельзя безопасно создать до изоляции shared worktree; push поэтому не выполнялся |
+
+## Verification planning-задачи
+
+- [x] Проверить локальные ссылки, Markdown structure и отсутствие placeholder implementation.
+- [x] Выполнить `git diff --check`.
+- [x] Выполнить `bash scripts/ci-check.sh docs`.
+- [x] Перечитать applicable requirements и importer master plan.
+- [x] Проверить `README.md` без фиктивного изменения.
+- [x] Добавить отдельную русскую planning-only запись `CHANGELOG.md`.
+- [x] Проверить `git status --short --branch`; concurrent/unrelated changes не поглощены.
+- [ ] Commit/push: `unresolved`, пока concurrent code/docs/tests/lock-file changes не позволяют пройти обязательный clean-worktree guard.
+
+---
+
+# Параллельная программа — безлимитная стабилизация, обновление и оптимизация
+
+Дата: 24.07.2026
+Статус: master implementation plan актуализирован после выполнения Tasks 1–2: Task 3 остаётся безопасно остановлен перед production mutation gate, а измеренные delivery/concurrency/cross-plan discoveries добавлены как Tasks 29–31 и безлимитный rolling extension protocol. Application/runtime/data этой planning-актуализацией не меняются.
+
 ## Завершённое исполнение — Batch 1: baseline и Redis persistence observability
 
 Статус: Task 1 и Task 2 завершены и закоммичены в `main` как `2227c08`; отправка в configured remote остаётся `unresolved` из-за отсутствующей HTTPS-аутентификации GitHub. Task 3 не получает implicit authority на остановку producers, Redis restart, signal/kill, backup overwrite или любое изменение production state.
@@ -308,6 +925,8 @@ staged README/CHANGELOG policies и whitespace прошли. Commit `d781661` с
 - [x] `php artisan project:docs-refresh --check --no-interaction`.
 - [x] `bash scripts/ci-check.sh docs`.
 - [x] Task-owned commit `7ce8e37` создан в `main`; `SEASONVAR_SKIP_GIT_GUARD=1` применён только к commit после ручного прохождения документационных проверок, потому что concurrent work оставляет разрешённый staged scope внутри общего dirty tree.
+- [x] Обычная попытка push выполнена без ослабления push guard; remote отклонил HTTPS-аутентификацию, поэтому доставка остаётся `unresolved`.
+
 ## Повторная актуализация безлимитного system plan — reviewed index и active-plan policy
 
 Дата: 24.07.2026
@@ -377,8 +996,6 @@ staged README/CHANGELOG policies и whitespace прошли. Commit `d781661` с
 - [x] Выполнить `project:docs-refresh --check`, docs CI и task-scoped `git diff --check`.
 - [x] Перечитать применимые requirements и task-specific compliance matrix.
 - [x] Изолированно commit-ить planning hunks в `main` как `cb432c7`; обычный push выполнен и оставлен `unresolved_remote` после отказа HTTPS-аутентификации.
-
-- [x] Обычная попытка push выполнена без ослабления push guard; remote отклонил HTTPS-аутентификацию, поэтому доставка остаётся `unresolved`.
 
 ## Актуализация безлимитного system plan — declared-path ownership
 
@@ -621,6 +1238,7 @@ staged README/CHANGELOG policies и whitespace прошли. Commit `d781661` с
 - README policy, `project:docs-refresh --check`, docs CI, task-owned/full working `git diff --check` прошли. Task-owned CHANGELOG entry проходит policy изолированно; full working policy останавливается на concurrent importer planning entry со словом `master`.
 - `shellcheck` в окружении не установлен; Bash syntax и поведенческие PHPUnit-контракты являются доступным verification evidence.
 - После финальной проверки player owner временно занял index своим documentation scope; Task-owned staging было остановлено без изменения чужого snapshot. Handoff завершён отдельным commit `a14cdf5`, после чего index освобождён для точного Task 32 manifest.
+- Implementation commit `2a7f636` создан в существующей `main` после повторной staged-проверки. Обычный `git push --porcelain origin main` достиг configured remote и вернул `could not read Username for 'https://github.com': No such device or address`; force, history rewrite, alternate branch и хранение credentials не применялись.
 
 ## Текущая реализация — Task 30, изолированная подготовка workspace lease
 
@@ -686,7 +1304,7 @@ staged README/CHANGELOG policies и whitespace прошли. Commit `d781661` с
 - [x] Проверить существующую реализацию, фактические версии framework/runtime/packages, host services, процессы, scheduler, очереди, Redis, SQLite, storage, permissions, production logs, dependency state и verification gates.
 - [x] Выполнить полный read-only аудит без очистки очередей/кешей, мутации production-like данных, обновления packages, изменения `.env` или перезапуска сервисов.
 - [x] Зафиксировать измеренный baseline, compatibility domains, зависимости этапов, rollback gates и критерии завершения.
-- [x] Подготовить и актуализировать TDD/operations implementation plan: стабильные Tasks 1–28, новые измеренные Tasks 29–31 и rolling protocol без верхнего лимита [`2026-07-24-system-maintenance-and-optimization-master-plan.md`](../superpowers/plans/2026-07-24-system-maintenance-and-optimization-master-plan.md).
+- [x] Подготовить и актуализировать TDD/operations implementation plan: стабильные Tasks 1–28, измеренные Tasks 29–33 и rolling protocol без верхнего лимита [`2026-07-24-system-maintenance-and-optimization-master-plan.md`](../superpowers/plans/2026-07-24-system-maintenance-and-optimization-master-plan.md).
 - [x] Сохранить параллельный согласованный player workstream ниже; новый master plan не разрешает смешивать его implementation с operational/package/database этапами.
 - [ ] Выполнять master plan только последовательно по dependency graph, начиная с нового датированного baseline и Redis/process/backup boundaries.
 
@@ -720,7 +1338,7 @@ Master plan является единственным подробным executi
 | 6. Performance/architecture | Tasks 20–23 | Telemetry budgets, evidence-based hot-path fixes, bounded decomposition и strict-types/Larastan ratchet. |
 | 7. Security/operations | Tasks 24–25 | Поэтапный CSP enforcement и честная optional alert boundary без fake delivery claims. |
 | 8. Strategic closeout | Tasks 26–28 | Измеренное решение по DB engine, архив планов и полная cross-system acceptance. |
-| Сквозное расширение | Tasks 29–31 и далее | Git delivery, shared-`main` ownership, child-roadmap reconciliation и последующие evidence-backed discovery без перенумерации истории. |
+| Сквозное расширение | Tasks 29–33 и далее | Git delivery, shared-`main` ownership, reviewed-index binding, child-roadmap reconciliation, active-plan policy и последующие evidence-backed discovery без перенумерации истории. |
 
 ## Expected files этой planning-задачи
 
@@ -812,6 +1430,70 @@ Master plan является единственным подробным executi
 
 Дата: 24.07.2026
 Статус: runtime implementation, full verification, repository scan и локальный commit `1ded102` завершены; push в `origin/main` остаётся `unresolved` из-за отсутствующей HTTPS-аутентификации GitHub.
+
+## Активная актуализация — безлимитный player roadmap
+
+Статус planning scope: `completed_local`; documentation gates и task-owned commit `a14cdf5` завершены, обязательный push выполнен и получил `unresolved_auth`. Существующий план
+[`2026-07-24-player-seamless-episode-switching.md`](../superpowers/plans/2026-07-24-player-seamless-episode-switching.md)
+становится единственным безлимитным master plan проигрывателя; параллельный документ не создаётся.
+
+### Решение и границы
+
+- Tasks 1–15 сохраняются как неизменяемый исторический baseline реализованного бесшовного проигрывателя и получают честный completed/delivery ledger.
+- Новые задачи получают только монотонные номера `Task 16+`; прежние номера, evidence и зависимости не перенумеровываются.
+- Безлимитность означает отсутствие искусственного потолка по числу будущих evidence-driven задач, а не бесконечное исполнение одной задачи, неограниченные запросы, polling, хранение данных или расширение authority.
+- Каждая новая задача остаётся конечной, TDD-проверяемой, обратимой и получает собственные requirements intake, expected files, protected contracts, cross-feature matrix, production/rollback review, verification и commit/push gate.
+- Первичная очередь после planning update: remote delivery → real-device iOS/WebKit evidence → production activation smoke → post-deploy regression. Возможности HLS/audio/subtitles/DRM/offline/PWA не становятся задачами реализации без подтверждённых данных, provider/legal/security contract и отдельного user-approved design.
+- Текущий planning change не меняет PHP, Blade, JavaScript, CSS, routes, schema, database, cache, queues, dependencies, assets, `.env` или production services.
+
+### Expected files planning-актуализации
+
+- Modify: `docs/superpowers/plans/2026-07-24-player-seamless-episode-switching.md`
+- Modify: `docs/superpowers/specs/2026-07-24-player-seamless-episode-switching-design.md`
+- Modify: `docs/plans/current-task-plan.md`
+- Modify: `README.md` — только roadmap, без фиктивной visitor-history записи
+- Modify: `CHANGELOG.md` — отдельная русская planning-only запись
+
+### Protected contracts и риски
+
+| Область | Статус | Evidence / ограничение |
+| --- | --- | --- |
+| Один player lifecycle | `already_compliant` | Один `CatalogPlayerSession`, `<video>`, Plyr, full `wire:ignore` и не более одного HLS.js instance сохраняются |
+| Source access/privacy | `already_compliant` | Server-side hierarchy/entitlement/source revalidation и один same-origin signed grant остаются authority; raw provider URL запрещён |
+| Progress/preferences/history | `already_compliant` | `EpisodeViewProgress`, progress token/sequence, `seasonvar.account-preferences.v1`, URL Back/Forward и discussion target не переопределяются планом |
+| Routes/API/SEO | `not_applicable` | Planning-only изменение не добавляет и не меняет public route/API/canonical |
+| Schema/migrations/data | `not_applicable` | Таблицы, индексы и persisted identities не меняются |
+| Translations/UI/assets | `not_applicable` | Runtime copy/layout/build не меняются; будущие UI tasks обязаны сохранять RU/EN parity и browser matrix |
+| Cache/queues/service worker | `not_applicable` | Новый key/domain/job/scheduler/offline layer не создаётся |
+| Dependencies/runtime | `not_applicable` | Manifests и lock files не меняются; будущие updates проходят отдельный maintenance decision |
+| Production activation | `unresolved` | Remote delivery и production smoke требуют внешней Git/deployment authority |
+| Native iOS fullscreen | `unresolved` | Chromium emulation не доказывает WebKit/OS source swap; fake fullscreen запрещён |
+| Shared worktree/index | `unresolved` | Concurrent importer/system work сохраняет unstaged application/shared-doc changes; task commit обязан использовать только точные player-plan hunks и не включать чужой scope |
+
+### Requirement-compliance matrix planning-актуализации
+
+| Требование | Статус | Evidence |
+| --- | --- | --- |
+| Root instructions и canonical read order | `completed` | `AGENTS.md`, requirement index и обязательные owners перечитаны 24.07.2026 |
+| Existing implementation и versions | `completed` | Проверены runtime, player owners, recent commits и installed PHP/Laravel/Livewire/frontend versions |
+| Existing design/master/current plan | `completed` | Approved spec, Tasks 1–15, stale statuses/checklists и текущий player section просмотрены до edit |
+| Expected files/contracts/risks | `completed` | Перечислены выше до изменения master plan |
+| Cross-feature impact | `completed` | Rolling lanes обязаны проверять auth, privacy, translations, cache, SEO, mobile, progress, importer/admin/API и production |
+| README policy | `completed` | Добавлен один factual roadmap item; visitor-history не менялась, её положение последним H2 сохранено |
+| CHANGELOG | `completed` | Добавлена отдельная русская planning-only запись без runtime/production claim |
+| Verification | `completed` | Placeholder/status scan, README policy, managed-doc check, docs CI и `git diff --check` прошли; полный working-copy CHANGELOG scan отдельно видит concurrent строку другого scope |
+| Commit/push | `unresolved_remote` | Task-owned planning snapshot зафиксирован в существующей `main` как `a14cdf5`; `git push origin main` вернул `could not read Username for 'https://github.com': No such device or address` |
+
+### Verification evidence planning-актуализации
+
+- Existing master plan сохранён на прежнем пути; отдельный player roadmap не создан.
+- 150 исторических шагов Tasks 1–15 синхронизированы с уже записанным runtime/test evidence; future Tasks 16–19 остаются открыты и имеют независимые external prerequisites.
+- Master plan содержит монотонный intake `Task 20+`, раздельный execution ledger, Definition of Ready/Done, 12 постоянных workstream lanes и explicit non-triggers для неподтверждённых capabilities.
+- Design spec больше не заявляет, что реализация не начата; старый countdown явно помечен как исторический baseline.
+- `scripts/check-readme-policy.sh README.md`, `php artisan project:docs-refresh --check`, `bash scripts/ci-check.sh docs` и `git diff --check` завершились успешно.
+- Planning snapshot зафиксирован в `main` как `a14cdf5`; обязательный push выполнен, но остался `unresolved_auth` из-за отсутствующей HTTPS-аутентификации GitHub.
+- `scripts/check-changelog-policy.sh CHANGELOG.md` для полной общей working copy отдельно предупреждает о concurrent importer/system planning text; task-owned staged версия проверяется перед commit и не должна включать эти строки.
+- PHP/Blade/JavaScript/CSS, routes, schema, database, cache, queues, dependencies, assets, `.env` и production services этой planning-задачей не менялись; application tests/build не требуются для documentation-only diff.
 
 ## Цель и согласованное решение
 
@@ -985,71 +1667,6 @@ Rollback реализации: вернуть прежний countdown/обыч�
 Дата: 24.07.2026
 Статус: implementation, verification и local commit завершены; push заблокирован отсутствующей HTTPS-аутентификацией GitHub.
 
-## Активная актуализация — безлимитный player roadmap
-
-Статус planning scope: `completed_local`; documentation gates и task-owned commit `a14cdf5` завершены, обязательный push выполнен и получил `unresolved_auth`. Существующий план
-[`2026-07-24-player-seamless-episode-switching.md`](../superpowers/plans/2026-07-24-player-seamless-episode-switching.md)
-становится единственным безлимитным master plan проигрывателя; параллельный документ не создаётся.
-
-### Решение и границы
-
-- Tasks 1–15 сохраняются как неизменяемый исторический baseline реализованного бесшовного проигрывателя и получают честный completed/delivery ledger.
-- Новые задачи получают только монотонные номера `Task 16+`; прежние номера, evidence и зависимости не перенумеровываются.
-- Безлимитность означает отсутствие искусственного потолка по числу будущих evidence-driven задач, а не бесконечное исполнение одной задачи, неограниченные запросы, polling, хранение данных или расширение authority.
-- Каждая новая задача остаётся конечной, TDD-проверяемой, обратимой и получает собственные requirements intake, expected files, protected contracts, cross-feature matrix, production/rollback review, verification и commit/push gate.
-- Первичная очередь после planning update: remote delivery → real-device iOS/WebKit evidence → production activation smoke → post-deploy regression. Возможности HLS/audio/subtitles/DRM/offline/PWA не становятся задачами реализации без подтверждённых данных, provider/legal/security contract и отдельного user-approved design.
-- Текущий planning change не меняет PHP, Blade, JavaScript, CSS, routes, schema, database, cache, queues, dependencies, assets, `.env` или production services.
-
-### Expected files planning-актуализации
-
-- Modify: `docs/superpowers/plans/2026-07-24-player-seamless-episode-switching.md`
-- Modify: `docs/superpowers/specs/2026-07-24-player-seamless-episode-switching-design.md`
-- Modify: `docs/plans/current-task-plan.md`
-- Modify: `README.md` — только roadmap, без фиктивной visitor-history записи
-- Modify: `CHANGELOG.md` — отдельная русская planning-only запись
-
-### Protected contracts и риски
-- Planning commit `ebbbc85` создан в существующей `main`. Обычный `git push --porcelain origin main` достиг configured remote и вернул `could not read Username for 'https://github.com': No such device or address`; force, history rewrite, alternate branch и хранение credentials не применялись.
-
-| Область | Статус | Evidence / ограничение |
-| --- | --- | --- |
-| Один player lifecycle | `already_compliant` | Один `CatalogPlayerSession`, `<video>`, Plyr, full `wire:ignore` и не более одного HLS.js instance сохраняются |
-| Source access/privacy | `already_compliant` | Server-side hierarchy/entitlement/source revalidation и один same-origin signed grant остаются authority; raw provider URL запрещён |
-| Progress/preferences/history | `already_compliant` | `EpisodeViewProgress`, progress token/sequence, `seasonvar.account-preferences.v1`, URL Back/Forward и discussion target не переопределяются планом |
-| Routes/API/SEO | `not_applicable` | Planning-only изменение не добавляет и не меняет public route/API/canonical |
-| Schema/migrations/data | `not_applicable` | Таблицы, индексы и persisted identities не меняются |
-| Translations/UI/assets | `not_applicable` | Runtime copy/layout/build не меняются; будущие UI tasks обязаны сохранять RU/EN parity и browser matrix |
-| Cache/queues/service worker | `not_applicable` | Новый key/domain/job/scheduler/offline layer не создаётся |
-| Dependencies/runtime | `not_applicable` | Manifests и lock files не меняются; будущие updates проходят отдельный maintenance decision |
-| Production activation | `unresolved` | Remote delivery и production smoke требуют внешней Git/deployment authority |
-| Native iOS fullscreen | `unresolved` | Chromium emulation не доказывает WebKit/OS source swap; fake fullscreen запрещён |
-| Shared worktree/index | `unresolved` | Concurrent importer/system work сохраняет unstaged application/shared-doc changes; task commit обязан использовать только точные player-plan hunks и не включать чужой scope |
-
-### Requirement-compliance matrix planning-актуализации
-
-| Требование | Статус | Evidence |
-| --- | --- | --- |
-| Root instructions и canonical read order | `completed` | `AGENTS.md`, requirement index и обязательные owners перечитаны 24.07.2026 |
-| Existing implementation и versions | `completed` | Проверены runtime, player owners, recent commits и installed PHP/Laravel/Livewire/frontend versions |
-| Existing design/master/current plan | `completed` | Approved spec, Tasks 1–15, stale statuses/checklists и текущий player section просмотрены до edit |
-| Expected files/contracts/risks | `completed` | Перечислены выше до изменения master plan |
-| Cross-feature impact | `completed` | Rolling lanes обязаны проверять auth, privacy, translations, cache, SEO, mobile, progress, importer/admin/API и production |
-| README policy | `completed` | Добавлен один factual roadmap item; visitor-history не менялась, её положение последним H2 сохранено |
-| CHANGELOG | `completed` | Добавлена отдельная русская planning-only запись без runtime/production claim |
-| Verification | `completed` | Placeholder/status scan, README policy, managed-doc check, docs CI и `git diff --check` прошли; полный working-copy CHANGELOG scan отдельно видит concurrent строку другого scope |
-| Commit/push | `unresolved_remote` | Task-owned planning snapshot зафиксирован в существующей `main` как `a14cdf5`; `git push origin main` вернул `could not read Username for 'https://github.com': No such device or address` |
-
-### Verification evidence planning-актуализации
-
-- Existing master plan сохранён на прежнем пути; отдельный player roadmap не создан.
-- 150 исторических шагов Tasks 1–15 синхронизированы с уже записанным runtime/test evidence; future Tasks 16–19 остаются открыты и имеют независимые external prerequisites.
-- Master plan содержит монотонный intake `Task 20+`, раздельный execution ledger, Definition of Ready/Done, 12 постоянных workstream lanes и explicit non-triggers для неподтверждённых capabilities.
-- Design spec больше не заявляет, что реализация не начата; старый countdown явно помечен как исторический baseline.
-- `scripts/check-readme-policy.sh README.md`, `php artisan project:docs-refresh --check`, `bash scripts/ci-check.sh docs` и `git diff --check` завершились успешно.
-- Planning snapshot зафиксирован в `main` как `a14cdf5`; обязательный push выполнен, но остался `unresolved_auth` из-за отсутствующей HTTPS-аутентификации GitHub.
-- `scripts/check-changelog-policy.sh CHANGELOG.md` для полной общей working copy отдельно предупреждает о concurrent importer/system planning text; task-owned staged версия проверяется перед commit и не должна включать эти строки.
-- PHP/Blade/JavaScript/CSS, routes, schema, database, cache, queues, dependencies, assets, `.env` и production services этой planning-задачей не менялись; application tests/build не требуются для documentation-only diff.
-
 ## Цель и согласованное решение
 
 - [x] Проверить существующий player/Plyr/Livewire lifecycle и keyboard preference.
@@ -1064,65 +1681,6 @@ Rollback реализации: вернуть прежний countdown/обыч�
 - [x] Выполнить Vite build и релевантные repository gates.
 - [x] Обновить playback/frontend owners, README, русский CHANGELOG и финальную compliance evidence.
 - [x] Выполнить legacy/duplicate/stale scan.
-## Текущая реализация — Task 30, изолированная подготовка workspace lease
-
-Статус: `preparation_completed_local`. Из-за активных importer/player owners в общем checkout текущий change set выполнил только master Task 30 Steps 1–3: новый самостоятельный lease-скрипт и его dedicated PHPUnit test. Изолированный implementation commit `ad5c13c` создан в `main`; configured remote отклонил HTTPS-аутентификацию, поэтому push остаётся `unresolved`. Live hooks, общий `CiQualityGateContractTest` и contributor workflow остаются неизменными до отдельного Step 4 после освобождения shared tree.
-
-### Expected files
-
-- Создать `scripts/task-workspace-lease.sh`.
-- Создать `tests/Unit/GitWorkspaceLeaseScriptTest.php`.
-- Актуализировать этот current plan и Task 30 master plan.
-- Добавить отдельную русскую запись в `CHANGELOG.md` перед commit только для фактически подготовленного developer tooling; concurrent записи не перезаписывать.
-- `README.md` проверить перед завершением, но не менять, пока новый lease не подключён к поддерживаемому contributor workflow.
-
-### Protected contracts и риски
-
-- `.githooks/lib/git-guard.sh`, `.githooks/pre-commit`, `.githooks/pre-push`, `tests/Unit/CiQualityGateContractTest.php` и существующий clean-tree/documentation gate не меняются в этой подготовке.
-- Lease хранится только ниже exact path из `git rev-parse --git-path`, создаётся атомарно и не меняет index, tracked/untracked source files, branch, worktree, stash или процессы.
-- На диск попадает только task ID, owner PID, UTC timestamp и SHA-256 digest; raw token выводится только при успешном `acquire`, не выводится `status` и обязателен для `release`.
-- Explicit stale recovery разрешена только для exact validated lease текущего repository и отказывается удалять lease живого PID; generic recursive deletion запрещена.
-- Task ID и owner PID валидируются до записи. Paths with spaces, competing acquisition и неверный release token покрываются тестами в отдельном temporary Git repository.
-- Migrations, routes, translations, cache keys, permissions, application runtime, database, Redis, queues, sessions, dependencies и production services не меняются; rollback удаляет только новый неинтегрированный script/test и task-specific documentation.
-
-### Requirement-compliance matrix
-
-| Требование / domain | Статус | Evidence / ограничение |
-| --- | --- | --- |
-| Root/canonical read order | `completed` | Перед edit перечитаны `AGENTS.md`, requirement index и применимые code/architecture/development/multilingual/security/maintenance/system-integration owners. |
-| Versions/existing implementation | `completed` | Boost подтвердил PHP `8.5`, Laravel `13.21.1`, Livewire `4.3.3`, PHPUnit `12.5.31`; существующие hooks, guard library и contract tests проверены. |
-| Written plan before code | `completed` | Scope, files, совместимость, риски и rollback зафиксированы здесь и в Task 30 master plan до test/code edit. |
-- Implementation commit `2a7f636` создан в существующей `main` после повторной staged-проверки. Обычный `git push --porcelain origin main` достиг configured remote и вернул `could not read Username for 'https://github.com': No such device or address`; force, history rewrite, alternate branch и хранение credentials не применялись.
-| TDD | `completed` | Наблюдаемый RED: 6 failures из-за отсутствующего script. Первый GREEN: 11 тестов/50 утверждений; cleanup review добавил отдельный RED на потерю metadata, финальный GREEN: 12/56. |
-| Git/shared workspace | `completed_for_preparation` | Только новые isolated paths и task-specific plan hunks; live hooks и concurrent importer/player files не меняются и не stage-ятся. |
-| Security/privacy/secrets | `completed` | Tests проверяют metadata allowlist, SHA-256 digest вместо raw token, single raw-token output, safe status, wrong-token refusal, exact cleanup и сохранение metadata при unexpected content. |
-| Production/data/cache/queue safety | `not_applicable` | Подготовка не подключена к runtime/hooks и не выполняет production mutation. |
-| Auth, translations, search, SEO, player, importer, premium, mobile, admin, legal | `not_applicable` | Application/public behavior не меняется. |
-| README | `already_compliant` | Проверен scope: contributor workflow ещё не активирован, поэтому фиктивное обновление не создаётся. |
-| CHANGELOG/docs | `completed_for_preparation` | Добавлен фактический русский пункт; README проверен без фиктивного изменения, documentation refresh/check и docs CI прошли. Полная working-copy проверка CHANGELOG отдельно видит незавершённый concurrent importer text; task-owned staged policy проверяется перед commit. |
-| Commit/push | `unresolved_remote` | Task-owned staged set закоммичен в существующей `main` как `ad5c13c`; обычный `git push --porcelain origin main` достиг remote и вернул `could not read Username for 'https://github.com': No such device or address`. |
-
-### Execution checklist
-
-- [x] Проверить требования, versions, plan, hooks, guard library и соседние PHPUnit patterns.
-- [x] Ограничить scope безопасными Steps 1–3 и обновить plan до кода.
-- [x] Создать dedicated failing tests и наблюдать RED.
-- [x] Реализовать минимальный безопасный script и получить GREEN.
-- [x] Выполнить syntax/focused/docs/diff verification и повторно проверить требования/README.
-- [x] Обновить compliance/evidence, изолированно commit-ить в `main` и попытаться отправить configured remote.
-- [ ] После освобождения shared tree отдельно выполнить Task 30 Steps 4–7: hook integration, contract test, contributor docs и полный gate.
-
-### Verification evidence подготовки
-
-- RED: первый запуск дал 6 failures с `No such file or directory` для отсутствующего `scripts/task-workspace-lease.sh`; invalid-input cases уже отказывались создавать lease.
-- Первый GREEN: 11 тестов/50 утверждений. Cleanup review добавил воспроизводимый RED, в котором unexpected file приводил к потере metadata; после exact preflight финальный suite прошёл 12 тестов/56 утверждений.
-- `bash -n scripts/task-workspace-lease.sh`, targeted Pint и `GitWorkspaceLeaseScriptTest` прошли.
-- Неизменённый `CiQualityGateContractTest` прошёл 17 тестов/95 утверждений.
-- `check-readme-policy.sh README.md`, `project:docs-refresh --check`, `bash scripts/ci-check.sh docs` и `git diff --check` завершились успешно.
-- Full application test/build не запускаются для isolated non-runtime preparation: application PHP/JS/CSS/assets/dependencies не затронуты, а общий checkout содержит активные player/importer изменения с собственными gates.
-- Staged diff содержал только `CHANGELOG.md`, task-specific current/master plan hunks, новый script и dedicated test; staged README/CHANGELOG policies прошли. Обычный hook отказался только из-за concurrent unstaged files, поэтому после эквивалентной ручной проверки существующий `SEASONVAR_SKIP_GIT_GUARD=1` применён process-scoped только к commit.
-- Implementation commit `ad5c13c` создан в `main`. Обычный push без force/rewrite достиг `origin` и был отклонён отсутствующей HTTPS-аутентификацией; remote delivery честно остаётся `unresolved`.
-
 - [x] Выполнить task-owned commit только из существующей `main`.
 - [ ] Отправить `main` в configured remote — `unresolved`: `git push origin main` вернул `could not read Username for 'https://github.com'`, а `gh` в окружении не установлен.
 
@@ -3288,12 +3846,251 @@ Rollback: code-only возврат `withCount($cardCounts)` и удаление 
 | Documentation/README/CHANGELOG | `completed` | Performance/cache/debt owners, русский CHANGELOG и visitor history фиксируют подтверждённое ускорение без SLA claim; current plan содержит rollback и остаточный count-sort/contention risk. |
 | Verification/Git delivery | `completed` | Pint scoped к затронутым PHP, Larastan 0 errors, Rector 0 diffs, Composer/npm audits 0 advisories/vulnerabilities, managed docs/diff, Vite 23 modules, affected 113/1 045 и full PHPUnit 1 444/1 433/11/123 046 прошли. Managed Chromium desktop/mobile catalog/search: 4×`200`, no overflow/console/page/request/first-party failures. Реализация и документация вошли в `7005a244571bf19f8d967be9b262fef6f0c18243`, опубликованный fast-forward из существующей `main`; local/origin/GitHub SHA и remote commit read-back совпали, force push не применялся. |
 
+# Параллельный непересекающийся срез — диагностика редакционных подборок
+
+Дата: 24.07.2026
+Статус: `implementation_complete_local`, `verification_complete`; commit и
+push остаются `unresolved` до освобождения активных foreign
+importer/player/system изменений. Общий index не изменяется этой задачей, а
+обязательный hook запрещает commit при любых foreign unstaged/untracked files.
+
+Безлимитный главный план улучшения редакционных подборок:
+[`2026-07-24-editorial-collections-improvement-master-plan.md`](../superpowers/plans/2026-07-24-editorial-collections-improvement-master-plan.md).
+
+Подробный исполнимый план Task 1 и task-specific compliance matrix:
+[`2026-07-24-editorial-collection-health-diagnostics.md`](../superpowers/plans/2026-07-24-editorial-collection-health-diagnostics.md).
+
+## Безлимитное продолжение
+
+- План основан на read-only снимке 54 редакционных подборок, 5 633 source
+  items, 100 exact matches и 5 533 unmatched rows. Из 39 пустых подборок
+  значительная часть является фильмовой и несовместима с текущим сериаловым
+  catalog type contract; их запрещено считать matcher defects или наполнять
+  нерелевантными сериалами.
+- Tasks 2–18 образуют первый конечный dependency graph: классификация
+  `supported|unsupported|unknown`, ограниченный exact retry, evidence-gated
+  ручные решения, staff review, preview кандидатов, пакетная редактура,
+  country/theme/format waves, publication readiness, recommendation quality,
+  dashboard и staged rollout.
+- Сначала требуется доставить уже проверенный Task 1 после освобождения общего
+  дерева, затем исполняется Task 2. Реальные provider requests, миграция
+  ручных решений, публикация подборок, recommendation activation и production
+  rollout этим planning-only обновлением не разрешены.
+- Tasks 19+ не имеют искусственного верхнего предела, получают только новые
+  монотонные номера и принимаются по датированному evidence, полному
+  `Definition of Ready`, отдельному rollback и проверяемому `Definition of
+  Done`. Номера и rejected decisions не удаляются и не переиспользуются.
+
+### Manifest planning-only обновления
+
+- Create:
+  `docs/superpowers/plans/2026-07-24-editorial-collections-improvement-master-plan.md`
+- Modify:
+  `docs/superpowers/plans/2026-07-24-editorial-collection-health-diagnostics.md`
+- Modify: `docs/plans/current-task-plan.md`
+- Modify: `docs/README.md`, `README.md`, `CHANGELOG.md`
+- Preserve: application code, routes, migrations, schema, catalog/source rows,
+  cache keys, queues, permissions, translations, provider configuration,
+  recommendation versions and public collection payloads
+
+### Planning compliance matrix
+
+| Требование | Статус | Evidence / решение |
+| --- | --- | --- |
+| Root/index/canonical read order | `completed` | Перед обновлением перечитаны обязательные requirements и применимые владельцы collection/importer/recommendation/UI/operations contracts |
+| Installed versions | `completed` | Проверены PHP 8.5.8, Laravel 13.21.1, Boost 2.4.13, Livewire 4.3.3, PHPUnit 12.5.31, Pint 1.29.3, Tailwind CSS 4.3.2, Vite 8.1.4, Node.js 26.4.0 и npm 12.0.1 |
+| Existing code/data baseline | `completed` | Проверены matcher, sync/reconcile, item/editor/query services, admin UI, recommendation handoff и read-only distributions SQLite |
+| External research | `completed` | Проверены актуальные страницы Netflix, Кинопоиска, START, Okko и PREMIER; они используются только как редакционный ориентир, не как разрешение на импорт |
+| Cross-feature impact | `completed` | Master plan отдельно оценивает auth, privacy, translations, cache, search, SEO, admin, import, recommendations, mobile/a11y, production и rollback |
+| README/document owners | `completed` | Карта документации и roadmap обновлены; visitor history не меняется без фактического product change |
+| Runtime/data/provider mutation | `not_applicable` | Обновление только документационное; HTTP, DML, migration, queue/cache/service actions не выполняются |
+| Commit/push | `unresolved` | Общая `main` содержит активные foreign tracked/untracked изменения; clean-worktree hook не обходится |
+
+## Scope и решение
+
+- Существующая приватная сводка `/admin/catalog?section=collections` получает фактическое число пустых source-managed подборок, покрытие matched/items и allowlisted breakdown стабильных matcher method codes последнего run.
+- `CatalogCollectionQuery::latestSourceSyncSummary()` остаётся единственной read boundary. Два новых aggregate используют существующие provider/reconcile/membership indexes; migration и production data mutation не нужны.
+- Matcher, reconciliation, membership writes, recommendations, routes, permissions, cache keys, public collection/API payloads и provider HTTP не меняются.
+- Source URL/path, remote title, raw `match_reasons`, unknown method codes и `error_summary` не передаются в Blade.
+- Shared importer/player/system files и staged index не stage/reset/stash/delete; реализация затрагивает только перечисленный collection manifest.
+
+## Expected files
+
+- Modify: `app/Services/Collections/CatalogCollectionQuery.php`
+- Modify: `app/Livewire/Collections/CatalogCollectionAdministrationManager.php`
+- Modify: `resources/views/livewire/collections/catalog-collection-administration-manager.blade.php`
+- Modify: `lang/ru/collections.php`, `lang/en/collections.php`
+- Modify: `tests/Feature/HdRezkaCollectionPresentationTest.php`
+- Create/modify: `docs/superpowers/plans/2026-07-24-editorial-collection-health-diagnostics.md`
+- Deferred until owner release for the Task 1 implementation report:
+  `docs/architecture.md`, `docs/administration.md`, `docs/performance.md` and
+  exact implementation-history hunks; this planning refresh changes only the
+  collection roadmap/link in `README.md`, its own Russian `CHANGELOG.md` item
+  and the additive section above.
+
+## Protected contracts, risks и compliance
+
+| Требование | Статус | Evidence / решение |
+| --- | --- | --- |
+| Root/index/canonical read order | `completed` | Requirements и применимые collection/importer/recommendation/UI/operations owners перечитаны до plan/code |
+| Installed versions/docs | `completed` | Boost подтвердил PHP 8.5, Laravel 13.21.1, Livewire 4.3.3, SQLite, PHPUnit 12.5.31 и Tailwind 4.3.2; Laravel 13 aggregate/Number docs проверены |
+| Exact matching/reconciliation | `already_compliant` | Matching thresholds/method identity и source-managed writes не меняются |
+| Admin authorization/privacy | `already_compliant` | Existing admin route/component/gate сохраняются; presentation принимает только counts и allowlisted labels |
+| Query performance | `completed_for_plan` | Actual SQLite `EXPLAIN` использует `catalog_collection_source_items_reconcile_idx`, provider covering index и `catalog_collection_items_collection_title_unique`; latency/SLA не заявляется |
+| Translations/Blade/mobile | `completed` | RU/EN keys, query-free prepared arrays, compact responsive grids, SSR feature contract и Vite build подтверждены |
+| Routes/API/cache/SEO/search/recommendations | `not_applicable` | Public contracts и cache identity не меняются |
+| Schema/data/network/production services | `not_applicable` | Нет migration, DML, sync/provider HTTP, config/env или worker change |
+| README/CHANGELOG/canonical docs | `completed_local` | Exact collection sections добавлены поверх shared working copy без изменения foreign hunks; commit-backed delivery ещё зависит от owner release |
+| Commit/push | `unresolved` | Clean-worktree hook и общий dirty worktree не обходятся; delivery возможна только из `main` exact task manifest |
+
+## Execution evidence
+
+- Наблюдаемый RED: 3 теста прошли, один новый admin scenario упал только на отсутствующей метрике «Пустых подборок».
+- GREEN и zero-denominator contract после scoped `Pint`: 5 тестов/48 утверждений; полный `HdRezkaCollection*` набор — 73/435.
+- Канонический `composer analyse` завершился без ошибок; финальный полный PHPUnit — 1 526 тестов, 1 515 успешных, 11 ожидаемо пропущенных и 123 698 утверждений.
+
+- Vite/Tailwind production build преобразовал 24 модуля без ошибки.
+- Feature contract подтвердил один latest-run read, один empty-membership aggregate, один latest-run match breakdown и запрет unknown method/source/error data в DOM.
+- Provider HTTP, sync/retry, migration, production DML, cache/queue clear, worker restart и `.env` mutation не выполнялись.
+- Foreign importer/dependency/system-plan hunks остаются вне scope; commit/push по clean-worktree contract всё ещё `unresolved`.
+
+Rollback: удалить additive diagnostics query/preparation/markup/translations. Schema, rows, cache, queues, external provider и production configuration не требуют rollback.
+
+# Активная задача — Editorial Collections Task 2: truthful source scope
+
+Дата: 24.07.2026
+Статус: `implementation_complete_local`, `verification_complete`,
+`delivery_unresolved`. Пользователь явно продолжил безлимитный master-план.
+Task 2 реализован локально поверх полностью проверенного Task 1; общий
+delivery остаётся `unresolved`, пока обязательный clean-worktree hook видит
+foreign importer/player/system/dependency changes.
+
+## Discovery и решение
+
+- Фактические source rows: `4 518 film`, `798 series`, `170 cartoon`,
+  `147` без типа; они распределены по 45/23/16/3 source collections
+  соответственно.
+- Канонический local publication contract —
+  `serial|show|anime|documentary|unknown`; фильмы и cartoons не являются
+  поддерживаемыми самостоятельными типами каталога.
+- `film` и `cartoon` поэтому получают scope `unsupported`, известные
+  `series|show|anime|documentary` — `supported`, отсутствующий или
+  неизвестный тип — `unknown`.
+- `unknown` остаётся actionable: отсутствие типа не маскируется под
+  несовместимость. Пустая source collection считается actionable, если
+  последний run содержит хотя бы один `supported` или `unknown` item.
+- Matcher сохраняет прежнюю fail-closed type mismatch семантику. Scope и
+  compatibility разделены: production scope может не поддерживать film, но
+  extraction не меняет уже существующий результат `film ↔ film` в
+  characterization tests.
+- Один grouped latest-run aggregate по source/type даёт bounded строки для
+  scope/item и empty-collection counts; сырые titles, paths, reasons и
+  provider addresses не выходят из read boundary.
+
+## Expected files Task 2
+
+- Create: `app/Enums/CatalogCollectionSourceScope.php`.
+- Create:
+  `app/Services/Collections/Import/HdRezkaCollectionTypeCompatibility.php`.
+- Modify:
+  `app/Services/Collections/Import/HdRezkaCollectionMatcher.php`,
+  `app/Services/Collections/CatalogCollectionQuery.php`.
+- Modify:
+  `app/Livewire/Collections/CatalogCollectionAdministrationManager.php`,
+  `resources/views/livewire/collections/catalog-collection-administration-manager.blade.php`.
+- Modify: `lang/ru/collections.php`, `lang/en/collections.php`.
+- Modify: `tests/Feature/HdRezkaCollectionMatcherTest.php`,
+  `tests/Feature/HdRezkaCollectionPresentationTest.php`.
+- Modify: collection owner docs, collection health/master plans, этот current
+  plan, `README.md`, `CHANGELOG.md`.
+
+## Protected contracts и risks
+
+- Preserve: `CatalogCollection` schema/memberships, exact matcher thresholds,
+  reconciliation writes, `/admin/catalog` route/gate, public collection/API
+  payloads, SEO/search/recommendations/cache keys and importer command.
+- No migration, DML, provider HTTP, retry/sync, queue/cache clear, service
+  restart, dependency/config/env change or production activation.
+- Query cardinality bounded by distinct `(source_id, source_type)` groups for
+  the latest run; no hydration of all source rows and no Blade query.
+- RU/EN keys remain symmetric; visitor-visible Russian copy states that
+  unsupported rows are outside the current catalog scope, not broken.
+- Rollback: restore matcher-local normalization and remove the additive
+  scope metrics/labels. Schema/data/cache/provider state do not change.
+
+## Task 2 requirement-compliance matrix
+
+| Requirement/domain | Status | Evidence / decision |
+| --- | --- | --- |
+| Root/index/canonical read order | `completed` | Root, registry and applicable collection/importer/UI/admin/security/performance/cache/maintenance/production owners reread before code |
+| Installed versions/docs | `completed` | Boost verified PHP 8.5, Laravel 13.21.1, Livewire 4.3.3, SQLite and PHPUnit 12.5.31; Laravel 13 grouped aggregate/enum cast and Livewire test docs checked |
+| Existing implementation/schema/data | `completed` | Matcher normalization, parser values, reconcile storage, indexed schema, query/UI/tests and read-only type distribution inspected |
+| Exact matching compatibility | `completed` | Existing and new characterization tests preserve successful film/cartoon aliases plus year/type fail-closed results after extraction |
+| Truthful scope diagnostics | `completed` | RED failed on missing service/labels; GREEN separates film/cartoon, series and unknown plus actionable/unsupported-only empty counts |
+| Authorization/privacy | `already_compliant` | Existing admin boundary remains; only allowlisted counts/labels reach presentation |
+| Query performance | `completed` | One grouped latest-run scope aggregate uses provider/reconcile/membership indexes; only bounded source/type groups reach PHP |
+| Translations/Blade/mobile | `completed` | RU/EN parity passed 2 tests/2 009 assertions; Livewire prepares metrics and responsive Blade remains query-free |
+| Routes/API/cache/SEO/search/recommendations | `not_applicable` | Public/persisted contracts unchanged |
+| Schema/data/network/production/dependencies | `not_applicable` | Explicitly excluded from Task 2 |
+| README/owner docs/CHANGELOG | `completed_local` | Architecture/admin/performance/data/importer owners, README product state and Russian changelog updated after factual GREEN; visitor history intentionally unchanged because public behavior did not change |
+| Shared Git delivery | `unresolved_shared_worktree` | Work only in existing `main`; foreign changes remain untouched and clean-worktree hook is not bypassed |
+
+## Execution checklist Task 2
+
+- [x] Выполнить mandatory discovery и read-only source-type snapshot.
+- [x] Зафиксировать exact files/contracts/risks/compliance до code.
+- [x] Получить focused RED на compatibility и admin health contracts.
+- [x] Реализовать enum/service и matcher extraction без behavior drift.
+- [x] Добавить grouped scope aggregate и safe RU/EN presentation.
+- [x] Выполнить Pint, focused/collection/full tests, Larastan, Vite, docs
+  checks, `EXPLAIN`, final requirements reread и legacy scan.
+- [x] Обновить factual docs/README/CHANGELOG и delivery evidence.
+- [x] Проверить delivery gate: commit/push exact manifest оставлены
+  `unresolved_shared_worktree` без обхода hook, stage или mutation foreign
+  files.
+
+## Execution evidence Task 2
+
+- RED: два направленных сценария дали один ожидаемый container error на
+  отсутствующем `HdRezkaCollectionTypeCompatibility` и один UI failure на
+  отсутствующей метрике «Требуют сопоставления».
+- GREEN после scoped Pint: matcher/presentation — 19 тестов и 97 утверждений;
+  весь `HdRezkaCollection*` набор — 77 тестов и 451 утверждение.
+- Паритет административных переводов — 2 теста и 2 009 утверждений;
+  `composer analyse` — 0 ошибок; полный PHPUnit — 1 566 тестов, 1 555
+  успешных, 11 ожидаемо пропущенных и 123 886 утверждений.
+- Vite 8.1.4 собрал 24 модуля. Реальный read-only summary: 39 пустых
+  коллекций = 10 actionable + 29 unsupported-only; source scope =
+  798 supported + 4 688 unsupported + 147 unknown.
+- `EXPLAIN QUERY PLAN` использует
+  `catalog_collection_sources_provider_source_key_unique`,
+  `catalog_collection_source_items_reconcile_idx` и
+  `catalog_collection_items_collection_title_unique`; временная B-tree
+  ограничена distinct source/type groups. SLA не заявляется.
+- Provider HTTP, sync/retry, migration, DML, cache/queue clear, worker
+  restart, dependency/config/env change и production activation не
+  выполнялись.
+- Финальный repository scan не нашёл второго scope service, второй admin
+  route, matcher-local type map, raw source data в presentation, query в
+  Blade или незавершённый Task 2 control. `main` остаётся на 33 локальных
+  commit впереди `origin/main`, index пуст; многочисленные foreign
+  importer/player/system/dependency files остаются tracked/untracked dirty,
+  поэтому обязательный clean-worktree hook не позволяет scoped commit.
+- `project:docs-refresh --check`, README policy, syntax catalogs и
+  `git diff --check` прошли. Общая проверка `CHANGELOG.md` дошла до foreign
+  строки 13 и остановилась на обычном английском `network-free`; новая строка
+  Task 2 выше неё прошла тот же policy.
+
 # Активная задача — центральные touch-controls проигрывателя
 
 Дата: 24.07.2026
-Статус: `planning_complete`, implementation начинается только после
-подтверждённого browser/static RED. Безлимитный player master получает
-монотонный `Task 21`; верхний предел будущих evidence-driven tasks отсутствует.
+Статус: `implemented_and_verified_local`. Draft независимо проверен:
+pre-change static/browser RED зафиксирован до принятия runtime-кода, затем
+matching production-assets дали GREEN и полный player lifecycle. Безлимитный
+player master сохраняет монотонный `Task 21`; верхний предел будущих
+evidence-driven tasks отсутствует. Commit остаётся
+`unresolved_shared_worktree`, push дополнительно `unresolved_auth`,
+production activation не заявляется.
 
 Design:
 [`2026-07-24-player-centered-touch-controls-design.md`](../superpowers/specs/2026-07-24-player-centered-touch-controls-design.md).
@@ -3359,16 +4156,16 @@ Implementation:
 | Applicable Markdown owners | `completed` | UI, frontend, views, playback, security, performance/cache, production/maintenance and unlimited master inspected |
 | Installed versions/docs | `completed` | Boost/npm verified exact versions; Tailwind 4 pointer guidance and official Plyr API/control docs inspected |
 | Existing implementation/diff | `completed` | Current clean player JS/CSS/test files and dirty unrelated scopes inspected |
-| One player lifecycle | `completed_for_plan` | Extend only `CatalogPlayerSession`; no second initializer/controller |
-| Mobile/touch/a11y | `completed_for_plan` | Exact sizes, center geometry, native buttons, dynamic labels/focus defined |
+| One player lifecycle | `completed` | Единственный `CatalogPlayerSession` создаёт и уничтожает кластер; static contract подтверждает один `new this.Plyr` |
+| Mobile/touch/a11y | `completed` | Desktop/Mobile/Tablet подтвердили размеры, оси, overflow, focus и действия; screenshots проверены |
 | Localization | `already_compliant` | Existing complete RU/EN control copy reused; no key addition |
 | Auth/source/privacy/progress | `already_compliant` | New controls receive no source/access/token data and reuse canonical media actions |
 | Routes/API/SEO/schema/cache/queues | `not_applicable` | No server or persistent contract changes |
 | Dependency/maintenance | `not_applicable` | No package/runtime/lock update |
-| Production assets/rollback | `completed_for_plan` | Matching build required; code/assets rollback documented |
-| RED/GREEN | `pending` | Browser and static RED must precede application code |
-| README/CHANGELOG/owners | `pending` | Update only after factual GREEN |
-| Commit/push | `unresolved_shared_worktree` | `main` ahead 28; foreign tracked/untracked files make canonical hook reject commit |
+| Production assets/rollback | `completed_local` | Vite собрал matching assets из 24 модулей; code/assets rollback документирован, deployment не заявляется |
+| RED/GREEN | `completed` | Pre-change `HEAD` не имел пяти JS-контрактов; сохранённый browser RED показал `26.5..34 px` вместо `≥56 px`; GREEN static `6/335`, focused browser `3/3`, full lifecycle `18` passed / `12` skipped |
+| README/CHANGELOG/owners | `completed_local` | Playback/frontend/UI owners, README capability/history и отдельная русская CHANGELOG-запись обновлены |
+| Commit/push | `unresolved` | Canonical pre-commit отклонил foreign tracked/untracked files; обычный push дополнительно остановился на отсутствующей HTTPS-аутентификации GitHub |
 
 ## Cross-feature impact
 
@@ -3378,6 +4175,33 @@ authorization, source grants, progress/history/preferences persistence,
 search, SEO, sitemap, recommendations, notifications, administration,
 imports, Premium, payments, region/legal, API, schema, cache, queue, storage
 and service worker.
+
+## Execution evidence
+
+- `node --check resources/js/player.js` — успешно.
+- RED boundary: pre-change `HEAD` не содержит пяти новых JS-контрактов;
+  сохранённые browser artifacts всех трёх проектов показывают прежние
+  `26.5..34 px` вместо минимальных `56 px`.
+- `FrontendAssetContractTest` — GREEN: `6` тестов, `335` утверждений.
+- Affected PHP/static matrix — `42` теста, `764` утверждения; targeted Pint
+  завершён успешно.
+- Focused Playwright — `3/3` проекта; полный
+  `player-lifecycle.spec.js` — `18` успешных сценариев и `12` ожидаемых
+  platform-specific skips.
+- Vite production build преобразовал `24` модуля.
+- Screenshots `1440×1200`, `768×1024` и `390×844` проверены под
+  `output/playwright/player-touch-controls-*.png`: один player/video, ровный
+  горизонтальный ряд, центральный toggle, читаемые и не обрезанные кнопки.
+- Managed docs, README policy и whitespace прошли. Общий CHANGELOG policy
+  принял новую Task 21 запись и остановился на отдельной foreign
+  importer-строке с обычным `network-free`; чужой scope не изменялся.
+- Repository scan подтвердил один `new this.Plyr`, один center-controls
+  initializer и отсутствие duplicate Blade/route/player implementation.
+- Runtime/server data, routes, translations, schema, cache, queues,
+  dependencies и environment не менялись.
+- Canonical pre-commit ожидаемо отклонил foreign unstaged/untracked scope;
+  обычный `git push origin main` без force дополнительно вернул
+  `could not read Username for 'https://github.com'`. Hook не обходился.
 
 ## Безлимитное продолжение после Task 21
 
@@ -3448,3 +4272,3149 @@ JS/CSS/tests и foreign importer/collection/system changes не вошли в co
 Вернуть только этот intake-pointer/compliance/CHANGELOG diff. Task 21 design,
 application code, tests, Vite assets, schema, data, cache, queues, environment
 и production services не требуют rollback.
+
+# Активная задача — объединённая безлимитная программа каталога
+
+Дата: 24.07.2026
+Статус: `tasks_36_38_completed_local_delivery_unresolved`; пользователь
+утвердил дизайн и прямо поручил программирование. Tasks 36–38 реализованы и
+проверены; Task 39 ожидает ownership handoff уже изменяемого
+`CatalogCollectionQuery.php`. Общий master продолжен монотонными Tasks 35–44;
+следующий доказанный backlog получает Task 45+ без верхнего лимита и без
+перенумерации истории.
+
+Design:
+[`2026-07-24-title-navigation-and-player-island-design.md`](../superpowers/specs/2026-07-24-title-navigation-and-player-island-design.md).
+
+Master plan:
+[`2026-07-24-system-maintenance-and-optimization-master-plan.md`](../superpowers/plans/2026-07-24-system-maintenance-and-optimization-master-plan.md#task-35-register-the-unified-visitor-catalog-roadmap-and-freeze-its-baseline).
+
+Child plans:
+
+- [`Discovery Tasks 1–13`](../superpowers/plans/2026-07-24-discovery-sections-end-to-end-improvement-master-plan.md);
+- [`Importer Tasks 1–19 и rolling Task 20+`](../superpowers/plans/2026-07-24-seasonvar-importer-improvement-master-plan.md);
+- [`Calendar default recent`](../superpowers/plans/2026-07-19-calendar-default-recent.md);
+- [`Player seamless switching`](../superpowers/plans/2026-07-24-player-seamless-episode-switching.md).
+
+## Scope и порядок
+
+1. Task 35 фиксирует baseline, exact ownership и protected contracts.
+2. Task 36 исправляет quick links, lazy reviews target, intended request и
+   calendar handoff.
+3. Task 37 обновляет previous/next через navigation-only Livewire island.
+4. Task 38 делает `/calendar` newest-first только для default Recent view.
+5. Task 39 заменяет title collection hot query на candidate-first hydration.
+6. Tasks 40–42 исполняют полный Discovery child plan для всех девяти режимов.
+7. Task 43 закрепляет importer-to-search/cache/calendar/recommendation handoff.
+8. Task 44 выполняет общий acceptance, документацию, delivery и создаёт только
+   evidence-backed Task 45+.
+
+Inline execution начинается с Task 36, потому что его application files чисты
+и не требуют foreign importer/collection/player-control paths. Task 37
+следует отдельным change set. Task 39 ждёт ownership handoff для уже dirty
+`CatalogCollectionQuery.php`. Production migrations/backfills/workers/cache
+activation не разрешены этим планом.
+
+## Expected files первого implementation batch
+
+- Modify: `app/Livewire/CatalogTitleDetail.php`.
+- Modify: `app/Livewire/Reviews/CatalogTitleReviews.php`.
+- Modify: `resources/views/livewire/catalog-title-detail.blade.php`.
+- Create:
+  `resources/views/livewire/reviews/catalog-title-reviews-placeholder.blade.php`.
+- Modify: `resources/js/app.js`.
+- Modify: `tests/Feature/CatalogVisualSystemTest.php`.
+- Modify: `tests/Feature/CatalogPageTest.php`.
+- Create: `tests/browser/title-section-navigation.spec.js`.
+- Task 37: `app/Livewire/CatalogTitlePlayer.php`,
+  `resources/views/livewire/catalog-title-player.blade.php`,
+  `resources/js/player-navigation.js`,
+  `tests/Unit/LivewireWireIgnoreContractTest.php` and isolated feature tests.
+- Task 37 browser discovery: modify `tests/browser/prepare-fixtures.php` with a
+  third deterministic episode/media pair and create
+  `tests/browser/player-navigation-island.spec.js`; production catalog data and
+  importer fixtures remain unchanged.
+- Task 38 browser discovery reuses only the dedicated Playwright database:
+  add two deterministic recent release entries to
+  `tests/browser/prepare-fixtures.php` and create
+  `tests/browser/release-calendar.spec.js`. The planned
+  `tests/Feature/ReleaseCalendarQueryTest.php` does not exist in this checkout,
+  so query ordering is covered through `ReleaseCalendarDefaultViewTest` and
+  the real Livewire browser flow instead of inventing a duplicate test class.
+
+## Protected contracts
+
+- `titles.show`, `/discover/*`, `/calendar*`, content-request and player route
+  names, localized aliases and `CatalogTitle:slug` binding.
+- Existing RU/EN translation architecture and hash/query identities.
+- Review lazy component, filters, pagination island, moderation and policies.
+- Content-request auth/policy/validation and intended destination semantics.
+- Calendar records, timezone, explicit sorts, SEO/sitemap/cache/notifications.
+- One `<video>`, Plyr/HLS, `wire:ignore`, grants, entitlement, progress,
+  history and media profile.
+- Importer command, source URL restrictions, network-free apply, checkpoints
+  and external-media-only storage.
+- Shared/private cache isolation, availability, premium, region/legal,
+  administration, search/API and recommendation identities.
+
+## Risks, migrations, cache, permissions и rollback
+
+- Task 36: no migration/cache key/permission change; rollback reverts only
+  Livewire/Blade/JS/tests/docs.
+- Task 37: no migration/cache/route change; island failure preserves href
+  fallback and current player; rollback restores renderless commit.
+- Task 38: no schema change; explicit sorts remain compatible; rollback
+  restores Recent `Earliest`.
+- Task 39: no index migration unless `EXPLAIN` proves a missing path; existing
+  `publicForTitle()` remains a compatibility adapter.
+- Tasks 40–42: projection migrations are additive/reversible, disabled-first,
+  without migration backfill; authoritative fallback remains.
+- Task 43: no second importer pipeline/command; only a proven missing
+  after-commit handoff may change code.
+- Task 44: no production claim without backup/readiness/canary/rollback
+  evidence.
+
+## Task-specific requirement-compliance matrix
+
+| Requirement/domain | Status | Evidence / decision |
+| --- | --- | --- |
+| Root/index/read order | `completed` | Root AGENTS, requirements registry and applicable owners reread 24.07.2026 |
+| Installed versions | `completed` | Laravel `13.21.1`, Livewire `4.3.3`, PHP `8.5.8`, Node `26.4.0`, npm `12.0.1` verified |
+| Existing implementation | `completed` | Browser evidence and route → Livewire → JS/query call graphs captured |
+| Title quick navigation root cause | `completed` | Stable SSR/lazy targets, intended auth route and active hash state verified by 3 feature contracts plus Desktop/Mobile browser flow |
+| Player navigation root cause | `completed` | Named navigation-only island updates `1 → 2 → 3`; one video/shell/Plyr identity verified on Desktop/Mobile |
+| Calendar requirement | `completed` | Recent default `Latest`, explicit `Earliest` and query-free default verified by 6 feature tests and Desktop/Mobile Livewire sorting |
+| Title query optimization | `planned_with_gate` | Candidate-first bounded collection hydration; foreign query file waits for handoff |
+| Discover all nine modes | `planned` | Child Tasks 1–13 cover correctness/cache/projection/upcoming/editorial/personalized/facets/SEO |
+| Importer integration | `planned_dependency` | Child Tasks 1–19 retained; Task 43 changes only proven missing after-commit handoff |
+| Authentication/authorization | `completed` | Existing auth middleware preserves form type/title in `url.intended`; browser login returns to protected form |
+| Localization | `already_compliant_for_plan` | Existing copy reused; any new key requires exact RU/EN parity |
+| Privacy/security | `already_compliant_for_plan` | Raw provider URLs/private signals remain outside HTML/shared cache/island state |
+| Query/cache performance | `planned` | Per-task SQL/cache budgets and authoritative fallbacks defined |
+| Mobile/accessibility | `completed_first_batch` | Desktop/Mobile Playwright passes stable targets, `aria-current`, player identity and calendar select; controls remain 44px |
+| SEO/search/notifications | `completed_first_batch` | Canonical title/calendar route identities and query-free default preserved; discovery/importer portions remain Tasks 40–44 |
+| Migrations/data safety | `not_applicable_first_batch` | Task 36–38 require no schema/data mutation |
+| Production operations | `not_applicable_first_batch` | No schema, dependency, environment, cache-key, worker, scheduler or data activation changed |
+| README/CHANGELOG/docs | `completed` | Frontend, playback, calendar, README visitor history, CHANGELOG, spec and current plan updated |
+| Commit/push | `unresolved_shared_worktree` | Existing foreign dirty files prevent canonical clean-tree commit; hooks will not be bypassed |
+
+## Implementation verification
+
+- Master self-review covers the approved design, exact file boundaries,
+  interfaces, TDD RED/GREEN, rollback and acceptance.
+- Placeholder scan found no implementation placeholder; occurrences of
+  `TODO|FIXME|HACK` are intentional repository-scan commands.
+- Task method/property names are consistent:
+  `playerNavigationIslandPage`, `catalog-player-navigation`,
+  `changeSort`, `resolvedSort`, `CatalogCollectionSummaryLoader::forTitle`.
+- Focused RED/GREEN evidence was observed for all three fixes.
+- `npm run build` completed with 24 transformed modules.
+- Desktop/Mobile browser scenarios pass for title anchors/auth/calendar,
+  navigation-only player island and recent-calendar sorting.
+- Fresh final `Pint` passed on the exact nine changed PHP/test files.
+- Fresh related PHPUnit passed: `128/128` tests and `1 237` assertions.
+- Fresh full PHPUnit passed: `1 572` tests, `1 561` passed,
+  `11` expected skipped and `123 916` assertions.
+- Fresh combined Desktop/Mobile Playwright passed: `8/8` scenarios.
+- Fresh Vite production build transformed `24` modules.
+- `project:docs-refresh --check`, `scripts/ci-check.sh docs`,
+  `check-readme-policy.sh` and task-manifest `git diff --check` passed.
+- The new Russian CHANGELOG entry passes its own line; the repository-wide
+  policy then stops at pre-existing line 6 containing ordinary English
+  `read-only`. This foreign line is not rewritten by the current task.
+- Standalone current-plan policy still reports the accumulated pre-existing
+  multi-H1 registry at line 1759. Task 33 already records this historical
+  consolidation prerequisite; the check is `unresolved`, not bypassed.
+- Repository scan found one canonical title quick-navigation implementation,
+  one review target at a time through lazy placeholder replacement, one named
+  player navigation island and one calendar sort action; unrelated sort
+  controls were not changed.
+- Final Git state is existing `main`, `34` commits ahead of `origin/main`.
+  Numerous foreign importer/collection/player/dependency files remain dirty,
+  so the canonical clean-worktree hook prevents staging/commit. Push is not
+  claimed and remains `unresolved_shared_worktree`.
+
+# Активная задача — Player Task 22 / System Task 45: чёрный fullscreen и scoped Facebook-палитра
+
+Дата: 24.07.2026
+Статус: `implemented_verified_local_delivery_unresolved`; пользователь принял
+рекомендуемый player-only scope командой начать программирование. Code и
+локальная verification завершены, production activation не выполнялась,
+commit/push блокирует общий dirty worktree. Следующие
+свободные указатели остаются Player Task 23+ и System Task 46+ без верхнего
+лимита.
+
+Design:
+[`2026-07-24-player-fullscreen-facebook-palette-design.md`](../superpowers/specs/2026-07-24-player-fullscreen-facebook-palette-design.md).
+
+Executable TDD plan:
+[`2026-07-24-player-fullscreen-facebook-palette.md`](../superpowers/plans/2026-07-24-player-fullscreen-facebook-palette.md).
+
+Unlimited owners:
+
+- [`player master Task 22`](../superpowers/plans/2026-07-24-player-seamless-episode-switching.md#task-22-чёрный-fullscreen-и-scoped-facebook-палитра);
+- [`system master Task 45`](../superpowers/plans/2026-07-24-system-maintenance-and-optimization-master-plan.md#task-45-force-black-fullscreen-and-apply-a-scoped-facebook-player-palette).
+
+## Discovery и решение
+
+- Live Desktop Chromium standard Fullscreen API уже вычисляет black `.plyr`
+  root благодаря bundled Plyr stylesheet; fullscreen DOM identity и один
+  video сохраняются.
+- До fullscreen application-owned `.plyr` имеет transparent background, а
+  native video получает slate. App CSS не владеет полным
+  standard/WebKit/fallback/backdrop набором, поэтому белая browser/page
+  подложка может просвечивать в другом runtime.
+- Выбран application-owned black media root на shell/Plyr/wrapper/video и во
+  всех CSS-управляемых fullscreen variants.
+- Facebook-inspired palette scoped только к player shell/menu. Общая
+  light slate/white + emerald система портала не меняется.
+- Exact functional tokens: `#1877f2`, `#166fe5`, `#e7f3ff`, `#f0f2f5`,
+  `#e4e6eb`, `#ccd0d5`, `#1c1e21`, `#65676b`, `#42b72a`, `#f7b928`,
+  `#fa383e`, `#ffffff`, `#000000`.
+- First CSS GREEN browser run passed all new black computed-style assertions,
+  then exposed a stale exact `2` episode expectation: the shared fixture
+  already contains exactly `3` episodes from the navigation-island work. The
+  three stale episode-menu count assertions in the same browser file will use
+  the exact current fixture count, and the fullscreen scenario will choose the
+  first of two non-current options explicitly for Playwright strict mode while
+  preserving transition and DOM/fullscreen identity assertions; fixture and
+  application code remain unchanged.
+- Native iOS OS-owned fullscreen не подменяется и остаётся
+  `unresolved_device`.
+
+## Expected files
+
+Create:
+
+- `docs/superpowers/specs/2026-07-24-player-fullscreen-facebook-palette-design.md`;
+- `docs/superpowers/plans/2026-07-24-player-fullscreen-facebook-palette.md`.
+
+Modify application/test:
+
+- `resources/css/app.css`;
+- `tests/Unit/FrontendAssetContractTest.php`;
+- `tests/browser/player-lifecycle.spec.js`.
+
+Modify owners/evidence:
+
+- `docs/UI_STANDARDS.md`;
+- `docs/frontend.md`;
+- `docs/audits/video-playback-report.md`;
+- `docs/plans/current-task-plan.md`;
+- both unlimited master plans;
+- `README.md`;
+- `CHANGELOG.md`.
+
+Must remain unchanged by Task 22/45:
+
+- `resources/js/player.js`;
+- `resources/views/livewire/catalog-title-player.blade.php`;
+- `app/Livewire/CatalogTitlePlayer.php`;
+- RU/EN translations;
+- routes, migrations, config, cache keys, permissions, packages/locks and
+  environment.
+
+## Protected public/persisted contracts
+
+- one `<video>`, Plyr, optional HLS.js, session and keyed `wire:ignore`;
+- same fullscreen root across in-place episode/media transitions;
+- source grants, entitlement, hierarchy, progress sequence, resume/history;
+- player menu, central touch controls, global keyboard, Media Session,
+  Back/Forward and ordinary href fallback;
+- RU/EN interface copy and translation identity;
+- public title/player routes, API, SEO/sitemap and shared/private cache
+  isolation;
+- importer, administration, premium, region/legal and download boundaries.
+
+## Risks, production и rollback
+
+- CSS order/specificity can otherwise leave native video transparent; static
+  and computed-style browser RED/GREEN cover it.
+- WebKit selector presence is statically verified, but real iOS system player
+  chrome cannot be claimed from Chromium.
+- Palette contrast and state semantics require text/icon/ARIA preservation and
+  desktop/tablet/mobile visual inspection.
+- No migration, DB data, query, cache key/invalidation, queue, scheduler,
+  permission, route, translation, dependency or environment change.
+- Production requires the matching Vite manifest/assets and ordinary asset
+  deployment; no cache flush or service-worker step exists.
+- Rollback reverts exact CSS/tests/docs and restores previous matching Vite
+  assets. Data/DB/cache/queue repair is not applicable.
+- Shared dirty worktree blocks canonical commit; foreign files are not staged,
+  reset, stashed, deleted or absorbed.
+
+## Cross-feature impact
+
+| Domain | Status | Evidence / decision |
+| --- | --- | --- |
+| Player CSS/fullscreen | `completed_local` | black normal + standard/WebKit/fallback/backdrop contract реализован и проверен |
+| Player palette | `completed_local` | все 13 scoped semantic tokens применены без изменения global theme |
+| Mobile/tablet/a11y | `completed_local` | desktop/tablet/mobile artifacts подтвердили targets, читаемость и отсутствие overflow |
+| Livewire/one-player lifecycle | `already_compliant_preserve` | no Blade/JS/PHP change; same ignored shell |
+| Localization | `not_applicable` | no user-facing copy or key change |
+| Auth/source/progress/privacy | `already_compliant_preserve` | CSS cannot grant access or expose source/private state |
+| Queries/performance | `not_applicable` | zero database/provider/Livewire request change |
+| Cache/search/SEO/sitemap | `not_applicable` | only hashed frontend asset identity changes |
+| Routes/API/schema/data | `not_applicable` | no contract or migration change |
+| Importer/admin/premium/region/legal | `not_applicable` | no domain decision change |
+| Production assets | `built_local_not_activated` | Vite build прошёл; live HTTPS всё ещё обслуживает прежний hashed asset |
+| Native iOS fullscreen | `unresolved_device` | OS-owned UI requires real device |
+| Commit/push | `unresolved_shared_worktree` | clean-tree hook cannot pass while foreign scope remains |
+
+## Task-specific requirement-compliance matrix
+
+| Requirement | Status | Evidence / next gate |
+| --- | --- | --- |
+| Root/index/read order | `completed` | root, index and mandatory/applicable owners reread 24.07.2026 |
+| Related Markdown | `completed` | UI, frontend, playback audit, views, player/system masters and current plan inspected |
+| Installed versions | `completed` | PHP 8.5.8; Laravel 13.21.1; Livewire 4.3.3; Boost 2.4.13; Node 26.4.0; npm 12.0.1; Tailwind 4.3.2; Vite 8.1.4; Plyr 3.8.4; HLS.js 1.6.16; Playwright 1.61.1 |
+| Existing implementation | `completed` | app CSS, Blade, JS state mapping, static/browser tests and live fullscreen computed styles inspected |
+| Approved finite design | `completed` | player-only scoped palette and black CSS-controlled fullscreen |
+| Unlimited roadmap integration | `completed` | Player Task 22 + System Task 45; next pointers 23+/46+ |
+| Canonical UI owner | `completed` | player-specific black/palette exception added before application code |
+| Static/browser RED | `completed` | static failure назвал отсутствующий primary token; browser failure показал transparent/slate layers |
+| CSS GREEN | `completed` | app-owned black roots, fullscreen variants и scoped palette реализованы |
+| Focused/full verification | `completed_local` | focused PHPUnit 45/45 и 801 assertion; full player Playwright 18 pass / 12 expected skip; Vite 24 modules; responsive artifacts 3/3 |
+| README/CHANGELOG | `completed` | owner docs и visitor/technical history обновлены по фактическому GREEN |
+| Documentation policies | `unresolved_pre_existing` | docs refresh/profile, README policy и whitespace прошли; CHANGELOG policy дошла до прежней строки 7 и отклонила существующий обычный текст `read-only`, не принадлежащий Task 22 |
+| Git delivery | `unresolved_shared_worktree` | do not bypass canonical hook |
+
+## Execution order
+
+1. Self-review spec and executable plan; scan for placeholders/conflicts.
+2. Re-read this current-task section.
+3. Add static PHPUnit RED and observe exact missing-token failure.
+4. Add Desktop Chromium computed-style RED and observe transparent/slate
+   normal media layers.
+5. Implement minimal scoped CSS GREEN without JS/Blade/PHP changes.
+6. Run focused, full player browser and Vite gates; inspect responsive colors.
+7. Update frontend/playback owners, README, CHANGELOG and compliance only from
+   actual evidence.
+8. Re-read requirements/task/diff, search stale implementations and run docs
+   policy gates.
+9. Commit/push only if shared worktree becomes clean and canonical hooks pass;
+   otherwise retain honest `unresolved_shared_worktree`.
+
+## Фактический результат
+
+- Static RED: `FrontendAssetContractTest` — `5 passed`, `1 failed`, `291`
+  assertion; причина — отсутствующий
+  `--catalog-player-primary: #1877f2;`.
+- Browser RED: standard fullscreen scenario до CSS GREEN получил transparent
+  `.plyr`, slate native video и не прошёл exact black computed-style contract.
+- GREEN: `FrontendAssetContractTest` — `6/6`, `353` assertions; связанный
+  PHPUnit — `45/45`, `801` assertion.
+- Vite production build собрал `24` модуля. Full
+  `player-lifecycle.spec.js` завершился `18` успешными сценариями и `12`
+  ожидаемыми platform-specific skips.
+- Первый полный PHPUnit-run обнаружил не связанное с Task 22 случайное
+  столкновение factory с уникальностью episode number; точный проблемный тест
+  затем прошёл `1/1` с `8` assertions, а свежий полный повтор завершился
+  успешно: `1572` tests, `1561` passed, `11` skipped, `123934` assertions.
+- Desktop `1440×1200`, tablet `768×1024` и mobile `390×844` artifacts
+  подтвердили чёрную media surface, читаемые player controls и отсутствие
+  horizontal overflow.
+- Live HTTPS inspection обнаружил прежний asset
+  `app-BNI4GkbQ.css`, тогда как локальный matching build создал
+  `app-BLl6ilyS.css`; production activation этой задачей не выполнялась и не
+  заявляется.
+- Реальный OS-owned iOS fullscreen остаётся `unresolved_device`.
+- Code: `completed_local`; verification: `completed_local`; commit/push:
+  `unresolved_shared_worktree`; production:
+  `not_activated_old_asset_observed`.
+
+## Активная задача — Premium Task 1: no-provider query hardening
+
+Дата: 24.07.2026.
+Статус: `completed_local_delivery_unresolved`.
+
+### Scope и решение
+
+- Канонический владелец: [`docs/premium.md`](../premium.md).
+- Утверждённый дизайн:
+  [`2026-07-24-premium-improvement-master-plan-design.md`](../superpowers/specs/2026-07-24-premium-improvement-master-plan-design.md).
+- Безлимитная очередь:
+  [`2026-07-24-premium-improvement-master-plan.md`](../superpowers/plans/2026-07-24-premium-improvement-master-plan.md).
+- Текущий конечный TDD change set:
+  [`2026-07-24-premium-foundation-query-hardening.md`](../superpowers/plans/2026-07-24-premium-foundation-query-hardening.md).
+
+Первый инкремент делает current guest/no-provider pricing read
+database-free и заменяет 12 последовательных `Schema::hasTable()` одним
+memoized Laravel 13 schema inventory operation. На SQLite эта framework
+operation выполняет два SQL statements: capability probe и
+`pragma_table_list`. Инкремент добавляет dedicated Premium query/public-page
+tests, но не подключает provider, тариф, валюту, payment method или новое
+visitor claim.
+
+Точечный lookup сначала валидирует внешний plan code: RED показал 2 лишних
+schema statements при настроенном commerce и невалидном code, GREEN снизил
+этот путь до 0 SQL.
+
+### Ожидаемые изменяемые файлы
+
+- `app/Services/Premium/PremiumPlanQuery.php`
+- `app/Services/Premium/PremiumSchema.php`
+- `tests/Feature/Premium/PremiumQueryBudgetTest.php`
+- `tests/Feature/Premium/PremiumPricingPageTest.php`
+- `docs/premium.md`
+- `docs/README.md`
+- `docs/plans/current-task-plan.md`
+- Premium design/master/task plans
+- `README.md` и `CHANGELOG.md` только по фактическому результату
+
+### Защищённые contracts
+
+- Все Premium/public/localized/private/admin/webhook routes и middleware.
+- `PremiumAccessResolver`, gateway registry, reconciler, DTO/enums и
+  entitlement/payment identities.
+- Пустые provider/currency/plan config и production data.
+- Browser return не подтверждает payment; user/amount/currency/provider/status
+  остаются server-owned.
+- Free catalog/player/download/progress/library/comments/reviews,
+  regional/legal, SEO/API/import и cache identities.
+- Existing migration history, packages/locks, `.env*`, assets и translations.
+
+### Risks, compatibility и rollback
+
+- Schema listing должен сравнивать unqualified exact table names и сохранять
+  fail-closed false при отсутствии любой из 12 таблиц.
+- Commerce fast path нельзя применять к authenticated access resolver:
+  manual/promotion entitlement работает без payment provider.
+- Shared/public HTML cache не вводится; auth-aware Livewire/CSRF/user state
+  остаётся private.
+- Migration, route, translation, cache key, permission, dependency и
+  environment changes отсутствуют.
+- Rollback восстанавливает два service-файла и удаляет новые tests/docs;
+  data/schema/cache/provider recovery не требуется.
+- Shared dirty `main` блокирует focused commit/push до clean ownership gate;
+  foreign changes не stage/reset/stash/delete.
+
+### Cross-feature impact
+
+| Domain | Status | Evidence / decision |
+| --- | --- | --- |
+| Public `/premium` | `affected` | Только server-side query count; DOM/copy/routes preserved |
+| Authenticated Premium | `already_compliant` | Access resolver не short-circuit-ится по provider config |
+| Billing/provider | `already_compliant` | Empty registry и fail-closed gateway boundary unchanged |
+| Settings/admin | `affected_future` | Schema readiness дешевле; read-model consolidation остаётся Tasks 4–5 |
+| Localization/UI/mobile/SEO | `already_compliant` | RU/EN, noindex, canonical и existing Blade сохраняются |
+| Cache/privacy/security | `already_compliant` | No shared user/page cache; no secret/provider object |
+| Catalog/player/import/API/legal | `not_applicable` | Routes/data/access/source behavior не меняется |
+| Production data/schema | `not_applicable` | Read-only code path; migration/DML отсутствуют |
+
+### Task-specific requirement-compliance matrix
+
+| Requirement | Status | Evidence / gate |
+| --- | --- | --- |
+| Fresh canonical read order | `completed` | Root/index/code/architecture/workflow/multilingual/security/performance/cache/UI/admin/operations/maintenance/integration/Premium owners reread 24.07.2026 |
+| Final requirement reread | `completed` | Canonical index paths, all applicable owners, Premium owner, current plan and final hashes rechecked after implementation; requirement files unchanged |
+| Installed versions | `completed` | Boost: PHP `8.5`, Laravel `13.21.1`, Livewire `4.3.3`, Boost `2.4.13`, PHPUnit `12.5.31`, Pint `1.29.3`, Larastan `3.10.0`, Tailwind `4.3.2` |
+| Official framework guidance | `completed` | Laravel 13 schema inspection, query listener, eager-loading, pagination/cache docs checked through Boost |
+| Existing implementation | `completed` | Routes, Livewire, plan/access/account/admin queries, schema/indexes, gateway/reconciler, translations/tests/browser/live DB inspected |
+| Design/master/task plan | `completed` | Linked documents define rolling Tasks 1–21+ and exact Task 1 RED/GREEN |
+| Expected/protected files | `completed` | Lists above; no migration/config/route/translation/dependency change |
+| TDD | `completed` | RED до production PHP: `14` SQL для no-provider plan read, `12` для schema readiness и `2` для invalid configured plan code; все три GREEN |
+| Query budgets | `completed` | 0 SQL для no-provider и invalid-code paths; одна memoized schema operation = 2 SQLite framework statements; configured empty catalog = 1 plan query после inventory |
+| README | `completed` | Premium overview и visitor history обновлены только по фактическому database-free unavailable path |
+| Verification | `completed_local` | Premium `9/49`; related admin `31/373`; full PHPUnit `1581`, `1570` passed, `11` skipped, `123983` assertions; PHPStan 0; Pint/Rector/routes/docs/browser passed |
+| Documentation policies | `unresolved_pre_existing` | docs profile, managed docs, README policy и diff check прошли; CHANGELOG policy отклонила прежнюю foreign planning-запись в строке 8 на обычном `read-only`, новая Premium-строка прошла |
+| Commit/push | `unresolved_shared_worktree` | Shared dirty worktree cannot satisfy clean-tree hooks safely; foreign scopes не stage/reset/stash/delete |
+
+### Фактический результат
+
+- No-provider guest plan read: `14 → 0` SQL.
+- `PremiumSchema::ready()`: `12` отдельных probes → одна memoized Laravel
+  operation; на SQLite она выполняет `2` framework statements и не
+  повторяется в том же scoped instance.
+- Invalid configured plan code: `2 → 0` SQL благодаря input validation до
+  schema/plan access.
+- Configured empty catalog сохраняет expected path: `2` schema statements и
+  `1` plan query; явный hydration limit/projection остаётся следующим
+  Premium Task 3.
+- RU/EN HTTP contracts подтверждают `200`, matching canonical,
+  `noindex, follow`, truthful unavailable copy и отсутствие checkout.
+- Live RU desktop `1440×1000` и EN mobile `390×844` не имеют horizontal
+  overflow или console errors; шесть TTFB samples `71–116 ms` остаются
+  diagnostic snapshot, не SLA.
+- Routes, migrations, production rows, provider/plans/currencies, translations,
+  Blade/assets, cache keys, permissions, dependencies и environment не
+  изменены.
+- Code/verification/docs: `completed_local`; Git delivery:
+  `unresolved_shared_worktree`; production commerce activation:
+  `not_applicable`.
+
+## Активная задача — полная русификация текущего CHANGELOG
+
+Дата: 24.07.2026.
+Статус: `completed_with_unresolved_delivery`.
+
+### Scope и проверенное решение
+
+- Каноническое правило уже принадлежит корневому `AGENTS.md`; новый
+  requirement owner не создаётся.
+- Дизайн и исходный план:
+  [`2026-07-16-russian-changelog-policy-design.md`](../superpowers/specs/2026-07-16-russian-changelog-policy-design.md)
+  и
+  [`2026-07-16-russian-changelog-policy.md`](../superpowers/plans/2026-07-16-russian-changelog-policy.md).
+- `scripts/check-changelog-policy.php`, shell wrapper, pre-commit hook,
+  backend CI и PHPUnit-контракты уже реализуют постоянный запрет английской
+  прозы.
+- Текущая рабочая копия содержит `391` строку, `11` датированных разделов,
+  `2` подзаголовка третьего уровня и `330` bullet entries.
+- Полная read-only инвентаризация нашла `352` обычных английских токена только
+  в восьми новых длинных строках: `8`, `9`, `19`, `25`, `27`, `29`, `32`,
+  `35`.
+- Повторная точная сверка показала, что прежняя строка задачи 34 не потеряна:
+  она целиком и дословно присутствует в текущем разделе. Относительно `HEAD`
+  это перенос, а не сокращение содержания; создавать дубликат или отменять
+  существующее изменение общего рабочего дерева не требуется.
+
+### Ожидаемые изменяемые файлы
+
+- `CHANGELOG.md`
+- `docs/plans/current-task-plan.md`
+
+Условно изменяемые только при доказанном пробеле enforcement:
+
+- `scripts/check-changelog-policy.php`
+- `scripts/check-changelog-policy.sh`
+- `.githooks/pre-commit`
+- `scripts/ci-check.sh`
+- `tests/Unit/ChangelogPolicyScriptTest.php`
+- `tests/Unit/CiQualityGateContractTest.php`
+
+После inspection эти условные файлы должны остаться неизменными, если их
+существующий контракт проходит.
+
+### Защищённые contracts
+
+- Все прежние даты, заголовки, записи, числа, измерения, результаты,
+  ограничения, rollback и compatibility evidence.
+- Точные имена технологий, классов, методов, команд, параметров, маршрутов,
+  путей, переменных окружения, протоколов и форматов.
+- Проверка рабочей и staged версии, pre-commit и backend CI integration.
+- `README.md` остаётся без фиктивной visitor/product записи.
+- Application code, routes, schema, data, translations, cache keys,
+  permissions, dependencies, assets и environment не меняются.
+
+### Risks, compatibility и rollback
+
+- Перевод нельзя использовать для сокращения, объединения, удаления или
+  смыслового упрощения истории.
+- Технический идентификатор не переводится; обычная английская проза
+  переводится, а при необходимости идентификатор заключается в backticks.
+- Количество датированных разделов, подзаголовков и bullet entries не должно
+  уменьшиться.
+- Rollback возвращает только формулировки `CHANGELOG.md` и эту task evidence;
+  database/cache/runtime/provider recovery не применим.
+- Shared dirty `main` блокирует commit/push, если clean-tree hook нельзя
+  выполнить без захвата foreign scopes.
+
+### Cross-feature impact
+
+| Domain | Status | Evidence / decision |
+| --- | --- | --- |
+| Documentation history | `affected` | Перевод восьми смешанных записей; содержание перенесённой прежней записи проверено дословно |
+| Future CHANGELOG enforcement | `already_compliant` | Agent rule, staged hook, backend CI и PHPUnit существуют |
+| README | `already_compliant` | Уже документирует русский журнал; product/visitor behavior не меняется |
+| Application/UI/API | `not_applicable` | Исполняемый код и публичные contracts не меняются |
+| Database/cache/queue/import | `not_applicable` | Нет runtime или persistent mutation |
+| Security/privacy/secrets | `already_compliant` | Перевод не добавляет private operational values |
+| Production/deployment | `not_applicable` | Нет activation, migration, config или service action |
+
+### Task-specific requirement-compliance matrix
+
+| Requirement | Status | Evidence / gate |
+| --- | --- | --- |
+| Fresh canonical read order | `completed` | Root/index/code/architecture/workflow/multilingual/security/performance/cache/UI/admin/operations/maintenance/integration owners перечитаны |
+| Installed versions | `completed` | PHP `8.5.8`, Laravel `13.21.1`, SQLite, Node `26.4.0`, npm `12.0.1` |
+| Existing policy implementation | `completed` | PHP/shell scanners, hook, CI и два PHPUnit contract files inspected |
+| Existing Russian design/plan | `completed` | Historical design и implementation plan перечитаны; duplicate plan не создан |
+| Baseline invariants | `completed` | `391` lines, `11` dates, `2` H3, `330` bullets, `352` violating tokens / `8` lines |
+| Translation | `completed` | Все восемь строк переведены без потери фактов; рабочий сканер политики проходит |
+| Historical-entry preservation | `completed` | Перенесённая запись задачи 34 совпадает с `HEAD` дословно и остаётся в журнале |
+| Policy/tests/docs | `completed` | Сканер рабочей копии, синтаксис PHP/shell, 21 тест / 101 утверждение, оба docs-прохода и scoped diff check успешны |
+| Current-plan structure | `unresolved` | Специальный сканер обнаруживает существующие дополнительные H1, начиная со строки 1759; исправление чужих активных разделов не входит в эту задачу |
+| README review | `already_compliant` | Строка 399 уже закрепляет русский журнал и автоматические проверки; отдельного изменения продукта или посетительской записи эта задача не создаёт |
+| Application/routes/schema/cache/permissions | `not_applicable` | Исполняемый код, маршруты, схема, данные, кеш и разрешения задачей не изменены |
+| Commit/push | `unresolved` | Ветка `main` подтверждена, но общее дерево содержит десятки чужих tracked/untracked изменений; обязательный clean-tree hook запрещает безопасный scoped commit |
+
+### Итоговая verification evidence
+
+- `scripts/check-changelog-policy.sh CHANGELOG.md` — успешно, английская
+  обычная проза не найдена.
+- `php -l scripts/check-changelog-policy.php` и `bash -n` для scanner
+  wrapper, `pre-commit` и `ci-check.sh` — успешно.
+- `php artisan test tests/Unit/ChangelogPolicyScriptTest.php
+  tests/Unit/CiQualityGateContractTest.php` — `21` тест, `101` утверждение,
+  всё успешно.
+- `scripts/check-readme-policy.sh README.md`,
+  `php artisan project:docs-refresh --check --no-interaction` и
+  `bash scripts/ci-check.sh docs` — успешно; управляемая документация уже
+  актуальна.
+- Итоговые инварианты `CHANGELOG.md`: `391` строка, `11` датированных
+  разделов, `2` подзаголовка третьего уровня и `330` записей — те же значения,
+  что до перевода. Восемь смешанных строк переведены без объединения или
+  сокращения; прежняя запись задачи 34 присутствует дословно.
+- Условные файлы scanner/hook/CI/tests не изменялись: существующее постоянное
+  принуждение уже полностью покрывает запрос.
+- `git diff --check -- CHANGELOG.md docs/plans/current-task-plan.md` — успешно.
+- `README.md` проверен; задача не меняет продукт, состояние дорожной карты,
+  установку или эксплуатацию, поэтому отдельная фиктивная запись не добавлена.
+- `scripts/check-current-plan-policy.sh docs/plans/current-task-plan.md` остаётся
+  `unresolved`: общий документ до этой задачи уже содержит несколько H1; первый
+  дополнительный заголовок, на котором останавливается сканер, находится в
+  строке `1759`.
+
+## Активная задача — автоматическое ведение русского CHANGELOG
+
+Дата: 25.07.2026.
+Статус: `completed_with_unresolved_delivery`.
+
+### Цель и утверждённое решение
+
+- Пользователь утвердил автоматическую фактическую запись по категориям
+  staged-файлов и потребовал начать реализацию без дополнительных вопросов.
+- Одобренный дизайн:
+  [`2026-07-25-automatic-russian-changelog-design.md`](../superpowers/specs/2026-07-25-automatic-russian-changelog-design.md).
+- Исполнимый план:
+  [`2026-07-25-automatic-russian-changelog.md`](../superpowers/plans/2026-07-25-automatic-russian-changelog.md).
+- Каноническим владельцем нового постоянного правила остаётся корневой
+  `AGENTS.md`; параллельный владелец требований не создаётся.
+- `pre-commit` после исходных Git guards автоматически добавит русскую
+  датированную запись и точечно добавит в индекс только `CHANGELOG.md`, если
+  staged-изменение кода не сопровождается ручным изменением журнала.
+- Изменения только Markdown-документации остаются без автоматической записи.
+
+### Ожидаемые изменяемые файлы
+
+- `AGENTS.md`
+- `.githooks/pre-commit`
+- `scripts/update-changelog-for-staged-code.php`
+- `scripts/update-changelog-for-staged-code.sh`
+- `tests/Unit/AutomaticChangelogUpdateScriptTest.php`
+- `tests/Unit/CiQualityGateContractTest.php`
+- `docs/development.md`
+- `docs/ci.md`
+- `README.md`
+- `CHANGELOG.md`
+- `docs/plans/current-task-plan.md`
+- `docs/superpowers/specs/2026-07-25-automatic-russian-changelog-design.md`
+- `docs/superpowers/plans/2026-07-25-automatic-russian-changelog.md`
+
+### Защищённые файлы и публичные контракты
+
+- `scripts/check-changelog-policy.php`,
+  `scripts/check-changelog-policy.sh` и их русский policy contract.
+- `.githooks/lib/git-guard.sh`, `.githooks/pre-push`,
+  `.githooks/post-commit` и `scripts/docs-autocommit-push.sh`.
+- Все прежние даты, записи, факты, числа и технические идентификаторы
+  `CHANGELOG.md`.
+- Единственная ветка `main`, clean-tree guards, запрет секретных и временных
+  путей и точный порядок docs/README/CHANGELOG checks.
+- Application routes, models, migrations, translations, cache keys,
+  permissions, dependencies, assets и production runtime остаются
+  совместимыми и не меняются этой задачей.
+
+### Риски, безопасность и откат
+
+- Автоматическое `git add` является явным изменением прежнего read-only
+  контракта `pre-commit`; разрешена только точная цель `CHANGELOG.md`.
+- Wrapper обязан сначала отказаться от работы при unstaged-изменении журнала,
+  а ручное staged-изменение журнала полностью подавляет автоматическое.
+- Классификация получает только NUL-разделённые repository-relative пути и не
+  записывает пути, diff, содержимое файлов, секреты или неподтверждённые
+  продуктовые утверждения.
+- Дата по умолчанию вычисляется в `Europe/Vilnius`, а тесты используют
+  `SEASONVAR_CHANGELOG_DATE=YYYY-MM-DD`.
+- Реальный hook нельзя безопасно запускать на текущем общем грязном дереве;
+  Git behavior проверяется в отдельных временных repository.
+- Откат удаляет точный вызов updater, два новых скрипта и их тесты и возвращает
+  документацию к обязательному ручному обновлению без изменения истории.
+
+### Cross-feature impact
+
+| Domain | Status | Evidence / решение |
+| --- | --- | --- |
+| Git workflow | `affected` | Разрешена одна автоматическая мутация и targeted staging `CHANGELOG.md` |
+| Documentation history | `affected` | Каждое code change получает русскую датированную запись |
+| Russian language policy | `already_compliant` | Существующие scanner, staged hook и backend CI сохраняются |
+| README/developer workflow | `affected` | Требуется точное описание нового поведения hook |
+| Application/UI/API | `not_applicable` | Исполняемый portal code и публичные routes не меняются |
+| Database/cache/queue/import | `not_applicable` | Нет schema, data, cache, worker или provider mutation |
+| Authentication/authorization/premium/legal | `not_applicable` | Access boundaries не затрагиваются |
+| Localization | `already_compliant` | Новая диагностика и автоматическая запись только на русском; interface catalogs не меняются |
+| Security/privacy | `affected` | Запрещены diff, contents, absolute paths и secrets; stage только exact file |
+| Production/deployment | `not_applicable` | Hook является repository tooling и не меняет runtime services |
+
+### Task-specific requirement-compliance matrix
+
+| Requirement | Status | Evidence / gate |
+| --- | --- | --- |
+| Fresh canonical read order | `completed` | Root/index/code/architecture/development/multilingual/security/maintenance/integration owners и feature docs перечитаны |
+| Installed versions | `completed` | Финальная сверка: PHP `8.5.8`, Laravel `13.22.0`, Node `26.4.0`, npm `12.0.1` |
+| Existing implementation | `completed` | Git guards, hooks, docs autocommit, README/CHANGELOG policies и PHPUnit contracts inspected |
+| Approved design | `completed` | Пользователь одобрил recommended pre-commit classification и затем письменный design |
+| Permanent rule owner | `completed` | Новый контракт сначала добавлен в корневой `AGENTS.md` |
+| Expected/protected files | `completed` | Exact lists, compatibility и rollback зафиксированы выше |
+| TDD RED | `completed` | 9 тестов получили 9 ожидаемых отказов из-за отсутствующего updater; отдельный hook-order test отказал на отсутствующей позиции |
+| TDD GREEN | `completed` | Updater: 9 тестов / 26 утверждений; объединённый policy/hook набор: 31 тест / 136 утверждений |
+| PHP/shell implementation | `completed` | Детерминированный классификатор, NUL-safe wrapper, targeted staging и hook order реализованы |
+| Russian policy | `completed` | Generated entry и весь рабочий `CHANGELOG.md` проходят существующий scanner |
+| Documentation/README | `completed` | `docs/development.md`, обнаруженный связанный `docs/ci.md`, Git-раздел и датированная история README обновлены |
+| Final focused verification | `completed` | Pint прошёл; 31 тест и 136 утверждений прошли; PHP/shell syntax, executable bit, README/CHANGELOG policies, managed docs, docs gate и scoped diff check прошли |
+| Current-plan structure | `unresolved_pre_existing` | Накопленный общий документ уже нарушает single-H1 policy; новый раздел H2 не расширяет этот долг |
+| Commit/push | `unresolved_shared_worktree` | Ветка `main`, но множество foreign tracked/untracked scopes не позволяют безопасно stage/commit/push или пройти обязательный clean-tree hook |
+
+### Фактический результат и текущая проверка
+
+- `scripts/update-changelog-for-staged-code.php` принимает дату и
+  NUL-разделённые относительные пути, отклоняет небезопасные пути, считает
+  каждый кодовый файл один раз и выводит категории в стабильном порядке.
+- `scripts/update-changelog-for-staged-code.sh` сохраняет ручную staged-запись,
+  отказывает при unstaged-журнале, не действует для документации и точечно
+  выполняет только `git add -- CHANGELOG.md`.
+- `.githooks/pre-commit` вызывает updater после исходных проверок чистоты и до
+  `docs`, README и русскоязычной CHANGELOG policy.
+- Повторный repository search выявил и исправил прежний противоречащий текст в
+  `docs/ci.md`; второй updater или альтернативная Git-граница не найдены.
+- `CHANGELOG.md` после содержательной записи содержит `395` строк,
+  `12` датированных разделов, `2` H3 и `331` запись против исходных
+  `391`/`11`/`2`/`330`; прежняя история не уменьшилась.
+- Финальный направленный запуск подтвердил: Pint — успешно; PHPUnit —
+  `31` тест и `136` утверждений; PHP/shell syntax, executable bit,
+  `CHANGELOG.md`/`README.md` policies, `project:docs-refresh --check`,
+  `ci-check.sh docs` и scoped `git diff --check` — успешно.
+- Финальный поиск нашёл один исполняемый updater и только его ожидаемые
+  test/documentation references; альтернативная мутация Git index не
+  добавлена.
+- Ветка остаётся `main` и опережает `origin/main` на `34` commit; общий
+  tracked/untracked diff содержит несвязанные изменения application code,
+  routes, configuration, translations, assets, dependencies и тестов.
+  Поэтому selective staging, commit и push этой задачи не выполнялись.
+- `scripts/check-current-plan-policy.sh` по-прежнему останавливается на первом
+  накопленном дополнительном H1 в строке `1759`; это
+  `unresolved_pre_existing`, не созданный новым H2-разделом.
+
+## Активная задача — Premium Task 2: матрица корректности доступа
+
+Дата: 25.07.2026.
+Статус: `completed_local_delivery_unresolved`.
+
+### Цель и решение
+
+- Следующий ready-пункт утверждённого безлимитного Premium master-плана —
+  Task 2.
+- Подробный исполнимый план:
+  [`2026-07-25-premium-access-resolver-correctness.md`](../superpowers/plans/2026-07-25-premium-access-resolver-correctness.md).
+- `PremiumAccessResolver` остаётся единственной entitlement read boundary.
+- TDD-матрица покрывает inactive/future/expired/revoked, exact time
+  boundaries, duration extension, lifetime, overlap manual/promotion/
+  subscription, provider grace, cancellation, payment-scoped revoke и
+  request memo invalidation.
+- Production `premium_entitlements` и `premium_subscriptions` сейчас пусты.
+  Read-only `EXPLAIN QUERY PLAN` использует
+  `premium_entitlements_user_feature_active_idx`, но показывает временное
+  B-tree для необязательного `ORDER BY starts_at`.
+- Summary вычисляет minimum, maximum и стабильные сортированные enum lists
+  независимо от порядка строк. Поэтому сначала тестируется удаление
+  необязательной сортировки; новый индекс запрещён без material dataset
+  evidence.
+- TDD подтвердил решение: RED прошёл `9/10` и упал только на присутствующем
+  `ORDER BY starts_at`; минимальный GREEN удалил эту сортировку.
+- Повторный read-only `EXPLAIN QUERY PLAN` использует тот же
+  `premium_entitlements_user_feature_active_idx`, но больше не содержит
+  temporary B-tree.
+
+### Ожидаемые изменяемые файлы
+
+- `app/Services/Premium/PremiumAccessResolver.php`
+- `app/Models/PremiumEntitlement.php` — только если понадобится factory
+  boundary
+- `database/factories/PremiumEntitlementFactory.php` — только если
+  подтверждён существующий factory pattern
+- `tests/Feature/Premium/PremiumAccessResolverTest.php`
+- `docs/premium.md`
+- `docs/superpowers/plans/2026-07-24-premium-improvement-master-plan.md`
+- `docs/superpowers/plans/2026-07-25-premium-access-resolver-correctness.md`
+- `docs/plans/current-task-plan.md`
+- `README.md`
+- `CHANGELOG.md`
+
+### Защищённые contracts и риски
+
+- Не меняются routes, middleware, `PremiumAccessSummary`, stable feature/
+  source/status codes, migrations, production rows, provider/currency/plan
+  configuration, translations, cache keys, permissions, dependencies,
+  `.env*`, assets или runtime services.
+- Browser/payment/subscription state не становится самостоятельным proof of
+  access: требуется explicit активный entitlement.
+- Lifetime возвращает `expiresAt=null`; разные sources сосуществуют; revoke
+  payment затрагивает только связанные rows.
+- Request memo остаётся scoped и обязательно сбрасывается после mutation;
+  shared user cache не вводится.
+- Первый подготовленный resolver read ограничен одним entitlement query и
+  одним projected subscription eager load; повторный read — ноль SQL.
+- Все тестовые записи создаются только в SQLite in-memory. Production DML,
+  migration, cache clear, queue control, provider HTTP и deployment не
+  разрешены.
+- Откат code-only: восстановить resolver query и удалить новый test/factory.
+
+### Cross-feature impact
+
+| Domain | Status | Evidence / решение |
+| --- | --- | --- |
+| Premium entitlement | `affected` | Полная automated correctness matrix и bounded read |
+| Authentication/account | `affected` | Resolver принимает только server-resolved nullable `User`; owner identity неизменна |
+| Billing/refund/dispute | `affected` | Проверяется точечный linked-payment revoke без изменения reconciler |
+| Cache/privacy/security | `affected` | Только request memo; shared cache и provider/private payload отсутствуют |
+| Settings/admin/help | `compatibility_required` | Существующие consumers DTO/flags должны остаться совместимыми |
+| Database/index | `completed` | Existing index используется; необязательная temp sort устранена code-only, migration не обоснована |
+| Routes/API/SEO/sitemap/UI/localization | `not_applicable` | Public contract и presentation не меняются |
+| Catalog/player/import/region/legal | `not_applicable` | Premium feature всё ещё не изменяет доступ к контенту |
+| Production operations | `not_applicable` | Нет schema/data/config/service mutation |
+
+### Task-specific requirement-compliance matrix
+
+| Requirement | Status | Evidence / gate |
+| --- | --- | --- |
+| Fresh canonical read order | `completed` | Root/index/code/architecture/development/multilingual/security/performance/cache/authorization/operations/maintenance/integration/Premium owners перечитаны |
+| Final requirement reread | `completed` | Перед финализацией повторно сверены canonical index, security/authorization, performance/cache, production/maintenance/integration и обновлённый Premium owner |
+| Installed versions | `completed` | Boost: PHP `8.5`, Laravel `13.22.0`, Livewire `4.3.3`, Boost `2.4.13`, PHPUnit `12.5.31`, Pint `1.29.3`, Larastan `3.10.0`, Tailwind `4.3.2`; SQLite |
+| Official Laravel guidance | `completed` | Boost: eager-load projections, query listener/count, local scopes и SQLite query-plan guidance |
+| Existing implementation | `completed` | Resolver/model/service/DTO/enums/migration/indexes/consumers/tests и production read-only counts inspected |
+| Production data safety | `completed` | Read-only counts: `0` entitlements, `0` subscriptions; никакой DML |
+| Expected/protected files | `completed` | Exact scope, public/persisted compatibility и rollback перечислены выше |
+| TDD RED | `completed` | `10` tests: `9` passed, единственный ожидаемый failure — SQL всё ещё содержал `ORDER BY starts_at` |
+| TDD GREEN | `completed` | Удалена только необязательная сортировка; focused matrix `10/10`, `59` assertions |
+| Query/index evidence | `completed` | Production read-only plan использует existing composite index без temporary B-tree; migration не обоснована |
+| Fixture/model boundary | `completed` | Typed local fixture builders достаточны; production model и factory не менялись |
+| Focused/broad verification | `completed` | Resolver `10/59`; Premium/admin `42/435`; Help Center `1/2`; scoped/full PHPStan 0; Pint/Rector/docs/README/CHANGELOG/diff gates прошли |
+| Full PHPUnit | `unresolved` | Все `1601` tests выполнены: `1589` passed, `11` skipped, единственный foreign authentication failure воспроизводится отдельно до project code из-за `laravel/framework 13.22.0` `ae66e4c` (`Arr::last(null)` из `CookieJar::hasQueued()`) |
+| Frontend/browser/build | `not_applicable` | PHP query и документация не меняют Blade, JavaScript, CSS, assets или browser behavior |
+| README/CHANGELOG | `completed` | Premium owner, docs map, честный visitor result и отдельная русская техническая запись обновлены |
+| Commit/push | `unresolved_shared_worktree` | Общая `main` содержит многочисленные foreign tracked/untracked changes |
+
+### Итоговая сверка и доставка
+
+- `PremiumAccessResolver` изменён одной строкой: удалён независимый от summary
+  `ORDER BY starts_at`.
+- Новый `PremiumAccessResolverTest` содержит 10 сценариев и 59 утверждений.
+- `EXPLAIN QUERY PLAN` после изменения использует
+  `premium_entitlements_user_feature_active_idx` без временного дерева
+  сортировки; миграция и новый индекс не обоснованы.
+- Полный статический анализ проекта, Pint, Rector, управляемая документация,
+  профиль документации, README/CHANGELOG policies и scoped whitespace check
+  прошли.
+- `scripts/check-current-plan-policy.sh` остаётся
+  `unresolved_pre_existing`: первый накопленный лишний H1 находится в строке
+  `1759`, до раздела этой задачи.
+- Полный PHPUnit не объявляется зелёным: стороннее незавершённое изменение
+  `composer.lock` обновило `laravel/framework` с `13.20.0` до `13.22.0`, где
+  upstream [`ae66e4c`](https://github.com/laravel/framework/commit/ae66e4c9b85e4f17ba9a6332aaa5809079f9f717)
+  нарушает вызов выхода из других браузерных сессий.
+  Premium-набор и все остальные тесты прошли; `vendor`, dependency lock и
+  несвязанный authentication scope этой задачей не исправлялись.
+- Селективные stage/commit/push невозможны без поглощения чужих изменений в
+  общих `README.md`, `CHANGELOG.md`, `docs/README.md`,
+  `docs/plans/current-task-plan.md` и master plan. Доставка остаётся
+  `unresolved_shared_worktree`.
+
+## Активная задача — Premium Task 3: ограниченные публичные тарифы и неизменяемая цена
+
+Дата: 25.07.2026.
+Статус: `completed_local_delivery_unresolved`.
+
+### Цель и подготовленное решение
+
+- Следующий `ready`-пункт утверждённого Premium master-плана — Task 3.
+- Подробный TDD-план:
+  [`2026-07-25-premium-public-plan-bounds.md`](../superpowers/plans/2026-07-25-premium-public-plan-bounds.md).
+- `PremiumPlanQuery` остаётся единственной public/purchasable read boundary;
+  второй repository, cache или provider read не создаётся.
+- Portable SQL до hydration отсекает inactive/private/legacy, неположительную
+  сумму, неподдерживаемую валюту/provider/type, отсутствующие provider
+  product/price mappings и несогласованные duration/billing fields.
+- Запрос выбирает только поля presentation/checkout validation, сортирует
+  `display_order ASC, id ASC`, гидратирует не более `48` candidates и
+  возвращает не более `12` полностью проверенных тарифов.
+- JSON/registry/translation/region/capability проверки остаются server-side;
+  цена и валюта берутся только из DB snapshot, locale используется только
+  для текста и форматирования.
+- Public-plan cache, provider HTTP и новая migration не добавляются.
+
+### Ожидаемые изменяемые файлы
+
+- `app/Services/Premium/PremiumPlanQuery.php`
+- `tests/Feature/Premium/PremiumPlanQueryTest.php`
+- `docs/premium.md`
+- `docs/performance.md`
+- `docs/README.md`
+- `docs/superpowers/plans/2026-07-24-premium-improvement-master-plan.md`
+- `docs/superpowers/plans/2026-07-25-premium-public-plan-bounds.md`
+- `docs/plans/current-task-plan.md`
+- `README.md`
+- `CHANGELOG.md`
+
+`app/Models/PremiumPlan.php`, `app/ValueObjects/Money.php`, provider/feature
+registries и factories проверяются, но меняются только при воспроизведённом
+дефекте; существующий локальный typed fixture pattern пока достаточен.
+
+### Защищённые contracts и риски
+
+- Не меняются Premium routes, `PremiumPlanData`, `CreatePremiumCheckout`
+  signature, enum identities, migration/indexes, production rows,
+  provider/currency configuration, dependencies, cache keys, permissions,
+  translations, assets или runtime services.
+- Task 1 zero-SQL no-provider/invalid-code fast paths и Task 2 entitlement
+  resolver/query memo сохраняются.
+- Candidate window может fail-closed скрыть валидную запись после первых 48
+  SQL-safe candidates, но никогда не превращает невалидную строку в
+  продаваемый тариф и ограничивает память/ответ. Операционный предел
+  документируется как максимум 12 опубликованных тарифов.
+- Production `premium_plans` read-only audit: `0` rows и `0` public
+  candidates; никакой DML, migration, cache clear или provider call.
+- Existing `premium_plans_public_order_idx` поддерживает
+  `(is_active,is_public,display_order)`; `EXPLAIN QUERY PLAN` выбирает его.
+  Новый индекс запрещён без material dataset evidence.
+- Откат code-only: вернуть прежний builder и удалить новый тест; schema/data
+  rollback не требуется.
+
+### Cross-feature impact
+
+| Domain | Status | Evidence / решение |
+| --- | --- | --- |
+| Premium plans/pricing | `affected` | Bounded projected query, complete validity matrix, immutable DB amount/currency |
+| Checkout/billing | `compatibility_required` | Browser по-прежнему передаёт code; checkout заново читает exact plan snapshot |
+| Authentication/authorization | `unaffected` | Guest/owner/admin boundaries и verified checkout gate не меняются |
+| Locale/translations | `compatibility_required` | RU/EN editorial completeness сохраняется; locale не выбирает currency |
+| Cache/privacy/security | `affected` | Shared plan/user cache не добавляется; provider/private identity не раскрывается |
+| Database/index | `affected_read_only` | Projection/predicates/limit меняют только SELECT; schema/indexes/data неизменны |
+| Settings/admin | `compatibility_required` | DTO/model signatures сохраняются; отдельные read paths не меняются |
+| Routes/API/SEO/sitemap | `unaffected` | Route names and no-provider noindex contract сохраняются |
+| Catalog/player/library/import/region/legal | `unaffected` | `premium_access` не даёт новых content privileges |
+| Production operations | `affected_code_rollout` | Code-only rollback, no migration/cache/provider/service step |
+
+### Task-specific requirement-compliance matrix
+
+| Requirement | Status | Evidence / gate |
+| --- | --- | --- |
+| Fresh canonical read order | `completed` | Root/index/code/architecture/development/multilingual/security/performance/cache/operations/maintenance/integration/Premium owners перечитаны |
+| Approved design/master plan | `completed` | Утверждённый Premium design и monotonic master Task 3 |
+| Installed versions | `completed` | Boost/shell: PHP `8.5.8`, Laravel `13.22.0`, Livewire `4.3.3`, Boost `2.4.13`, PHPUnit `12.5.31`, Pint `1.29.3`, Larastan `3.10.0`, Tailwind `4.3.2`, Node `26.4.0`, npm `12.0.1`, SQLite |
+| Official Laravel guidance | `completed` | Laravel 13 Boost docs: explicit Eloquent select/order/limit, DB query listener and SQLite/query inspection |
+| Existing implementation | `completed` | Query/model/Money/DTO/registries/config/migration/checkout/Livewire/tests/consumers inspected |
+| Production data safety | `completed` | Read-only schema/count/EXPLAIN; `premium_plans=0`, no DML |
+| Expected/protected files | `completed` | Exact lists, compatibility, candidate-limit risk and rollback recorded above |
+| Detailed executable plan | `completed` | Task-specific TDD plan saved and reread before code |
+| TDD RED | `completed` | `4` tests: `1` passed, `2` expected assertion failures (unbounded `13`/unsupported locale), `1` expected invalid-enum hydration error |
+| TDD GREEN | `completed` | `PremiumPlanQueryTest`: `4/4`, `28` assertions; bounded projection/filter/order и immutable snapshot реализованы |
+| Focused/static/full verification | `completed_with_unrelated_failures` | Query budget `6/28`; pricing `3/21`; Premium `23/136` и filter `25/149`; administration `63/2635`; Pint, full PHPStan, Rector, managed docs, README/CHANGELOG и scoped diff прошли. Full suite: `1605` tests, `1592` passed, `11` skipped, один foreign auth failure и один случайный factory collision; factory test прошёл отдельно `1/8`, auth failure воспроизвёлся отдельно |
+| Final requirement reread/legacy scan | `completed` | Повторно сверены canonical index, security/PCI, performance/cache, integration и обновлённый Premium owner; второй public-plan query/cache/client-owned amount не найден |
+| README/CHANGELOG | `completed` | Premium/performance/docs map/master, честная visitor history и отдельная русская техническая запись обновлены; policy checks прошли |
+| Commit/push | `unresolved_shared_worktree` | Existing `main` has many unrelated tracked/untracked changes |
+
+### Итоговая сверка и доставка
+
+- `PremiumPlanQuery` выполняет один projected candidate read: `13` полей,
+  SQL-safe predicates, порядок `(display_order,id)`, предел `48` candidates и
+  максимум `12` полностью проверенных тарифов.
+- Unsupported locale, empty commerce и invalid code сохраняют ранний
+  fail-closed path; `purchasable()` повторно выбирает server-owned
+  `amount_minor`, `currency` и provider mappings.
+- Read-only SQLite `EXPLAIN QUERY PLAN` использует
+  `premium_plans_public_order_idx`; таблица пуста, production DML, migration,
+  cache, provider HTTP, dependency и environment change отсутствуют.
+- Полный PHPUnit не объявляется полностью зелёным. Из `1605` тестов `1592`
+  прошли и `11` пропущены; один unrelated
+  `CatalogTitleSuggestionQueryTest` столкнулся со случайным уникальным номером
+  серии и сразу прошёл отдельно (`1/1`, `8` утверждений). Единственный
+  стабильный failure —
+  `WebAccountManagementTest::test_logout_other_browser_sessions_preserves_current_session`;
+  он воспроизводится отдельно и остаётся известным внешним регрессом после
+  незавершённого общего обновления `laravel/framework` до `13.22.0`.
+- `main` опережает `origin/main` на `34` коммита и содержит множество чужих
+  `tracked`/`untracked` изменений, включая общие файлы этой задачи. Безопасно
+  выделить индекс, выполнить commit и push без поглощения чужой работы нельзя;
+  Git delivery остаётся `unresolved_shared_worktree`.
+
+## Активная задача — Premium Task 4: account read model и bounded history
+
+Дата: 25.07.2026.
+Статус: `implemented_verified_local_delivery_unresolved`.
+
+Подробный исполнимый план:
+[`2026-07-25-premium-account-read-model.md`](../superpowers/plans/2026-07-25-premium-account-read-model.md).
+
+### Discovery и решение
+
+- `/settings/premium` уже защищён owner-only middleware,
+  `private, no-store` и `noindex,nofollow`; route/permission change не нужен.
+- `AccountSettingsPage` отдельно вызывает `overview()` и `payments()`.
+  Overview повторно читает active entitlements через resolver, затем до `25`
+  entitlement rows, latest subscription и active entitlement + plan.
+- Payment history сохраняет нужную полную `LengthAwarePaginator`, но
+  гидратирует `SELECT *`; `history_per_page` имеет minimum `5`, но не maximum.
+- Выбран один prepared `snapshot()`: entitlement query объединяет все active
+  rows с последними `25`, summary строится resolver-ом из уже загруженного
+  owner set, active plan берётся там же. Pending subscription остаётся
+  отдельным projected read, потому что может ещё не иметь entitlement.
+- Payment paginator сохраняет `premiumPaymentsPage`, total/last-page UI и
+  default `15`, получает hard maximum `50`, explicit projection и stable
+  `(created_at,id) DESC`.
+- Existing `premium_payments_user_time_idx` соответствует query; migration
+  запрещена без material `EXPLAIN` evidence.
+
+### Ожидаемые файлы
+
+- Modify: `app/Services/Premium/PremiumAccountQuery.php`.
+- Modify: `app/Services/Premium/PremiumAccessResolver.php`.
+- Modify: `app/Livewire/Settings/AccountSettingsPage.php`.
+- Create: `app/DTOs/Premium/PremiumPaymentHistoryData.php`.
+- Modify: `resources/views/livewire/settings/account-settings-page.blade.php`
+  только для readonly DTO property access без visual change.
+- Create: `tests/Feature/Premium/PremiumAccountQueryTest.php`.
+- Modify: `docs/premium.md`, `docs/performance.md`, `docs/README.md`.
+- Managed refresh: `docs/CODE_STANDARDS.md`, `docs/UI_STANDARDS.md`,
+  `docs/DATA_RELATIONS.md`, `docs/SOURCE_PARITY.md`,
+  `docs/MAINTENANCE_LOG.md` and README managed block.
+- Modify: Premium master plan, current plan, `README.md`, `CHANGELOG.md`.
+- Inspect-only unless RED: config, models, migration, routes, translations,
+  gateways.
+
+### Совместимость, риски и rollback
+
+- Сохраняются `overview()`, `payments()`, `PremiumAccessSummary`, Blade
+  variables, `LengthAwarePaginator`, page name/URL и entitlement/provider
+  contracts; payment row получает readonly DTO вместо shape-array.
+- Все active entitlements входят в summary даже за пределами visible history;
+  relation projection включает keys для Eloquent matching и explicit grace.
+- Provider/private IDs, notes, payloads и HTTP не входят в render.
+- Нет schema/data/cache/dependency/environment/worker/service mutation.
+- Code-only rollback возвращает прежние builders и два Livewire-вызова.
+
+### Cross-feature impact
+
+| Domain | Status | Решение |
+| --- | --- | --- |
+| Premium account/access | `affected` | Prepared authoritative snapshot без client state |
+| Billing/history/refunds | `affected` | Projected owner page, reconciled refund snapshot |
+| Auth/privacy/security | `already_compliant` | Existing self route/private middleware сохраняются |
+| Livewire/UI/mobile/a11y | `compatibility_required` | Props, paginator name и Blade остаются прежними |
+| Cache | `not_applicable` | Shared/user cache не добавляется |
+| Database/index | `affected_read_only` | SELECT/projection/order only; existing index проверяется |
+| Locale/translations | `compatibility_required` | Locale только форматирует prepared values |
+| Admin/API/SEO/sitemap | `unaffected` | Routes/DTOs/public contracts не меняются |
+| Catalog/player/import/legal/region | `unaffected` | Premium не даёт новых content privileges |
+| Production operations | `code_only` | No DML/migration/provider/cache action |
+
+### Task-specific compliance matrix
+
+| Requirement | Status | Evidence / gate |
+| --- | --- | --- |
+| Fresh root/index/read order | `completed` | Canonical requirements и related Premium/settings docs reread |
+| Installed versions | `completed` | PHP 8.5, Laravel 13.22.0, Livewire 4.3.3, Boost 2.4.13, SQLite |
+| Official docs | `completed` | Named paginator, full pagination и eager projection guidance |
+| Existing implementation | `completed` | Call graph, schema/indexes, models, Blade and test patterns inspected |
+| Detailed plan | `completed` | Task-specific TDD plan saved before code |
+| TDD RED | `completed` | Missing snapshot and unbounded 1000-row configuration reproduced |
+| TDD GREEN | `completed` | Account/resolver 14 tests, 86 assertions; Premium 29/176 |
+| Query/EXPLAIN | `completed` | One entitlement + one subscription read; payment existing index; no new migration |
+| Privacy/owner HTTP | `completed` | Payment DTO renders under private/no-store/noindex owner route |
+| Static/build/full suite | `completed_with_unrelated_failure` | Full PHPStan/Pint/Vite pass; PHPUnit 1597 pass, 11 skip, one pre-existing auth failure |
+| README/CHANGELOG/docs | `completed` | Canonical Premium/performance owners, map, master and Russian histories updated |
+| Documentation policies | `completed_with_pre_existing_unresolved` | Refresh/CI, README, CHANGELOG and whitespace pass; old multi-H1 current plan still fails at line 1759 |
+| Commit/push | `unresolved_shared_worktree` | Existing foreign dirty main; hooks not bypassed |
+
+### Verification evidence
+
+- RED: `3` tests, `1` pass, `5` assertions, expected undefined
+  `snapshot()` error and `perPage=1000` failure.
+- GREEN: `PremiumAccountQueryTest` + `PremiumAccessResolverTest` —
+  `14/14`, `86` assertions; all Premium-filtered tests — `29/29`, `176`
+  assertions.
+- Full `PHPStan` passed; `Pint` passed; `npm run build` built `24` modules.
+- Full PHPUnit: `1609` tests, `1597` passed, `11` skipped, `1` known unrelated
+  account-session failure; exact test failed again in isolation.
+- Read-only counts: entitlement/subscription/payment/refund all `0`.
+  Payment `EXPLAIN` uses `premium_payments_user_time_idx`; speculative
+  entitlement-history index is rejected until material evidence.
+- Routes, middleware, schema, data, cache, translations, permissions,
+  provider configuration, dependencies, `.env`, queues and services unchanged.
+- `scripts/check-current-plan-policy.sh` всё ещё останавливается на первом
+  историческом лишнем H1 в строке 1759, до этой задачи; это накопленный
+  `unresolved_pre_existing`, а не обход проверки.
+- Existing `main` remains ahead of `origin/main` with numerous foreign
+  tracked/untracked changes, including shared docs; clean-tree commit/push
+  cannot be claimed.
+
+## Активная задача — Premium Task 5: administration query boundary
+
+Дата: 25.07.2026.
+
+Статус: `implemented_verified_local_delivery_unresolved`.
+
+Подробный исполнимый план:
+[`2026-07-25-premium-administration-query-boundary.md`](../superpowers/plans/2026-07-25-premium-administration-query-boundary.md).
+
+### Discovery и решение
+
+- `/admin/premium` уже является full-page Livewire route под canonical private
+  admin middleware и отдельными Premium gates.
+- User, entitlement, promotion и audit builders сейчас находятся прямо в
+  `PremiumAdministrationManager`; mutations уже корректно делегированы
+  существующим services.
+- Новый `PremiumAdministrationQuery` возвращает только prepared safe arrays и
+  audit paginator, а permissions остаются server-side решениями Livewire.
+- UUID и email расходятся до SQL. Exact normalized email использует
+  `users_email_unique`; legacy `lower(email)` выполняется только как fallback.
+- Read-only production-like evidence: `102` users, `0` ненормализованных email,
+  все четыре затрагиваемые Premium data tables пусты. Combined
+  UUID/`lower(email)` и fallback используют scan; отдельный UUID использует
+  `users_public_id_unique`. Новая identity column/expression index при таком
+  объёме не обоснованы.
+- Entitlements ограничены `30`, promotions `20`, audit full paginator `20`;
+  explicit projections исключают private notes, context, provider и
+  idempotency identities.
+
+### Ожидаемые файлы
+
+- Create `app/Services/Premium/PremiumAdministrationQuery.php`.
+- Create `tests/Feature/Premium/PremiumAdministrationQueryTest.php`.
+- Modify `app/Livewire/Premium/PremiumAdministrationManager.php`.
+- Modify `docs/premium.md`, `docs/performance.md`,
+  `docs/administration.md`, `docs/README.md`.
+- Modify Premium master plan, current plan, `README.md`, `CHANGELOG.md`.
+- Inspect-only unless RED: Blade, models, migrations, routes, gates, config,
+  translations, provider registry.
+
+### Совместимость, риски и rollback
+
+- Сохраняются route, middleware, все Premium gates, Livewire action names,
+  locked public ID, validation/rate limits, mutation services, Blade variable
+  names/shapes, pagination island/page name, noindex/private/no-store.
+- Legacy mixed-case email поддерживается fallback query; обычный normalized
+  путь остаётся indexed.
+- Schema readiness fail-closed; denied capability не вызывает скрытый domain
+  read.
+- Нет DDL/DML, cache, provider HTTP, dependencies, environment, queue, worker
+  или asset changes.
+- Code-only rollback; migration/data/cache rollback отсутствует.
+
+### Cross-feature impact
+
+| Domain | Status | Evidence / решение |
+| --- | --- | --- |
+| Premium administration | `affected` | Один prepared read service |
+| Authorization/audit | `compatibility_required` | Existing gates и safe audit shape |
+| User identity/auth | `affected_read_only` | Indexed exact lookup + legacy fallback |
+| DB/index | `affected_read_only` | Projection/order/limits, без migration |
+| Cache/privacy/security | `affected` | No shared cache; private columns не выбираются |
+| Livewire/UI/mobile/a11y | `compatibility_required` | Existing props/island/controls сохраняются |
+| Locale/translations | `compatibility_required` | Только existing labels/date formatting |
+| Billing/providers | `compatibility_required` | Registry codes only, no HTTP |
+| Routes/API/SEO/sitemap | `unaffected` | Public contracts не меняются |
+| Catalog/player/import/region/legal | `unaffected` | Content rights не расширяются |
+| Production operations | `code_only` | No migration/cache/service action |
+
+### Task-specific compliance matrix
+
+| Requirement | Status | Evidence / gate |
+| --- | --- | --- |
+| Fresh canonical/related read | `completed` | Root/index/all applicable owners/design/master reread |
+| Versions/official docs | `completed` | Boost Laravel 13.22/Livewire 4.3 docs and app info |
+| Existing implementation/schema | `completed` | Component/Blade/models/routes/gates/indexes/tests inspected |
+| Read-only production evidence | `completed` | Counts, normalization census and EXPLAIN recorded |
+| Detailed plan/files/contracts/risks | `completed` | Task-specific plan above |
+| TDD RED | `completed` | `3` tests ожидаемо упали только на отсутствующем query class |
+| TDD GREEN | `completed` | Query/Livewire `4/63`; enabled budget `8`, denied budget `2` schema-only queries |
+| Focused/static/full verification | `completed_with_unrelated_failure` | Premium `33/239`, administration `67/2698`, full PHPStan/Pint/docs green; full suite has one known auth failure |
+| Final requirement reread/legacy scan | `completed` | Applicable requirements reread; duplicate/stale read builders not found |
+| README/CHANGELOG/docs | `completed` | Premium/performance/admin owners, map, master and Russian histories updated |
+| Commit/push | `unresolved_shared_worktree` | Clean-tree hook plus numerous foreign tracked/untracked changes prevent safe selective delivery |
+
+### Verification evidence
+
+- RED: `3` tests, `0` assertions, only missing
+  `PremiumAdministrationQuery`.
+- GREEN: query and Livewire integration `4` tests, `63` assertions.
+- Query budget: fully enabled populated page performs `8` queries including
+  two framework schema-inventory reads and one actor eager load; denied page
+  performs only `2` schema-inventory reads and no user/Premium domain read.
+- Premium filter: `33` tests, `239` assertions; administration filter: `67`
+  tests, `2698` assertions.
+- Full PHPStan and required Pint passed. Docs refresh/profile, README,
+  CHANGELOG and whitespace policies passed.
+- Full PHPUnit: `1613` tests, `1601` passed, `11` skipped, one stable unrelated
+  browser-session failure; isolated rerun failed identically.
+- Frontend files, Blade and asset assumptions were not changed by Task 5;
+  Vite build is not applicable.
+- Read-only working data: `102` users, no normalized-email anomalies and empty
+  entitlement/promotion/redemption/audit tables. Existing UUID/email unique
+  indexes are selected; no migration or production DML.
+- Routes, middleware, gates, translations, cache keys, provider registry,
+  dependencies, `.env`, queues, workers and services remain unchanged.
+- Legacy scan confirms read builders are centralized in
+  `PremiumAdministrationQuery`; component model reads remain only
+  authorization-scoped mutation lookups.
+- Current-plan policy still fails at historical line `1759`, before this task.
+  Existing shared dirty `main` prevents clean-tree commit/push.
+
+## Активная задача — восстановление `seasonvar:import` после потери Redis transport
+
+Дата: 25.07.2026.
+
+Статус: `implemented_verified_production_recovery_active_delivery_unresolved`.
+
+Исполнимый TDD-план:
+[`2026-07-25-seasonvar-active-run-reconciliation.md`](../superpowers/plans/2026-07-25-seasonvar-active-run-reconciliation.md).
+
+### Root cause evidence
+
+- `php artisan seasonvar:import` завершается с успешным single-flight сообщением,
+  потому что global queued run `#1255` остаётся `running`.
+- Run содержит `32 523` selected/live claims, `32 522` durable
+  `seasonvar_import_prepared_pages`, `20 869` active title groups и `0`
+  parsed pages; `dispatch_completed=false`.
+- Redis transport для `seasonvar-import` пуст: pending/delayed/reserved равны
+  нулю; import workers живы, но получают только watchdog/finalizer signals.
+- Последняя durable prepared row создана `24.07.2026 16:16:03` UTC. Linux
+  process `seasonvar:import` отсутствует; текущие workers не выполняют page
+  jobs.
+- `FinalizeSeasonvarQueuedImport::dispatchIsIncomplete()` обновляет heartbeat
+  каждые десять минут без state transition. Поэтому run выглядит свежим и не
+  попадает в stale recovery.
+- Existing importer master plan Task 6 уже определяет этот failure mode как
+  потерю Redis transport при сохранённом SQLite ledger. Текущий запрос
+  разрешает реализацию и production-safe recovery, но не разрешает broad
+  queue/cache/database cleanup.
+
+### Ожидаемые изменяемые файлы
+
+- Create:
+  `app/DTOs/Seasonvar/SeasonvarActiveRunReconciliationResult.php`,
+  `app/Services/Seasonvar/SeasonvarActiveRunReconciler.php`,
+  `app/Jobs/ReconcileSeasonvarQueuedImportRun.php`,
+  `tests/Feature/SeasonvarActiveRunReconciliationTest.php`,
+  task-specific plan.
+- Modify:
+  `app/Console/Commands/ImportSeasonvar.php`,
+  `app/Jobs/FinalizeSeasonvarQueuedImport.php`,
+  `app/Jobs/WakeSeasonvarImportFinalizers.php`,
+  focused Seasonvar tests, `docs/importer.md`, `docs/queues.md`,
+  `docs/performance.md`, importer master/current plans, docs map, `README.md`,
+  `CHANGELOG.md`.
+- Inspect-only unless RED proves otherwise:
+  migrations, route files, translations, policies/gates, cache identities,
+  media parser/importer and production service units.
+
+### Совместимые public/persisted contracts
+
+- Единственная public command и её signature:
+  `php artisan seasonvar:import`.
+- `CatalogTitle → Season → Episode`, source identity, additive relations,
+  external-media-only storage and bounded metadata HTTP.
+- Existing queue connection/name, existing job constructors, ID-only payloads,
+  `$tries=0`/`retryUntil()` and `timeout=900 < retry_after=1200`.
+- `seasonvar_import_runs`, title groups, prepared pages and page-claim schema;
+  additive migration в этом reliability slice не требуется.
+- Routes, API/Resources, Livewire/admin actions, translations, permissions,
+  search/SEO/sitemap, recommendations, release calendar, cache identities,
+  premium/region/legal/player access remain compatible.
+
+### Cross-feature impact и риски
+
+| Domain | Status | Evidence / решение |
+| --- | --- | --- |
+| Import/queue/runtime | `affected` | Durable staging redispatch and active-run reconciliation |
+| Database/data safety | `affected_additive_writes` | Existing rows/statuses preserved; only summary and enqueue-attempt timestamps update |
+| External provider | `affected_bounded_existing_path` | Requeued page jobs use existing guarded HTTP/crawl-delay boundary |
+| Cache/search/recommendations/calendar/API sync | `compatibility_required` | Existing group/global finalizers remain sole side-effect owners |
+| Authentication/authorization/admin | `already_compliant` | CLI/internal job adds no route or gate bypass |
+| Translations/UI/mobile/accessibility | `not_applicable` | No visible control/copy change |
+| SEO/sitemap/player/premium/region/legal | `unaffected` | Catalog access and delivery contracts unchanged |
+| Dependencies/runtime/schema | `not_applicable` | No package, runtime, environment or migration change |
+| Redis/cache keys | `affected_internal` | One bounded per-run reconciliation unique/lock identity; public caches unchanged |
+| Backward compatibility | `required` | Existing serialized jobs and queue names unchanged |
+
+### Production, rollback и failure recovery
+
+- До mutation повторно проверить отсутствие живого coordinator process,
+  возраст durable staging, workers, queue counts, disk/backup evidence.
+- Не использовать `queue:clear`, retry-all, cache clear, manual SQL
+  status/claim update или deletion.
+- Recovery requeues only nonterminal durable staging in bounded batches.
+  Claims не освобождаются: worker повторно доказывает ownership/lease.
+- Redis loss после enqueue восстанавливается повторным due-ledger scan;
+  duplicate delivery остаётся idempotent по persisted prepared status.
+- Rollback отключает новый scheduled/job/CLI trigger code-only. Уже
+  подготовленные или применённые rows остаются каноническими; schema/data
+  downgrade не нужен. Interrupted recovery безопасно повторяется.
+
+### Production recovery evidence
+
+- `app:deployment-check --json` завершился с `ready=true`: environment/debug,
+  migrations, SQLite quick/FK, required indexes, FTS и cache transports прошли.
+  Существующие failed jobs и неподтверждённый coordinator process остались
+  warning, а не были удалены или скрыты.
+- Свободно `679 GiB`; schema/dependencies/environment не менялись, поэтому
+  database restore не требуется. Полноценная свежая backup/restore rehearsal
+  не заявляется; rollback code-only и повторный due-ledger scan.
+- Scheduled watchdog первым восстановил barrier run `#1255`, после чего exact
+  `php artisan seasonvar:import` сообщил о повторной постановке `250` задач и
+  сохранил global single-flight.
+- Итоговое наблюдение подтвердило четыре занятых import worker, Redis backlog
+  `4799`, рост `parsed` с `0` до `1023`, `172 applied`, `104` завершённые
+  группы, уменьшение live claims с `32 523` до `31 501` и обновлённый
+  heartbeat. Run остаётся `running`; terminal completion до фактического drain
+  не заявляется.
+- Не выполнялись `queue:clear`, `cache:clear`, retry-all, manual SQL,
+  status/claim deletion, migration, service stop/restart или environment write.
+
+### Task-specific requirement-compliance matrix
+
+| Requirement | Status | Evidence / gate |
+| --- | --- | --- |
+| Fresh canonical read order | `completed` | Root/index/code/architecture/development/multilingual/security/performance/cache/production/maintenance/integration and importer owners reread |
+| Installed versions | `completed` | Boost/shell: PHP `8.5.8`, Laravel `13.22.0`, Livewire `4.3.3`, Boost `2.4.13`, PHPUnit `12.5.32`, Pint `1.29.3`, SQLite/Redis |
+| Existing implementation | `completed` | Command, coordinator, dispatcher, claims, staging, group/global finalizers, watchdog, workers, DB and Redis state traced |
+| Root cause reproduction | `completed` | Exact command reproduced single-flight refusal; read-only DB/queue/process evidence above |
+| Detailed plan/files/contracts/risks | `completed` | Task-specific plan and matrices prepared before production code |
+| TDD RED | `completed` | Missing reconciler produced exact container errors; CLI integration and real-work heartbeat assertions failed for the intended reasons |
+| TDD GREEN | `completed` | Durable reconciler/result/job, false-heartbeat removal, CLI/watchdog integration and queue contract pass focused tests |
+| Production recovery | `completed_recovery_in_progress` | Exact command and watchdog restored run `#1255`; queue/worker/parsed/claim trends verified without manual SQL or clears |
+| Focused/full/static verification | `completed_with_unrelated_failure` | Seasonvar `278/278` and `1716` assertions; PHPStan 0; Pint/docs/diff green; full PHPUnit `1624` pass, `11` skip, one reproducible unrelated account-session failure |
+| Final reread/legacy scan | `completed` | Applicable requirements reread; false heartbeat, duplicate recovery, scheduler/job ownership, TODO/FIXME and public-path scans completed |
+| README/CHANGELOG/docs | `completed_local` | Importer, queues, performance, docs map, master/current plans and Russian visitor/technical histories updated from measured behavior |
+| Commit/push | `unresolved_shared_worktree` | Existing foreign tracked/untracked changes currently block clean canonical commit |
+
+### Verification evidence
+
+- Focused regression после финального PHP/Pint snapshot: `12` тестов,
+  `147` утверждений; расширенный Seasonvar filter: `278/278`, `1716`
+  утверждений.
+- `COMPOSER_ALLOW_SUPERUSER=1 composer analyse --no-interaction`:
+  `PHPStan` без ошибок. `Pint`, `project:docs-refresh --check`,
+  `scripts/ci-check.sh docs` и `git diff --check` прошли.
+- Полный `php artisan test`: `1636` тестов, `1624` успешных, `11` ожидаемо
+  пропущены, один отказ
+  `WebAccountManagementTest::test_logout_other_browser_sessions_preserves_current_session`.
+  Отдельный повтор воспроизвёл тот же прежний account-session failure; все
+  Seasonvar tests остаются зелёными.
+- Legacy scan подтвердил один active-run reconciler и один scheduled owner.
+  `SeasonvarPrematurelyFinalizedRunRecovery` сохранён как отдельная
+  fail-closed boundary для уже terminal run, а не как дубликат текущего
+  running-run recovery. TODO/FIXME/placeholder в изменённом scope отсутствуют.
+- README/CHANGELOG/managed-docs/whitespace policies прошли. Новый
+  current-plan policy сохраняет прежний unrelated отказ на историческом
+  дополнительном H1 в строке `1759`; текущая секция этот долг не создаёт.
+
+## Активная задача — Premium Task 6: authorization, validation and Livewire state
+
+Дата: 25.07.2026.
+
+Статус: `implemented_verified_local_delivery_unresolved`.
+
+Подробный исполнимый план:
+[`2026-07-25-premium-authorization-validation-livewire-state.md`](../superpowers/plans/2026-07-25-premium-authorization-validation-livewire-state.md).
+
+### Discovery и решение
+
+- `/premium` и локализованный alias остаются публичными full-page
+  Livewire GET routes; checkout создаётся только Livewire action после
+  повторной server-side проверки плана.
+- `/admin/premium` уже защищён `auth`, `auth.session`, `verified`,
+  `account.private`, `account.active`, `admin.access`, route throttle и
+  capability middleware; все mutation actions повторно вызывают Premium gates.
+- Livewire 4 автоматически сохраняет `auth`/`can`, а project provider уже
+  добавляет `AuthenticateSession`, `EnsureAccountAccess` и
+  `EnsureAdministrator`. Framework `EnsureEmailIsVerified` отсутствует в
+  persistent list, поэтому route-level `verified` не гарантирован на
+  последующих component update requests.
+- Минимальное production-решение после обязательного RED:
+  добавить только `EnsureEmailIsVerified` в существующий persistent boundary.
+  Middleware будет применяться только к исходным маршрутам с `verified`.
+- `checkoutToken`, `locale` и `selectedUserPublicId` уже `#[Locked]`;
+  action UUID и user/plan input уже проходят server-side checks. Они требуют
+  regression/IDOR/rate-limit evidence, а не преждевременной замены кода.
+- Тестовый gateway и plan существуют только в PHPUnit memory; production
+  provider, price, currency и plan не создаются.
+
+### Ожидаемые файлы
+
+- Create `tests/Feature/Premium/PremiumAuthorizationAndLivewireStateTest.php`.
+- Modify `app/Providers/AppServiceProvider.php` после RED.
+- Modify `PremiumPricingPage` или `PremiumAdministrationManager` только если
+  отдельный падающий тест докажет реальный defect.
+- Modify `docs/premium.md`, Premium master/current plans и `CHANGELOG.md`.
+- Check `README.md`; modify only for a real visitor/product/roadmap change.
+- Inspect-only unless RED: routes, bootstrap aliases, config, gates, services,
+  actions, models, migrations, translations and Premium Blade.
+
+### Совместимость, риски и rollback
+
+- Сохраняются все route names/verbs, gates/permissions/roles, Livewire action
+  names/properties, no-provider fallback, provider/action/service boundaries,
+  RU/EN parity, private/no-store/noindex и free catalog behavior.
+- Persistent `verified` intentional cross-feature impact ограничен
+  Livewire-компонентами, чей исходный route уже требует verified email.
+- Нет migration, DML, shared cache, dependency, `.env`, provider HTTP, queue,
+  worker, service или asset changes.
+- Code-only rollback удаляет одну persistent middleware registration;
+  data/cache rollback не требуется.
+
+### Cross-feature impact
+
+| Domain | Status | Evidence / решение |
+| --- | --- | --- |
+| Premium pricing/checkout | `affected_test_boundary` | Guest/verified/plan/rate/loading contracts |
+| Premium administration | `affected` | Gate, verified, locked ID, IDOR, UUID/input boundaries |
+| Authentication/verification | `affected` | Route `verified` становится persistent для Livewire |
+| Authorization/audit | `compatibility_required` | Existing gates/services remain authoritative |
+| Privacy/security | `affected` | Client state and action parameters remain untrusted |
+| Livewire/UI/mobile/a11y | `affected_test_boundary` | Existing loading/disabled controls verified |
+| DB/index | `not_applicable` | In-memory fixtures; no schema/index change |
+| Cache/rate limiter | `affected_test_boundary` | Existing user-scoped limits only |
+| Locale/translations | `compatibility_required` | RU/EN behavior preserved |
+| Provider/billing | `compatibility_required` | PHPUnit stub only; no commercial activation |
+| Routes/API/SEO/sitemap | `compatibility_required` | No GET mutation; names/canonical remain |
+| Catalog/player/import/legal/region | `unaffected` | No content privilege changes |
+| Production operations | `code_only` | Standard deployment/rollback; no state mutation |
+
+### Task-specific compliance matrix
+
+| Requirement | Status | Evidence / gate |
+| --- | --- | --- |
+| Fresh root/index/canonical reads | `completed` | AGENTS, requirements index and applicable owners reread |
+| Related Markdown/design/master | `completed` | Premium owner, approved design and rolling master inspected |
+| Installed versions | `completed` | PHP 8.5.8, Laravel 13.22.0, Livewire 4.3.3, Boost 2.4.13, PHPUnit 12.5.32 |
+| Version-specific official docs | `completed` | Boost Livewire security/locked/testing/persistent middleware and Laravel gates/rate limits/UUID |
+| Existing implementation | `completed` | Routes, provider, components, gates, services, tests and Blade inspected |
+| Detailed plan/files/contracts/risks | `completed` | Task-specific plan linked above |
+| TDD RED | `completed` | Один тест/одно утверждение ожидаемо отказали только из-за отсутствующего `EnsureEmailIsVerified` |
+| TDD GREEN | `completed` | Минимальная регистрация middleware; focused 15 тестов/96 утверждений |
+| IDOR/input/rate/loading evidence | `completed` | Guest/verified/gates/locked IDs/UUID/IDOR/validation/rate/routes/loading matrix |
+| Focused/static/full verification | `completed_with_unrelated_failures` | Premium 48/335, admin 71/2733, Pint и PHPStan green; full 1622 pass/11 skip/2 unrelated fail |
+| Final requirement reread/legacy scan | `completed` | Applicable owners reread; duplicate gates/routes/client authority/GET mutation не найдены |
+| README/CHANGELOG/docs | `completed_with_foreign_failures` | Premium owner/README обновлены; Task 6 запись проходит policy отдельно, общий CHANGELOG остановлен новой foreign строкой 5 |
+| Commit/push | `unresolved_shared_worktree` | Existing numerous foreign dirty changes; clean-worktree hook нельзя безопасно пройти |
+
+### Verification evidence
+
+- RED: `PremiumAuthorizationAndLivewireStateTest` выполнил один тест и
+  ожидаемо отказал на отсутствии
+  `Illuminate\Auth\Middleware\EnsureEmailIsVerified` в
+  `Livewire::getPersistentMiddleware()`.
+- GREEN/refactor: новый Task 6 набор — `15/15`, `96` утверждений; фильтр
+  `Premium` — `48/48`, `335` утверждений; фильтр `Administration` — `71/71`,
+  `2733` утверждения.
+- Scoped PHPStan для provider/test и canonical `composer analyse` прошли без
+  ошибок; targeted Pint прошёл. Composer потребовал только документированный
+  `COMPOSER_ALLOW_SUPERUSER=1` для read-only запуска в текущем root runtime.
+- Финальный полный PHPUnit: `1635` tests, `1622` passed, `11` skipped, `2`
+  failed. `AutomaticChangelogUpdateScriptTest::test_generated_entry_passes_the_russian_policy`
+  после единичного segmentation fault процесса PHP сразу прошёл отдельно
+  (`1` test, `2` assertions), подтверждая нестабильный foreign failure.
+  `WebAccountManagementTest::test_logout_other_browser_sessions_preserves_current_session`
+  повторно отказал отдельно (`1` test, `3` assertions) тем же известным
+  способом, который существовал до Task 6 после общего незавершённого Laravel
+  update.
+- Route inventory подтверждает только GET/HEAD pricing/return/admin и POST
+  webhook; имена, middleware, localized aliases и no-provider fallback
+  сохранены.
+- Repository scan нашёл одну регистрацию каждого persistent middleware,
+  существующие gates/locked fields и не нашёл duplicate Premium route,
+  client-owned user/token, GET mutation или unfinished Task 6 code.
+- Миграции, production rows, тарифы/цены/валюты, provider config/HTTP, cache
+  keys, translations, dependencies, `.env`, queues, assets и services не
+  менялись. `npm run build` и production/provider/browser payment verification
+  не применимы.
+- `project:docs-refresh --check`, README policy, scoped Task 6 CHANGELOG policy
+  и whitespace прошли. Общий CHANGELOG policy теперь останавливается на новой
+  foreign importer-записи в строке `5` (`transport`) до Task 6 entry.
+  Current-plan policy сохраняет прежний unrelated отказ на historical extra
+  H1 в строке `1759`.
+- Final Git snapshot: existing `main` ahead `34`, `88` tracked и `47`
+  untracked paths. Shared `AppServiceProvider`, README, CHANGELOG, Premium
+  docs/current plan содержат foreign hunks; staging/commit/push без поглощения
+  чужой работы невозможны.
+
+## Активная задача — Player/System Task 46: надёжная кнопка следующей серии до готовности runtime
+
+Дата: 25.07.2026.
+
+Статус: `implemented_verified_live_delivery_unresolved`.
+
+Master task:
+[`Task 46`](../superpowers/plans/2026-07-24-system-maintenance-and-optimization-master-plan.md#task-46-keep-adjacent-episode-navigation-correct-before-player-runtime-is-ready).
+
+## Подтверждённая причина
+
+- На точном production URL после полной инициализации player runtime переход
+  работает: URL, video episode/media и соседние ссылки меняются через
+  `commitPlayerTransition()` в named island.
+- После воспроизведения реального `pagehide` teardown кнопка продолжала иметь
+  `wire:click.prevent="selectEpisode(...)"` внутри island. Этот action меняет
+  URL и fragment navigation, но `wire:ignore` video остаётся на прежней серии.
+- Capture-phase `CatalogPlayerSession` обычно перехватывает клик раньше
+  Livewire. Поэтому race до готовности runtime или после teardown превращает
+  одну кнопку в два конкурирующих state owners и визуально выглядит как
+  отсутствие переключения.
+
+## Решение и ожидаемые файлы
+
+- `resources/views/livewire/catalog-title-player.blade.php`: adjacent
+  previous/next anchors сохраняют реальные `href` и data attributes, но
+  больше не вызывают island-local `selectEpisode()`.
+- `tests/Unit/LivewireWireIgnoreContractTest.php`: отдельный static contract
+  запрещает `wire:click` только внутри adjacent navigation island.
+- `tests/browser/player-navigation-island.spec.js`: normal path по-прежнему
+  проверяет island morph и неизменную video/Plyr identity; новый fallback
+  scenario проверяет document navigation и согласованные URL/video/nav после
+  runtime teardown.
+- `docs/frontend.md`, `docs/audits/video-playback-report.md`, `README.md`,
+  `CHANGELOG.md`, current/master plans: фактический visitor и technical
+  contract.
+
+## Сохраняемые contracts и cross-feature impact
+
+- Сохраняются route `titles.show`, slug binding,
+  `season|episode|media|variant|quality|format#player`, History API и Back.
+- Normal path остаётся
+  `$wire.$island('catalog-player-navigation').commitPlayerTransition(...)`;
+  prepare/entitlement/source selection остаются server-owned.
+- `wire:ignore` shell, один video/Plyr/HLS, progress sequence/token, media
+  profile, autoplay, menu, keyboard и Media Session сохраняются.
+- No-JS/pre-runtime path использует настоящий внутренний GET и заново проходит
+  canonical validation/authorization; raw media URL в HTML/state не добавляется.
+- Authentication, premium, region/legal, administration, search, SEO,
+  recommendations, importer, calendar, notifications и API не меняются.
+- Mobile layout/copy не меняются; новых translation keys нет.
+
+## Migrations, cache, permissions, deployment и rollback
+
+- Migrations/DML/indexes: `not_applicable`.
+- Cache keys/invalidation: `not_applicable`; full-page/private playback
+  policies сохраняются.
+- Permissions/routes/translations/dependencies/environment: без изменений.
+- Production impact: Blade/tests/docs change; Vite build обязателен как
+  frontend acceptance. Production activation подтверждена только точной
+  проверкой текущих HTML/assets и обеих веток перехода; Git delivery остаётся
+  отдельным unresolved gate.
+- Rollback: вернуть два `wire:click.prevent` и matching tests/docs; data/cache
+  rollback не требуется.
+
+## Task-specific requirement-compliance matrix
+
+| Requirement/domain | Status | Evidence / gate |
+| --- | --- | --- |
+| Root/index/canonical requirements | `completed` | Fresh read выполнен для code, architecture, workflow, multilingual, security, performance/cache, UI/frontend, production/maintenance/system integration |
+| Installed versions | `completed` | PHP 8.5.8; Laravel 13.22.0; Livewire 4.3.3; Boost 2.4.13; PHPUnit 12.5.32; Tailwind 4.3.2 |
+| Official version-specific docs | `completed` | Boost Livewire 4 docs подтверждают `$wire.$island(name).action()` и named/always island contract |
+| Existing implementation | `completed` | Blade → capture click → prepare → media swap → island commit traced |
+| Production reproduction | `completed` | Initialized path green; post-`pagehide` click reproduced URL/nav episode advance with stale video episode |
+| Plan/files/contracts/risks | `completed` | Task 46 registered here and in monotonic unlimited master |
+| TDD RED | `completed` | Unit-contract отказал только на двух adjacent `wire:click`; browser RED сохранил marker исходного документа после URL change |
+| Minimal GREEN | `completed` | Удалены только два competing `wire:click.prevent`; JavaScript/PHP/routes не менялись |
+| Normal island regression | `completed` | Desktop/Mobile `1 → 2 → 3`, same video/shell/Plyr и island commit |
+| Runtime-unavailable fallback | `completed` | Desktop/Mobile full document GET согласовал URL/video/navigation после `pagehide` teardown |
+| Security/privacy/authorization | `already_compliant` | Existing signed/entitlement boundaries and internal fallback URL preserved |
+| Localization/mobile/accessibility | `already_compliant` | Existing RU/EN labels, semantic links and 44px layout unchanged |
+| Schema/cache/queues/dependencies | `not_applicable` | No stateful infrastructure change |
+| README/CHANGELOG/owner docs | `completed` | Frontend/playback owners, visitor history, русский changelog и оба plans обновлены |
+| Current-plan structure policy | `unresolved` | Проверка останавливается на прежнем дополнительном H1 в строке 1759; новый Task 46 добавлен как H2 и не расширяет этот долг |
+| Commit/push | `unresolved` | Existing shared dirty paths require clean-tree ownership before canonical delivery |
+
+## Verification checklist
+
+- [x] Focused static RED fails only on the two adjacent `wire:click` attributes.
+- [x] Browser RED reproduces stale video after runtime teardown.
+- [x] Focused GREEN, related player tests and Pint pass.
+- [x] Vite build passes.
+- [x] Desktop `1440×1200` and mobile `390×844` cover normal island and
+  fallback, console/page/local-asset errors and horizontal overflow.
+- [x] Final requirement reread, legacy/duplicate scan,
+  docs/README/CHANGELOG policies and task-scoped diff check pass.
+- [ ] Commit/push only from existing `main` after foreign shared worktree
+  ownership is safely resolved; сейчас честно `unresolved`.
+
+## Verification evidence
+
+- TDD RED: unit — `1` тест, `7` утверждений, один ожидаемый отказ на
+  `wire:click`; Desktop browser — один ожидаемый отказ на сохранённом marker
+  исходного документа.
+- Focused GREEN: тот же unit — `1/1`, `7` утверждений; fallback browser —
+  `1/1`.
+- Fresh related verification: `90/90` PHPUnit-тестов, `894` утверждения;
+  `Pint` для изменённого PHP-теста; Vite `24` modules; Desktop/Mobile
+  Playwright `4/4`.
+- Exact production normal path: `490015/522542 → 490016/522550`, previous
+  `490015`, next `490017`, one video, one Plyr, overflow `0`.
+- Exact production fallback после `pagehide`: новый document без marker,
+  episode/media `490017/522559`, previous `490016`, next `490018`, one video,
+  one Plyr, overflow `0`, console errors `0`.
+- `project:docs-refresh --check`, README/CHANGELOG policies, task-scoped
+  whitespace check и adjacent legacy scan прошли. Единственный оставшийся
+  `wire:click.prevent="selectEpisode(...)"` принадлежит полноценному списку
+  серий вне adjacent island и остаётся правильным root-update control.
+- Ветка остаётся существующей `main`, ahead `34`; shared tracked/untracked
+  changes не позволяют безопасно пройти canonical clean-tree commit/push без
+  поглощения чужих scopes.
+
+## Активная задача — Calendar/System Task 47: новые даты первыми и надёжная доставка
+
+Дата: 25.07.2026.
+
+Статус: `implemented_verified_live_delivery_unresolved`.
+
+Design:
+[`2026-07-25-calendar-newest-first-delivery-design.md`](../superpowers/specs/2026-07-25-calendar-newest-first-delivery-design.md).
+
+Implementation plan:
+[`2026-07-25-calendar-newest-first-delivery.md`](../superpowers/plans/2026-07-25-calendar-newest-first-delivery.md).
+
+Master task:
+[`Task 47`](../superpowers/plans/2026-07-24-system-maintenance-and-optimization-master-plan.md#task-47-make-newer-calendar-dates-the-durable-default).
+
+## Подтверждённая задача и состояние
+
+- Пользователь подтвердил: чистый `/calendar` показывает новые даты первыми,
+  а явный `?sort=earliest` остаётся рабочим пользовательским выбором.
+- Task 38 уже владеет функциональной реализацией. Новая Task 47 должна
+  закрепить regression/delivery, а не создать второй calendar sorting path.
+- Production smoke подтвердил `latest` на чистом URL и динамически найденный
+  порядок `1 июня → 31 → 30 → 29 → 28 мая`; explicit `earliest` подтвердил
+  `26 → 27 → 28 → 29 → 30 мая`.
+- Рабочее дерево содержит реализацию Task 38, но `HEAD` всё ещё хранит
+  статический default `earliest`. До отдельного commit/push результат
+  операционно не закреплён.
+- Focused `ReleaseCalendarDefaultViewTest` прошёл: 8 тестов,
+  33 утверждения.
+- Browser RED отказал только на отсутствии второй страницы у двух-row fixture;
+  после 26 dedicated calendar rows Desktop/Mobile прошли `2/2`, включая
+  `calendarPage=2` reset, monotonic Latest/Earliest, clean default URL,
+  zero overflow и отсутствие page errors.
+- Vite собрал 24 модуля; production Desktop/Mobile подтвердил `29 → 28`,
+  explicit `28 → 29`, `h1` и zero overflow, browser log пуст.
+- Финальный task-scope gate повторно прошёл Pint, два PHPUnit-фильтра
+  по 8 тестов и 33 утверждения, Vite, Desktop/Mobile Playwright `2/2`,
+  `git diff --check` и inventory из 17 calendar routes.
+- `project:docs-refresh --check` и docs CI честно остаются
+  `unresolved_shared_worktree`: generated inventory требует добавить в
+  `docs/MAINTENANCE_LOG.md` чужую untracked migration Task 48.
+
+## Изменённые и проверенные файлы Task 47
+
+- Existing modify:
+  `app/Livewire/ReleaseCalendar/ReleaseCalendarPage.php`.
+- Existing modify:
+  `resources/views/livewire/release-calendar/release-calendar-page.blade.php`.
+- Existing modify:
+  `tests/Feature/ReleaseCalendarDefaultViewTest.php`.
+- Existing modify:
+  `tests/browser/prepare-fixtures.php`.
+- Existing create:
+  `tests/browser/release-calendar.spec.js`.
+- Modify only if a failing gap proves necessity:
+  `app/Services/ReleaseCalendar/ReleaseCalendarQuery.php`.
+- Update: `docs/release-calendar.md`, `docs/frontend.md`,
+  `docs/plans/current-task-plan.md`,
+  `docs/superpowers/plans/2026-07-24-system-maintenance-and-optimization-master-plan.md`,
+  `README.md` при фактической visitor delivery и `CHANGELOG.md`.
+
+## Сохраняемые contracts
+
+- Все calendar/localized/legacy route names и URI.
+- `ReleaseCalendarSort::{Earliest,Latest,Title}`, shareable URL-state и
+  `calendarPage`.
+- Upcoming/day/week/month/personal defaults, filters, timezone и civil dates.
+- Query-before-pagination ordering, visibility и deterministic `id` tie-break.
+- Publication/audience/premium/region/legal, personal auth и admin gates.
+- Notification/subscription/correction/importer/SEO/sitemap/cache contracts.
+- RU/EN parity, mobile layout, accessibility, error/empty/loading states.
+
+## Risks, migrations, cache, permissions и rollback
+
+- Главный риск: рабочий production checkout уже показывает желаемый результат,
+  но Git `HEAD` его не содержит; будущая доставка из `HEAD` может вернуть
+  ascending default.
+- Presentation-only reversal запрещён: он расходится с SQL pagination.
+- Номер production page нестабилен из-за импорта; acceptance использует
+  deterministic fixtures или фактически найденные соседние date groups.
+- Migrations/DML/indexes/routes/permissions/translations/dependencies/
+  environment/queues/storage: `not_applicable`.
+- Cache keys/invalidation: без изменений; сохраняется
+  `CacheDomain::ReleaseCalendar`.
+- Rollback возвращает только Livewire/Blade/tests/docs; data/cache restore не
+  требуется.
+
+## Cross-feature impact
+
+| Domain | Status | Evidence / решение |
+| --- | --- | --- |
+| Calendar Recent | `affected` | Default `Latest` и clean URL |
+| Explicit sort | `compatibility_required` | `earliest|latest|title` сохраняются |
+| Other calendar views | `compatibility_required` | Default остаётся `Earliest` |
+| Pagination/query | `affected_regression_gate` | Sort до paginate, stable `id` |
+| Livewire URL/history | `affected` | Empty route default, named page reset |
+| Blade/UI/mobile/a11y | `affected_regression_gate` | Effective select, Desktop/Mobile |
+| Locale/translations | `already_compliant` | Новых ключей нет, RU/EN сохраняются |
+| SEO/sitemap | `compatibility_required` | Clean canonical default и filtered noindex |
+| Cache/performance | `already_compliant` | Existing bounded query/domain preserved |
+| Auth/premium/region/legal | `unaffected` | Visibility boundary не меняется |
+| Notifications/import/admin | `unaffected` | No mutation/service changes |
+| DB/queues/storage/dependencies | `not_applicable` | Stateful change отсутствует |
+| Production delivery | `affected` | Working tree/HEAD drift требует commit/push |
+
+## Task-specific requirement-compliance matrix
+
+| Requirement/domain | Status | Evidence / gate |
+| --- | --- | --- |
+| Root/index/applicable owners | `completed` | Fresh AGENTS/index/code/architecture/workflow/localization/security/performance/cache/UI/frontend/operations/calendar reads |
+| Related Markdown | `completed` | Calendar owner, views, Task 38, current/master plans inspected |
+| Installed versions | `completed` | PHP 8.5; Laravel 13.22.0; Livewire 4.3.3; Boost 2.4.13; PHPUnit 12.5.32; Tailwind 4.3.2 |
+| Official version-specific docs | `completed` | Boost confirmed Livewire `#[Url(except:,history:)]` and named `resetPage()` |
+| Existing implementation | `completed` | Route → Livewire → query → paginator → groupBy → Blade traced |
+| Production/browser evidence | `completed` | Desktop/Mobile clean Latest, dynamic `29 → 28`, explicit `28 → 29`, zero overflow and empty browser log |
+| Design alternatives/approval | `completed` | Query-owned route-specific default selected; force/reverse-in-Blade rejected |
+| Written design spec | `completed` | Linked spec contains data flow, failures, tests, rollback and delivery |
+| User written-spec review | `completed` | User explicitly continued after linked written spec review gate |
+| Detailed Task 47 implementation plan | `completed` | Four executable tasks cover ownership, server regression, Livewire/Blade reconciliation, Desktop/Mobile pagination, docs and delivery |
+| TDD/regression | `completed` | Browser RED on missing second page; server characterization confirms clean-HEAD drift without production rewrite |
+| Focused verification | `completed` | PHPUnit 8/33, Playwright 2/2, Pint and Vite 24 modules |
+| Route/static verification | `completed` | 17 calendar/localized/admin/legacy routes; one query owner, one Livewire default owner, no Blade reversal/TODO; `git diff --check` passed |
+| Managed docs freshness | `unresolved_shared_worktree` | `project:docs-refresh --check` and docs CI require `docs/MAINTENANCE_LOG.md` to inventory an unrelated untracked Task 48 migration |
+| README relevance check | `completed_no_change` | Existing visitor-history entry already states newest-first and explicit old-first compatibility |
+| CHANGELOG | `completed` | Separate Russian planning and implementation/evidence entries retained |
+| Current-plan structure policy | `unresolved_preexisting` | Historical extra H1 remains outside this task |
+| Commit/push | `unresolved_shared_worktree` | Canonical hook rejects current foreign tracked/untracked changes |
+
+## Design-phase verification
+
+- [x] Production clean `/calendar` uses `latest`.
+- [x] Production range containing 29/28 May renders `29 → 28`.
+- [x] Explicit `?sort=earliest` renders `28 → 29`.
+- [x] Route inventory confirms 17 canonical/localized/admin/legacy calendar routes.
+- [x] `ReleaseCalendarDefaultViewTest`: 8 tests, 33 assertions.
+- [x] Livewire 4.3.3 version-specific URL/pagination docs checked.
+- [x] README checked; no fictitious visitor entry added for design-only work.
+- [x] User reviewed the written spec and explicitly continued.
+- [x] Task 47 detailed plan and append-only master entry created.
+- [x] User continued with inline Task 47 implementation.
+- [x] Desktop/Mobile Playwright, Vite build and live acceptance completed.
+- [x] Final duplicate scan, `git diff --check` and exact delivery-set review
+  completed.
+- [ ] Managed-docs refresh requires the unrelated Task 48 migration to be
+  owned and completed first; сейчас `unresolved_shared_worktree`.
+- [ ] Commit/push only after canonical clean-tree ownership is available;
+  сейчас `unresolved_shared_worktree`.
+
+## Активная задача — Seasonvar Task 48: оптимизация recovery-запросов
+
+Дата: 25.07.2026.
+
+Статус: `implementation_verified_local_delivery_unresolved`.
+
+Design:
+[`2026-07-25-seasonvar-active-run-query-optimization-design.md`](../superpowers/specs/2026-07-25-seasonvar-active-run-query-optimization-design.md).
+
+Implementation plan:
+[`2026-07-25-seasonvar-active-run-query-optimization.md`](../superpowers/plans/2026-07-25-seasonvar-active-run-query-optimization.md).
+
+## Подтверждённый scope и baseline
+
+- Пользователь продолжил рекомендованный ограниченный scope после выбора между
+  recovery hot path и полной throughput-частью Task 6.
+- Изменяется только `SeasonvarActiveRunReconciler` и индекс его durable-ledger
+  query; первоначальная bulk registration sitemap/cursor остаётся отдельной
+  Task 6.
+- Рабочая таблица содержит `187 293` prepared rows; exact due-select run
+  `#1255` использовал full scan и дал p50 `124,902 ms`, p95 `128,302 ms`.
+- Один batch `250` содержал 80–95 distinct groups, которые уже eager-loaded,
+  но повторно читались отдельными `find()`.
+- На reflink-копии composite index дал p50 `2,518 ms`, p95 `2,897 ms`;
+  построение заняло `20,634 s`. Это diagnostic evidence, не SLA.
+- Legacy non-serial query уже выбирает
+  `source_pages_parallel_import_run_index`; speculative source index не нужен.
+
+## Рассмотренные подходы и решение
+
+1. Только reuse eager-loaded groups: безопасно, но full scan остаётся.
+2. Reuse groups + `batchSize + 1` sentinel + additive composite index:
+   выбранный минимальный measured change.
+3. Полный Task 6 bulk dispatch/cursor: не смешивается с текущим change set.
+
+## Ожидаемые изменяемые файлы
+
+- Create:
+  `database/migrations/2026_07_25_120000_add_active_run_recovery_index_to_seasonvar_import_prepared_pages.php`.
+- Modify:
+  `app/Services/Seasonvar/SeasonvarActiveRunReconciler.php`.
+- Modify:
+  `tests/Feature/SeasonvarActiveRunReconciliationTest.php`.
+- Create or modify only if exact plan test needs isolated contract:
+  `tests/Feature/SeasonvarActiveRunQueryPlanTest.php`.
+- Update:
+  `docs/importer.md`, `docs/queues.md`, `docs/performance.md`,
+  `docs/plans/current-task-plan.md`,
+  `docs/superpowers/plans/2026-07-24-seasonvar-importer-improvement-master-plan.md`,
+  `README.md`, `CHANGELOG.md`.
+
+## Сохраняемые contracts
+
+- Единственная public command `php artisan seasonvar:import`.
+- `seasonvar-import` connection/queue, ID-only preparation/reconciliation/
+  finalizer payloads, batch size, CAS, lease, timeout, retry/backoff и
+  heartbeat semantics.
+- Run/group/prepared status enums, terminal reasons, counters and summary.
+- Catalog identity/writes, external URL-only media, cache/search/
+  recommendation/calendar/API-sync handoffs.
+- Routes, translations, permissions, environment, dependencies, frontend and
+  public visitor behavior.
+
+## Migrations, production и rollback
+
+- Migration additive/reversible; только индекс
+  `(seasonvar_import_run_id,status,updated_at,id)`.
+- Production SQLite около 27 ГБ; migration не запускается при активных writers
+  и без verified backup/free-space/restore gate.
+- Rollout: pause writers → migrate → quick/FK/schema/EXPLAIN → graceful worker
+  restart → bounded canary → resume.
+- Store-wide cache flush, queue clear, failed-job retry-all, manual run/claim
+  DML и provider activation запрещены.
+- Code rollback может оставить additive index. Index removal требует нового
+  paused-writer/backup gate; data restore не требуется.
+
+## Cross-feature impact
+
+| Domain | Status | Evidence / решение |
+| --- | --- | --- |
+| Import reliability | `affected` | Durable ledger/CAS unchanged; fewer reads |
+| Queue transport | `compatibility_required` | Same queues, payloads and backpressure |
+| SQLite/schema | `affected_gated` | One measured additive index |
+| Catalog writes | `unaffected` | Apply/importer services untouched |
+| Cache/search/recommendations | `unaffected` | Existing finalizer signals preserved |
+| Calendar/API sync/player | `unaffected` | Handoffs and public models unchanged |
+| Auth/admin/premium/region/legal | `unaffected` | No access or UI change |
+| Locale/translations/routes/SEO | `not_applicable` | No presentation/public URL change |
+| Dependencies/environment/assets | `not_applicable` | No package/config/build change |
+| Production operations | `affected_gated` | Backup, paused writers and canary required |
+
+## Task-specific requirement-compliance matrix
+
+| Requirement/domain | Status | Evidence / gate |
+| --- | --- | --- |
+| Root/index/applicable owners | `completed` | Fresh code/architecture/workflow/multilingual/security/performance/cache/operations/maintenance/integration/importer/queue reads |
+| Installed versions | `completed` | PHP 8.5; Laravel 13.22.0; Boost 2.4.13; PHPUnit 12.5.32; SQLite |
+| Official version-specific docs | `completed` | Boost Laravel 13 query/eager-load/subquery/chunk guidance checked |
+| Existing implementation | `completed` | Reconciler, dispatcher, coordinator, models, migrations and tests traced |
+| Production query evidence | `completed` | Schema inventory, counts, EXPLAIN and 30-run timing recorded above |
+| Alternatives/design approval | `completed` | User explicitly continued recommended hot-path scope |
+| Written design spec | `completed` | Linked spec fixes architecture, errors, tests, rollout and rollback |
+| Spec self-review | `completed` | No placeholders/contradictions; full Task 6 explicitly excluded |
+| User written-spec review | `completed` | User explicitly continued optimization after the written specification gate |
+| Implementation plan | `completed` | Five executable TDD/documentation/verification tasks with exact files, contracts, commands and rollback |
+| Application/migration code | `completed` | Reconciler, reversible migration and regression tests match the approved design; focused query-plan/reconciliation/queue-contract GREEN reproduced 25.07.2026 |
+| TDD evidence | `completed` | RED зафиксировал `SCAN`, отсутствие migration, 3 group SELECT вместо 1 и 2 prepared-ledger SELECT вместо 1; GREEN: reconciliation 11/62, query-plan 2/6, queue contract 2/83 |
+| README relevance | `completed` | Import overview and final visitor history describe bounded recovery without an unverified latency promise |
+| CHANGELOG | `completed` | Separate Russian entry records sentinel, group reuse, additive index, RED/GREEN evidence and the unapplied production gate |
+| Repository document policies | `completed` | `bash scripts/ci-check.sh docs` и повторный `project:docs-refresh --check` прошли после штатного обновления managed migration inventory |
+| Verification | `completed_with_unrelated_failure` | Seasonvar 283/1736, Pint и PHPStan green; full PHPUnit 1644 total, 1632 passed, 11 skipped, one pre-existing account-session failure reproduced separately |
+| Managed documentation | `completed` | `project:docs-refresh` добавил только task-owned migration и дату в managed block; последующий `--check` и docs CI green |
+| Production migration activation | `unresolved_operator_gate` | Working SQLite remains untouched until verified backup/restore, disk/WAL headroom, paused writers, integrity/EXPLAIN checks and bounded canary |
+| Commit/push | `unresolved_shared_worktree` | Existing foreign tracked/untracked changes block canonical clean hooks |
+
+## Implementation verification
+
+- [x] Exact production schema/index inventory read-only.
+- [x] Active-run status distribution and due rows read-only.
+- [x] Baseline and indexed clone timing.
+- [x] Exact `EXPLAIN QUERY PLAN` before/after.
+- [x] Existing tests and finalizer field consumption inspected.
+- [x] Spec placeholder, ambiguity, consistency and scope review.
+- [x] README checked; no fictitious visitor history added.
+- [x] User reviewed the written spec and explicitly continued.
+- [x] Exact TDD implementation plan created.
+- [x] Approved implementation completed through exact RED → minimal GREEN
+  without destructive production or foreign-worktree mutation.
+- [x] Reproduced query-plan GREEN: 2 tests, 6 assertions.
+- [x] Reproduced reconciliation GREEN: 11 tests, 62 assertions.
+- [x] Reproduced queue-contract GREEN: 2 tests, 83 assertions.
+- [x] Reconciled README, CHANGELOG and canonical documentation with focused
+  evidence.
+- [x] Wide Seasonvar, Pint, direct PHPStan, full PHPUnit, focused unrelated
+  failure reproduction, final requirements reread and legacy scan completed.
+- [x] `migrate:status` confirms the production recovery index remains
+  `Pending`; rollout checklist remains operator-gated.
+- [x] Managed docs refresh/check и docs CI завершены штатно.
+- [ ] Commit and push remain `unresolved_shared_worktree`.
+
+## Активная задача — Seasonvar Task 49: bounded batch dispatch
+
+Дата: 25.07.2026.
+
+Статус: `inline_tdd_execution_in_progress`.
+
+Design:
+[`2026-07-25-seasonvar-batch-dispatch-query-optimization-design.md`](../superpowers/specs/2026-07-25-seasonvar-batch-dispatch-query-optimization-design.md).
+
+Implementation plan:
+[`2026-07-25-seasonvar-batch-dispatch-query-optimization.md`](../superpowers/plans/2026-07-25-seasonvar-batch-dispatch-query-optimization.md).
+
+## Discovery и выбранная граница
+
+- Пользователь подтвердил рекомендованный полный вариант: bounded batch
+  registration + durable resume/CAS, а не code-only удаление нескольких
+  повторных selects.
+- Изолированный SQLite profile текущего dispatcher на 100 serial pages и 10
+  groups выполнил 1 239 SQL-запросов: 100 prepared `exists`, 202 title
+  selects, 100 group selects, 300 prepared selects и 200 per-row counter
+  increments.
+- Рабочая база read-only содержит 47 878 source pages, 92 610 title groups и
+  187 293 prepared rows. Run `#1255` остаётся active; production DML,
+  migration, queue/cache mutation и worker control не выполнялись.
+- Production duplicate preflight вернул 0 повторов пары
+  `(seasonvar_import_run_id, source_page_id)`.
+- Discovery изменило master-plan решение: один `dispatch_cursor_id` не может
+  быть authority, потому что planner состоит из overlapping reason queries и
+  metadata phases. Exact run/page ledger anti-join является безопасной
+  resumable boundary; единичный high-water cursor мог бы пропустить страницу.
+- Bounded sitemap-tail сохраняет в summary только ordered internal
+  `source_page_id`, а не raw URL/hash list, чтобы crash-resume не менял выбор
+  при обновлении внешнего sitemap.
+
+## Рассмотренные подходы и решение
+
+1. Удалить второй title lookup и лишние prepared reads: недостаточно, per-page
+   claims/groups/counters и crash gap остаются.
+2. Bounded batch transaction + prepared-ledger anti-join + ID-only
+   continuation/reconciliation: выбранный вариант.
+3. Сохранить отдельный полный dispatch-plan и новые batch envelopes:
+   отклонено как дублирующая staging topology и rolling queue risk.
+
+## Ожидаемые изменяемые файлы
+
+- Create `SeasonvarImportDispatchBatch` DTO и
+  `SeasonvarImportDispatchBatcher`.
+- Create additive migration
+  `2026_07_25_130000_add_batch_dispatch_progress_to_seasonvar_import.php`.
+- Modify queued dispatcher, refresh planner, claim manager, title-group
+  dispatcher, run recorder/coordinator, active reconciler, start/reconcile/
+  prepare jobs and run/prepared models.
+- Create focused batch/query-plan tests and update directly related Seasonvar
+  tests.
+- Update importer/queue/performance owners, importer master/current plans,
+  `README.md` only for factual product/roadmap state and Russian
+  `CHANGELOG.md`.
+
+## Сохраняемые contracts
+
+- Одна public command `php artisan seasonvar:import`.
+- Existing queue names and scalar ID-only job constructors.
+- Run/group/prepared states, terminal reasons, counters, claim duration,
+  retry/backoff/timeout and finalizer locks.
+- Один `CatalogTitle` для всех сезонов; current identity/merge/publication/
+  partial snapshot behavior.
+- External URL-only media, no stored full video, existing guarded provider
+  HTTP.
+- Cache/search/recommendation/calendar/API-sync handoffs, routes, locale,
+  permissions, SEO, frontend, dependencies and environment keys.
+
+## Migrations, production и rollback
+
+- Add nullable `seasonvar_import_runs.last_progress_at`.
+- Add prepared enqueue-attempt metadata, unique run/page and due-outbox index.
+- Migration additive/reversible in code, but unique/index build on SQLite is
+  `potentially_locking`; duplicate preflight must fail closed.
+- Task 48 pending recovery index is preserved and not edited.
+- Production activation requires verified backup/restore, free-space/WAL
+  headroom, terminal importer, paused writers, integrity/schema/EXPLAIN gates,
+  graceful worker restart and bounded canary.
+- Code rollback may leave additive schema. Destructive down under traffic,
+  queue/cache clear, retry-all and manual status/claim DML are prohibited.
+
+## Cross-feature impact
+
+| Domain | Status | Evidence / решение |
+| --- | --- | --- |
+| Import throughput/recovery | `affected` | Per-page registration becomes bounded durable batches |
+| Queue transport | `affected_compatible` | Same queues and ID-only jobs; prepared rows become explicit outbox |
+| SQLite/schema | `affected_operator_gated` | Additive progress/enqueue columns and measured indexes |
+| Catalog identity/writes | `compatibility_required` | Grouped resolver preserves current title precedence; apply untouched |
+| Provider HTTP/media | `unaffected` | Registration performs no provider/media request |
+| Cache/search/recommendations | `unaffected` | Existing finalizer handoffs unchanged |
+| Calendar/API sync/player | `unaffected` | No catalog apply or public model change |
+| Auth/admin/premium/region/legal | `unaffected` | Admin start reuses same run boundary; access decisions unchanged |
+| Locale/routes/SEO/frontend | `not_applicable` | No presentation or public URL change |
+| Dependencies/environment | `not_applicable` | No package or environment key planned |
+| Production operations | `affected_gated` | Paused-writer migration/canary/rollback evidence required |
+
+## Task-specific requirement-compliance matrix
+
+| Requirement/domain | Status | Evidence / gate |
+| --- | --- | --- |
+| Root/index/applicable owners | `completed` | Fresh code/architecture/workflow/multilingual/security/performance/cache/operations/maintenance/integration/importer/queue reads |
+| Installed versions | `completed` | Boost: PHP 8.5, Laravel 13.22.0, Boost 2.4.13, PHPUnit 12.5.32, SQLite |
+| Official version-specific docs | `completed` | Laravel 13 query chunking, eager loading, query listener/count tests and after-commit queue guidance checked through Boost |
+| Existing implementation | `completed` | Dispatcher, planner, coordinator, claims, groups, prepared ledger, jobs, schema and tests traced |
+| Baseline query evidence | `completed` | Disposable migrated SQLite profile: 1 239 SQL for 100 serial pages |
+| Production read-only evidence | `completed` | Counts, active lifecycle and duplicate preflight read without DML |
+| Alternatives/high-level approval | `completed` | User explicitly continued the recommended durable batch option |
+| Written design spec | `completed` | Linked spec covers architecture, data flow, errors, tests, rollout and rollback |
+| Spec self-review | `completed` | One H1, no unresolved placeholders; batch cap, title precedence, tail resume, non-serial scope, errors, rollout and rollback checked |
+| User written-spec review | `completed` | User explicitly continued after the written-spec review gate |
+| Implementation plan | `completed` | Seven executable TDD/schema/lifecycle/query-budget/documentation tasks with exact contracts, commands and rollback gates |
+| Implementation plan self-review | `completed` | Spec coverage, type/resume/transaction/progress/migration consistency and placeholder scan checked |
+| Execution mode | `completed` | User continued after the two-mode handoff; inline execution selected |
+| Application/migration code | `in_progress` | Inline TDD execution started after approved spec and implementation plan |
+| TDD/verification | `pending` | Exact RED/GREEN begins only after implementation plan |
+| README relevance | `pending` | Must be checked again after actual result |
+| CHANGELOG/docs | `pending` | Update only from implemented/verified result |
+| Production activation | `unresolved_operator_gate` | No migration, worker or live run mutation authorized |
+| Commit/push | `unresolved_shared_worktree` | `main` is ahead 34 with extensive foreign tracked/untracked changes |
+
+## Design-phase verification
+
+- [x] Current 100-page SQL baseline captured on a disposable migrated SQLite
+  database; working database was not used for writes.
+- [x] Live schema/index inventory and active run inspected read-only.
+- [x] Exact target files and related tests inspected.
+- [x] Existing master Task 6 compared with actual multi-phase planner.
+- [x] Public/queue/catalog/media compatibility and rollback boundaries listed.
+- [x] Written design created after user approved the recommended scope.
+- [x] Complete spec self-review: scoped `git diff --check` green; one H1;
+  no unresolved placeholder; multi-phase planner, title precedence,
+  SQLite bind cap, tail identity, non-serial compatibility and rollback
+  contradictions resolved.
+- [x] Obtain explicit written-spec approval.
+- [x] Invoke `writing-plans` and prepare exact TDD execution plan.
+- [ ] Implementation, documentation, final requirements reread and delivery
+  remain pending.
+
+## Активная задача — Task 40: корректность discovery, refresh и public cache
+
+Дата: 25.07.2026.
+
+Статус: `implementation_verified_local_delivery_unresolved`.
+
+Источник:
+[`2026-07-24-discovery-sections-end-to-end-improvement-master-plan.md`](../superpowers/plans/2026-07-24-discovery-sections-end-to-end-improvement-master-plan.md),
+Tasks 1–4.
+
+## Подтверждённый scope и решение
+
+- Выполняются только Tasks 1–4 утверждённого discovery-плана: один
+  `discover()` на Livewire interaction, полный гостевой cold-start,
+  канонический guest cache `discovery-ids-v3`, post-cache session exclusions
+  и одностраничный `random`.
+- Выбран существующий orchestration boundary:
+  `CatalogDiscoveryPage` → `CatalogRecommendationService` →
+  `CatalogRecommendationCache` / `CatalogPublicDiscoveryQuery` → title loader.
+- Защищённый request-local DTO и отдельный prepared flag используются только
+  между Livewire action и следующим render того же interaction; публичным
+  Livewire state результат не становится.
+- Deterministic guest modes могут разделять bounded scalar candidate pool.
+  Авторизованные, personalized и random requests всегда обходят shared result
+  cache. Session recent IDs фильтруются после cache lookup и не входят в key.
+- Cold-start накапливает unique candidates по цепочке
+  `editorial → weekly trending → monthly trending → popular`, не останавливая
+  страницу на первом непустом источнике. Monthly fallback сохраняет честную
+  причину периода.
+- `random` всегда нормализуется к page 1, получает не более `perPage` rows и
+  возвращает `hasMore=false`; refresh сначала меняет seed, затем делает один
+  resolve.
+- Task 39 и её collection query budget не поглощаются этой задачей:
+  `app/Services/Collections/CatalogCollectionQuery.php` уже содержит чужие
+  незакоммиченные изменения. Новый query-budget покрывает только discovery.
+- Projection, schema/index, collection hydration, upcoming/editorial
+  readiness и browser polish остаются Tasks 41–42.
+
+## Ожидаемые изменяемые файлы
+
+- Modify: `app/Livewire/CatalogDiscoveryPage.php`.
+- Modify: `app/DTOs/CatalogRecommendationContext.php`.
+- Modify: `app/Services/Catalog/CatalogRecommendationService.php`.
+- Modify: `app/Services/Catalog/CatalogRecommendationCache.php`.
+- Modify: `app/Services/Catalog/CatalogRecommendationExclusionService.php`.
+- Modify only if exact random/cold-start contract requires it:
+  `app/Services/Catalog/CatalogPublicDiscoveryQuery.php`.
+- Modify: `app/Enums/CatalogRecommendationReason.php`.
+- Modify only if a distinct existing identity is insufficient:
+  `app/Enums/CatalogRecommendationSource.php`.
+- Modify: `lang/ru/recommendations.php`,
+  `lang/en/recommendations.php`.
+- Modify only for an explicit bounded setting:
+  `config/recommendations.php`.
+- Create: `tests/Feature/CatalogDiscoveryInteractionTest.php`.
+- Create: `tests/Feature/CatalogDiscoveryQueryBudgetTest.php`.
+- Modify: `tests/Feature/CatalogRecommendationPrivacyTest.php`.
+- Modify only for a proven loader regression:
+  `tests/Feature/CatalogRecommendationTitleLoaderQueryTest.php`.
+- Update: `docs/architecture.md`, `docs/caching.md`,
+  `docs/catalog-search.md`, `docs/performance.md`,
+  `docs/security.md`,
+  `docs/superpowers/specs/2026-07-13-recommendation-v3-list-design.md`,
+  `docs/superpowers/specs/2026-07-16-recommendation-personalization-exploration-design.md`,
+  `docs/plans/current-task-plan.md`,
+  `docs/superpowers/plans/2026-07-24-system-maintenance-and-optimization-master-plan.md`,
+  `README.md`, `CHANGELOG.md`.
+
+## Сохраняемые файлы и public contracts
+
+- Не изменять уже занятый
+  `app/Services/Collections/CatalogCollectionQuery.php` и collection
+  routes/cache/summary contracts.
+- Сохранить все девять `/discover/*` route names/URI, localized aliases,
+  enum values, query-string filters, canonical/noindex policy и route binding.
+- Сохранить visibility/watchability, audience, premium, region, legal,
+  authenticated ownership, feedback/repeat suppression и title loader
+  boundaries.
+- Shared cache хранит только нормализованные scalar candidate rows; user ID,
+  seed, session recent IDs, private profile и Eloquent models в него не
+  попадают.
+- Сохранить API Resources, sitemap/home consumers, importer invalidation,
+  release calendar, search, recommendations build и existing cache-domain
+  invalidation contracts.
+- Сохранить RU/EN key parity; видимый русский текст остаётся русским.
+- Не добавлять dependency, route, permission, queue, scheduler, worker,
+  environment variable, DB table/column/index или production DML.
+
+## Risks, cache, permissions, production и rollback
+
+- Главный correctness risk: повторное вычисление в render после action или
+  повторная попытка после exception. Отдельный protected prepared flag обязан
+  различать «результат ещё не вычислен» и «вычисление завершилось ошибкой».
+- Главный privacy risk: seed/session recent IDs могут раздробить или
+  персонализировать shared cache. Key строится только из canonical public
+  dimensions; per-session recent filtering выполняется после lookup.
+- Cache namespace меняется additively с `discovery-ids-v2` на
+  `discovery-ids-v3`; глобальная очистка запрещена, старые записи истекают
+  естественно.
+- Random page normalization может затронуть ranks и URL-state; requested type,
+  page 1 и `hasMore=false` проверяются отдельно.
+- Migrations, production DB, queue, Redis, scheduler, storage, environment,
+  permissions, dependencies и asset activation: `not_applicable`.
+- Rollback возвращает previous Livewire action/render flow, cold-start и
+  namespace v2. Data/cache restore не требуется; старые cache entries можно
+  оставить до TTL.
+
+## Cross-feature impact
+
+| Domain | Status | Evidence / решение |
+| --- | --- | --- |
+| Livewire discovery refresh | `affected` | One resolve per interaction; protected request-local DTO |
+| Personalized cold-start | `affected` | Four-source accumulation and honest month reason |
+| Guest shared cache | `affected` | Canonical v3 scalar pool; recent IDs filtered after lookup |
+| Auth/privacy | `affected_regression_gate` | Auth/personal/random bypass shared result cache |
+| Random pagination | `affected` | Page 1 only, exact page size, no next page |
+| Visibility/watchability | `compatibility_required` | Loader and visibility service remain authoritative |
+| Collections | `unresolved_separate_task` | Task 39 owns dirty collection query and its query budget |
+| Home/sitemap/API | `compatibility_required` | Existing service consumers and DTO contracts preserved |
+| Search/import/calendar | `compatibility_required` | Existing invalidation/handoffs unchanged |
+| SEO/routes/localization | `compatibility_required` | Nine routes and current canonical/noindex rules preserved |
+| Premium/region/legal | `compatibility_required` | Server-side visibility remains after cached IDs |
+| DB/queues/storage/dependencies | `not_applicable` | No stateful or package change |
+| Production operations | `not_applicable` | No activation, cache flush or process mutation |
+
+## Task-specific requirement-compliance matrix
+
+| Requirement/domain | Status | Evidence / gate |
+| --- | --- | --- |
+| Root/index/applicable canonical requirements | `completed` | Fresh AGENTS/index/code/architecture/development/localization/security/performance/cache/UI/frontend/authorization/maintenance/operations/integration reads |
+| Related Markdown | `completed` | Docs map, catalog-search, personalization spec, system Task 40 and complete discovery master plan inspected |
+| Installed versions | `completed` | PHP 8.5; Laravel 13.22.0; Livewire 4.3.3; Boost 2.4.13; PHPUnit 12.5.32; Tailwind 4.3.2; SQLite |
+| Official version-specific docs | `completed` | Boost docs confirm Livewire post-action render, protected property behavior, action tests and Laravel cache semantics |
+| Existing implementation | `completed` | Route → Livewire → service → exclusions/cache/query → loader/result traced |
+| Scope/alternatives | `completed` | Existing service boundary selected; controller/second recommender/schema/global flush rejected |
+| Written approved implementation plan | `completed` | Child plan Tasks 1–4 is `approved_for_inline_execution` |
+| Expected/protected paths and risks | `completed` | Exact manifests, compatibility domains, cache/privacy/rollback recorded above |
+| Task 39 ownership separation | `completed` | Dirty collection query excluded; collection query budget remains unresolved in Task 39 |
+| TDD RED | `completed` | Five exact failures: 1/24 cold-start, absent month row, 2/1 refresh resolve, random page 2, 2/1 guest rebuild |
+| Minimal GREEN | `completed` | Request-local result, accumulated fallback, v3 cache/post-filter and single-page random; no projection/schema/collection expansion |
+| RU/EN translations | `completed` | `trending_period` parity and localized `period` parameter |
+| Canonical docs | `completed` | Architecture/cache/search/performance/security/v3/personalization owners updated |
+| README relevance | `completed` | Visitor history records corrected refresh, full cold-start and one-page random |
+| CHANGELOG | `completed` | Separate dated Russian implementation/evidence entry |
+| Focused/wide verification | `completed_with_unrelated_failure` | Focused 19/70, discovery 20/98, recommendations 61/266, PHPStan/Pint/docs green; full 1661 with one reproduced pre-existing account-session failure |
+| Shared staged diff integrity | `unresolved_shared_index_collision` | Foreign staged Premium/Seasonvar/design paths contain trailing whitespace; task-owned working diff passes `git diff --check` |
+| Commit/push | `unresolved_shared_index_collision` | During final verification another owner staged at least 158 mixed Task 40/Premium/Seasonvar/player paths, later growing to 160; Task 40 did not stage, unstage, commit or push that foreign set |
+
+## TDD и verification sequence
+
+- [x] RED: guest personalized cold-start fills 24 unique rows from more than
+  one public source.
+- [x] RED: monthly trending fallback is not presented as weekly and does not
+  duplicate the weekly row.
+- [x] RED: Livewire initial render plus refresh performs exactly two service
+  resolves total and records only the refreshed set.
+- [x] RED: random ignores page 2 and never exposes `hasMore`.
+- [x] RED: deterministic guest cache rebuild is reused while recent exclusions
+  remain session-local; auth/personal/random bypass shared cache.
+- [x] RED: discovery-only query budget is bounded without touching collection
+  query ownership.
+- [x] GREEN: minimum application changes for Tasks 3–4.
+- [x] Focused PHPUnit, Pint, nine-route inventory and relevant existing tests.
+- [x] Canonical docs, README relevance check and Russian CHANGELOG.
+- [x] Final requirement reread, legacy/duplicate scan, `git diff --check`,
+  exact task-path review and honest Git delivery gate.
+
+## Verification evidence Task 40
+
+- RED: 9 tests, 4 passed, 5 failed exactly on the five planned contracts.
+- Focused GREEN: 19 tests, 70 assertions.
+- `CatalogDiscovery`: 20 tests, 98 assertions.
+- `CatalogRecommendation`: 61 tests, 266 assertions.
+- Existing title-loader and unified collection-route regressions passed;
+  collection query implementation remained untouched.
+- Direct `PHPStan`, Pint, `project:docs-refresh --check`, docs CI and
+  `git diff --check` passed.
+- Route inventory preserves `discover.index` and
+  `localized.discover.index`; isolated feature cases returned 200 for all
+  nine discovery enum values.
+- Full PHPUnit: 1661 total, 1649 passed, 11 skipped, one pre-existing
+  `WebAccountManagementTest` flash failure; focused reproduction failed
+  identically and does not touch Task 40 paths.
+- No migration, production data/cache/service activation, queue mutation,
+  dependency, environment, route or permission change was performed.
+- Final legacy scan found and reconciled the old seeded-refresh wording in
+  the canonical v3 recommendation design and security owner. Historical v3
+  execution-plan and maintenance-log evidence remains unchanged because it
+  truthfully describes the former v2 implementation.
+- During the final read-only diff review the shared index changed externally
+  from empty to at least 158 staged paths and then 160, mixing Task 40 with
+  Premium, Seasonvar, player, calendar, hooks and other workstreams. The
+  foreign staged set also fails `git diff --cached --check` on trailing
+  whitespace outside Task 40. Task 40 made no index mutation. Commit/push is
+  blocked until the canonical owner safely reconciles and reviews that staged
+  set; no bypass, unstage or partial commit was used.
+
+## Активная задача — System Task 50: тихий no-op `project:docs-refresh`
+
+Дата: 25.07.2026.
+
+Статус: `implementation_verified_local_delivery_unresolved`.
+
+### Цель и подтверждённая причина
+
+- Успешный `php artisan project:docs-refresh --check --no-interaction
+  --no-ansi` при актуальной документации сейчас возвращает код `0`, но
+  печатает `Документация уже актуальна.`.
+- `git blame` связывает строку с первоначальной реализацией команды
+  `ba0f7788`, а текущий `post-commit` вызывает
+  `scripts/docs-autocommit-push.sh`, который запускает эту команду без
+  фильтрации stdout. Поэтому обычный успешный no-op выглядит как сообщение
+  Git-хука.
+- Исправление выполняется в источнике: успешный no-op команды остаётся
+  успешным, но не пишет в stdout/stderr. Фильтрация строки только в hook
+  отклонена, потому что сохранила бы тот же шум у прямых и будущих callers.
+- Сообщения о broken Markdown links, stale documentation и реально
+  обновлённых файлах сохраняются.
+- Первый RED через документированный `PendingCommand::doesntExpectOutput()`
+  неожиданно прошёл при существующем `$this->info(...)`. Проверка исходника
+  Laravel 13.22 показала, что helper задаёт ожидание на mocked
+  `BufferedOutput`, но текущий styled `info()` path не сделал его
+  чувствительным к этой строке. Regression поэтому использует реальный
+  `Kernel::call` через отключённый console mock и сравнивает полный
+  `Artisan::output()` с пустой строкой.
+
+### Ожидаемые изменяемые файлы
+
+- Modify: `tests/Feature/RefreshProjectDocsCommandTest.php`.
+- Modify: `app/Console/Commands/RefreshProjectDocs.php`.
+- Modify: `docs/development.md`.
+- Modify: `docs/plans/current-task-plan.md`.
+- Modify: `CHANGELOG.md`.
+- Checked, no content change: `README.md`.
+
+### Сохраняемые contracts
+
+- Сигнатура `project:docs-refresh {--check}` и код `0` для актуальной
+  документации остаются совместимыми.
+- `--check` по-прежнему возвращает код `1` и перечисляет stale files.
+- Broken Markdown links по-прежнему перечисляются и возвращают код `1`.
+- Обычный refresh по-прежнему перечисляет фактически обновлённые файлы.
+- `post-commit`, auto-commit, opt-in auto-push, `core.hooksPath`, CI profiles
+  и `SEASONVAR_DOCS_*` environment contracts не меняются.
+- Managed Markdown blocks и `ProjectDocumentationRefresher` не меняются.
+
+### Risks, cross-feature impact и rollback
+
+| Domain | Status | Evidence / решение |
+| --- | --- | --- |
+| Artisan output | `affected` | Только успешный no-op становится silent |
+| Git hooks | `affected_compatible` | `post-commit` больше не показывает no-op строку; exit code и state flow прежние |
+| CI docs profile | `affected_compatible` | Read-only check остаётся code-0/code-1 gate без success noise |
+| Errors and warnings | `compatibility_required` | Existing stale, broken-link и updated-file tests сохраняются |
+| Routes/API/Livewire/UI/translations | `not_applicable` | Публичное приложение и user-facing copy не меняются |
+| Database/migrations/cache/queue/storage | `not_applicable` | Нет schema, data, cache key или process-state mutation |
+| Auth/permissions/privacy/premium/region/legal | `not_applicable` | Access boundaries не затронуты |
+| Dependencies/runtime/environment | `not_applicable` | Constraints, lock files и variables не меняются |
+| Production/deployment | `unaffected` | Меняется только локальный/CI console output |
+
+Rollback — вернуть одну удалённую строку `$this->info(...)` и regression
+assertion; data restore, cache clear, migration rollback и process restart не
+нужны.
+
+### Task-specific requirement-compliance matrix
+
+| Requirement/domain | Status | Evidence / gate |
+| --- | --- | --- |
+| Root/index/canonical owners | `completed` | Fresh `AGENTS.md`, index, code, architecture, development, multilingual, security and maintenance reads |
+| Related Markdown | `completed` | Docs map, CI owner, Git workflow, hook scripts and current plan inspected |
+| Installed versions | `completed` | Boost: PHP 8.5, Laravel 13.22.0, Boost 2.4.13, PHPUnit 12.5.32, Pint 1.29.3; Node 26.4.0/npm 12.0.1 |
+| Official Laravel 13 docs | `completed` | Boost confirms `doesntExpectOutput()` and explicit command exit-code assertions |
+| Existing implementation/root cause | `completed` | Direct reproduction returned `exit=0` plus exact unwanted line; source and caller chain traced |
+| Expected/protected paths | `completed` | Exact files and compatibility contracts listed above |
+| Migrations/routes/cache/permissions | `not_applicable` | No changes planned in these domains |
+| TDD RED | `completed` | Direct Kernel capture failed exactly on `Документация уже актуальна.\n` with exit code still `0` |
+| Minimal GREEN | `completed` | Removed only no-op `info()`; focused refresh/check regression passes 2 cases / 6 assertions |
+| Documentation/README/CHANGELOG | `completed` | Workflow owner and separate Russian changelog entry updated; README re-read and correctly unchanged because visitor behavior did not change |
+| Verification | `completed_with_shared_docs_blocker` | Focused 8/20 and related Git/CI set 26/124 pass; exact Pint, syntax, hook syntax, phrase scan and task diff pass; shared docs/CHANGELOG gates fail only outside Task 50 |
+| Commit/push | `unresolved_shared_index_collision` | Existing `main` is ahead 34 with a large mixed staged set plus unrelated unstaged/untracked work; canonical hook gates cannot pass without absorbing foreign scope |
+
+### TDD и execution plan
+
+- [x] Add data-provider cases to
+  `test_it_is_silent_when_documentation_is_current()` in
+  `tests/Feature/RefreshProjectDocsCommandTest.php`; mock
+  `ProjectDocumentationRefresher::refresh(false|true)` with
+  `new ProjectDocumentationRefreshResult([], [])`, disable mocked console
+  output and assert the normal refresh and `--check` modes:
+
+```php
+$this->withoutMockingConsoleOutput();
+
+$this->assertSame(0, $this->artisan('project:docs-refresh', ['--no-ansi' => true]));
+$this->assertSame('', Artisan::output());
+```
+
+- [x] Run
+  `php artisan test --filter=test_it_is_silent_when_documentation_is_current`
+  and require a failure caused by the unexpected
+  `Документация уже актуальна.` output.
+- [x] Remove only `$this->info('Документация уже актуальна.');` from the
+  no-change branch in `RefreshProjectDocs::handle()`.
+- [x] Re-run the focused test and require success.
+- [x] Run the complete `RefreshProjectDocsCommandTest`, Pint for dirty PHP,
+  then directly capture exit/stdout/stderr from
+  `php artisan project:docs-refresh --check --no-interaction --no-ansi`.
+- [x] Update `docs/development.md`, Russian `CHANGELOG.md` and this matrix;
+  keep `README.md` unchanged because visitor/product behavior did not change.
+- [x] Re-read applicable requirements, scan the repository for the legacy
+  phrase and duplicate output paths, run `project:docs-refresh --check`,
+  scoped/full verification as permitted by the shared worktree, and record
+  honest Git delivery status.
+
+### Verification evidence
+
+- RED captured exit code `0` with the exact unexpected
+  `Документация уже актуальна.\n`; GREEN removed only the corresponding
+  `info()` call.
+- `RefreshProjectDocsCommandTest` passed 8 tests / 20 assertions; together
+  with `CiQualityGateContractTest`, the related final set passed 26 tests /
+  124 assertions.
+- Exact-file Pint, two PHP syntax checks, `bash -n` for `post-commit` and its
+  script, README policy and task-scoped `git diff --check` passed.
+- Repository scan found no remaining executable producer of the legacy
+  success phrase; its remaining occurrences are dated changelog/plan evidence.
+- Read-only `project:docs-refresh --check --no-interaction --no-ansi`
+  returned `1` only because `docs/MAINTENANCE_LOG.md` must inventory an
+  unrelated untracked Task 49 migration
+  `2026_07_25_130000_add_batch_dispatch_progress_to_seasonvar_import.php`;
+  the staged inventory already includes Task 48. Write-refresh was
+  intentionally not used because it would absorb foreign scope.
+- Full working-tree CHANGELOG policy proceeds past the new Task 50 and
+  corrected Task 40 entries, then stops on ordinary English in the foreign
+  staged Calendar entry. Task 50 does not rewrite that owner’s staged scope.
+- No route, migration, database, cache, queue, worker, hook configuration,
+  dependency, environment or production service was changed.
+
+## Активная задача — System Task 51: категории подборок, discovery без обложек и оптимизация запросов
+
+Дата: 25.07.2026.
+
+Статус: `implemented_and_verified_delivery_unresolved_shared_index`.
+
+### Цель и согласованные решения
+
+- Полностью удалить изображения именно у подборок: presentation, upload,
+  import, API/SEO/sitemap contracts, DB metadata и физические файлы в точном
+  collection uploads subtree. Постеры тайтлов внутри подборок не затрагивать.
+- Пользователь прямо запретил сохранять копии обложек. Media rollback
+  намеренно невозможен; cleanup выполняется только через точный dry-run и
+  explicit execute.
+- Ввести один управляемый двухуровневый справочник. Все владельцы могут
+  выбирать активную категорию/подкатегорию своей подборки; создавать,
+  переводить, сортировать и архивировать справочник может только
+  `content.manage`.
+- Хранить у подборки один nullable FK на корневой или дочерний узел, не
+  дублировать category/subcategory ID и не вводить many-to-many tags.
+- Не классифицировать существующие записи эвристикой. До реального назначения
+  они доступны через виртуальный фильтр «Без категории».
+- Owner/editor write требует реальную активную категорию для
+  `public|unlisted`; private и trusted source reconciliation могут оставлять
+  запись без категории, но importer никогда не выдумывает и не
+  перезаписывает назначение.
+- Администратор получает bounded bulk-assignment до 100 явно выбранных
+  stable UUID, чтобы последовательно разобрать исходные 500+ записей без
+  browser-supplied «выбрать все» и keyword-эвристики.
+- Сохранить `/discover/{type}`, localized aliases, collection detail/profile/
+  dashboard/API contracts и встроить обновлённый каталог в
+  `/discover/popular`. Новый `/discover` landing route не добавлять.
+- Перевести collection cards на единый text-only компонент во всех
+  consumers.
+- Перестроить public directory на двухфазную пагинацию: сначала eligible IDs
+  и order, затем bounded summary только для IDs текущей страницы.
+
+Канонический дизайн:
+[`docs/superpowers/specs/2026-07-25-discovery-collection-taxonomy-and-cover-removal-design.md`](../superpowers/specs/2026-07-25-discovery-collection-taxonomy-and-cover-removal-design.md).
+
+### Подтверждённое исходное состояние
+
+- Branch: `main`, commit `08aeae6`, local branch ahead `origin/main` на 34
+  commit.
+- Shared tree уже содержит большой mixed staged/unstaged/untracked scope.
+  Task 51 не имеет права reset/stash/unstage/перезаписать чужие изменения.
+- Installed runtime: PHP 8.5, Laravel 13.22.0, Livewire 4.3.3, Laravel Boost
+  2.4.13, Pint 1.29.3, PHPUnit 12.5.32, Tailwind CSS 4.3.2.
+- SQLite evidence: 1403 коллекции, 501 public+approved, 3 294 655 membership
+  rows; все 1403 collection rows содержат cover metadata.
+- `catalog_collection_sources`: 54 source-managed records с cover metadata.
+- Exact storage subtree `storage/app/private/uploads/catalog-collections`
+  содержит 1924 файла общим размером 7 259 428 bytes. Это единственная
+  разрешённая destructive file target этой задачи.
+- `/discover` без type остаётся 404; public list смонтирован только в
+  `/discover/popular`.
+- Current `publicDirectory()` применяет `summaryQuery()` с correlated counts,
+  translation/owner/source/fallback poster loads до paginator `LIMIT`.
+- `CatalogCollectionQuery.php`, discovery Livewire и связанные tests уже
+  содержат незавершённые чужие изменения. Любое пересечение должно сохранять
+  их фактический diff и проверяться отдельно.
+
+### Реализованное состояние и destructive evidence
+
+- Authoritative pre-execute dry-run непосредственно перед удалением зафиксировал
+  1 403 файла / 5 265 172 bytes, 1 403 collection rows и 54 source rows.
+  Ранний planning snapshot 1 924 / 7 259 428 не использовался как execute
+  authority; команда заново перечислила exact configured prefix.
+- `catalog-collections:purge-covers --execute` без backup/trash удалил только
+  `uploads/catalog-collections/`. Повторный dry-run: 0 files, 0 bytes, 0
+  collection rows, 0 source rows, readiness `да`.
+- Соседние `demo-data`/`user-profiles` до и после сохранили 1 749 files /
+  5 197 797 bytes. Title posters, profile images и video paths не менялись.
+- Exact migrations `140000`–`140300` применены отдельно, не затронув pending
+  foreign importer migrations `120000`/`130000`: 5 root, 31 child, 72
+  translation rows; existing 1 403 collections имеют nullable category и не
+  были классифицированы автоматически; все восемь cover columns отсутствуют.
+- Runtime/UI/API/SEO/sitemap/importer используют text-only collection
+  representation; прежний route/service/importer удалены. Public API
+  сохраняет deprecated `cover_url=null`.
+- `/discover/{type}` получил mode-specific H1, девять реальных links,
+  collapsed/active filters, secondary refresh и разделение serial/collection
+  sections. Category explorer имеет desktop/mobile root-child controls и
+  URL-backed normalized state.
+
+### Ожидаемые изменяемые файлы
+
+Новые schema/domain paths:
+
+- `database/migrations/2026_07_25_*_create_catalog_collection_categories.php`;
+- `database/migrations/2026_07_25_*_add_category_to_catalog_collections.php`;
+- отдельная idempotent reference-data migration/command без смешивания с DDL;
+- отдельная destructive migration удаления только collection/source cover
+  columns после zero-residue gate;
+- `app/Models/CatalogCollectionCategory.php`;
+- `app/Models/CatalogCollectionCategoryTranslation.php`;
+- category factory только для tests, если соответствует текущему factory
+  pattern;
+- `app/Services/Collections/CatalogCollectionCategoryQuery.php`;
+- `app/Services/Collections/CatalogCollectionCategoryService.php`;
+- `app/Services/Collections/CatalogCollectionCoverPurgeService.php`;
+- `app/Console/Commands/PurgeCatalogCollectionCovers.php`;
+- `app/DTOs/CatalogCollectionData.php`;
+- `app/Models/CatalogCollection.php`;
+- `app/Services/Collections/CatalogCollectionSchema.php`;
+- `app/Services/Collections/CatalogCollectionService.php`;
+- `app/Services/Collections/CatalogCollectionQuery.php`;
+- `app/Services/Collections/CatalogCollectionCacheInvalidator.php`.
+
+Existing presentation/write paths:
+
+- `app/Livewire/Collections/CatalogCollectionExplorer.php`;
+- `app/Livewire/Concerns/InteractsWithCatalogCollectionCategory.php` for
+  shared root/subcategory Livewire state without duplicate browser trust;
+- `app/Livewire/Collections/CatalogCollectionEditor.php`;
+- `app/Livewire/Collections/CatalogCollectionAdministrationManager.php`;
+- `app/Livewire/Collections/CatalogCollectionCategoryManager.php`;
+- `app/Livewire/CatalogAdministrationPage.php`;
+- `app/Livewire/CatalogDiscoveryPage.php` only after preserving its current
+  foreign diff;
+- `app/View/Components/Collections/CollectionCard.php`;
+- `app/View/ViewModels/CatalogCollectionCardViewModel.php`;
+- `resources/views/components/collections/collection-card.blade.php`;
+- `resources/views/components/collections/category-fields.blade.php`;
+- `resources/views/livewire/collections/catalog-collection-explorer.blade.php`;
+- `resources/views/livewire/collections/catalog-collection-editor.blade.php`;
+- `resources/views/livewire/collections/catalog-collection-administration-manager.blade.php`;
+- `resources/views/livewire/collections/catalog-collection-category-manager.blade.php`;
+- `resources/views/livewire/catalog-administration-page.blade.php`;
+- `resources/views/livewire/collections/catalog-collection-page.blade.php`;
+- `resources/views/livewire/catalog-discovery-page.blade.php`;
+- existing collection-card consumers on home, title detail, profiles,
+  dashboard and catalog search should need no duplicate markup.
+
+Cover-removal consumers:
+
+- delete `app/Services/Collections/CatalogCollectionCoverService.php`;
+- delete `app/Services/Collections/CatalogCollectionCoverResponder.php`;
+- delete `app/Services/Collections/Import/HdRezkaCollectionCoverImporter.php`;
+- `routes/web.php`;
+- `app/Services/Collections/Import/HdRezkaCollectionParser.php`;
+- `app/Services/Collections/Import/HdRezkaCollectionReconciler.php`;
+- `app/Services/Collections/Import/HdRezkaCollectionSyncService.php`;
+- `app/Models/CatalogCollectionSource.php`;
+- `app/Services/Catalog/CatalogSitemapResponder.php`;
+- `app/Services/Collections/CatalogCollectionSeoPresenter.php`;
+- `app/Http/Resources/Api/V1/CatalogCollectionResource.php`;
+- `app/Services/Collections/CatalogCollectionAccountService.php`;
+- collection/profile/demo services returned by the repository-wide cover
+  reference manifest;
+- `resources/api/openapi.json`;
+- collection-only config/translation keys.
+
+Tests and documentation:
+
+- new focused schema/category/service/query/Livewire/purge tests in
+  `tests/Feature`;
+- update/delete cover-specific tests and update existing collection,
+  importer, sitemap, profile, demo, API and discovery regressions;
+- `docs/DATA_RELATIONS.md`, `docs/architecture.md`,
+  `docs/authorization.md`, `docs/administration.md`, `docs/views.md`,
+  `docs/frontend.md`, `docs/performance.md`, `docs/caching.md`,
+  `docs/storage.md`, `docs/UI_STANDARDS.md`,
+  `docs/system-integration.md`,
+  `docs/requirements/system-wide-integration.md`, affected importer/API docs and docs map
+  only if ownership changes;
+- `README.md`, `CHANGELOG.md`, this current plan and the Task 51 execution
+  plan.
+
+Этот manifest обновляется немедленно, если TDD/repository audit выявляет
+другой реальный consumer. Исторические migrations/specs/plans не
+переписываются как runtime implementation.
+
+### Сохраняемые файлы и публичные contracts
+
+- `routes/web.php`: все существующие discovery mode route names, collection
+  detail/localized/history/profile/mine/create/edit/report routes, middleware
+  and binding identities кроме намеренно удаляемого `collections.cover`.
+- `routes/api.php`: existing v1 collection routes, pagination envelope and
+  resource identity.
+- `CatalogCollection` stable `id`, `public_id`, current/history slug,
+  owner/type/visibility/moderation/sort/content-version, membership,
+  translations, source and report relations.
+- `catalog_collection_items` остаётся единственной membership table;
+  seasons/episodes не превращаются в collection titles.
+- `CatalogCollectionPolicy`, current owner derivation, verified write
+  boundary, moderator permissions and deny-as-not-found behavior.
+- `CatalogCollectionQuery` остаётся sole read boundary; Blade не выполняет
+  queries.
+- Existing URL state `collections_q`, `collections_sort`,
+  `collectionsPage`; новые keys additive.
+- API v1 сохраняет `cover_url` как `null` compatibility field; private source
+  data и numeric IDs не раскрываются.
+- Existing recommendation signal identity
+  `editorial_collection:{source_id}`, membership reconciliation, cache warm
+  command and Seasonvar importer command остаются совместимыми.
+- Catalog title posters, avatars, profile header images, other upload roots,
+  playback media and source URLs являются protected out-of-scope data.
+- RU/EN interface parity, locale prefix, canonical/hreflang, mobile 44px
+  targets, native controls and no inner scroll.
+
+### Migrations, data safety, rollback и production impact
+
+- Category DDL additive, SQLite-compatible и обратима до появления category
+  writes. FK delete restrict не позволяет потерять назначения.
+- Reference taxonomy создаётся отдельным идемпотентным шагом с deterministic
+  public UUID/slug; она не классифицирует catalog content.
+- Cover cleanup и cover-column migration разделены. Destructive DDL
+  запрещена, пока dry-run/execute verification не подтвердит ноль файлов и
+  metadata.
+- Allowed file prefix: только configured uploads disk path
+  `catalog-collections/`; никакие unresolved env vars, glob roots, poster,
+  profile или video paths не принимаются.
+- Пользователь запретил backup/trash копию cover files. Rollback не
+  восстанавливает images; collection text/membership/identity сохраняются.
+- Interrupted cleanup повторяется идемпотентно. Partial failure блокирует
+  schema drop и возвращает ненулевой exit.
+- Deployment order: additive DDL → reference data → compatible code →
+  cleanup dry-run/execute → zero-residue check → destructive column drop →
+  cache/API/sitemap/HTML verification.
+- Не запускать `migrate:fresh`, `db:wipe`, `cache:clear`, broad storage delete
+  или недокументированные production mutations.
+- Локальная очистка текущей workspace DB/storage не означает production
+  rollout; фактическое production execution и verification фиксируются
+  отдельно и честно.
+
+### Cross-feature impact
+
+| Domain | Статус | Решение / gate |
+| --- | --- | --- |
+| Authentication | `affected_compatible` | Existing session/verified owner flow unchanged |
+| Authorization | `affected` | Category dictionary requires `content.manage`; owner assignment reuses collection policy |
+| Translations | `affected` | RU/EN category rows + paired interface keys, stable slug untranslatable |
+| Caching | `affected` | Versioned category tree/counts and existing discovery/search/sitemap invalidation after commit |
+| Search | `affected_compatible` | Collection suggestions become text-only; existing search semantics preserved |
+| Notifications | `not_applicable` | No category subscriptions or new notification state |
+| SEO/sitemap | `affected` | Keep collection URLs; remove image extension/structured image; add category context only where canonical |
+| Privacy/export/delete | `affected_compatible` | Export stable category fields; account delete no longer deletes cover files |
+| Mobile/API | `affected_compatible` | Add category object; retain `cover_url=null`; no new token ability |
+| Administration/audit | `affected` | Embedded taxonomy manager, stable UUID, permission and safe audit |
+| Imports/recommendations | `affected_compatible` | Stop remote cover fetch; preserve source identity, membership and signals |
+| Premium/region/legal | `already_compliant` | Existing title visibility/entitlement boundaries remain sole authority |
+| Storage | `affected_destructive` | Exact collection cover subtree removed permanently by explicit command |
+| Queue/schedule | `affected_compatible` | Sync no longer performs cover network/image work; command identity unchanged |
+| Routes | `affected_compatible` | Only cover route removed; discovery/detail/API routes preserved |
+| Dependencies/runtime | `not_applicable` | No package, PHP, Node or framework upgrade |
+| Browser/accessibility | `affected` | Text rows, responsive dependent filters, keyboard/focus/44px/no inner scroll QA |
+
+### Task-specific requirement-compliance matrix
+
+| Requirement/domain | Статус | Evidence / gate |
+| --- | --- | --- |
+| Root `AGENTS.md` and requirement index fresh read | `completed` | Read before code on 25.07.2026 |
+| All index-mandatory owners | `completed` | Code, architecture, development, multilingual, security, performance, caching, UI, production and maintenance owners inspected |
+| Related Markdown | `completed` | Collections/discovery/admin/auth/data/storage/importer plans and docs inspected |
+| Installed versions | `completed` | Boost/application evidence listed above |
+| Official Laravel 13 behavior | `completed` | Boost docs checked for migrations, pagination, subqueries and Livewire URL state |
+| Existing implementation and production-shaped data | `completed` | Routes, Livewire, query, schema, indexes, row/file counts inspected read-only |
+| Design alternatives and user decision | `completed` | Three approaches compared; recommended controlled two-level taxonomy delegated/approved |
+| Design specification | `completed` | Canonical Task 51 spec written and self-reviewed |
+| Expected/protected files/contracts | `completed` | Manifest and compatibility list above |
+| Migration/rollback/data safety | `completed` | Staged rollout and irreversible media rollback explicitly documented |
+| TDD RED before production code | `completed` | Category schema/default/service/editor/admin/query/explorer/text/runtime/external/discovery/purge/schema-removal tests observed RED before GREEN |
+| Minimal GREEN/refactor | `completed` | Domain/query/Livewire/Blade/import/API/SEO/storage boundaries implemented and focused suites green |
+| Query optimization evidence | `completed` | Two-phase directory, grouped category counts and focused query budget/empty-second-phase tests pass |
+| Cover zero-residue evidence | `completed` | Tested dry-run/execute; actual 1 403 files and 1 403+54 metadata rows removed; repeat audit four zeros; sibling aggregates unchanged |
+| RU/EN/mobile/accessibility | `completed` | 303/303 translation-key parity; 44px/native controls; wrapping navigation; discovery and recommendation Playwright each pass Desktop/Mobile/Tablet with no overflow/errors |
+| Canonical docs/README/CHANGELOG | `completed` | Domain owners, storage runbook, docs map, Russian README visitor history and dated CHANGELOG updated |
+| Final requirement reread and legacy scan | `completed` | Canonical owners re-read; runtime/source scan leaves only guarded purge/history/migration evidence and deprecated API `cover_url=null` |
+| Full verification | `completed_with_external_blockers` | Related 151/1 045 green; split broad run 1 711 (1 700 pass, 11 skip) plus two isolated green tests; build/Pint/docs/route/schema/query/Playwright green. Two unrelated reproducible blockers listed below |
+| Commit/push in `main` | `unresolved_shared_index_collision` | `main` ahead 34 with a large pre-existing mixed staged/unstaged/untracked set overlapping Task 51 files; isolated staging/commit would absorb or overwrite foreign work |
+
+### Финальная verification evidence
+
+- `catalog-collections:purge-covers` повторно подтвердил 0 files, 0 bytes, 0
+  collection rows и 0 source rows; schema содержит 5 root, 31 child, 72
+  translations, 0 assignments/orphans/depth violations и ни одной из восьми
+  legacy cover columns.
+- Production `route:list` сначала воспроизвёл старый `collections.cover` из
+  `bootstrap/cache/routes-v7.php` от 20.07.2026 при отсутствии route в source.
+  Адресный `php artisan route:cache` пересобрал artifact; повторный route list
+  содержит 10 разрешённых collection routes и не содержит cover route.
+- SQLite `EXPLAIN QUERY PLAN` выбирает covering
+  `catalog_collections_category_public_order_idx` для category/public/order
+  lookup. Category tree не читается для закрытого или гостевого title
+  membership dialog; query-budget regressions снова зелёные.
+- `./vendor/bin/pint --dirty --test --format agent`,
+  `php artisan project:docs-refresh --check`, `npm run build` и task-scoped
+  `git diff --check` прошли. Managed migration inventory обновлён штатной
+  `project:docs-refresh`, включая фактически присутствующий параллельный
+  `130000` и Task 51 `140000`–`140300`.
+- Focused final set: 151 tests / 1 045 assertions. Broad set без двух
+  external blockers и одного отдельно исполненного GD test: 1 711 tests,
+  1 700 passed, 11 skipped, 124 485 assertions. Отдельно прошли profile
+  WebP test (1/12) и foreign batch-claim test (1/6). Полный единый процесс
+  при 256 MB исчерпывает память в позднем GD profile test; этот же тест
+  отдельно зелёный, поэтому verification разделён без изменения runtime
+  configuration.
+- Playwright: `discovery-collections.spec.js` — 3/3 и
+  `recommendation-ui.spec.js` — 3/3 в Desktop, Mobile и Tablet Chromium.
+  Визуально проверена финальная mobile screenshot; mode navigation
+  переносится, заголовки читаемы, collection cards text-only.
+- External blocker 1: untracked
+  `tests/Feature/SeasonvarImportDispatchBatcherTest.php` второй сценарий
+  требует отсутствующий, прямо запланированный параллельной задачей
+  `App\Services\Seasonvar\SeasonvarImportDispatchBatcher`. Первый независимый
+  claim scenario проходит.
+- External blocker 2: неизменённый Task 15
+  `WebAccountManagementTest::test_logout_other_browser_sessions_preserves_current_session`
+  отдельно воспроизводит `sessionStatus=null` при legacy invalid database
+  session payload. Task 51 не меняет authentication/session boundary.
+- Task/full unstaged `git diff --check` прошёл. `git diff --cached --check`
+  блокируется только ранее staged trailing whitespace в чужих Premium,
+  player, calendar и importer plan/spec files; Task 51 не stage/unstage и не
+  переписывает этот index, поэтому commit/push не выполняются.
+
+### Рекомендуемый execution scope без искусственного лимита
+
+План не ограничивается косметическим первым этапом и остаётся активным до
+закрытия всех матричных `unresolved` либо честной фиксации внешнего блокера:
+
+1. Подготовить detailed TDD execution plan и перечитать его.
+2. RED/GREEN category schema/models/query and reference taxonomy.
+3. RED/GREEN category assignment domain and permissions.
+4. RED/GREEN admin taxonomy management.
+5. RED/GREEN two-phase public directory and category counts.
+6. RED/GREEN text-only collection component and all consumers.
+7. RED/GREEN `/discover/popular` category UX and general discovery polish.
+8. RED/GREEN stop all new cover writes/imports/responses/API/SEO output.
+9. RED/GREEN exact cover purge command.
+10. Выполнить local dry-run, explicit irreversible cleanup and zero-residue
+    verification только после готовности всех защитных gates.
+11. Применить destructive column removal and update schema guards.
+12. Обновить canonical docs, README visitor history and Russian CHANGELOG.
+13. Выполнить full tests/build/browser/query/legacy verification.
+14. Проверить exact Task 51 diff against shared worktree, затем commit/push
+    only if the mixed index can be reconciled without чужих mutations.
+
+## Task 52 — центр полуавтоматической классификации подборок
+
+Статус: `implementation_plan_written_execution_authorized`.
+
+Discovery 25.07.2026: существующая каноническая search boundary называется
+`App\Services\Catalog\Search\CatalogSearchNormalizer`, а не
+`SearchInputNormalizer`. Task 52 переиспользует именно её `display()` и не
+вводит второй нормализатор.
+
+Measured query discovery 25.07.2026: bounded page с owner relation и холодной
+проверкой source-sync schema выполняет не более 14 запросов; два из них —
+одноразовые compatibility probes `sourceSyncAvailable()`. Бюджет не растёт от
+числа подборок или их элементов, pagination предшествует evidence loading, а
+per-parent sample остаётся ограничен 50 строками.
+
+Audit discovery 25.07.2026: один confirmation batch может назначать разные
+категории, а `AdminAuditRecorder` требует конкретный resource. Поэтому
+authoritative service создаёт одно безопасное
+`collection_category.assignments_confirmed` событие на каждую фактически
+изменённую категорию; stale/already-assigned строки не попадают в audit.
+
+Preview hardening 25.07.2026: после проверки выбора Livewire хранит exact
+assignment snapshot в `#[Locked] classificationPreviewAssignments`.
+Изменение выбора/категории/фильтра закрывает preview; final confirmation не
+может незаметно разойтись с показанным администратору списком.
+
+Legacy cleanup 25.07.2026: новый classification query полностью заменил
+старую Livewire-очередь единого ручного назначения. Удалены её мёртвые
+properties/actions/markup и неиспользуемый
+`CatalogCollectionQuery::uncategorizedForAdministration()`; существующий
+authoritative `bulkAssign()` service contract сохранён для обратной
+совместимости и его regression test остаётся.
+
+Дата начала: 25.07.2026.
+
+### Цель и принятое решение
+
+Пользователь поручил без искусственного лимита продолжить развитие подборок
+по рекомендованному варианту. Текущий bottleneck подтверждён production-shaped
+данными: 1 403 из 1 403 подборок не имеют category FK, 501 из них публичны и
+одобрены, а `catalog_collection_items` содержит 3 294 655 membership-строк.
+
+Выбран human-in-the-loop центр классификации:
+
+- система детерминированно предлагает category только для текущей страницы;
+- предложение показывает score, confidence и максимум три причины;
+- high-confidence action только заполняет выбор и никогда не пишет в БД;
+- администратор может исправить каждую category;
+- отдельный preview предшествует final confirm;
+- запись выполняется только после explicit `content.manage` action;
+- внешний AI/provider, новая dependency, queue, scheduler, schema и
+  сохранённая таблица догадок не добавляются.
+
+Каноническая спецификация:
+[`2026-07-25-collection-classification-cockpit-design.md`](../superpowers/specs/2026-07-25-collection-classification-cockpit-design.md).
+
+Письменная спецификация подтверждена повторным поручением пользователя
+сделать всё по рекомендованному варианту и начать программирование. Detailed
+TDD plan:
+[`2026-07-25-collection-classification-cockpit.md`](../superpowers/plans/2026-07-25-collection-classification-cockpit.md).
+
+### Подготовительное evidence
+
+- Повторно прочитаны root `AGENTS.md`, canonical requirement index,
+  обязательные code/architecture/development/multilingual/security/
+  performance/caching/UI/admin/authorization/production/maintenance/system
+  integration owners и collection-specific docs.
+- Laravel Boost подтвердил PHP 8.5, Laravel 13.22.0, Livewire 4.3.3,
+  SQLite, Boost 2.4.13, Pint 1.29.3, PHPUnit 12.5.32 и Tailwind CSS 4.3.2.
+- Official Laravel/Livewire docs повторно проверены для constrained eager
+  loading, named multiple paginators, transactions/deadlock retries и
+  prevention of lazy loading.
+- Установленный Laravel source подтверждает relation `groupLimit()` для
+  `HasOneOrMany` и SQLite window-function compilation.
+- Existing manager, category service/query, collection pagination,
+  category tree, assignments, policies, audit и cache invalidator inspected;
+  новая конкурирующая architecture не требуется.
+- Worktree остаётся shared/mixed: branch `main`, ahead 34, большое количество
+  чужих staged/unstaged/untracked изменений. Reset/stash/unstage и broad add
+  запрещены.
+
+### Согласованные границы данных и запросов
+
+- Classification summary выполняется одним grouped aggregate.
+- Queue pagination выполняется до evidence loading.
+- Global confidence filter отсутствует: он потребовал бы inference до
+  pagination по всему каталогу. Confidence показывается и применяется только
+  к выбору high-confidence строк текущей страницы.
+- Максимум 50 collections на страницу, default 20.
+- Максимум 50 stable membership samples на collection через per-parent eager
+  limit; верхняя граница render evidence — 2 500 item rows.
+- Suggestion rules используют только stable slugs стандартного справочника,
+  allowlisted RU/EN words и projected title genre/country/network/studio/type.
+- Custom, mood, `other-*`, конфликтующие и слабые случаи остаются manual.
+- Suggested winner требует score ≥ 60 и margin ≥ 15; `high` начинается с 85.
+- Suggestion DTO не содержит raw private text, numeric ID или полный список
+  member titles и не является authorization evidence.
+- Final batch содержит 1–100 unique collection UUID, expected
+  `content_version` и active category UUID; server повторно разрешает и
+  блокирует authoritative rows.
+- Malformed/unknown category or collection rejects batch; stale/already
+  assigned rows count as skipped; все remaining writes commit atomically.
+- Existing `changedMany()` invalidation и safe admin audit применяются после
+  successful transaction.
+
+### Ожидаемые изменяемые файлы
+
+Новые focused boundaries:
+
+- `app/DTOs/CatalogCollectionCategorySuggestion.php`;
+- `app/DTOs/CatalogCollectionClassificationSummary.php`;
+- `app/DTOs/CatalogCollectionClassificationResult.php`;
+- `app/Enums/CatalogCollectionCategorySuggestionConfidence.php`;
+- `app/Services/Collections/CatalogCollectionCategorySuggestionRules.php`;
+- `app/Services/Collections/CatalogCollectionCategorySuggestionService.php`;
+- `app/Services/Collections/CatalogCollectionClassificationQuery.php`.
+
+Existing integration:
+
+- `app/Services/Collections/CatalogCollectionCategoryService.php`;
+- `app/Livewire/Collections/CatalogCollectionCategoryManager.php`;
+- `resources/views/livewire/collections/catalog-collection-category-manager.blade.php`;
+- `lang/ru/collections.php`;
+- `lang/en/collections.php`.
+
+Tests:
+
+- `tests/Unit/CatalogCollectionCategorySuggestionServiceTest.php`;
+- `tests/Feature/CatalogCollectionClassificationQueryTest.php`;
+- `tests/Feature/CatalogCollectionClassificationAdministrationTest.php`;
+- existing category/discovery/cache/authorization/query-budget tests where
+  the public contract is already owned.
+
+Documentation after product implementation:
+
+- `docs/architecture.md`;
+- `docs/DATA_RELATIONS.md`;
+- `docs/administration.md`;
+- `docs/authorization.md`;
+- `docs/performance.md`;
+- `docs/caching.md`;
+- `docs/UI_STANDARDS.md`;
+- `docs/frontend.md`;
+- `docs/requirements/system-wide-integration.md`;
+- `docs/deployment.md`;
+- `docs/plans/current-task-plan.md`;
+- `README.md`;
+- `CHANGELOG.md`.
+
+Manifest updates immediately when TDD/repository discovery proves another
+real consumer. No migration/config/package/environment file is expected.
+
+### Сохраняемые public contracts
+
+- `/discover/{type}`, collection detail/profile/dashboard/admin/API routes
+  and route names;
+- two-level category schema, stable category/collection UUID and slugs;
+- existing owner category selector and `CatalogCollectionPolicy`;
+- `CatalogCollectionQuery` as public collection read boundary;
+- `CatalogCollectionCategoryService` as authoritative category write
+  boundary;
+- existing API envelope/category shape and deprecated `cover_url=null`;
+- text-only collection presentation and permanent absence of covers;
+- importer membership/recommendation signal behavior;
+- `content.view`/`content.manage`, private/no-store admin response and safe
+  audit contracts;
+- RU/EN parity, native controls, 44 px targets and no page horizontal
+  overflow;
+- Premium, region, legal, playback, account, profile, calendar, sitemap and
+  title visibility boundaries.
+
+### Migrations, routes, translations, cache и compatibility risks
+
+| Area | Решение |
+| --- | --- |
+| Migrations | `not_applicable`: schema не меняется |
+| Routes/API | `already_compatible`: новых endpoints/routes нет |
+| Translations | Добавляются парные RU/EN interface/reason keys; slugs не переводятся |
+| Cache keys | Новая suggestion cache отсутствует; existing targeted invalidation сохраняется |
+| Permissions | Queue/evidence/preview/confirm требуют `content.manage` на hydration и action |
+| Browser state | Только allowlisted filters/UUID/version; score/confidence server-owned |
+| Rollback | Code rollback оставляет подтверждённые category FK как корректные data |
+| Performance | Главный gate — pagination-first, 50×50 evidence cap, query budget и `EXPLAIN` |
+| Privacy | Raw private descriptions/member titles не входят в audit, URL, logs или public cache |
+| Backward compatibility | Public collection/discovery/API/importer/image-removal contracts не меняются |
+| Delivery | Shared index collision остаётся `unresolved` до безопасной exact-path фиксации |
+
+### Task-specific requirement-compliance matrix
+
+| Requirement/domain | Статус | Evidence / следующий gate |
+| --- | --- | --- |
+| Fresh requirement read | `completed` | Canonical index order повторно выполнен 25.07.2026 |
+| Related collection docs/code read | `completed` | Task 51 spec/plan и current implementation inspected |
+| Installed versions / official docs | `completed` | Boost application info/docs + installed source evidence |
+| Existing implementation first | `completed` | Manager/query/service/schema/audit/cache inspected |
+| Alternatives and delegated decision | `completed` | Manual, auto и human-in-the-loop compared; option 3 approved |
+| Written design | `completed` | Task 52 spec written and self-reviewed |
+| User review of written spec | `completed` | Пользователь повторно подтвердил рекомендованный scope и execution |
+| Detailed TDD implementation plan | `completed` | Task 52 plan written, spec coverage/type/placeholder self-review passed |
+| Expected/protected files | `completed` | Manifests recorded above |
+| Cross-feature impact | `completed_preliminary` | Public/admin/cache/import/API/SEO/privacy/mobile matrix recorded |
+| Migration/rollback/production assessment | `completed_preliminary` | No DDL/dependency/env; code rollback contract recorded |
+| TDD RED before code | `pending` | No Task 52 production code written |
+| Query budget and browser evidence | `pending` | Required during implementation |
+| Canonical docs/README/CHANGELOG | `pending` | Update only after visitor/product change exists |
+| Final legacy/requirements reread | `pending` | Required before completion |
+| Commit/push in `main` | `unresolved_shared_index_collision` | Exact delivery depends on shared index safety |
+
+### Execution scope без искусственного лимита
+
+После письменного review gate:
+
+1. Подготовить exact TDD implementation plan и перечитать его.
+2. RED/GREEN immutable rule registry, DTO и confidence/margin scoring.
+3. RED/GREEN bounded classification query, progress aggregate и empty-page
+   short circuit.
+4. RED/GREEN transactional optimistic batch confirmation и safe audit/cache.
+5. RED/GREEN Livewire filters, selection, manual override, preview и confirm.
+6. RED/GREEN responsive RU/EN UI without inner/page overflow.
+7. Проверить public discovery reflection after confirmed assignment.
+8. Выполнить query-count, `EXPLAIN`, authorization/privacy и concurrency gates.
+9. Обновить canonical docs, README visitor history, Russian CHANGELOG и эту
+   compliance matrix.
+10. Выполнить focused/broad tests, Pint, build, docs checks и Playwright.
+11. Повторно проверить shared worktree и commit/push только если Task 52 scope
+    можно зафиксировать без чужих изменений; иначе delivery честно остаётся
+    `unresolved`.
+
+## Task 53 — производительность главной страницы
+
+Статус: `implementation_plan_written_execution_authorized`.
+
+Дата начала: 25.07.2026.
+
+Detailed TDD plan:
+[`2026-07-25-homepage-cold-path-performance.md`](../superpowers/plans/2026-07-25-homepage-cold-path-performance.md).
+
+### Цель и measured root cause
+
+Пользователь поручил устранить фактическую задержку более четырёх секунд на
+главной. Read-only диагностика подтвердила не абстрактную «медленную
+страницу», а три связанные причины:
+
+- рабочий HTML имеет размер 1 529 634–1 598 093 байта при каноническом лимите
+  uncompressed public-page cache 1 500 000 байт, поэтому каждый гостевой
+  запрос получает `X-Seasonvar-Page-Cache: BYPASS`;
+- около 983 КБ создаёт блок «Новые серии»: import batch разворачивает до
+  80–114 серий и столько же media rows внутри одной карточки тайтла;
+- cold guest `Trending` aggregate занимает около 2 748 мс, тогда как уже
+  существующий visibility-aware `RecentlyAdded` возвращает те же восемь
+  обзорных мест примерно за 326 мс;
+- unbounded `latestReleaseGroups()` гидратирует сотни моделей примерно за
+  567 мс;
+- telemetry главной показывает 33 rebuild со средним 5 652,18 мс и hit ratio
+  0,06.
+
+Discovery после первого GREEN: truly cold builder всё ещё занял 8 690 мс.
+Новый breakdown: full-history `latestTitleUpdates()` — 3 259 мс, точный count
+880 486 публичных media — 2 116 мс. Existing
+`episodes_created_at_idx`/`licensed_media_created_at_idx` возвращают bounded
+newest events за 9–10 мс с SQLite index hint; без него planner выбирает status
+index и сортирует всю таблицу. Scope расширен до bounded adaptive snapshot и
+отдельного стабильного metrics version scope; schema/migration не нужны.
+
+Discovery следующего profile: первый adaptive snapshot занял 3 893 мс,
+потому что bounded validation выбирала secondary indexes, а
+`video_title_ids` materialized все media за 2 129 мс. `NOT INDEXED` вернул
+bounded row-id validation за 54–74 мс; correlated `EXISTS` вернул те же
+восемь video title ID за 5,34 мс. Эти planner contracts добавлены в TDD scope.
+
+Выбран минимальный domain-consistent fix: bounded overview последних восьми
+выпусков каждого из 12 тайтлов с честной ссылкой на полную страницу, SQL cap
+до Eloquent hydration, быстрый guest-only `RecentlyAdded` и прежний
+`Personalized` для авторизованного пользователя. Payload limit не
+увеличивается, API snapshot из 48 обновлений не сокращается.
+
+### Ожидаемые изменяемые файлы
+
+- `app/Services/Catalog/CatalogHomeContentAdditionQuery.php`;
+- `app/Services/Catalog/CatalogHomeMetricsCache.php`;
+- `app/Services/Catalog/CatalogHomeSnapshotCache.php`;
+- `app/Services/Catalog/CatalogHomePageBuilder.php`;
+- `app/View/Components/Catalog/LatestMediaCard.php`;
+- `resources/views/components/catalog/latest-media-card.blade.php`;
+- `lang/ru/home.php`, `lang/en/home.php`;
+- focused homepage/content/cache tests;
+- `docs/frontend.md`, `docs/caching.md`, `docs/performance.md`;
+- `docs/plans/current-task-plan.md`, `README.md`, `CHANGELOG.md`.
+
+Migration, route, permission, package, environment, queue, scheduler и
+production DML не ожидаются.
+
+### Сохраняемые public contracts
+
+- `/`, `/en`, route names, full-page Livewire и существующая локализация;
+- 48-row factual snapshot и `/api/v1` home response shape;
+- publication/audience/watchability/premium/region/legal visibility;
+- персональные рекомендации, private state и remember-shown только после auth;
+- scalar public cache, versioned invalidation и отсутствие user/session keys;
+- полные сезоны, серии и media на странице тайтла;
+- фактический chronological ordering и stable tie-breaker;
+- RU/EN parity, SEO, mobile layout, sitemap/import/search/admin contracts.
+
+### Cross-feature и production risks
+
+| Domain | Статус | Решение |
+| --- | --- | --- |
+| Guest HTML cache | `affected` | Вернуть payload ниже существующего лимита; `MISS → HIT` gate |
+| Home cold queries | `affected` | Per-title SQL window cap и indexed RecentlyAdded |
+| Home cold snapshot | `affected` | Adaptive created-at event window с повторной exact visibility validation |
+| Home metrics | `affected` | Stable metrics version scope; warmer/explicit forget refresh exact counts |
+| Auth/privacy | `compatibility_required` | Personalized path/shared-cache bypass сохраняются |
+| API/mobile | `compatibility_required` | Snapshot 48 и resource shape не меняются |
+| Imports | `compatibility_required` | Mass batch остаётся полным в БД; overview bounded |
+| Visibility/legal/premium | `compatibility_required` | Existing model/query scopes сохраняются |
+| Localization/UI | `affected` | Парный RU/EN overflow message; mobile-first link |
+| Cache invalidation | `already_compatible` | Existing Homepage/Recommendations domains |
+| Migration/routes/permissions | `not_applicable` | Schema и public contracts не меняются |
+| Rollback | `completed_preliminary` | Code rollback; data/cache restore не требуется |
+| Partial deploy | `risk_recorded` | Query group shape и Blade/component выкатываются атомарно |
+| Shared worktree delivery | `unresolved` | Exact-path commit gate после verification |
+
+### Task-specific requirement-compliance matrix
+
+| Requirement/domain | Статус | Evidence / следующий gate |
+| --- | --- | --- |
+| Root/index/canonical requirements fresh read | `completed` | AGENTS, index и applicable owners перечитаны 25.07.2026 |
+| Related Markdown | `completed` | Home content/cache/card-count specs и plans inspected |
+| Installed versions | `completed` | PHP 8.5, Laravel 13.22, Livewire 4.3.3, Boost 2.4.13, PHPUnit 12.5.32, Tailwind 4.3.2 |
+| Official version-specific docs | `completed` | Boost docs: cache SWR, DB listeners, eager loading, Livewire lazy; existing project cache remains canonical |
+| Existing implementation first | `completed` | Route → Livewire → builder → snapshot/recommendations/content query → Blade traced |
+| Measured root cause | `completed` | Cache telemetry, DB listeners, live payload/headers, section bytes и 8,69 s cold rebuild breakdown |
+| Expected/protected files | `completed` | Manifests recorded above and in detailed plan |
+| Cross-feature/rollback/operations review | `completed_preliminary` | Matrix above; no DDL/dependency/env/production mutation |
+| Written plan reread | `completed` | Detailed plan перечитан; episode/media merge уточнён двойным query/component cap |
+| TDD RED | `completed_partial` | Bounded group/overflow and guest path failed exactly; cold snapshot/metrics tests pending |
+| Minimal GREEN | `in_progress` | Bounded group and guest path pass 7 tests / 41 assertions; cold snapshot unresolved |
+| Focused/wide/browser verification | `pending` | PHPUnit/Pint/build/live HTTP gates |
+| Canonical docs/README/CHANGELOG | `pending` | Update after verified product behavior |
+| Final requirement/legacy reread | `pending` | Required before completion |
+| Commit/push in `main` | `unresolved_shared_worktree` | Existing mixed index must not absorb foreign tasks |
+
+### Execution sequence
+
+1. Перечитать detailed plan и проверить его против existing component data
+   merge semantics.
+2. RED/GREEN bounded release query и overflow presentation.
+3. RED/GREEN guest RecentlyAdded при unchanged authenticated Personalized.
+4. RED/GREEN production-shaped public-page `MISS → HIT`.
+5. RED/GREEN adaptive indexed home snapshot и stable metrics scope.
+6. Измерить рабочие response bytes, truly cold builder/query times и cache header.
+7. Выполнить focused/wide tests, Pint, build, docs и browser checks.
+8. Обновить owners, README, CHANGELOG и эту compliance matrix.
+9. Повторно прочитать requirements, выполнить legacy scan и exact diff review.
+10. Commit/push только если shared-index safety доказана.
+
+## Task 54 — нормальный частичный Git commit
+
+Статус: `root_cause_confirmed_plan_written`.
+
+Дата начала: 25.07.2026.
+
+Detailed TDD plan:
+[`2026-07-25-normal-partial-git-commit.md`](../superpowers/plans/2026-07-25-normal-partial-git-commit.md).
+
+### Цель и подтверждённая причина
+
+Пользователь попросил вернуть обычную работу `git commit`. Прямой запуск
+`.githooks/pre-commit` воспроизвёл отказ до любых quality checks:
+`seasonvar_git_guard_require_no_unstaged_changes` блокирует commit из-за
+десяти unrelated unstaged tracked paths, а следующий guard также заблокировал
+бы один unrelated untracked test. Стандартный Git partial commit из-за этого
+невозможен, хотя staged paths безопасны и branch равен `main`.
+
+После адресного запуска оставшихся проверок обнаружен второй независимый
+blocker: staged `CHANGELOG.md` отклоняется русской policy на строке 6 из-за
+обычного английского текста `mode-specific`. Политика русского журнала не
+ослабляется; staged prose переводится, а точные identifiers сохраняются.
+
+Выбран минимальный contract: `pre-commit` проверяет `main`, unresolved
+conflicts, staged temporary/credential paths, updater и staged documentation
+policies, но допускает unrelated unstaged/untracked files. Полностью clean
+working tree остаётся обязательным в `pre-push` перед широким backend/frontend
+gate.
+
+### Ожидаемые изменяемые файлы
+
+- `.githooks/pre-commit`;
+- `.githooks/lib/git-guard.sh`;
+- `tests/Unit/CiQualityGateContractTest.php`;
+- `AGENTS.md`;
+- `docs/development.md`;
+- `docs/ci.md`;
+- `docs/superpowers/specs/2026-07-25-automatic-russian-changelog-design.md`;
+- `docs/superpowers/plans/2026-07-25-normal-partial-git-commit.md`;
+- `docs/plans/current-task-plan.md`;
+- `README.md`;
+- `CHANGELOG.md`.
+
+Другие application, migration, route, translation, cache, package, environment
+и browser files не входят в Task 54 scope.
+
+### Сохраняемые contracts
+
+- единственная рабочая ветка `main`;
+- запрет unresolved conflicts;
+- запрет staged temporary/debug/credential paths и реальных `.env`;
+- автоматическое targeted staging только `CHANGELOG.md`;
+- обязательный русский staged `CHANGELOG.md` и staged `README.md` для code
+  commit;
+- clean-tree guard и полный `pre-push` quality profile;
+- GitHub main history protection, secret scanning и push protection;
+- отсутствие изменений Laravel runtime, routes, schema, data, cache,
+  permissions, queues, dependencies и production services.
+
+### Cross-feature и compatibility risks
+
+| Domain | Статус | Решение |
+| --- | --- | --- |
+| Git commit | `affected` | Unrelated unstaged/untracked больше не блокируют staged commit |
+| Git push | `already_compatible` | `seasonvar_git_guard_require_clean_tree` остаётся обязательным |
+| Staged security | `already_compatible` | Branch/conflict/safe-path guards не меняются |
+| README/CHANGELOG | `affected_compatible` | Staged policies и automatic updater сохраняются |
+| CI | `affected_compatible` | Commit docs gate и pre-push backend/frontend gate сохраняются |
+| Laravel/product | `not_applicable` | Application behavior не меняется |
+| Routes/migrations/data | `not_applicable` | Нет schema, route или DML изменений |
+| Translations/cache/permissions | `not_applicable` | Нет interface/domain state |
+| Production/deployment | `not_applicable` | Hook используется только в local Git workflow |
+| Rollback | `completed_preliminary` | Вернуть два commit-only guards и прежние test/docs assertions |
+| Shared index | `risk_recorded` | Task 54 не сбрасывает и не поглощает unrelated staged work |
+
+### Task-specific requirement-compliance matrix
+
+| Requirement/domain | Статус | Evidence / следующий gate |
+| --- | --- | --- |
+| Root/index/canonical requirements fresh read | `completed` | Выполнено 25.07.2026 до implementation |
+| Related Markdown | `completed` | Git workflow, CI, automatic CHANGELOG spec/plan и historical gate contracts inspected |
+| Installed versions | `completed` | Git 2.52, PHP 8.5.8, Laravel 13.22.0, Boost 2.4.13, PHPUnit 12.5.32 |
+| Existing implementation first | `completed` | Hook, guard library, updater, policies и contract tests traced |
+| Reproducible root cause | `completed` | Прямой hook exit 1 на unstaged tracked changes |
+| Secondary blocker | `completed` | Docs/policy sequence exit 1 на английской prose CHANGELOG |
+| Expected/protected files | `completed` | Manifests recorded above |
+| Migration/route/cache/permission/production review | `completed` | Все `not_applicable`; pre-push remains strict |
+| Written plan reread | `pending` | Required before RED test |
+| TDD RED | `pending` | Integration test must fail on old hook |
+| Minimal GREEN | `pending` | Remove only two commit clean-tree guards |
+| Russian CHANGELOG policy | `pending` | Translate current violations without allowlist weakening |
+| Focused/docs/hook verification | `pending` | Exact commands in detailed plan |
+| README actuality | `completed_preliminary` | Git section needs update; visitor history must not receive fake product entry |
+| Final requirement/legacy reread | `pending` | Required before completion |
+| Commit/push in `main` | `pending_shared_index_review` | Exact coherent scope must be proven before delivery |

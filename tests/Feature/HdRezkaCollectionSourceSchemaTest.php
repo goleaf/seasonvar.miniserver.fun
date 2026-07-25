@@ -30,14 +30,14 @@ final class HdRezkaCollectionSourceSchemaTest extends TestCase
             'catalog_collection_id',
             'source_path',
             'remote_name',
-            'cover_source_path',
-            'cover_path',
-            'cover_content_hash',
             'semantic_content_hash',
             'last_seen_run_id',
             'last_successful_sync_at',
             'missing_since_at',
         ]));
+        $this->assertFalse(Schema::hasColumn('catalog_collection_sources', 'cover_source_path'));
+        $this->assertFalse(Schema::hasColumn('catalog_collection_sources', 'cover_path'));
+        $this->assertFalse(Schema::hasColumn('catalog_collection_sources', 'cover_content_hash'));
         $this->assertTrue(Schema::hasColumns('catalog_collection_source_items', [
             'catalog_collection_source_id',
             'source_item_key',

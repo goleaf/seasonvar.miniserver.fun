@@ -68,8 +68,6 @@ class FinalizeSeasonvarQueuedImport implements ShouldBeUniqueUntilProcessing, Sh
         }
 
         if ($this->dispatchIsIncomplete($run)) {
-            $runs->heartbeat($run->id);
-
             return;
         }
 
@@ -105,8 +103,6 @@ class FinalizeSeasonvarQueuedImport implements ShouldBeUniqueUntilProcessing, Sh
             }
 
             if ($this->dispatchIsIncomplete($run)) {
-                $runs->heartbeat($run->id);
-
                 return;
             }
 

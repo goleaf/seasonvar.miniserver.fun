@@ -1,4 +1,6 @@
 <div class="mx-auto max-w-7xl space-y-5" data-livewire-catalog-collection-administration-manager>
+    <livewire:collections.catalog-collection-category-manager :key="'admin-collection-categories'" />
+
     @if ($sourceSyncSummary !== null)
         <section data-collection-source-sync-summary class="rounded-panel border border-slate-200 bg-white p-5 shadow-panel sm:p-6" aria-labelledby="collection-source-sync-title">
             <div class="flex flex-wrap items-start justify-between gap-3">
@@ -21,6 +23,43 @@
                     </div>
                 @endforeach
             </dl>
+            <div class="mt-5 space-y-4 border-t border-slate-200 pt-4">
+                <div>
+                    <h3 class="text-sm font-black text-slate-700">{{ __('collections.sync.health_title') }}</h3>
+                    <dl class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        @foreach ($sourceSyncSummary['health_metrics'] as $metric)
+                            <div class="rounded-control bg-slate-50 px-3 py-3">
+                                <dt class="text-xs font-bold text-slate-500">{{ $metric['label'] }}</dt>
+                                <dd class="mt-1 text-lg font-black text-slate-800">{{ $metric['value'] }}</dd>
+                            </div>
+                        @endforeach
+                    </dl>
+                </div>
+                <div>
+                    <h3 class="text-sm font-black text-slate-700">{{ __('collections.sync.scope_title') }}</h3>
+                    <dl class="mt-3 grid gap-3 sm:grid-cols-3">
+                        @foreach ($sourceSyncSummary['scope_metrics'] as $metric)
+                            <div class="rounded-control bg-slate-50 px-3 py-3">
+                                <dt class="text-xs font-bold text-slate-500">{{ $metric['label'] }}</dt>
+                                <dd class="mt-1 text-lg font-black text-slate-800">{{ $metric['value'] }}</dd>
+                            </div>
+                        @endforeach
+                    </dl>
+                </div>
+                @if ($sourceSyncSummary['match_metrics'] !== [])
+                    <div>
+                        <h3 class="text-sm font-black text-slate-700">{{ __('collections.sync.breakdown_title') }}</h3>
+                        <dl class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+                            @foreach ($sourceSyncSummary['match_metrics'] as $metric)
+                                <div class="rounded-control bg-slate-50 px-3 py-3">
+                                    <dt class="text-xs font-bold text-slate-500">{{ $metric['label'] }}</dt>
+                                    <dd class="mt-1 text-lg font-black text-slate-800">{{ $metric['value'] }}</dd>
+                                </div>
+                            @endforeach
+                        </dl>
+                    </div>
+                @endif
+            </div>
         </section>
     @endif
 
@@ -71,6 +110,7 @@
                         @endunless
                     </div>
 
+                    @if ($canModerateCollections)
                     <div class="mt-4 flex flex-wrap gap-2 border-t border-slate-200 pt-4">
                         @unless ($collection->presentation_deleted)
                             <button type="button" wire:click="moderate('{{ $collection->public_id }}', 'approved')" wire:loading.attr="disabled" class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-control bg-emerald-50 px-3 text-sm font-bold text-emerald-700 hover:bg-emerald-100 sm:flex-none"><x-ui.icon name="fa-solid fa-check" />{{ __('collections.admin.approve') }}</button>
@@ -85,6 +125,7 @@
                             <button type="button" wire:click="resolveReports('{{ $collection->public_id }}')" wire:confirm="{{ __('collections.admin.resolve_confirmation') }}" wire:loading.attr="disabled" class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-control bg-sky-50 px-3 text-sm font-bold text-sky-700 hover:bg-sky-100 sm:flex-none"><x-ui.icon name="fa-solid fa-flag-checkered" />{{ __('collections.admin.resolve_reports') }}</button>
                         @endif
                     </div>
+                    @endif
                 </article>
             @endforeach
         </div>

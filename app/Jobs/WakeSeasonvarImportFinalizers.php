@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Services\Seasonvar\SeasonvarActiveRunReconciler;
+use App\Services\Seasonvar\SeasonvarGlobalImportRunCoordinator;
 use App\Services\Seasonvar\SeasonvarImportFinalizationDispatcher;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Cache\Repository;
@@ -35,8 +37,17 @@ final class WakeSeasonvarImportFinalizers implements ShouldBeUnique, ShouldQueue
         $this->onQueue((string) config('seasonvar.queue.queue', 'seasonvar-import'));
     }
 
-    public function handle(SeasonvarImportFinalizationDispatcher $finalizers): void
-    {
+    public function handle(
+        SeasonvarImportFinalizationDispatcher $finalizers,
+        SeasonvarGlobalImportRunCoordinator $globalRuns,
+        SeasonvarActiveRunReconciler $reconciler,
+    ): void {
+        $activeRun = $globalRuns->activeRun();
+
+        if ($activeRun !== null) {
+            $reconciler->reconcile($activeRun->id);
+        }
+
         $finalizers->wakeReady();
     }
 

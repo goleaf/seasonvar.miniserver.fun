@@ -6,7 +6,6 @@ namespace App\View\Components\Collections;
 
 use App\Models\CatalogCollection;
 use App\Services\Auth\AccountDateTimeFormatter;
-use App\Services\Collections\CatalogCollectionCoverService;
 use App\View\ViewModels\CatalogCollectionCardViewModel;
 use Illuminate\Contracts\View\View;
 use Illuminate\View\Component;
@@ -19,7 +18,6 @@ final class CollectionCard extends Component
 
     public function __construct(
         CatalogCollection $collection,
-        CatalogCollectionCoverService $covers,
         AccountDateTimeFormatter $dates,
         bool $management = false,
         bool $compact = false,
@@ -28,7 +26,6 @@ final class CollectionCard extends Component
         $this->compact = $compact;
         $this->card = new CatalogCollectionCardViewModel(
             $collection,
-            $covers,
             $dates,
             $management,
             $timezone,

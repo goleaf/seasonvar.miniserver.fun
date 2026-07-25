@@ -4,9 +4,20 @@ declare(strict_types=1);
 
 use App\Enums\AdminMembershipStatus;
 use App\Enums\AdminRoleCode;
+use App\Enums\CatalogCollectionModerationStatus;
+use App\Enums\CatalogCollectionSort;
+use App\Enums\CatalogCollectionType;
+use App\Enums\CatalogCollectionVisibility;
+use App\Enums\ReleaseDatePrecision;
+use App\Enums\ReleaseScheduleEntryType;
+use App\Enums\ReleaseScheduleSource;
+use App\Enums\ReleaseScheduleStatus;
 use App\Models\Actor;
 use App\Models\AdminRole;
 use App\Models\AdminUserRole;
+use App\Models\CatalogCollection;
+use App\Models\CatalogCollectionCategory;
+use App\Models\CatalogCollectionItem;
 use App\Models\CatalogRecommendationBuild;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRating;
@@ -17,6 +28,7 @@ use App\Models\Episode;
 use App\Models\EpisodeViewProgress;
 use App\Models\Genre;
 use App\Models\LicensedMedia;
+use App\Models\ReleaseScheduleEntry;
 use App\Models\Season;
 use App\Models\User;
 use App\Models\UserAccountSetting;
@@ -24,6 +36,7 @@ use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Database\Eloquent\Factories\Sequence;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 require dirname(__DIR__, 2).'/vendor/autoload.php';
 
@@ -171,7 +184,7 @@ $nextEpisode = Episode::factory()->create([
     'title' => 'Серия 2',
 ]);
 
-LicensedMedia::factory()->create([
+$nextMedia = LicensedMedia::factory()->create([
     'catalog_title_id' => $title->id,
     'season_id' => $season->id,
     'episode_id' => $nextEpisode->id,
@@ -208,6 +221,85 @@ LicensedMedia::factory()->create([
     'health_status' => 'active',
     'published_at' => now()->subMinute(),
 ]);
+
+$thirdEpisode = Episode::factory()->create([
+    'season_id' => $season->id,
+    'number' => 3,
+    'title' => 'Серия 3',
+]);
+
+LicensedMedia::factory()->create([
+    'catalog_title_id' => $title->id,
+    'season_id' => $season->id,
+    'episode_id' => $thirdEpisode->id,
+    'title' => 'Browser Smoke 3 серия',
+    'storage_disk' => 'external_playlist',
+    'path' => 'https://media.example.com/player-fixtures/valid-next.m3u8',
+    'playback_url' => 'https://media.example.com/player-fixtures/valid-next.m3u8',
+    'format' => 'm3u8',
+    'quality' => '1080p',
+    'variant_type' => 'original',
+    'variant_key' => 'browser-original',
+    'duration_seconds' => 600,
+    'status' => 'published',
+    'check_status' => 'available',
+    'health_status' => 'active',
+    'published_at' => now()->subMinute(),
+]);
+
+LicensedMedia::factory()->create([
+    'catalog_title_id' => $title->id,
+    'season_id' => $season->id,
+    'episode_id' => $thirdEpisode->id,
+    'title' => 'Browser Smoke 3 серия MP4',
+    'storage_disk' => 'external_playlist',
+    'path' => 'https://media.example.com/player-fixtures/direct-next.mp4',
+    'playback_url' => 'https://media.example.com/player-fixtures/direct-next.mp4',
+    'format' => 'mp4',
+    'quality' => '720p',
+    'variant_type' => 'original',
+    'variant_key' => 'browser-original',
+    'duration_seconds' => 600,
+    'status' => 'published',
+    'check_status' => 'available',
+    'health_status' => 'active',
+    'published_at' => now()->subMinute(),
+]);
+
+collect(range(1, 26))->each(
+    function (int $offset) use (
+        $title,
+        $season,
+        $episode,
+        $media,
+        $nextEpisode,
+        $nextMedia,
+    ): void {
+        $useNext = $offset % 2 === 0;
+        $entryEpisode = $useNext ? $nextEpisode : $episode;
+        $entryMedia = $useNext ? $nextMedia : $media;
+        $startsAt = now()->subDays($offset)->startOfHour();
+
+        ReleaseScheduleEntry::query()->create([
+            'logical_key' => 'browser-calendar-'.$offset,
+            'entry_type' => ReleaseScheduleEntryType::PortalPublication,
+            'status' => ReleaseScheduleStatus::Released,
+            'precision' => ReleaseDatePrecision::ExactDateTime,
+            'source' => ReleaseScheduleSource::Portal,
+            'catalog_title_id' => $title->id,
+            'season_id' => $season->id,
+            'episode_id' => $entryEpisode->id,
+            'licensed_media_id' => $entryMedia->id,
+            'season_number' => $season->number,
+            'episode_number' => $entryEpisode->number,
+            'starts_at' => $startsAt,
+            'released_at' => $startsAt,
+            'original_timezone' => 'UTC',
+            'is_public' => true,
+            'notifications_enabled' => false,
+        ]);
+    },
+);
 
 $recommendedTitle = CatalogTitle::factory()->create([
     'slug' => 'browser-recommended',
@@ -275,6 +367,31 @@ AdminUserRole::query()->create([
     'status' => AdminMembershipStatus::Active,
     'reason_code' => 'browser_fixture',
     'assigned_at' => now()->subMinute(),
+]);
+
+$collectionCategory = CatalogCollectionCategory::query()
+    ->where('slug', 'detective-and-crime')
+    ->firstOrFail();
+$collection = CatalogCollection::query()->create([
+    'public_id' => (string) Str::uuid(),
+    'owner_id' => $user->id,
+    'catalog_collection_category_id' => $collectionCategory->id,
+    'name' => 'Браузерная подборка детективов',
+    'description' => 'Текстовая подборка для проверки категорий без собственной обложки.',
+    'slug' => 'browser-detective-collection',
+    'type' => CatalogCollectionType::User,
+    'visibility' => CatalogCollectionVisibility::Public,
+    'moderation_status' => CatalogCollectionModerationStatus::Approved,
+    'sort_mode' => CatalogCollectionSort::Manual,
+    'content_locale' => 'ru',
+    'content_version' => 1,
+    'published_at' => now()->subMinute(),
+]);
+CatalogCollectionItem::query()->create([
+    'catalog_collection_id' => $collection->id,
+    'catalog_title_id' => $title->id,
+    'added_by_id' => $user->id,
+    'position' => 1,
 ]);
 
 UserAccountSetting::query()->create([

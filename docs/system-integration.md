@@ -1,6 +1,6 @@
 # Системная интеграция портала
 
-Обновлено: 19.07.2026
+Обновлено: 25.07.2026
 
 Этот документ — единый владелец финальной cross-feature dependency matrix и production-readiness evidence. Постоянные правила находятся в [`requirements/system-wide-integration.md`](requirements/system-wide-integration.md), а детальные domain contracts — в [`README.md`](README.md). Статусы здесь означают только подтверждённое состояние repository; отсутствующие capabilities не изображаются реализованными.
 
@@ -42,19 +42,19 @@ Administrative/catalog moderation использует `AdminAuditRecorder`/`adm
 
 ## 9. Storage model
 
-Public assets, private uploads, ticket screenshots, exports и generated artifacts используют configured disks. Private legal/advertiser/invoice classes не заявляются существующими без domain evidence; при будущем добавлении они обязаны иметь separate authorized storage/download boundary. Inventory owner — [`storage.md`](storage.md).
+Public assets, private profile uploads, ticket screenshots, exports и generated artifacts используют configured disks. Collection image domain удалён: runtime route/upload/import отсутствуют, exact legacy prefix очищен без backup-копии, schema metadata удалены. Private legal/advertiser/invoice classes не заявляются существующими без domain evidence; при будущем добавлении они обязаны иметь separate authorized storage/download boundary. Inventory owner — [`storage.md`](storage.md).
 
 ## 10. Cache model
 
-Public snapshots/facets/stats/search/recommendations и private overlays разделены. Keys/invalidation принадлежат `App\Support\Cache` и cache-aware services, user-specific payload не входит в shared cache. Гостевой HTML включает hash текущего Vite manifest в key dimensions: новый asset release не читает HTML со ссылками на прежние hashes и не требует global flush. Service worker отсутствует, поэтому browser private cache state — `not_installed`.
+Public snapshots/facets/stats/search/recommendations и private overlays разделены. Collection category/assignment mutation использует существующие Collections/CatalogPages/API/Sitemap invalidators; отдельного image cache нет. Keys/invalidation принадлежат `App\Support\Cache` и cache-aware services, user-specific payload не входит в shared cache. Гостевой HTML включает hash текущего Vite manifest в key dimensions. Service worker отсутствует, поэтому browser private cache state — `not_installed`.
 
 ## 11. Search model
 
-Public catalog/portal/help/profile/collection search использует отдельные scope/query boundaries и исключает private resources. Staff queues выполняют permission-scoped database search и не индексируются публично. Locale, visibility и deterministic pagination входят в query contract. Profile deletion и name change bump-ят search-suggestion version после commit, поэтому удалённое или переименованное публичное имя не остаётся в прежнем cache generation.
+Public catalog/portal/help/profile/collection search использует отдельные scope/query boundaries и исключает private resources. Collection directory дополнительно нормализует root/subcategory и virtual uncategorized state, затем гидратирует только текущую страницу. Staff queues выполняют permission-scoped database search и не индексируются публично. Locale, visibility и deterministic pagination входят в query contract.
 
 ## 12. SEO model
 
-Canonical/localized URLs, `hreflang`, robots, structured data и sitemap включают только public resources. Auth/account/admin/ticket/payment-return/signed endpoints не индексируются; legal/advertiser/service-worker routes отсутствуют. Проверено 246 registered routes: 66 под `/api`, 13 под `/admin` и 167 остальных web/framework entries; 41 route входит в localized boundary, legacy aliases сохранены. Duplicate method/URI и duplicate names не обнаружены, destructive GET mutation не зарегистрирована.
+Canonical/localized URLs, `hreflang`, robots, structured data и sitemap включают только public resources. Collection JSON-LD/sitemap/API не содержат image URL; deprecated API `cover_url` равен `null`. `/discover/{type}` и localized aliases сохранены, bare `/discover` остаётся 404. Auth/account/admin/ticket/payment-return/signed endpoints не индексируются; legal/advertiser/service-worker routes отсутствуют.
 
 ## 13. Account merge flow
 
@@ -70,7 +70,7 @@ Canonical/localized URLs, `hreflang`, robots, structured data и sitemap вкл�
 
 ## 16. Administration integration
 
-13 administration routes используют `auth`, `auth.session`, `account.private` и explicit capability gates; mutations повторно делегируют authorization/policies domain services. Панель показывает только real content/import/moderation/request/issue/help/calendar/premium-boundary state; unrestricted shell/Artisan/SQL/env/file/dependency controls и fake advertiser/legal/operations dashboards отсутствуют.
+Administration routes используют `auth`, `auth.session`, `account.private` и explicit capability gates; mutations повторно делегируют authorization/policies domain services. `content.manage` владеет collection category dictionary и bounded bulk assignment, `collections.moderate` — moderation queue. Панель показывает только real state; unrestricted shell/Artisan/SQL/env/file/dependency controls и fake advertiser/legal/operations dashboards отсутствуют.
 
 ## 17. Mobile and PWA behavior
 

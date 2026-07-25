@@ -14,6 +14,8 @@ use Illuminate\Support\Carbon;
  * @property SeasonvarPreparedPageStatus $status
  * @property array<string, mixed>|null $payload
  * @property list<array<string, mixed>>|null $warnings
+ * @property Carbon|null $last_enqueue_attempt_at
+ * @property int $enqueue_attempts
  * @property Carbon|null $prepared_at
  * @property Carbon|null $applied_at
  * @property SeasonvarImportRun $run
@@ -30,11 +32,17 @@ use Illuminate\Support\Carbon;
     'payload',
     'warnings',
     'last_error',
+    'last_enqueue_attempt_at',
+    'enqueue_attempts',
     'prepared_at',
     'applied_at',
 ])]
 class SeasonvarImportPreparedPage extends Model
 {
+    protected $attributes = [
+        'enqueue_attempts' => 0,
+    ];
+
     /** @return BelongsTo<SeasonvarImportRun, $this> */
     public function run(): BelongsTo
     {
@@ -119,6 +127,8 @@ class SeasonvarImportPreparedPage extends Model
             'parser_version' => 'integer',
             'payload' => 'array',
             'warnings' => 'array',
+            'last_enqueue_attempt_at' => 'datetime',
+            'enqueue_attempts' => 'integer',
             'prepared_at' => 'datetime',
             'applied_at' => 'datetime',
         ];

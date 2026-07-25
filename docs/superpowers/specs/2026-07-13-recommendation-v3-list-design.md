@@ -205,7 +205,19 @@ Random selection calculates eligible min/max IDs, performs at most 12 indexed pr
 
 ### Cache, performance and failure behavior
 
-Shared cache stores only scalar public candidate arrays (`id`, internal score, source/reason codes), never Eloquent models or user state. Dimensions are type, locale, public audience, period, rating source, current/exclusion hash when required, normalized filter hash and `task18-v6-r2` ranking version. Version `v6-r2` retains the earlier `v6` trending/upcoming hardening and additionally makes the former `indexed_at`-ordered `recently_added` pool unreachable; it does not scan or flush either cache store. Page/per-page are applied after the shared candidate pool and are intentionally absent from the key. Authenticated, personalized, random and every server-seeded refresh/repeat-aware request bypass shared results, so session seed and recently shown IDs never create high-cardinality global keys. Only stable unseeded public contexts use the shared pool; their hashed exclusions are public page context rather than private state.
+Shared cache stores only scalar public candidate arrays (`id`, internal score,
+source/reason codes), never Eloquent models or user state. Dimensions are
+type, locale, public audience, period, rating source, current/exclusion hash
+when required, normalized filter hash and `task18-v6-r2` ranking version.
+Version `v6-r2` retains the earlier `v6` trending/upcoming hardening and
+additionally makes the former `indexed_at`-ordered `recently_added` pool
+unreachable; it does not scan or flush either cache store. Page/per-page are
+applied after the shared candidate pool and are intentionally absent from the
+key. Authenticated, personalized and random requests bypass shared results.
+Deterministic guest refresh reuses namespace `discovery-ids-v3` with only
+canonical public exclusions; session recent IDs are applied to the returned
+pool in memory. Seed, recent IDs and private viewer state therefore never
+create high-cardinality global keys or enter a shared value.
 
 Public metadata/rating/comment/review/editorial/rebuild/merge changes bump the existing Recommendations version. Meaningful progress crosses the invalidation boundary only on the first 180s/10% threshold or completion, not every heartbeat. Watchlist/rating changes invalidate only through their existing after-commit services. No application-wide cache flush, mandatory queue, cron, vector DB or external search/inference dependency was introduced; cache failure falls back to bounded queries.
 

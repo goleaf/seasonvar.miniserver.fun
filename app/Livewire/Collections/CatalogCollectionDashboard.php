@@ -7,12 +7,13 @@ namespace App\Livewire\Collections;
 use App\DTOs\CatalogCollectionData;
 use App\Enums\CatalogCollectionType;
 use App\Enums\CatalogCollectionVisibility;
+use App\Livewire\Concerns\InteractsWithCatalogCollectionCategory;
 use App\Livewire\Concerns\InteractsWithCollectionLocale;
 use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Models\CatalogCollection;
 use App\Models\User;
 use App\Services\Auth\AccountSettingsService;
-use App\Services\Collections\CatalogCollectionCoverService;
+use App\Services\Collections\CatalogCollectionCategoryQuery;
 use App\Services\Collections\CatalogCollectionQuery;
 use App\Services\Collections\CatalogCollectionResolver;
 use App\Services\Collections\CatalogCollectionService;
@@ -29,6 +30,7 @@ final class CatalogCollectionDashboard extends Component
 {
     private const AUTHORING_LOCALE = 'ru';
 
+    use InteractsWithCatalogCollectionCategory;
     use InteractsWithCollectionLocale;
     use InteractsWithPaginationIslands;
     use WithPagination;
@@ -69,6 +71,8 @@ final class CatalogCollectionDashboard extends Component
             'description' => ['nullable', 'string', 'max:10000'],
             'visibility' => ['required', Rule::enum(CatalogCollectionVisibility::class)],
             'type' => ['required', Rule::in($this->creatableTypes($user))],
+            'categoryRootPublicId' => ['nullable', 'uuid'],
+            'categoryPublicId' => ['nullable', 'uuid'],
         ], $this->messages());
 
         $collection = $service->create($user, new CatalogCollectionData(
@@ -80,9 +84,11 @@ final class CatalogCollectionDashboard extends Component
                 ? self::AUTHORING_LOCALE
                 : null,
             publicId: $this->creationPublicId,
+            categoryPublicId: $this->selectedCategoryPublicId(),
         ));
 
         $this->reset(['name', 'description', 'type', 'showCreate']);
+        $this->resetCategorySelection();
         $this->visibility = $this->defaultVisibility;
         Session::flash('catalog_collection_status', __('collections.status.created'));
         $this->redirectRoute('collections.edit', ['collectionPublicId' => $collection->public_id], navigate: true);
@@ -106,15 +112,16 @@ final class CatalogCollectionDashboard extends Component
         string $publicId,
         CatalogCollectionResolver $resolver,
         CatalogCollectionService $service,
-        CatalogCollectionCoverService $covers,
     ): void {
-        $service->forceDelete($this->user(), $resolver->byPublicId($publicId, true), $covers);
+        $service->forceDelete($this->user(), $resolver->byPublicId($publicId, true));
         $this->status = __('collections.status.deleted_forever');
         $this->resetPage(pageName: 'deletedCollectionsPage');
     }
 
-    public function render(CatalogCollectionQuery $collections): View
-    {
+    public function render(
+        CatalogCollectionQuery $collections,
+        CatalogCollectionCategoryQuery $categories,
+    ): View {
         $user = $this->user();
         $ownedCollections = $collections->ownedBy($user);
         $deletedCollections = $collections->ownedBy($user, true);
@@ -140,6 +147,7 @@ final class CatalogCollectionDashboard extends Component
             'showTypeSelector' => count($typeOptions) > 1,
             'canCreate' => Gate::forUser($user)->allows('create', CatalogCollection::class),
             'restorationDays' => max(1, (int) config('catalog-collections.restoration_days', 30)),
+            ...$this->categorySelectionViewData($categories),
         ])->extends('layouts.app', [
             'title' => __('collections.dashboard.title'),
             'seo' => [
@@ -162,6 +170,8 @@ final class CatalogCollectionDashboard extends Component
             'description.max' => __('collections.validation.description'),
             'visibility.*' => __('collections.validation.visibility'),
             'type.*' => __('collections.validation.type'),
+            'categoryRootPublicId.*' => __('collections.validation.category'),
+            'categoryPublicId.*' => __('collections.validation.category'),
         ];
     }
 

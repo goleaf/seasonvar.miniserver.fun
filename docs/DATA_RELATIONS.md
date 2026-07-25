@@ -1,6 +1,6 @@
 # Связи данных и фильтры
 
-Обновлено: 24.07.2026
+Обновлено: 25.07.2026
 
 ## Основные связи
 
@@ -11,6 +11,7 @@
 - `SeasonvarImportTitleGroup hasMany SeasonvarImportPreparedPage`; unique `(seasonvar_import_title_group_id, source_page_id)` исключает повторную подготовку одной страницы в группе.
 - `SeasonvarImportTitleGroup.terminal_reason_code` nullable и хранит только allowlisted code из `SeasonvarImportTitleGroupTerminalReason`; русское безопасное объяснение вычисляется enum, а не сохраняется как идентификатор. Индекс `(status, updated_at, id)` обслуживает десятиминутный bounded watchdog для counter-ready/stale active групп; сам reason code не индексируется, потому что по нему нет runtime eligibility query.
 - `SeasonvarImportPreparedPage belongsTo SourcePage` и хранит нормализованный parser payload, предупреждения, content hash и статусы `queued/preparing/prepared/applied/failed`, но не становится источником истины каталога.
+- Retention удаляет `SeasonvarImportTitleGroup` только когда и сама группа, и parent `SeasonvarImportRun` terminal; FK cascade удаляет только её `SeasonvarImportPreparedPage`, а общий row budget считает группу и фактические owned pages. Active/неподтверждённые parent rows fail closed.
 
 - `CatalogTitle belongsTo Source`
 - `CatalogTitle belongsTo SourcePage`
@@ -58,6 +59,7 @@
 - Crawl provenance metadata-страницы остаётся в `SourcePage`: URL/hash, ETag/Last-Modified, content hash, crawl/import/parse timestamps, missing flags и import events. `catalog_relation_source_identities` отдельно хранит только `(source_id, relation_type, source_key_hash) -> canonical_key`, чтобы повторный provider object после смены подписи возвращался к прежней строке; raw external ID и raw URL туда не записываются. `SourcePageSnapshot` для non-serial не хранит исходную страницу или описательный текст, а только безопасную hash-сводку; serial snapshot остаётся полным из-за существующего локального metadata-backfill.
 - `SeasonvarImportRun hasMany SeasonvarImportEvent`
 - `SeasonvarImportRun hasMany SourcePageSnapshot`
+- Snapshot retention требует terminal parent run и удаляет только копию, для которой существует детерминированно более новая строка той же `SourcePage`; поэтому последняя копия сохраняется независимо от возраста.
 - `SeasonvarImportRun hasMany SourcePage` через `last_import_run_id`
 - Каждая модель связи каталога относится ко многим `CatalogTitle` через явную pivot-таблицу.
 - `User hasMany CatalogTitleUserState` и `User hasMany EpisodeViewProgress`; unique `(user_id, catalog_title_id)` хранит одну запись списка просмотра и внутренней пользовательской оценки, unique `(user_id, episode_id)` — одну каноническую позицию выпуска. Отдельной таблицы favorites нет: в текущем продукте «избранное» означает тот же список просмотра. `CatalogTitleRating` остаётся импортной provider-оценкой и не участвует во внутреннем среднем; editorial rating в модели отсутствует и не симулируется. `User hasOne UserProfile` хранит только публичную presentation identity/privacy/media metadata; все library/progress rows по-прежнему принадлежат стабильному `User` напрямую и не дублируются в профиле. Progress дополнительно хранит trusted duration/percent, первый и последний просмотр, неизменяемый `completed_at`, source media, ULID активной playback session и последний принятый event sequence.
@@ -216,22 +218,27 @@
 
 | Таблица | Назначение и ограничения |
 | --- | --- |
-| `catalog_collections` | Stable DB ID, unique public UUID и global current slug; nullable owner FK, original name/description, enum-backed type/visibility/moderation/sort, optional content locale, feature/publication state, private cover metadata/version, content version, timestamps и soft delete. |
+| `catalog_collections` | Stable DB ID, unique public UUID и global current slug; nullable owner/category FK, original name/description, enum-backed type/visibility/moderation/sort, optional content locale, feature/publication state, content version, timestamps и soft delete. Собственных image metadata нет. |
+| `catalog_collection_categories` | Двухуровневый управляемый справочник: stable UUID/slug, nullable self parent только на root, deterministic position, active/archive state и timestamps. Один узел может быть назначен многим подборкам. |
+| `catalog_collection_category_translations` | Unique category/locale display name для `ru|en`; stable slug/FK никогда не переводятся и не принимаются как browser authority. |
 | `catalog_collection_slugs` | Unique historical slug → stable collection FK. Старые URL разрешаются после policy check и перенаправляются на current slug. |
 | `catalog_collection_items` | Одна serial membership: collection FK, `CatalogTitle` FK, nullable added-by FK, manual position и timestamps. Unique collection/title запрещает логический дубль; title/collection и collection/position indexes обслуживают discovery и ordering. |
 | `catalog_collection_translations` | Только editorial DB content: unique collection/locale title, description, SEO title/description. User-created text сюда не копируется. |
 | `catalog_collection_reports` | Collection moderation evidence с nullable FK, preserved collection UUID/content version, nullable reporter/moderator, stable reason/status, sanitized details/note и unique deduplication key. |
 | `catalog_collection_sync_runs` | Агрегированный audit одного provider-run: stable provider/status, allowlisted JSON counters, safe error summary и lifecycle timestamps. Raw HTML, URL, credentials и exception trace не сохраняются. |
-| `catalog_collection_sources` | Unique `(provider,source_key)` identity remote-подборки, nullable unique collection FK, normalized source/cover paths, remote name, content-addressed local WebP metadata, semantic hash, retry state и last-seen/successful-run provenance. Collection deletion оставляет source record для следующего безопасного reconciliation. |
-| `catalog_collection_source_items` | Unique source/item identity, normalized title/hash, optional year/type/countries, normalized detail path/hash, page/position, stable match status/method/confidence/reasons, nullable matched title и last-seen run. Строка хранится и для unmatched/ambiguous результата, чтобы следующий запуск мог повторить сопоставление без создания тайтла. |
+| `catalog_collection_sources` | Unique `(provider,source_key)` identity remote-подборки, nullable unique collection FK, normalized source path, remote name, semantic hash, retry state и last-seen/successful-run provenance. Изображения и image metadata не сохраняются. Collection deletion оставляет source record для следующего безопасного reconciliation. |
+| `catalog_collection_source_items` | Unique source/item identity, normalized title/hash, optional year/type/countries, normalized detail path/hash, page/position, stable match status/method/confidence/reasons, nullable matched title и last-seen run. Строка хранится и для unmatched/ambiguous результата, чтобы следующий запуск мог повторить сопоставление без создания тайтла. `source_type` остаётся provenance, а вычисляемый `supported|unsupported|unknown` scope не хранится отдельным состоянием и не изменяет membership. |
 
-`users.public_id` — nullable-at-schema external UUID с migration backfill и model-side assignment для новых users. Публичный owner URL использует его, а не numeric ID/email. Relations: `User::catalogCollections()`, `CatalogCollection::{owner,items,historicalSlugs,translations,reports,comments}()`, `CatalogTitle::collectionItems()` и item `catalogTitleWithTrashed()` для owner-safe unavailable state.
+`users.public_id` — nullable-at-schema external UUID с migration backfill и model-side assignment для новых users. Публичный owner URL использует его, а не numeric ID/email. Relations: `User::catalogCollections()`, `CatalogCollection::{owner,category,items,historicalSlugs,translations,reports,comments}()`, `CatalogCollectionCategory::{parent,children,translations,collections}()`, `CatalogTitle::collectionItems()` и item `catalogTitleWithTrashed()` для owner-safe unavailable state.
 
 Source relations: `CatalogCollection::sourceRecord()`, `CatalogCollectionSource::{collection,items,lastSeenRun}()`, `CatalogCollectionSourceItem::{source,catalogTitle,lastSeenRun}()` и `CatalogCollectionSyncRun::{sources,sourceItems}()`. `catalog_collection_id` и `catalog_title_id` nullable намеренно: provenance переживает удаление локальной подборки/тайтла, а последующий run может заново сопоставить карточку.
 
+`CatalogCollectionSourceScope` вычисляется из `source_type` через `HdRezkaCollectionTypeCompatibility`: поддерживаемы `series|show|anime|documentary`, вне текущей сериаловой области находятся `film|cartoon`, отсутствующий или неизвестный тип остаётся `unknown`. Scope используется только для read-only административной диагностики; schema, source identity, match status/method и локальная relation identity от него не зависят.
+
 ### Invariants
 
-- User collection создаётся только с server-derived `owner_id`; owner name/email не входят в identity. `id` и `public_id` переживают rename, slug change, locale, cover, visibility и restore.
+- User collection создаётся только с server-derived `owner_id`; owner name/email не входят в identity. `id` и `public_id` переживают rename, slug/category change, locale, visibility и restore.
+- `catalog_collection_category_id` хранит ровно один active root или child. Public/unlisted owner/editor write без активной категории отклоняется; private и trusted source rows могут быть `null`. Importer не классифицирует название эвристикой и не перезаписывает существующее назначение. Archive сохраняет FK у существующих rows, но закрывает новое owner assignment; администратор назначает не более 100 exact collection UUID за действие.
 - Internal values хранятся только как `user|editorial|system`, `private|unlisted|public`, `pending|approved|rejected|hidden|archived` и enum sort codes. Переведённые labels существуют только в `lang/ru|en/collections.php`.
 - Unique current slug и unique history slug вместе с UUID suffix дают deterministic allocation. История same collection может быть освобождена при возврате к прежнему имени; current/history другого record не переиспользуются.
 - Unique item constraint вводится сразу, потому что pre-migration audit подтвердил отсутствие legacy collection tables/rows. Runtime add/batch остаётся идемпотентным и обрабатывает DB races transaction retry; merge duplicate titles выполняет reconciliation до title delete.
@@ -246,6 +253,7 @@ Source relations: `CatalogCollection::sourceRecord()`, `CatalogCollectionSource:
 
 - `catalog_collections_owner_order_idx(owner_id, deleted_at, updated_at, id)` — active/deleted owner dashboards с deterministic pagination.
 - `catalog_collections_public_order_idx(visibility, moderation_status, deleted_at, updated_at, id)` — public directory/profile/search/sitemap eligibility и recent ordering.
+- `catalog_collections_category_public_order_idx(catalog_collection_category_id,visibility,moderation_status,deleted_at,updated_at,id)` — первая фаза public category/subcategory pagination без summary joins.
 - `catalog_collections_featured_idx(type, is_featured, visibility, moderation_status)` — bounded homepage/editorial featured query.
 - `catalog_collection_items_manual_order_idx(catalog_collection_id, position, id)` — manual page/order normalization; unique collection/title одновременно обслуживает membership existence.
 - `catalog_collection_items_title_lookup_idx(catalog_title_id, catalog_collection_id)` — title page discovery, merge reconciliation и bounded import-driven public collection cache lookup.
@@ -255,9 +263,9 @@ Source relations: `CatalogCollection::sourceRecord()`, `CatalogCollectionSource:
 
 ### Rollback и legacy normalization
 
-Миграции additive и SQLite-compatible: сначала добавляют/backfill `users.public_id`, затем collection tables, потом editorial translations и отдельные source-sync audit tables/indexes. `down()` удаляет только новые tables/indexes и UUID column; watchlist, rating, progress, history, comments, reviews, catalog identity и media не затрагиваются. После production writes перед rollback нужен account/collection/source-audit export и backup: rollback схемы намеренно не переносит новые коллекции в другую архитектуру.
+Category migrations additive и SQLite-compatible: сначала создают dictionary/translations, затем nullable FK/index и детерминированные 5 root + 31 child с `ru|en` rows; существующие 1 403 подборки намеренно не классифицируются. После подтверждённой exact-prefix очистки migration `2026_07_25_140300` удаляет пять collection и три source cover columns. Её `down()` может вернуть только пустые nullable/default columns, но не удалённые metadata/файлы; media rollback невозможен по продуктовому требованию. Watchlist, rating, progress, history, comments, reviews, catalog identity, title posters и profile uploads не затрагиваются.
 
-Baseline audit не нашёл duplicate systems/items/slugs/positions, translated DB labels, invalid owners или unsafe legacy covers, поэтому destructive backfill не нужен. Будущая диагностика должна выявлять unique violations, invalid enum codes, orphaned owners/titles, position gaps/duplicates, missing cover files и public rows вне approved state; исправление проходит idempotent domain services, а не blind delete.
+Будущая диагностика должна выявлять unique violations, category orphan/cycle/depth ошибки, invalid enum codes, orphaned owners/titles, position gaps/duplicates и public rows вне approved state; исправление проходит idempotent domain services, а не blind delete.
 
 ## Обсуждения
 

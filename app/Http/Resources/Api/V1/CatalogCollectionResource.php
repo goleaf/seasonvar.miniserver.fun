@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Resources\Api\V1;
 
 use App\Models\CatalogCollection;
+use App\Models\CatalogCollectionCategory;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -17,9 +18,10 @@ final class CatalogCollectionResource extends JsonResource
         $owner = $this->relationLoaded('owner') ? $this->owner : null;
         $ownerPublicId = $owner?->getAttribute('public_id');
         $ownerPublicId = is_string($ownerPublicId) && $ownerPublicId !== '' ? $ownerPublicId : null;
-        $coverUrl = $this->cover_path !== null && $this->cover_version > 0
-            ? route('collections.cover', ['publicId' => $this->public_id, 'version' => $this->cover_version])
-            : ($this->getAttribute('fallback_poster_url') ?: null);
+        $category = $this->relationLoaded('category') ? $this->category : null;
+        $parent = $category instanceof CatalogCollectionCategory && $category->relationLoaded('parent')
+            ? $category->parent
+            : null;
 
         return [
             'id' => $this->public_id,
@@ -31,7 +33,15 @@ final class CatalogCollectionResource extends JsonResource
             'content_locale' => $this->content_locale,
             'featured' => $this->is_featured,
             'sort' => $this->sort_mode->value,
-            'cover_url' => $coverUrl,
+            'cover_url' => null,
+            'category' => $category instanceof CatalogCollectionCategory ? [
+                'slug' => $category->slug,
+                'name' => $category->display_name,
+                'parent' => $parent instanceof CatalogCollectionCategory ? [
+                    'slug' => $parent->slug,
+                    'name' => $parent->display_name,
+                ] : null,
+            ] : null,
             'item_count' => (int) ($this->visible_items_count ?? 0),
             'owner' => $owner === null ? null : array_filter([
                 'id' => $ownerPublicId,

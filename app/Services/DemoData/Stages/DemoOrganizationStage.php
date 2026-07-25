@@ -23,7 +23,6 @@ use App\Models\User;
 use App\Models\UserTag;
 use App\Services\DemoData\DemoBulkWriter;
 use App\Services\DemoData\DemoPersonaFactory;
-use App\Services\DemoData\DemoRasterAsset;
 use App\Services\DemoData\DemoRussianText;
 use App\Services\DemoData\DemoStableValue;
 use App\Services\DemoData\DemoTitleSelector;
@@ -58,7 +57,6 @@ final readonly class DemoOrganizationStage implements DemoDataStage
         $startedAt = microtime(true);
         $selector = new DemoTitleSelector($options);
         $writer = new DemoBulkWriter($options);
-        $assets = new DemoRasterAsset($options, $this->stable);
         $users = $this->users($options);
         $personalTagCount = 0;
         $personalAssignmentCount = 0;
@@ -85,7 +83,6 @@ final readonly class DemoOrganizationStage implements DemoDataStage
                 $user,
                 $userIndex,
                 $options,
-                $assets,
                 $createdAt,
                 $updatedAt,
             );
@@ -219,7 +216,6 @@ final readonly class DemoOrganizationStage implements DemoDataStage
         User $user,
         int $userIndex,
         DemoDataOptions $options,
-        DemoRasterAsset $assets,
         CarbonImmutable $createdAt,
         CarbonImmutable $updatedAt,
     ): array {
@@ -237,14 +233,6 @@ final readonly class DemoOrganizationStage implements DemoDataStage
         for ($ordinal = 0; $ordinal < $count; $ordinal++) {
             $copy = $this->text->collection($persona, $ordinal);
             $publicId = $this->stable->uuid("organization:user:{$userIndex}:collection:{$ordinal}");
-            $cover = $assets->store(
-                'collection-covers',
-                $publicId,
-                960,
-                540,
-                'catalog-collections/'.$publicId.'/demo',
-                'webp',
-            );
             $visibility = $visibilityCases[($userIndex + $ordinal - 1) % count($visibilityCases)];
             $rows[] = [
                 'public_id' => $publicId,
@@ -258,11 +246,6 @@ final readonly class DemoOrganizationStage implements DemoDataStage
                 'sort_mode' => $sortCases[($userIndex + $ordinal - 1) % count($sortCases)]->value,
                 'content_locale' => 'ru',
                 'is_featured' => false,
-                'cover_disk' => $cover['disk'],
-                'cover_path' => $cover['path'],
-                'cover_mime_type' => $cover['mime_type'],
-                'cover_size' => $cover['size'],
-                'cover_version' => 1,
                 'content_version' => 1,
                 'published_at' => $visibility === CatalogCollectionVisibility::Private ? null : $createdAt,
                 'deleted_at' => null,

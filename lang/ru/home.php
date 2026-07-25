@@ -39,6 +39,7 @@ return [
         'format' => 'Формат: :format',
         'translation' => 'Перевод: :translation',
         'published_at' => 'Опубликовано: :date',
+        'more_on_title' => 'На странице сериала доступны остальные серии и видео.',
     ],
     'update_types' => [
         'new_episode' => 'Новая серия',

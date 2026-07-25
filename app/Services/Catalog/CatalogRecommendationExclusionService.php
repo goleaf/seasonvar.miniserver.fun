@@ -38,6 +38,12 @@ final class CatalogRecommendationExclusionService
     }
 
     /** @return list<int> */
+    public function recentExclusions(CatalogRecommendationContext $context): array
+    {
+        return $this->normalize($this->repeats->recentIds($context->user));
+    }
+
+    /** @return list<int> */
     public function discoveryDemotions(CatalogRecommendationContext $context): array
     {
         if ($context->user === null || $context->type !== CatalogRecommendationType::Personalized) {

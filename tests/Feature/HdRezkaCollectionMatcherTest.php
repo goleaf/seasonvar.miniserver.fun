@@ -6,6 +6,7 @@ namespace Tests\Feature;
 
 use App\DTOs\HdRezkaCollectionItemData;
 use App\Enums\CatalogCollectionSourceMatchStatus;
+use App\Enums\CatalogCollectionSourceScope;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleSearchDocument;
 use App\Models\Country;
@@ -13,6 +14,7 @@ use App\Models\Genre;
 use App\Services\Catalog\Search\CatalogSearchDocumentBuilder;
 use App\Services\Catalog\Search\CatalogSearchNormalizer;
 use App\Services\Collections\Import\HdRezkaCollectionMatcher;
+use App\Services\Collections\Import\HdRezkaCollectionTypeCompatibility;
 use App\Support\CatalogTitleDisplayName;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -22,6 +24,42 @@ use Tests\TestCase;
 final class HdRezkaCollectionMatcherTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_film_source_is_reported_outside_current_catalog_scope(): void
+    {
+        $compatibility = app(HdRezkaCollectionTypeCompatibility::class);
+
+        $this->assertSame(
+            CatalogCollectionSourceScope::Unsupported,
+            $compatibility->sourceScope('film'),
+        );
+    }
+
+    public function test_series_source_remains_actionable_for_serial_catalog_type(): void
+    {
+        $compatibility = app(HdRezkaCollectionTypeCompatibility::class);
+
+        $this->assertSame(
+            CatalogCollectionSourceScope::Supported,
+            $compatibility->sourceScope('series'),
+        );
+        $this->assertTrue($compatibility->compatible('series', 'serial'));
+    }
+
+    public function test_unknown_source_type_is_not_silently_called_unsupported(): void
+    {
+        $compatibility = app(HdRezkaCollectionTypeCompatibility::class);
+
+        $this->assertSame(
+            CatalogCollectionSourceScope::Unknown,
+            $compatibility->sourceScope(null),
+        );
+        $this->assertSame(
+            CatalogCollectionSourceScope::Unknown,
+            $compatibility->sourceScope('new-provider-type'),
+        );
+        $this->assertTrue($compatibility->compatible('new-provider-type', 'serial'));
+    }
 
     public function test_exact_primary_title_and_year_match_one_local_title(): void
     {
@@ -110,6 +148,28 @@ final class HdRezkaCollectionMatcherTest extends TestCase
 
         $this->assertSame(CatalogCollectionSourceMatchStatus::Unmatched, $match->status);
         $this->assertNull($match->catalogTitleId);
+    }
+
+    public function test_matcher_keeps_existing_year_and_type_fail_closed_results_after_extraction(): void
+    {
+        $this->indexedTitle(['title' => 'Год не совпадает', 'year' => 2023, 'type' => 'serial']);
+        $this->indexedTitle(['title' => 'Тип не совпадает', 'year' => 2024, 'type' => 'anime']);
+
+        $yearMismatch = app(HdRezkaCollectionMatcher::class)->match($this->item(
+            title: 'Год не совпадает',
+            year: 2024,
+            type: 'series',
+        ));
+        $typeMismatch = app(HdRezkaCollectionMatcher::class)->match($this->item(
+            title: 'Тип не совпадает',
+            year: 2024,
+            type: 'series',
+        ));
+
+        $this->assertSame(CatalogCollectionSourceMatchStatus::Unmatched, $yearMismatch->status);
+        $this->assertSame('no_eligible_candidate', $yearMismatch->method);
+        $this->assertSame(CatalogCollectionSourceMatchStatus::Unmatched, $typeMismatch->status);
+        $this->assertSame('no_eligible_candidate', $typeMismatch->method);
     }
 
     public function test_two_country_overlaps_break_an_otherwise_equal_tie(): void

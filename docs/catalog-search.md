@@ -158,7 +158,7 @@ Mobile `GET /api/v1/search/suggestions` без `scope` сохраняет сов
 
 ## Поиск и фильтры коллекций
 
-Вложенный `CatalogCollectionExplorer` на единственном публичном directory `/discover/popular` использует отдельный bounded UGC search по public approved name/description, real active/fallback editorial translations и public owner name; private, unlisted, pending/rejected/hidden/deleted records исключаются до поиска. Это дополнение к title-only FTS, а не расширение его document: collection text не смешивается с `CatalogTitleSearch` и не попадает в title snippets. Отдельный directory `/collections` запрещён; detail `/collections/{slug}`, cover/profile и read-only API contracts сохраняются.
+Вложенный `CatalogCollectionExplorer` на единственном публичном directory `/discover/popular` использует отдельный bounded UGC search по public approved name/description, real active/fallback editorial translations и public owner name; private, unlisted, pending/rejected/hidden/deleted records исключаются до поиска. Это дополнение к title-only FTS, а не расширение его document: collection text не смешивается с `CatalogTitleSearch` и не попадает в title snippets. Отдельный directory `/collections` запрещён; detail `/collections/{slug}`, profile и read-only API contracts сохраняются. Собственного collection image/cover search field или route нет.
 
 Внутри одной коллекции `CatalogCollectionQuery::items()` переиспользует canonical title visibility, title/original/alias normalization и существующие genre/country/status/year relations. Allowlisted sorting и paginator state находятся в URL; любое изменение criteria сбрасывает только `collectionPage`. Unique collection/title pivot и identity-first join предотвращают дубли от aliases/taxonomy translations. Stateful query URL получает clean collection canonical и `noindex`, но остаётся shareable и корректно восстанавливается browser back/forward через Livewire `#[Url(history: true)]`.
 
@@ -189,6 +189,15 @@ Request directory ищет только public eligible title/original/alternati
 Canonical discovery URL — `/discover/{type}` и `/{locale}/discover/{type}`; default `/discover` и legacy `/recommendations` удалены без redirect. `type` — implemented enum strategy, поэтому отдельный arbitrary recommendation `sort` column отсутствует. Stable recommendation fields: `period`, `rating_source`, taxonomy slugs `genre|country|tag|actor|director|translation|studio`, `year_from|year_to`, `quality`, `subtitles=available`, `rating_min`, `votes_min`, `page`. Для collection-секции `popular` используются независимые `collections_q`, `collections_sort=featured|recent|title`, `collectionsPage`; search bypass-ит shared HTML cache, stateful variants получают `noindex`. Unknown/out-of-range values normalize to defaults; page max 500, result limit server-configured max 48.
 
 Filters reuse `CatalogTaxonomyRegistry`, task 04 facet SQL and canonical visibility. Interface locale does not change media preference or title identity. Personal feedback/history/current user/recent IDs/seed never enter query. Filtered/authenticated/personal/random pages are noindex and canonicalize to stable public type; default filters are omitted. Search empty state links to clearly labelled popular discovery and never treats those cards as search matches.
+
+Все девять discovery type сохраняют прежние route identities. Явное
+обновление выполняет один server resolve уже с новым seed. Deterministic guest
+types используют общий канонический candidate pool, после которого текущая
+сессия удаляет недавно показанные ID; личные данные не становятся URL- или
+cache-dimension. Гостевой `personalized` дозаполняет окно по цепочке
+редакционной, недельной, месячной и общей популярности. Для `random` параметр
+`page` всегда нормализуется к 1, а элементы перехода на следующую страницу не
+показываются.
 
 Search/filter technical defects use the private Task 20 form with allowlisted `search`/`page` context; arbitrary query strings, signed/private parameters and raw search history are not copied. Ticket search is a separate viewer-scoped DB query and does not alter catalogue ranking, filters, public cache or URL contract. См. [`technical-issues.md`](technical-issues.md).
 

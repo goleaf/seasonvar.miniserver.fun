@@ -40,6 +40,7 @@
 | Collection diagnostics workstream | `implementation_verified_uncommitted` | The collection-specific plan reports focused RED/GREEN, 72 tests / 431 assertions and Vite verification, but code, translations, owner docs and its task plan remain uncommitted in the shared checkout. Public collection, matching, route, cache and recommendation contracts are unchanged. |
 | Shared delivery state | `repeated_collision_observed` | Task 30 base preparation is committed in `ad5c13c`; Task 32 standalone index approval is committed in `2a7f636` with evidence `cb83684`. During Task 32 verification another owner added a player-plan path to the staged set and later removed only its own path before `f22e755`; this proves that a reviewed digest needs both hook activation and a declared-path boundary. |
 | Rolling extension Tasks 29+ | `in_progress` | Delivery recovery, shared-`main` ownership, cross-workstream reconciliation, reviewed-index binding, current-plan policy and declared-path ownership are evidence-backed Tasks 29–34. Task 34 planning is committed in `ebbbc85`; implementation has not started. Later discoveries continue with monotonic IDs without changing completed history. |
+| Visitor/catalog Tasks 35+ | `tasks_35_38_completed_task_45_verified_live_task_46_verified_live_delivery_unresolved_task_47_verified_live_delivery_unresolved` | Task 35 зафиксировал общий baseline, Tasks 36–38 реализовали quick navigation, navigation-only player island и newest-first `/calendar`; Task 45 реализовал black fullscreen и scoped player palette, а свежий production smoke Task 46 подтвердил matching `app-BLl6ilyS.css`. Task 46 устранил подтверждённую гонку до готовности player runtime: normal-path остаётся seamless Livewire island commit, а adjacent episode anchors сохраняют настоящий full-page fallback вместо island-only mutation со старым `wire:ignore` video. Task 47 закрепил invalid-sort/Upcoming и paginator-reset regressions, прошёл Desktop/Mobile и подтвердил live `29 мая → 28 мая`, не создавая второй механизм Task 38; Git delivery остаётся unresolved из-за shared dirty worktree. Task 39 ждёт ownership handoff уже изменяемого `CatalogCollectionQuery.php`, Tasks 40–44 остаются в очереди, а уже выделенный Task 48 и Task 49+ продолжают rolling protocol без верхнего лимита. |
 
 Task 1 and Task 2 were delivered as one isolated Batch 1 commit because they shared operations owners while unrelated importer/player changes already occupied the worktree. This is a recorded commit-granularity deviation, not a reason to rewrite `main`. Every later implementation task returns to one independently reviewable commit.
 
@@ -2885,6 +2886,1313 @@ git push --porcelain origin main
 ```
 
 Stage `README.md` only for the actual contributor-workflow change. Never include importer, player, collection, dependency, application or production files.
+
+---
+
+### Task 35: Register the Unified Visitor Catalog Roadmap and Freeze Its Baseline
+
+**Status:** `completed_local_delivery_unresolved`; planning/evidence baseline
+зафиксирован, production rollout не выполнялся, commit/push блокируются
+общим foreign dirty worktree.
+
+**Files:**
+- Modify: `docs/superpowers/plans/2026-07-24-system-maintenance-and-optimization-master-plan.md`
+- Review: `docs/superpowers/plans/2026-07-24-discovery-sections-end-to-end-improvement-master-plan.md`
+- Review: `docs/superpowers/plans/2026-07-24-seasonvar-importer-improvement-master-plan.md`
+- Review: `docs/superpowers/plans/2026-07-19-calendar-default-recent.md`
+- Review: `docs/superpowers/specs/2026-07-24-title-navigation-and-player-island-design.md`
+- Modify: `docs/plans/current-task-plan.md`
+
+**Interfaces:**
+- Consumes: stable system Tasks 1–34, discovery child Tasks 1–13, importer child Tasks 1–19, approved calendar/title/player designs and the shared-worktree ownership rules.
+- Produces: one monotonic dependency registry for Tasks 36–44 and future `Task N+1`.
+- Preserves: child plans own their implementation details; this master owns ordering, cross-feature gates, final acceptance and production activation.
+
+- [x] **Step 1: Capture a read-only functional baseline**
+
+Run:
+
+```bash
+git status --short --branch
+php artisan about
+php artisan route:list --path=discover
+php artisan route:list --path=calendar
+php artisan route:list --path=titles
+```
+
+Expected: current branch is `main`; installed runtime is recorded; no route, cache, database or process state changes.
+
+- [x] **Step 2: Capture the exact browser failures**
+
+Use Playwright against:
+
+```text
+/titles/kizilovyi-shherbetkizilcik-serbeti#data-title-reference
+/titles/xardeikerythe-hardacres?season=78311&episode=490014&media=522533&variant=voiceover-syncmer&quality=1080p&format=mp4#player
+```
+
+Record:
+
+```json
+{
+  "about_target_exists": false,
+  "reviews_target_exists_before_lazy_hydration": false,
+  "episode_1_to_2_url_changes": true,
+  "navigation_dom_changes_after_commit": false
+}
+```
+
+Expected: evidence reproduces the two root causes without downloading a complete video.
+
+- [x] **Step 3: Freeze query baselines**
+
+Measure cold/warm samples and SQL counts for:
+
+```text
+/discover/personalized
+/discover/trending
+/discover/popular
+/discover/top_rated
+/discover/recently_added
+/discover/recently_updated
+/discover/upcoming
+/discover/editorial
+/discover/random
+/calendar
+/titles/xardeikerythe-hardacres
+```
+
+For the title route, record the collection-membership subquery separately. Preserve the measured baseline already observed locally: warm public response about `69–79 ms`, bypass/cold response about `581–624 ms`, and one collection projection query around `370 ms`; these are diagnostics, not an SLA.
+
+- [x] **Step 4: Record task ownership and compatibility**
+
+Write an exact matrix:
+
+```text
+Task 36 -> title anchors, lazy reviews placeholder, content request/calendar links.
+Task 37 -> player previous/next navigation island.
+Task 38 -> recent calendar default chronology.
+Task 39 -> candidate-first title collection projection.
+Tasks 40–42 -> discovery child plan.
+Task 43 -> importer-to-search/cache/calendar/recommendation handoff.
+Task 44 -> cross-feature acceptance, docs, delivery and rollout.
+```
+
+Expected: no file is assigned to two active owners; foreign dirty files remain unstaged.
+
+- [x] **Step 5: Verify planning documentation**
+
+```bash
+php artisan project:docs-refresh --check --no-interaction
+bash scripts/ci-check.sh docs
+git diff --check
+```
+
+Expected: plan links resolve and no placeholder or second active owner is introduced.
+
+---
+
+### Task 36: Repair Title Section Navigation and Authenticated Destination Handoffs
+
+**Status:** `completed_local_delivery_unresolved`, priority `P0 correctness/accessibility`; focused PHPUnit and Desktop/Mobile Playwright passed, commit/push blocked by the shared foreign dirty worktree.
+
+**Files:**
+- Modify: `app/Livewire/CatalogTitleDetail.php`
+- Modify: `app/Livewire/Reviews/CatalogTitleReviews.php`
+- Modify: `resources/views/livewire/catalog-title-detail.blade.php`
+- Create: `resources/views/livewire/reviews/catalog-title-reviews-placeholder.blade.php`
+- Modify: `resources/js/app.js`
+- Modify: `tests/Feature/CatalogVisualSystemTest.php`
+- Modify: `tests/Feature/CatalogPageTest.php`
+- Create: `tests/browser/title-section-navigation.spec.js`
+
+**Interfaces:**
+- Consumes: existing same-page anchor scroll functions, Livewire lazy loading, protected `requests.create`, `calendar.upcoming` and existing RU/EN copy.
+- Produces: stable IDs `player`, `seasons`, `data-title-reference`, `reviews`; one active link with `aria-current="location"`; canonical content-request and calendar URLs.
+- Preserves: all route names, title slug binding, review pagination island, auth policies, form validation and no-JavaScript anchors.
+
+- [ ] **Step 1: Write failing HTML and Livewire tests**
+
+Add assertions equivalent to:
+
+```php
+$html = $this->get(route('titles.show', $title))->assertOk()->getContent();
+
+$this->assertStringContainsString('href="#data-title-reference"', $html);
+$this->assertStringContainsString('id="data-title-reference"', $html);
+$this->assertStringContainsString('href="#reviews"', $html);
+
+$placeholder = Livewire::test(CatalogTitleReviews::class, [
+    'catalogTitleId' => $title->id,
+])->html();
+
+$this->assertSame(1, substr_count($placeholder, 'id="reviews"'));
+```
+
+Add a guest request test:
+
+```php
+$target = route('requests.create', [
+    'type' => 'broken_content_restoration',
+    'catalog_title_id' => $title->id,
+]);
+
+$this->get($target)
+    ->assertRedirect(route('login'));
+$this->assertSame($target, session('url.intended'));
+```
+
+- [ ] **Step 2: Run RED**
+
+```bash
+php artisan test --filter=CatalogVisualSystemTest
+php artisan test --filter=CatalogPageTest
+```
+
+Expected: failures prove the about/reviews targets and intended destination are absent from the current contract.
+
+- [ ] **Step 3: Add the stable review placeholder**
+
+Add to `CatalogTitleReviews`:
+
+```php
+public function placeholder(): View
+{
+    return view('livewire.reviews.catalog-title-reviews-placeholder');
+}
+```
+
+The new Blade root is:
+
+```blade
+<section
+    id="reviews"
+    aria-busy="true"
+    aria-live="polite"
+    class="scroll-mt-40 min-h-32 rounded-panel border border-slate-200 bg-white p-5 shadow-panel sm:scroll-mt-44 lg:scroll-mt-48"
+    data-livewire-placeholder
+>
+    <div class="motion-safe:animate-pulse">
+        <div class="h-5 w-40 rounded-control bg-slate-200"></div>
+        <div class="mt-4 h-3 w-full rounded-control bg-slate-100"></div>
+        <div class="mt-2 h-3 w-3/4 rounded-control bg-slate-100"></div>
+    </div>
+    <span class="sr-only">{{ __('catalog.loading') }}</span>
+</section>
+```
+
+The hydrated review component keeps the same single root ID and matching scroll margins.
+
+- [ ] **Step 4: Make every link semantically complete**
+
+In the detail Blade:
+
+```blade
+<x-ui.panel
+    id="data-title-reference"
+    data-title-reference
+    :title="__('catalog.title.about')"
+    icon="fa-solid fa-circle-info"
+    class="scroll-mt-40 sm:scroll-mt-44 lg:scroll-mt-48"
+>
+```
+
+Every quick link receives only the neutral classes plus Tailwind
+`aria-[current=location]:*` variants. Remove the permanently active styling
+from «Смотреть».
+
+In `CatalogTitleDetail::render()` always build:
+
+```php
+'contentRequestUrl' => route('requests.create', [
+    'type' => 'broken_content_restoration',
+    'catalog_title_id' => $this->catalogTitleId,
+]),
+'releaseCalendarUrl' => route('calendar.upcoming', [
+    'title' => $this->catalogTitleId,
+]),
+```
+
+Remove `wire:navigate` only from the calendar link. Both buttons remain ordinary anchors.
+
+- [ ] **Step 5: Add one idempotent active-section observer**
+
+Extend `resources/js/app.js` with one registry:
+
+```js
+const titleNavigationSessions = new WeakMap();
+
+const initializeTitleQuickNavigation = (root = document) => {
+    const navigation = root.querySelector('[data-title-quick-navigation]');
+
+    if (!navigation || titleNavigationSessions.has(navigation)) return;
+
+    const links = [...navigation.querySelectorAll('[data-title-quick-link]')];
+    const targets = links
+        .map((link) => ({ link, target: document.getElementById(new URL(link.href).hash.slice(1)) }))
+        .filter(({ target }) => target);
+    const observer = new IntersectionObserver((entries) => {
+        const visible = entries
+            .filter((entry) => entry.isIntersecting)
+            .sort((left, right) => left.boundingClientRect.top - right.boundingClientRect.top)[0];
+
+        if (!visible) return;
+
+        links.forEach((link) => link.removeAttribute('aria-current'));
+        targets.find(({ target }) => target === visible.target)
+            ?.link.setAttribute('aria-current', 'location');
+    }, {
+        rootMargin: '-12rem 0px -60% 0px',
+        threshold: [0, 0.01],
+    });
+
+    targets.forEach(({ target }) => observer.observe(target));
+    titleNavigationSessions.set(navigation, observer);
+};
+```
+
+Call it from the existing initial, Livewire morph and `livewire:navigated` boundaries. Cleanup disconnects the observer before a removed/navigation root is discarded. Hash selection remains authoritative when no section intersects.
+
+- [ ] **Step 6: Run GREEN and browser acceptance**
+
+```bash
+php artisan test --filter=CatalogVisualSystemTest
+php artisan test --filter=CatalogPageTest
+npm run build
+npx playwright test tests/browser/title-section-navigation.spec.js --project="Desktop Chromium" --project="Mobile Chromium"
+./vendor/bin/pint --dirty --format agent
+```
+
+Expected: all six controls navigate; about/reviews have real targets; guest login returns to the form; one quick link is current; no duplicate IDs/listeners or horizontal overflow.
+
+- [ ] **Step 7: Commit the isolated task**
+
+```bash
+git add app/Livewire/CatalogTitleDetail.php app/Livewire/Reviews/CatalogTitleReviews.php resources/views/livewire/catalog-title-detail.blade.php resources/views/livewire/reviews/catalog-title-reviews-placeholder.blade.php resources/js/app.js tests/Feature/CatalogVisualSystemTest.php tests/Feature/CatalogPageTest.php tests/browser/title-section-navigation.spec.js docs/frontend.md docs/UI_STANDARDS.md docs/plans/current-task-plan.md README.md CHANGELOG.md
+git commit -m "fix: repair title section navigation"
+git push --porcelain origin main
+```
+
+Stop before staging if the exact declared paths cannot be isolated from foreign work.
+
+---
+
+### Task 37: Update Previous and Next Episode Links through a Navigation-Only Livewire Island
+
+**Status:** `completed_local_delivery_unresolved`, priority `P0 playback correctness`; `1 → 2 → 3` and preserved video/shell/Plyr identity passed on Desktop/Mobile, commit/push blocked by the shared foreign dirty worktree.
+
+**Files:**
+- Modify: `app/Livewire/CatalogTitlePlayer.php`
+- Modify: `resources/views/livewire/catalog-title-player.blade.php`
+- Modify: `resources/js/player-navigation.js`
+- Modify: `tests/Feature/CatalogPageTest.php`
+- Modify: `tests/Unit/LivewireWireIgnoreContractTest.php`
+- Create: `tests/browser/player-navigation-island.spec.js`
+
+**Interfaces:**
+- Consumes: `CatalogTitlePlaybackQuery::watchableEpisode()`, `navigationForEpisode()`, existing media-profile state and Livewire 4 named islands.
+- Produces: computed `playerNavigationIslandPage(): array` and named island `catalog-player-navigation`.
+- Preserves: one `<video>`, one Plyr instance, `wire:ignore` media shell, grant/entitlement validation, progress token/sequence, URL query keys and full-page fallback links.
+
+- [ ] **Step 1: Write failing island contracts**
+
+Add static/runtime assertions:
+
+```php
+$this->assertStringContainsString(
+    "@island(name: 'catalog-player-navigation', always: true, with: \$this->playerNavigationIslandPage)",
+    $playerBlade,
+);
+$this->assertStringContainsString(
+    "\$wire.\$island('catalog-player-navigation')",
+    $navigationJavaScript,
+);
+$this->assertStringNotContainsString(
+    "#[Renderless]\n    public function commitPlayerTransition",
+    $component,
+);
+```
+
+Create three ordered episodes and assert after:
+
+```php
+Livewire::test(CatalogTitlePlayer::class, ['catalogTitleId' => $title->id])
+    ->set('episode', (string) $first->id)
+    ->call('commitPlayerTransition', $second->id, $secondMedia->id)
+    ->assertSet('episode', (string) $second->id)
+    ->assertSee('data-player-next-episode', false)
+    ->assertSee('data-player-transition-episode="'.$third->id.'"', false);
+```
+
+- [ ] **Step 2: Run RED**
+
+```bash
+php artisan test --filter=CatalogPageTest
+php artisan test --filter=LivewireWireIgnoreContractTest
+```
+
+Expected: current renderless commit leaves the old previous/next fragment unchanged.
+
+- [ ] **Step 3: Add bounded island presentation data**
+
+In `CatalogTitlePlayer` add:
+
+```php
+/** @var array<string, mixed>|null */
+protected ?array $playerNavigationIslandViewData = null;
+
+/** @return array<string, mixed> */
+#[Computed]
+public function playerNavigationIslandPage(): array
+{
+    if ($this->playerNavigationIslandViewData !== null) {
+        return $this->playerNavigationIslandViewData;
+    }
+
+    $title = $this->title();
+    $user = $this->user();
+    $episodeId = $this->positiveId($this->episode);
+    $selectedEpisode = $episodeId === null
+        ? null
+        : $this->playback->watchableEpisode($title, $user, $episodeId);
+    $navigation = $selectedEpisode === null
+        ? new CatalogEpisodeNavigation
+        : $this->playback->navigationForEpisode($title, $user, $selectedEpisode);
+
+    return $this->playerNavigationIslandViewData = $this->navigationIslandData(
+        $title,
+        $selectedEpisode,
+        $navigation,
+    );
+}
+```
+
+`navigationIslandData()` returns only `selectedEpisode`, `episodeNavigation`,
+`previousUrl` and `nextUrl`. Fallback URLs preserve current
+`variant|quality|format`, omit the current media ID and use the adjacent
+episode ID. Initial full render writes the same array to
+`$playerNavigationIslandViewData`, avoiding duplicate initial queries.
+
+- [ ] **Step 4: Render only the island**
+
+Wrap the existing `<nav>` block:
+
+```blade
+@island(name: 'catalog-player-navigation', always: true, with: $this->playerNavigationIslandPage)
+    @if ($selectedEpisode && ($episodeNavigation->previous || $episodeNavigation->next))
+        <nav class="mt-3 grid gap-2 sm:grid-cols-2" aria-label="{{ __('catalog.player.episode_navigation') }}">
+            {{-- existing previous/next anchors, using $previousUrl and $nextUrl --}}
+        </nav>
+    @endif
+@endisland
+```
+
+Remove `#[Renderless]` only from `commitPlayerTransition()`. Prepare, menu,
+progress and other renderless actions remain unchanged.
+
+- [ ] **Step 5: Scope only commit to the named island**
+
+In `resources/js/player-navigation.js` add:
+
+```js
+const callWire = async (root, method, args, island = null) => {
+    const wire = wireFor(root);
+    const target = island === null ? wire : wire?.$island?.(island);
+
+    if (!target || typeof target[method] !== 'function') {
+        throw new Error('Player component is unavailable.');
+    }
+
+    return target[method](...args);
+};
+```
+
+Pass `catalog-player-navigation` only for
+`catalog-player-transition-commit`. `preparePlayerTransition` remains a
+normal renderless component call.
+
+- [ ] **Step 6: Run GREEN and exact browser regression**
+
+```bash
+php artisan test --filter=CatalogPageTest
+php artisan test --filter=LivewireWireIgnoreContractTest
+npm run build
+npx playwright test tests/browser/player-navigation-island.spec.js --project="Desktop Chromium" --project="Mobile Chromium"
+./vendor/bin/pint --dirty --format agent
+```
+
+Browser assertions:
+
+```text
+episode 1 shows next 2;
+click changes URL to episode 2 and visible next to 3;
+second click changes URL to episode 3;
+previous link now points to episode 2;
+video element count is 1 and its DOM handle is unchanged;
+Plyr root count is 1;
+no Livewire/page/console/local-asset failure occurs.
+```
+
+- [ ] **Step 7: Commit independently**
+
+```bash
+git add app/Livewire/CatalogTitlePlayer.php resources/views/livewire/catalog-title-player.blade.php resources/js/player-navigation.js tests/Feature/CatalogPageTest.php tests/Unit/LivewireWireIgnoreContractTest.php tests/browser/player-navigation-island.spec.js docs/frontend.md docs/audits/video-playback-report.md docs/plans/current-task-plan.md README.md CHANGELOG.md
+git commit -m "fix: refresh episode navigation through island"
+git push --porcelain origin main
+```
+
+Do not stage foreign `resources/js/player.js` or `tests/browser/player-lifecycle.spec.js`.
+
+---
+
+### Task 38: Reverse the Default Recent Calendar Chronology without Changing Explicit Sorts
+
+**Status:** `completed_local_delivery_unresolved`, priority `P0 correctness`; default/explicit chronology passed feature and Desktop/Mobile Livewire browser tests, commit/push blocked by the shared foreign dirty worktree.
+
+**Files:**
+- Modify: `app/Livewire/ReleaseCalendar/ReleaseCalendarPage.php`
+- Modify: `resources/views/livewire/release-calendar/release-calendar-page.blade.php`
+- Modify: `tests/Feature/ReleaseCalendarDefaultViewTest.php`
+- Modify: `tests/browser/prepare-fixtures.php`
+- Create: `tests/browser/release-calendar.spec.js`
+- Modify: `docs/release-calendar.md`
+
+**Interfaces:**
+- Consumes: `ReleaseCalendarSort::{Earliest,Latest,Title}` and existing query ordering.
+- Produces: dynamic route default: `Recent => Latest`, every other calendar view => `Earliest`.
+- Preserves: explicit `?sort=earliest|latest|title`, localized routes, pagination, filters, SEO canonical, notifications and title filtering.
+
+- [ ] **Step 1: Write failing chronology tests**
+
+Create two released entries:
+
+```php
+$older = $this->createReleasedEntryAt('Старая дата', '2026-05-28 12:00:00 UTC');
+$newer = $this->createReleasedEntryAt('Новая дата', '2026-05-29 12:00:00 UTC');
+
+$this->get('/calendar')
+    ->assertSeeInOrder(['29 мая 2026', '28 мая 2026']);
+
+$this->get('/calendar?sort=earliest')
+    ->assertSeeInOrder(['28 мая 2026', '29 мая 2026']);
+
+$this->get('/calendar/upcoming')
+    ->assertSeeInOrder(['Ближайшая дата', 'Дальняя дата']);
+```
+
+- [ ] **Step 2: Run RED**
+
+```bash
+php artisan test --filter=ReleaseCalendarDefaultViewTest
+php artisan test --filter=ReleaseCalendarQueryTest
+```
+
+Expected: `/calendar` currently returns ascending dates.
+
+- [ ] **Step 3: Introduce a dynamic default sort**
+
+Change URL state to:
+
+```php
+#[Url(history: true, except: '')]
+public string $sort = '';
+
+private function defaultSort(): ReleaseCalendarSort
+{
+    return ReleaseCalendarView::from($this->view) === ReleaseCalendarView::Recent
+        ? ReleaseCalendarSort::Latest
+        : ReleaseCalendarSort::Earliest;
+}
+
+private function resolvedSort(): ReleaseCalendarSort
+{
+    return ReleaseCalendarSort::tryFrom($this->sort) ?? $this->defaultSort();
+}
+
+public function changeSort(string $sort): void
+{
+    $resolved = ReleaseCalendarSort::tryFrom($sort) ?? $this->defaultSort();
+    $this->sort = $resolved === $this->defaultSort() ? '' : $resolved->value;
+    $this->resetPage(pageName: 'calendarPage');
+}
+```
+
+`clearFilters()` resets `$sort=''`. `render()` passes
+`$this->resolvedSort()` to the query and SEO filtered-state comparison.
+
+- [ ] **Step 4: Render the effective value without polluting canonical URLs**
+
+Replace `wire:model.live="sort"` with:
+
+```blade
+<select wire:change="changeSort($event.target.value)" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2">
+    @foreach ($sortOptions as $option)
+        <option value="{{ $option['value'] }}" @selected($effectiveSort === $option['value'])>
+            {{ $option['label'] }}
+        </option>
+    @endforeach
+</select>
+```
+
+Pass `'effectiveSort' => $this->resolvedSort()->value` from the component.
+Default `/calendar` remains query-free and indexable; explicit override remains
+in history/query state.
+
+- [ ] **Step 5: Run GREEN and browser smoke**
+
+```bash
+php artisan test --filter=ReleaseCalendarDefaultViewTest
+php artisan test --filter=ReleaseCalendarQueryTest
+npm run build
+npx playwright test tests/browser/release-calendar.spec.js --project="Desktop Chromium" --project="Mobile Chromium"
+./vendor/bin/pint --dirty --format agent
+```
+
+Expected: 29 May precedes 28 May on `/calendar`; explicit earliest reverses it; upcoming/day/week/month/personal keep their existing default semantics.
+
+- [ ] **Step 6: Commit independently**
+
+```bash
+git add app/Livewire/ReleaseCalendar/ReleaseCalendarPage.php resources/views/livewire/release-calendar/release-calendar-page.blade.php tests/Feature/ReleaseCalendarDefaultViewTest.php tests/Feature/ReleaseCalendarQueryTest.php docs/release-calendar.md docs/plans/current-task-plan.md README.md CHANGELOG.md
+git commit -m "fix: show recent calendar dates newest first"
+git push --porcelain origin main
+```
+
+---
+
+### Task 39: Replace the Title Collection Hot Query with Candidate-First Bounded Hydration
+
+**Status:** `planned_after_collection_ownership_handoff`, priority `P0 performance`.
+
+**Files:**
+- Create: `app/Services/Collections/CatalogCollectionSummaryLoader.php`
+- Modify after ownership handoff: `app/Services/Collections/CatalogCollectionQuery.php`
+- Modify: `app/Livewire/CatalogTitleDetail.php`
+- Create: `tests/Feature/CatalogTitleCollectionQueryBudgetTest.php`
+- Modify: `tests/Feature/CatalogPageTest.php`
+- Modify: `docs/performance.md`
+
+**Interfaces:**
+- Produces:
+
+```php
+public function forTitle(
+    int $catalogTitleId,
+    ?User $viewer = null,
+    int $limit = 6,
+): Collection;
+```
+
+- Phase 1 selects at most 12 eligible collection IDs in featured/updated/id order.
+- Phase 2 hydrates only those IDs with owner, active/fallback translations, total/visible counts, source marker and poster fallback.
+- Preserves: collection card model contract, public/approved/published/deleted visibility, locale fallback, cover behavior, exact order and limit.
+
+- [ ] **Step 1: Write a failing query-budget test**
+
+Seed at least 40 public collections with 100 memberships each and record SQL:
+
+```php
+DB::flushQueryLog();
+DB::enableQueryLog();
+
+$collections = app(CatalogCollectionSummaryLoader::class)
+    ->forTitle($title->id, null, 6);
+
+$this->assertCount(6, $collections);
+$this->assertLessThanOrEqual(8, count(DB::getQueryLog()));
+```
+
+Also assert every hydration/count/poster query is constrained to the six
+candidate IDs and the final order matches the legacy fixture.
+
+- [ ] **Step 2: Run RED and capture EXPLAIN**
+
+```bash
+php artisan test --filter=CatalogTitleCollectionQueryBudgetTest
+```
+
+Expected: failure because the loader does not exist; preserve the current
+unbounded/correlated query plan as before-evidence.
+
+- [ ] **Step 3: Implement candidate-first selection**
+
+The first query is:
+
+```php
+$candidateIds = CatalogCollection::query()
+    ->publiclyListed()
+    ->join('catalog_collection_items as title_item', function ($join) use ($catalogTitleId): void {
+        $join->on('title_item.catalog_collection_id', '=', 'catalog_collections.id')
+            ->where('title_item.catalog_title_id', $catalogTitleId);
+    })
+    ->orderByDesc('catalog_collections.is_featured')
+    ->orderByDesc('catalog_collections.updated_at')
+    ->orderByDesc('catalog_collections.id')
+    ->limit(max(1, min(12, $limit)))
+    ->pluck('catalog_collections.id');
+```
+
+Return immediately when empty. Hydrate only `whereKey($candidateIds)` and
+restore candidate order with an ID-to-position map. Reuse the canonical
+`CatalogTitleQuery` visibility constraint for visible item counts; do not copy
+access rules into Blade.
+
+- [ ] **Step 4: Replace only the title-page call path**
+
+Inject the loader into `CatalogTitleDetail` and replace:
+
+```php
+$this->collections->publicForTitle($this->catalogTitleId)
+```
+
+with:
+
+```php
+$this->collectionSummaries->forTitle($this->catalogTitleId, $user)
+```
+
+Keep `CatalogCollectionQuery::publicForTitle()` as a compatibility adapter
+delegating to the loader until repository-wide callers are migrated and
+verified. Do not remove it in this task.
+
+- [ ] **Step 5: Verify budgets**
+
+```bash
+php artisan test --filter=CatalogTitleCollectionQueryBudgetTest
+php artisan test --filter=CatalogPageTest
+./vendor/bin/pint --dirty --format agent
+```
+
+Capture five cold and five warm title samples. Acceptance:
+
+```text
+same six collection IDs/order/cards;
+collection subpath <= 8 SQL statements;
+no correlated count/poster work before candidate LIMIT;
+no new N+1;
+cold title p50 improves by at least 30% from the recorded local baseline,
+or the task remains in_progress with the next measured bottleneck recorded.
+```
+
+An index migration is added only if `EXPLAIN QUERY PLAN` proves the candidate
+join lacks an existing `(catalog_title_id, catalog_collection_id)` path.
+
+- [ ] **Step 6: Commit independently**
+
+```bash
+git add app/Services/Collections/CatalogCollectionSummaryLoader.php app/Services/Collections/CatalogCollectionQuery.php app/Livewire/CatalogTitleDetail.php tests/Feature/CatalogTitleCollectionQueryBudgetTest.php tests/Feature/CatalogPageTest.php docs/performance.md docs/plans/current-task-plan.md README.md CHANGELOG.md
+git commit -m "perf: bound title collection hydration"
+git push --porcelain origin main
+```
+
+---
+
+### Task 40: Complete Discovery Correctness, Refresh and Public Cache Boundaries
+
+**Status:** `implementation_verified_local_delivery_unresolved`; discovery
+child Tasks 1–4 выполнены без поглощения занятой Task 39.
+
+**Files and exact implementation:** owned by
+`docs/superpowers/plans/2026-07-24-discovery-sections-end-to-end-improvement-master-plan.md`,
+Tasks 1–4.
+
+**Interfaces:**
+- Produces one `discover()` call per interaction, guest deterministic cache namespace `discovery-ids-v3`, private/auth/random bypass, full cold-start chain and single-page random results.
+- Preserves all nine route names, enum identities, visibility/watchability, recent-ID privacy and scalar-only shared cache.
+
+- [x] **Step 1: Execute child Task 1 contract updates**
+
+Update only the canonical recommendation, cache, performance and UI owners
+listed in the child plan. No application behavior changes in this step.
+
+- [x] **Step 2: Execute child Task 2 RED matrix**
+
+```bash
+php artisan test --filter=CatalogDiscoveryInteractionTest
+php artisan test --filter=CatalogRecommendationPrivacyTest
+php artisan test --filter=CatalogDiscoveryQueryBudgetTest
+```
+
+Expected: focused failures reproduce duplicate refresh calls, incomplete
+cold-start and random pagination before implementation.
+
+- [x] **Step 3: Execute child Tasks 3–4 GREEN**
+
+Implement the exact `resolvedResultPrepared` action boundary, v3 cache rules,
+`editorial → weekly trending → monthly trending → popular` accumulation and
+random `page=1/hasMore=false` contract from the child plan.
+
+- [x] **Step 4: Verify all route identities**
+
+```bash
+for mode in personalized trending popular top_rated recently_added recently_updated upcoming editorial random; do
+    php artisan route:list --path="discover/$mode"
+done
+php artisan test --filter=CatalogDiscovery
+./vendor/bin/pint --dirty --format agent
+```
+
+Expected: no route change; authenticated/private data never enters shared
+cache; a one-row weekly source no longer truncates the page.
+
+- [ ] **Step 5: Commit only child Tasks 1–4**
+
+Use the exact child manifest and a dedicated commit:
+
+```bash
+git commit -m "fix: complete discovery refresh and fallback behavior"
+git push --porcelain origin main
+```
+
+Observed 25.07.2026: RED produced five exact failures for one-row cold-start,
+missing monthly fallback, two refresh resolves, random page 2 and two guest
+rebuilds. GREEN passed 19 focused tests / 70 assertions,
+`CatalogDiscovery` 20 / 98, `CatalogRecommendation` 61 / 266, direct
+`PHPStan`, Pint, managed-docs check, docs CI and `git diff --check`. The two
+canonical dynamic route identities still point to
+`CatalogDiscoveryPage`, and all nine enum types return HTTP 200 in isolated
+feature tests. Full PHPUnit ran 1661 tests: 1649 passed, 11 skipped and the one
+pre-existing account-session flash failure reproduced separately. Commit/push
+remains `unresolved_shared_index_collision`: during final verification another
+owner staged at least 158 mixed Task 40/Premium/Seasonvar/player/calendar/hook
+paths; the set later grew to 160 and failed staged `diff --check` on foreign
+trailing whitespace. Task 40 did not alter the index and cannot safely unstage,
+approve or commit that foreign set.
+
+---
+
+### Task 41: Add Discovery Metric Projection and Shared Two-Phase Collection Hydration
+
+**Status:** `planned_after_backup_and_collection_ownership_gate`; executes discovery child Tasks 5–7.
+
+**Interfaces:**
+- Produces versioned additive discovery metrics, fail-open authoritative reads, durable dirty-title reconciliation and `CatalogCollectionSummaryLoader`.
+- Preserves authoritative fallback, public/private separation, existing cache invalidation and zero migration backfill.
+
+- [ ] **Step 1: Execute projection schema RED/GREEN**
+
+Follow child Task 5 exactly. Migrations create only versioned projection/state
+tables and are reversible; backfill is a separate command.
+
+```bash
+php artisan test tests/Feature/CatalogDiscoveryMetricProjectionTest.php
+php artisan migrate:status
+```
+
+- [ ] **Step 2: Execute read path and dirty ledger**
+
+Follow child Task 6. Every mutation owner writes a durable title ID after
+commit; stale/unavailable projection falls back to the authoritative query.
+
+```bash
+php artisan test tests/Feature/CatalogDiscoveryMetricProjectionTest.php tests/Feature/CatalogPopularityQueryTest.php
+php artisan schedule:list
+```
+
+- [ ] **Step 3: Reuse one collection summary loader**
+
+Follow child Task 7 and Task 39’s exact
+`CatalogCollectionSummaryLoader::forTitle()` contract. Embedded directory
+pagination uses ID-first `publicDirectory()` plus `hydratePage()`; title page
+uses `forTitle()`. Do not create a second collection-card projection.
+
+- [ ] **Step 4: Verify rollback before activation**
+
+```text
+projection feature flag false -> authoritative path;
+failed build -> previous ready version remains active;
+missing table -> no 500;
+dirty reconciliation failure -> dirty row remains;
+collection ownership not handed off -> stop without editing foreign file.
+```
+
+- [ ] **Step 5: Commit schema, read path and collection loader separately**
+
+Create one commit for additive projection schema/build and another for the
+read/collection path. Do not activate production projection in either commit.
+
+---
+
+### Task 42: Finish Upcoming, Editorial, Personalized, Facets, SEO and Failure Behavior
+
+**Status:** `planned`; executes discovery child Tasks 8–13.
+
+**Interfaces:**
+- Produces canonical release-calendar upcoming candidates, readiness-gated editorial, consolidated personalized signals, progressive facets, mode-specific controls and final performance evidence.
+- Preserves top-rated/recently-added/recently-updated indexed paths, SEO/noindex rules, feedback/undo, locale parity and title access.
+
+- [ ] **Step 1: Implement truthful upcoming**
+
+Execute child Task 8:
+
+```bash
+php artisan test tests/Feature/CatalogUpcomingDiscoveryQueryTest.php tests/Feature/ReleaseCalendarDefaultViewTest.php
+```
+
+Confirmed future events precede incomplete seasons without invented dates.
+
+- [ ] **Step 2: Gate editorial readiness**
+
+Execute child Task 9. Code/tests never auto-feature a collection. A real canary
+requires a separate authorized operator action after readiness evidence.
+
+- [ ] **Step 3: Consolidate personalized signals**
+
+Execute child Task 10 and keep the existing v2 rollout disabled:
+
+```bash
+php artisan test tests/Feature/CatalogPersonalizedRecommendationQueryTest.php tests/Feature/CatalogDiscoveryQueryBudgetTest.php
+```
+
+Acceptance: the same fixture order with no more than 25 queries and no query
+inside candidate loops.
+
+- [ ] **Step 4: Load advanced facets progressively**
+
+Execute child Task 11. Initial render loads only genre/country; active URL
+filters force their required groups to load.
+
+- [ ] **Step 5: Lock fast modes and SEO**
+
+Execute child Task 12:
+
+```bash
+php artisan test tests/Feature/CatalogDiscoveryQueryBudgetTest.php tests/Feature/PublicCacheRouteSafetyTest.php --filter=Discovery
+```
+
+- [ ] **Step 6: Run child Task 13 acceptance**
+
+```bash
+php artisan test
+npm run build
+npx playwright test tests/browser/discovery-sections.spec.js
+php artisan project:docs-refresh --check
+```
+
+Save cold/warm/query-plan evidence for all nine modes before any production
+feature-flag activation.
+
+---
+
+### Task 43: Preserve Importer-to-Discovery, Calendar, Search and Cache Freshness Handoffs
+
+**Status:** `planned_after_importer_delivery`; no second importer command or pipeline.
+
+**Files:**
+- Review/modify only when a failing contract proves a gap: `app/Jobs/FinalizeSeasonvarImportTitleGroup.php`
+- Review/modify only when a failing contract proves a gap: `app/Services/Seasonvar/SeasonvarImportPipeline.php`
+- Modify: `tests/Feature/SeasonvarImportTitleGroupFinalizerTest.php`
+- Modify: `tests/Feature/SeasonvarReleaseObservationSynchronizerTest.php`
+- Modify: `tests/Feature/CatalogDiscoveryMetricProjectionTest.php`
+- Modify: `docs/importer.md`
+
+**Interfaces:**
+- Consumes: importer child Tasks 2–19, existing after-commit finalization, search sync, API sync, release-calendar observation sync, recommendation dirty marking and catalog cache invalidation.
+- Produces: one integration contract proving imported changes reach every affected read model exactly once after committed state.
+- Preserves: `php artisan seasonvar:import` as the only public command, network-free title apply, external-media-only storage and no production activation before system Tasks 3–5.
+
+- [ ] **Step 1: Write the failing/characterization integration test**
+
+For one prepared title group, assert ordered effects:
+
+```text
+catalog transaction commits;
+release observations synchronize;
+search/API sync receives the canonical title ID;
+recommendation/discovery dirty ledgers receive the title ID once;
+targeted title/home/discovery/collection cache generations invalidate;
+failed finalization remains resumable and does not replay committed catalog writes.
+```
+
+Use fakes/spies and `Http::preventStrayRequests()`; no live provider call.
+
+- [ ] **Step 2: Run the focused importer/discovery matrix**
+
+```bash
+php artisan test --filter=SeasonvarImportTitleGroupFinalizerTest
+php artisan test --filter=SeasonvarReleaseObservationSynchronizerTest
+php artisan test --filter=CatalogDiscoveryMetricProjectionTest
+```
+
+- [ ] **Step 3: Change only a proven gap**
+
+If all characterization tests pass, mark implementation
+`already_compliant` and do not refactor. If one handoff is absent, add it to
+the existing after-commit/finalization boundary; never dispatch before the
+catalog transaction commits and never call network inside apply.
+
+- [ ] **Step 4: Re-run importer safety**
+
+```bash
+php artisan test --filter=SeasonvarImport
+./vendor/bin/pint --dirty --format agent
+```
+
+Expected: idempotency, checkpoints, source URL restrictions, media metadata
+limits and no-stray-HTTP tests remain green.
+
+- [ ] **Step 5: Commit only if code or contract evidence changed**
+
+Do not mix the existing dirty importer Tasks 2–4 scope with title/player/UI
+work. Production worker/process activation remains a separate operational gate.
+
+---
+
+### Task 44: Run Cross-Feature Acceptance, Performance Budgets, Documentation and Controlled Delivery
+
+**Status:** `planned`; completion task for Tasks 35–43, not the end of the rolling program.
+
+**Files:**
+- Create: `docs/audits/visitor-catalog-end-to-end-report.md`
+- Modify: `docs/performance.md`
+- Modify: `docs/caching.md`
+- Modify: `docs/release-calendar.md`
+- Modify: `docs/frontend.md`
+- Modify: `docs/audits/video-playback-report.md`
+- Modify: `docs/importer.md`
+- Modify: `docs/README.md`
+- Modify: `docs/plans/current-task-plan.md`
+- Modify: `README.md`
+- Modify: `CHANGELOG.md`
+- Modify: this master plan
+
+**Interfaces:**
+- Consumes: isolated verified commits for Tasks 36–43.
+- Produces: one evidence-backed release decision and the next monotonic
+  `Task 46+` backlog from measured residuals.
+
+- [ ] **Step 1: Re-read all applicable canonical requirements**
+
+Reconcile security, multilingual, caching, performance, UI/mobile,
+authorization, production operations, maintenance, release calendar, importer
+and playback owners. Every row receives only:
+
+```text
+completed
+already_compliant
+not_applicable
+unresolved
+```
+
+- [ ] **Step 2: Run the narrow-to-wide verification matrix**
+
+```bash
+./vendor/bin/pint --dirty --format agent
+php artisan test --filter=CatalogVisualSystemTest
+php artisan test --filter=CatalogPageTest
+php artisan test --filter=ReleaseCalendar
+php artisan test --filter=CatalogDiscovery
+php artisan test --filter=SeasonvarImportTitleGroupFinalizerTest
+php artisan test
+npm run build
+npx playwright test tests/browser/title-section-navigation.spec.js tests/browser/player-navigation-island.spec.js tests/browser/discovery-sections.spec.js
+php artisan project:docs-refresh --check --no-interaction
+git diff --check
+```
+
+- [ ] **Step 3: Verify real URLs**
+
+Desktop `1440×1200` and mobile `390×844`:
+
+```text
+all nine /discover routes;
+/calendar and explicit sort overrides;
+the exact Kizilovyi title quick links;
+the exact Hardacres episode 1 -> 2 -> 3 navigation;
+guest request login/intended return;
+title schedule link;
+Back/Forward, no-JS href fallback, console/network/local assets and overflow.
+```
+
+- [ ] **Step 4: Enforce performance acceptance**
+
+Save five cold/five warm samples and SQL/EXPLAIN evidence. Minimum gates:
+
+```text
+title collection hydration is bounded to selected IDs;
+title cold p50 improves >=30% or remains in_progress with measured next bottleneck;
+deterministic public discovery cache is reachable;
+personalized <=25 queries on the accepted fixture;
+no discovery route exceeds its recorded baseline without an explained correctness trade-off;
+player commit morphs only navigation island;
+anchor navigation performs zero DB/network work.
+```
+
+- [ ] **Step 5: Search for stale implementations**
+
+```bash
+rg -n "data-title-quick-link|data-title-reference|id=\"reviews\"|commitPlayerTransition|catalog-player-navigation|publicForTitle|ReleaseCalendarSort::Earliest|discovery-ids-v2|TODO|FIXME|HACK" app resources routes tests docs
+rg -n "@php|<script|<style|style=|env\\(" resources/views app routes
+```
+
+Classify every match before removal. Compatibility adapters stay until all
+callers and rollback conditions are verified.
+
+- [ ] **Step 6: Update truthful visitor and technical documentation**
+
+Update `README.md` only for delivered visitor behavior, keep its visitor
+history as the last H2, add a separate Russian `CHANGELOG.md` bullet, and
+record unresolved real-device/remote/production states honestly.
+
+- [ ] **Step 7: Commit each isolated completed stream and push**
+
+Before each commit:
+
+```bash
+git status --short --branch
+git diff --cached --name-status
+git diff --cached --check
+```
+
+Commit only the declared task manifest in existing `main`. Push normally:
+
+```bash
+git push --porcelain origin main
+```
+
+Credential/network refusal remains `unresolved`. No force push, alternate
+branch, history rewrite, stash/reset of foreign work or fake production claim.
+
+- [ ] **Step 8: Append the next measured tasks**
+
+If acceptance finds residual work after registered Tasks 46–47, append
+`Task 48` and later IDs to this same rolling section. Do not renumber
+Tasks 1–47, copy another master body or impose an artificial maximum. Each new
+task must satisfy the seven rolling-extension evidence fields before
+implementation.
+
+---
+
+### Task 45: Force Black Fullscreen and Apply a Scoped Facebook Player Palette
+
+**Status:** `implemented_verified_local_delivery_unresolved`; finite
+visitor/player task завершил code и local verification по датированному
+evidence. It does not unblock or reorder Tasks 39–44 and does not absorb their
+discovery/importer/collection scope.
+
+**Reason:** The user reports a white fullscreen background. Desktop Chromium
+diagnostics show bundled Plyr CSS makes standard fullscreen black, while the
+application-owned normal `.plyr` is transparent and native video is slate.
+The application lacks an explicit standard/WebKit/fallback/backdrop contract.
+The user additionally requested Facebook colors and accepted the recommended
+player-only scope.
+
+**Files:**
+
+- Create:
+  `docs/superpowers/specs/2026-07-24-player-fullscreen-facebook-palette-design.md`
+- Create:
+  `docs/superpowers/plans/2026-07-24-player-fullscreen-facebook-palette.md`
+- Modify: `resources/css/app.css`
+- Modify: `tests/Unit/FrontendAssetContractTest.php`
+- Modify: `tests/browser/player-lifecycle.spec.js`
+- Modify: `docs/UI_STANDARDS.md`
+- Modify: `docs/frontend.md`
+- Modify: `docs/audits/video-playback-report.md`
+- Modify: `docs/plans/current-task-plan.md`
+- Modify: player master, this master, `README.md`, `CHANGELOG.md`
+
+**Interfaces:**
+
+- Consumes: existing `[data-player-shell]`, `.plyr`, video wrapper/native
+  video, `data-player-state`, player menu/center controls and Fullscreen API.
+- Produces: scoped `--catalog-player-*` CSS tokens and explicit black
+  normal/standard/WebKit/fallback media surfaces.
+- Preserves: one video/Plyr/HLS/session, Livewire ignored shell/navigation
+  island, grants, progress, History API, RU/EN copy, routes, schema, caches,
+  permissions, dependencies and importer boundaries.
+
+**Execution:** The exact RED/GREEN code, commands, palette values, responsive
+acceptance, documentation and rollback are canonical in
+[`2026-07-24-player-fullscreen-facebook-palette.md`](2026-07-24-player-fullscreen-facebook-palette.md).
+Implementation stays inline because project/user rules do not authorize
+subagents or a worktree.
+
+**Acceptance:**
+
+```text
+normal .plyr, wrapper and native video compute rgb(0, 0, 0);
+standard fullscreen preserves the same three black layers after episode swap;
+standard/WebKit/fallback/backdrop selectors exist in app-owned CSS;
+all 13 scoped palette tokens exist and do not alter the global theme;
+focused static/player tests, full player Playwright and Vite build pass;
+one video/Plyr and existing touch/menu/keyboard/progress contracts remain;
+native iOS system fullscreen remains unresolved_device until real hardware.
+```
+
+**Rollback:** revert only Task 45 CSS/tests/docs and restore previous matching
+Vite assets. No migration/data/cache/queue/dependency/environment rollback.
+
+**Verification:** static RED failed on the first absent palette token; browser
+RED reproduced transparent/slate normal media layers. Static GREEN passed
+`6/6` with `353` assertions; related PHPUnit passed `45/45` with `801`
+assertions; full player Playwright passed `18` applicable scenarios with `12`
+expected platform skips; Vite built `24` modules; desktop/tablet/mobile visual
+review passed `3/3`. Standard fullscreen kept `.plyr`, wrapper and video black
+after the in-place episode transition. После отдельного успешного повтора
+случайно столкнувшегося factory-теста свежий полный PHPUnit прошёл `1572`
+tests, `1561` passed, `11` skipped и `123934` assertions.
+
+**Delivery:** commit only in existing `main` after canonical clean-tree hooks
+can pass. Existing shared dirty importer/collection/player files are not
+staged, reset, stashed or absorbed, so commit/push stay
+`unresolved_shared_worktree`. Fresh Task 46 production smoke now serves the
+matching `app-BLl6ilyS.css`; browser activation is observed, while canonical
+Git delivery remains unresolved.
+
+---
+
+### Task 46: Keep Adjacent Episode Navigation Correct before Player Runtime Is Ready
+
+**Status:** `implemented_verified_live_delivery_unresolved`, priority `P0 playback correctness`.
+
+**Reason:** The exact Hardacres URL switches correctly after
+`CatalogPlayerSession` initialization, but a browser reproduction after the
+same lifecycle teardown used by `pagehide` confirms a stale split state:
+`wire:click.prevent="selectEpisode(...)"` runs inside
+`catalog-player-navigation`, changes Livewire URL/navigation state and leaves
+the `wire:ignore` video on the previous episode. The capture-phase player
+handler normally prevents this action, so the failure is timing/runtime-state
+dependent and can appear as a dead «Следующая» button.
+
+**Files:**
+
+- Modify: `resources/views/livewire/catalog-title-player.blade.php`
+- Modify: `tests/Unit/LivewireWireIgnoreContractTest.php`
+- Modify: `tests/browser/player-navigation-island.spec.js`
+- Modify: `docs/frontend.md`
+- Modify: `docs/audits/video-playback-report.md`
+- Modify: `docs/plans/current-task-plan.md`
+- Modify: this master, `README.md`, `CHANGELOG.md`
+
+**Interfaces:**
+
+- Consumes: existing capture-phase `CatalogPlayerSession` transition,
+  `preparePlayerTransition()` and
+  `$wire.$island('catalog-player-navigation').commitPlayerTransition(...)`.
+- Produces: adjacent episode anchors without a competing island-local
+  `selectEpisode()` action.
+- Preserves: canonical `href` query/hash fallback, one video/Plyr/HLS
+  instance on successful seamless transition, signed playback and entitlement
+  checks, progress/history, named island, routes, RU/EN copy and mobile layout.
+
+**TDD execution:**
+
+1. Add a failing static contract that extracts the adjacent navigation island,
+   requires both real `href` values and rejects `wire:click` in that fragment.
+2. Extend the isolated browser spec with a runtime-unavailable scenario:
+   execute the same `pagehide` teardown, click «Следующая», and require a real
+   document navigation whose newly rendered video, URL and navigation all
+   identify episode 2.
+3. Remove only the two conflicting `wire:click.prevent="selectEpisode(...)"`
+   attributes. Do not change episode-list controls, transition services,
+   player JavaScript, routes, queries or access logic.
+4. Verify the existing normal path still performs `1 → 2 → 3` through the
+   named island while retaining the same video/shell/Plyr identity.
+
+**Compatibility and operations:** no migration, DML, dependency, translation,
+cache key, permission, route, queue, worker, scheduler or environment change.
+Rollback restores the two attributes and the matching tests/docs; no
+data/cache rollback is required. Production acceptance requires the fresh
+hashed Vite asset/Blade release to be served together and verifies both
+initialized-runtime and pre-runtime clicks.
+
+**Verification:** TDD RED failed on the exact adjacent `wire:click` contract
+and on the preserved original document after `pagehide`. Minimal GREEN removed
+only two attributes. Fresh related PHPUnit passed `90/90` tests with `894`
+assertions; Pint passed on the changed PHP test; Vite built `24` modules; the
+Desktop/Mobile Chromium matrix passed `4/4` scenarios. The exact production
+Hardacres URL now exposes no adjacent `wire:click`; normal transition selected
+episode/media `490016/522550` with one video/Plyr and zero overflow, while the
+runtime-unavailable fallback loaded a new document with aligned
+episode/media/navigation `490017/522559`, one video/Plyr and zero console
+errors.
+
+**Unlimited intake:** Task 46 is finite. Task 47 is registered below; later
+evidence-backed work is appended as Task 48, Task 49 and onward without
+renumbering or upper limit.
+
+---
+
+### Task 47: Make Newer Calendar Dates the Durable Default
+
+**Status:** `implemented_verified_live_delivery_unresolved`, priority `P0 visitor correctness and delivery durability`.
+
+**Reason:** Task 38 already implements and locally verifies the requested
+`29 мая → 28 мая` Recent chronology, and current production smoke observes
+`latest`. However, the implementation remains only in the shared working tree
+while Git `HEAD` still contains static `earliest`; a future checkout or
+deployment from `HEAD` can restore the reported ascending order. Task 47 closes
+that drift, strengthens invalid-sort and paginator-reset regressions, and
+performs a separate canonical delivery/activation gate.
+
+**Design:**
+[`2026-07-25-calendar-newest-first-delivery-design.md`](../specs/2026-07-25-calendar-newest-first-delivery-design.md).
+
+**Implementation plan:**
+[`2026-07-25-calendar-newest-first-delivery.md`](2026-07-25-calendar-newest-first-delivery.md).
+
+**Files:**
+
+- Modify: `app/Livewire/ReleaseCalendar/ReleaseCalendarPage.php`
+- Modify:
+  `resources/views/livewire/release-calendar/release-calendar-page.blade.php`
+- Modify: `tests/Feature/ReleaseCalendarDefaultViewTest.php`
+- Modify: `tests/browser/prepare-fixtures.php`
+- Modify: `tests/browser/release-calendar.spec.js`
+- Inspect-only unless a new RED proves a defect:
+  `app/Services/ReleaseCalendar/ReleaseCalendarQuery.php`
+- Modify: `docs/release-calendar.md`, `docs/frontend.md`, current/master plans,
+  spec, `CHANGELOG.md`
+- Check `README.md`; do not duplicate its existing newest-first visitor entry
+
+**Interfaces:**
+
+- Consumes: Task 38 dynamic default,
+  `ReleaseCalendarSort::{Earliest,Latest,Title}`,
+  `ReleaseCalendarQuery::entries(...)`, `calendarPage` and Livewire
+  `#[Url(except: '', history: true)]`.
+- Produces: Git-durable `Recent => Latest`, deterministic invalid-input and
+  pagination browser evidence, exact commit/push/activation status.
+- Preserves: explicit sorts, other view defaults, routes/locales, filters,
+  visibility, timezone, SEO/sitemap/cache, notifications, subscriptions,
+  importer/admin, RU/EN copy and mobile/accessibility.
+
+**Execution:** follow the child plan task-by-task. It first freezes ownership,
+adds server regression for invalid Recent sort and Upcoming, reconciles the
+existing Task 38 Livewire/Blade diff, expands only the Playwright database
+beyond one page, proves named paginator reset on Desktop/Mobile, updates owner
+docs and runs the canonical delivery gate. No presentation-only reversal or
+second query service is allowed.
+
+**Compatibility and operations:** no migration, DML, route, permission,
+translation, cache-key, dependency, environment, queue, worker, scheduler or
+storage change. Rollback reverts only Livewire/Blade/tests/docs; database and
+cache recovery are not required. A local pass does not complete Task 47:
+commit, push and production activation remain explicit and may honestly stay
+`unresolved_shared_worktree|unresolved_push|unresolved_production_activation`.
+
+**Verification:** server regression added invalid Recent sort and preserved
+Upcoming chronology; focused PHPUnit passed `8/8` with `33` assertions.
+Browser RED failed only because the two-row fixture had no second page. After
+expanding only the Playwright database to 26 dated rows, Desktop/Mobile
+Chromium passed `2/2`: clean `latest`, explicit `earliest`, `calendarPage=2`
+reset, monotonic timestamps, zero overflow and no page errors. Pint passed and
+Vite built `24` modules. Read-only production Desktop/Mobile confirmed clean
+`latest`, dynamically found `29 мая` before `28 мая`, explicit `earliest`
+with `28 мая` before `29 мая`, correct `h1`, zero overflow and no browser log.
+
+**Delivery:** implementation and live activation are verified, but Git `HEAD`
+still omits the Task 38/47 diff. The canonical hook cannot accept the current
+large foreign tracked/untracked worktree without absorbing unrelated scopes;
+commit/push remain `unresolved_shared_worktree` and hooks are not bypassed.
+The final `project:docs-refresh --check` and docs CI also remain in that state:
+their generated `docs/MAINTENANCE_LOG.md` inventory would include an unrelated
+untracked Task 48 migration. Task 47 does not absorb that migration.
+
+**Unlimited intake:** Task 47 is finite. Task 48 is already allocated to the
+next Seasonvar workstream; later measured work is appended as Task 49,
+Task 50 and onward without renumbering or upper limit.
 
 ---
 

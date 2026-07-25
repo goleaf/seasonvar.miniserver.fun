@@ -8,6 +8,8 @@ use App\Jobs\FinalizeSeasonvarImportTitleGroup;
 use App\Jobs\FinalizeSeasonvarQueuedImport;
 use App\Jobs\ImportSeasonvarSourcePage;
 use App\Jobs\PrepareSeasonvarImportTitlePage;
+use App\Jobs\PruneSeasonvarImportStorage;
+use App\Jobs\ReconcileSeasonvarQueuedImportRun;
 use App\Jobs\RefreshSeasonvarCatalogTitle;
 use App\Jobs\RunSeasonvarImport;
 use App\Jobs\StartSeasonvarQueuedImport;
@@ -36,6 +38,7 @@ final class SeasonvarQueueJobContractTest extends TestCase
             'sync import' => [new RunSeasonvarImport, 900, [60, 300, 900], 'seasonvar-import', 3600],
             'queued coordinator' => [new StartSeasonvarQueuedImport(2), 900, [60, 300, 900], 'seasonvar-coordinator:2', 21_600],
             'finalization watchdog' => [new WakeSeasonvarImportFinalizers, 120, [30, 120, 300], 'seasonvar-import-finalization-watchdog', 900],
+            'storage retention' => [new PruneSeasonvarImportStorage, 60, [60, 300, 900], 'seasonvar-import-storage-prune-v1', 900],
         ];
 
         foreach ($attemptBoundJobs as $name => [$job, $timeout, $backoff, $uniqueId, $uniqueFor]) {
@@ -58,11 +61,13 @@ final class SeasonvarQueueJobContractTest extends TestCase
             'title group finalizer' => [new FinalizeSeasonvarImportTitleGroup(6), [30, 60, 300, 900], 86_400],
             'global finalizer' => [new FinalizeSeasonvarQueuedImport(7), [60, 300, 900], 172_800],
             'title refresh' => [new RefreshSeasonvarCatalogTitle(8), [60, 300, 900], 21_600],
+            'active run reconciliation' => [new ReconcileSeasonvarQueuedImportRun(9), [30, 120, 300], 21_600],
         ];
 
         foreach ($deadlineBoundJobs as $name => [$job, $backoff, $deadlineSeconds]) {
             $this->assertSame(0, $job->tries, "{$name} tries");
-            $this->assertSame(900, $job->timeout, "{$name} timeout");
+            $expectedTimeout = $job instanceof ReconcileSeasonvarQueuedImportRun ? 120 : 900;
+            $this->assertSame($expectedTimeout, $job->timeout, "{$name} timeout");
             $this->assertLessThan(1200, $job->timeout, "{$name} timeout must stay below retry_after");
             $this->assertSame($backoff, $job->backoff(), "{$name} backoff");
             $this->assertSame(now()->addSeconds($deadlineSeconds)->getTimestamp(), $job->retryUntil()->getTimestamp(), "{$name} deadline");
@@ -78,6 +83,11 @@ final class SeasonvarQueueJobContractTest extends TestCase
         $this->assertSame('seasonvar-finalizer:7', $deadlineBoundJobs['global finalizer'][0]->uniqueId());
         $this->assertSame('catalog-title-refresh:8', $deadlineBoundJobs['title refresh'][0]->uniqueId());
         $this->assertSame(21_900, $deadlineBoundJobs['title refresh'][0]->uniqueFor);
+        $this->assertSame(
+            'seasonvar-active-run-reconciliation:9',
+            $deadlineBoundJobs['active run reconciliation'][0]->uniqueId(),
+        );
+        $this->assertSame(21_600, $deadlineBoundJobs['active run reconciliation'][0]->uniqueFor);
     }
 
     public function test_watchdog_failure_log_is_low_cardinality_and_secret_free(): void

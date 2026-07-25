@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\DemoData;
 
-use App\DTOs\DemoData\DemoDataOptions;
 use App\Enums\ReviewOrigin;
-use App\Models\CatalogCollection;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleReview;
 use App\Models\Episode;
@@ -15,7 +13,6 @@ use App\Models\Season;
 use App\Models\Translation;
 use App\Models\User;
 use App\Models\UserProfile;
-use App\Services\DemoData\DemoDataAuditor;
 use App\Services\DemoData\DemoDataOrchestrator;
 use Database\Seeders\PortalDemoSeeder;
 use Illuminate\Database\Eloquent\Collection;
@@ -121,17 +118,7 @@ final class PortalDemoSeederTest extends TestCase
         Storage::disk($this->uploadDisk)->assertExists((string) $profile->avatar_path);
         Storage::disk($this->uploadDisk)->assertExists((string) $profile->cover_path);
 
-        CatalogCollection::query()->firstOrFail()->forceFill([
-            'cover_disk' => null,
-            'cover_path' => null,
-            'cover_mime_type' => null,
-            'cover_size' => null,
-        ])->save();
-        $brokenAssets = app(DemoDataAuditor::class)->audit(DemoDataOptions::fromConfig());
-        $this->assertContains(
-            'Демонстрационная коллекция содержит недоставляемую обложку.',
-            $brokenAssets->violations,
-        );
+        Storage::disk($this->uploadDisk)->assertMissing('catalog-collections');
         Mail::assertNothingSent();
     }
 

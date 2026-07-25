@@ -54,26 +54,11 @@ final class HdRezkaCollectionParser
                 continue;
             }
 
-            $coverPath = null;
-            $image = $xpath->query('.//img[1]', $node)?->item(0);
-
-            if ($image instanceof DOMElement) {
-                $coverUrl = trim($image->getAttribute('data-src')) ?: trim($image->getAttribute('src'));
-
-                if ($coverUrl !== '') {
-                    $coverPath = $this->relativePath($this->urlGuard->absolute(
-                        $coverUrl,
-                        HdRezkaCollectionUrlGuard::PURPOSE_COVER,
-                    ));
-                }
-            }
-
             $seen[$sourceKey] = true;
             $collections[] = new HdRezkaCollectionDefinition(
                 sourceKey: $sourceKey,
                 name: $name,
                 path: $path,
-                coverPath: $coverPath,
                 position: count($collections) + 1,
             );
         }

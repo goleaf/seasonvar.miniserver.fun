@@ -431,17 +431,17 @@
                                         <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th scope="col" class="px-4 py-3">{{ __('premium.payment.created_at') }}</th><th scope="col" class="px-4 py-3">{{ __('premium.payment.amount') }}</th><th scope="col" class="px-4 py-3">{{ __('premium.payment.status') }}</th><th scope="col" class="px-4 py-3">{{ __('premium.payment.refunded_amount') }}</th></tr></thead>
                                         <tbody class="divide-y divide-slate-200">
                                             @foreach ($premiumPayments as $payment)
-                                                <tr><td class="break-words px-4 py-3 text-slate-600">{{ $payment['created_at'] }}</td><td class="break-words px-4 py-3 font-bold tabular-nums text-slate-800">{{ $payment['amount'] }}</td><td class="break-words px-4 py-3 text-slate-700">{{ $payment['status'] }}</td><td class="break-words px-4 py-3 text-slate-600">{{ $payment['refunded_amount'] ?? '—' }}</td></tr>
+                                                <tr><td class="break-words px-4 py-3 text-slate-600">{{ $payment->createdAt }}</td><td class="break-words px-4 py-3 font-bold tabular-nums text-slate-800">{{ $payment->amount }}</td><td class="break-words px-4 py-3 text-slate-700">{{ $payment->status }}</td><td class="break-words px-4 py-3 text-slate-600">{{ $payment->refundedAmount ?? '—' }}</td></tr>
                                             @endforeach
                                         </tbody>
                                     </table>
                                     <ul class="divide-y divide-slate-200 sm:hidden" aria-label="{{ __('premium.a11y.payment_history') }}">
                                         @foreach ($premiumPayments as $payment)
                                             <li class="space-y-2 p-4">
-                                                <div><span class="block text-xs font-black uppercase tracking-wide text-slate-500">{{ __('premium.payment.created_at') }}</span><span class="mt-1 block break-words text-sm text-slate-700">{{ $payment['created_at'] }}</span></div>
-                                                <div><span class="block text-xs font-black uppercase tracking-wide text-slate-500">{{ __('premium.payment.amount') }}</span><span class="mt-1 block break-words text-sm font-bold tabular-nums text-slate-800">{{ $payment['amount'] }}</span></div>
-                                                <div><span class="block text-xs font-black uppercase tracking-wide text-slate-500">{{ __('premium.payment.status') }}</span><span class="mt-1 block break-words text-sm text-slate-700">{{ $payment['status'] }}</span></div>
-                                                <div><span class="block text-xs font-black uppercase tracking-wide text-slate-500">{{ __('premium.payment.refunded_amount') }}</span><span class="mt-1 block break-words text-sm text-slate-700">{{ $payment['refunded_amount'] ?? '—' }}</span></div>
+                                                <div><span class="block text-xs font-black uppercase tracking-wide text-slate-500">{{ __('premium.payment.created_at') }}</span><span class="mt-1 block break-words text-sm text-slate-700">{{ $payment->createdAt }}</span></div>
+                                                <div><span class="block text-xs font-black uppercase tracking-wide text-slate-500">{{ __('premium.payment.amount') }}</span><span class="mt-1 block break-words text-sm font-bold tabular-nums text-slate-800">{{ $payment->amount }}</span></div>
+                                                <div><span class="block text-xs font-black uppercase tracking-wide text-slate-500">{{ __('premium.payment.status') }}</span><span class="mt-1 block break-words text-sm text-slate-700">{{ $payment->status }}</span></div>
+                                                <div><span class="block text-xs font-black uppercase tracking-wide text-slate-500">{{ __('premium.payment.refunded_amount') }}</span><span class="mt-1 block break-words text-sm text-slate-700">{{ $payment->refundedAmount ?? '—' }}</span></div>
                                             </li>
                                         @endforeach
                                     </ul>

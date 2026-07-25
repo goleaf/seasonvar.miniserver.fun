@@ -1,6 +1,6 @@
 # Стандарты интерфейса
 
-Обновлено: 24.07.2026
+Обновлено: 25.07.2026
 
 ## Финальная cross-system UI verification
 
@@ -213,9 +213,11 @@ Blade и Livewire Blade являются только presentation layer: зап
 
 ## Коллекции
 
-- Collection directory/cards, owner dashboard, editor и public page используют существующие `x-ui.panel`, `x-ui.poster-frame`, `x-catalog.title-card`, form/status/pagination components и светлую палитру; отдельный visual system не вводится.
-- Long user names/descriptions переносятся, cover сохраняет `16:9`, missing cover использует безопасный fallback, а structural grids переходят в один столбец на узком экране без horizontal overflow.
+- Collection directory/cards, owner dashboard, editor и public page используют существующие `x-ui.panel`, form/status/pagination components и светлую палитру; отдельный visual system не вводится.
+- Long user names/descriptions и category path переносятся, а structural grids переходят в один столбец на узком экране без horizontal overflow. Собственное collection image, image frame и fallback poster запрещены во всех этих поверхностях.
 - Все action targets не меньше 44px. Visibility radio, selector checkboxes, report dialog, delete confirmation, locale links и reorder up/down доступны keyboard. Drag-handle ручного порядка подборки также имеет touch target 44px, действует только в текущей странице и никогда не становится единственным способом действия; hover/color не несут essential semantics.
+- `/discover/{type}` использует один H1, все девять mode links и свёрнутый по умолчанию filters `<details>`; при активном URL-фильтре блок открыт. Refresh находится в заголовке результатов как secondary bordered action. В `popular` serial ranking и каталог подборок имеют отдельные H2/контейнеры.
+- Подборки во всех контекстах text-only: нельзя выводить собственную обложку, fallback poster, пустой image frame или decorative image placeholder. Category path, название, описание, owner/state и счётчик формируют иерархию. Desktop category navigation использует root sidebar + child pills, mobile — root/child selects без horizontal inner-scroll.
 - Loading/success/error содержат localized live/status regions, destructive controls отделены цветом и текстом, а unavailable item не раскрывает internal removal reason.
 
 ## Обсуждения
@@ -302,6 +304,7 @@ Portal использует один mobile-first HTML/Livewire tree и те ж�
 - Layout применяет единые mobile gutters, `min-width: 0`, перенос длинных слов, стабильные poster ratios и `overflow-x: clip`. Обычные страницы остаются document-flow; viewport height ограничивает только меню, autocomplete, dialogs и player overlays.
 - Единственный viewport meta — `width=device-width, initial-scale=1, viewport-fit=cover`: `maximum-scale`, `user-scalable=no` и orientation lock запрещены. CSS задаёт fallback `vh`, затем `svh`/`dvh`, а `visualViewport` только уточняет доступную высоту и состояние экранной клавиатуры.
 - `env(safe-area-inset-*)` применяется к shell, header/footer, status banner, player controls/captions и fullscreen overlays. На устройствах без inset padding остаётся нулевым; sticky/fixed control не должен перекрывать home indicator, browser chrome или focused input.
+- В центре video player располагается один горизонтальный ряд крупных native controls: назад на 10 секунд, play/pause, вперёд на 10 секунд. Боковые hit areas используют `clamp(3.5rem, 17vw, 5rem)`, центральная — `clamp(4.25rem, 21vw, 6rem)`, и остаются центрированными по обеим осям player container на телефоне, планшете и desktop без горизонтального переполнения. У всех кнопок есть видимые icon/состояние, локализованное доступное имя, `focus-visible`, touch feedback и обычная клавиатурная альтернатива; скрытый Plyr controls state отключает pointer events, а failure создания custom controls сохраняет стандартную центральную кнопку Plyr.
 - Базовый текст и form controls остаются читаемыми, input text на телефоне не меньше 16 px, заголовки/metadata/translated labels переносятся. User zoom и text scaling не ограничиваются.
 - Primary links/buttons имеют не менее 44×44 CSS px hit area. Hover может быть дополнительным состоянием, но bookmark, collection, comment/review/report/edit/filter/player actions всегда доступны tap, focus и keyboard. Gesture-only essential action запрещён; Task 23 намеренно не добавляет конфликтующие swipe/double-tap gestures.
 
@@ -310,6 +313,22 @@ Portal использует один mobile-first HTML/Livewire tree и те ж�
 Каталожные фильтры остаются одной Livewire state boundary: один полноширинный native `<details>` и одна форма работают на compact и wide viewport без dialog или второго draft. Checkbox/select меняют applied state через grouped islands, строка названия и числовые диапазоны отправляются явно, а сброс возвращает канонический query. Внутренний people lookup использует targeted Livewire loading; header/help/request autocomplete остаются viewport-bounded, отменяют stale client requests и доступны без hover.
 
 Player сохраняет один responsive 16:9 container. Plyr/HLS controls получают coarse-pointer hit areas, safe-area padding и bounded menu; captions смещаются выше controls/home indicator и переносят длинные строки. Меню `Сезон → Серия → Перевод` использует один dialog: на desktop одновременно видны три колонки, на телефоне — один последовательный уровень с Back. Все options имеют минимум 44 px, `aria-current`, видимый focus, Escape/focus trap/focus return и обычное управление стрелками/Enter/Space; длинные списки используют bounded pagination без horizontal page overflow. Portrait, page-landscape и in-place source transition не переинициализируют media; standards fullscreen/PiP показываются только по capability Plyr/browser, iOS может использовать native video fullscreen. Автоматической блокировки orientation и fake fullscreen нет.
+
+Player media surface является единственным намеренно чёрным продуктовым
+интерфейсом: `[data-player-shell]`, video wrapper, native video, standard
+Fullscreen API, WebKit fullscreen, Plyr fallback и управляемый CSS backdrop
+используют чистый `#000000`. Нативная системная оболочка fullscreen на iOS
+остаётся browser/OS-owned и не подменяется fake fullscreen. Вне проигрывателя
+портал сохраняет светлую slate/white тему и emerald action-цвет.
+
+Внутри `[data-player-shell]` используется scoped functional
+Facebook-inspired palette, не меняющая global Tailwind theme:
+`#1877f2`/`#166fe5` для primary/focus/active, `#e7f3ff` для мягкого selected
+state, `#f0f2f5`/`#e4e6eb`/`#ccd0d5` для surfaces/borders,
+`#1c1e21`/`#65676b` для текста, `#42b72a` для success, `#f7b928` для warning,
+`#fa383e` для danger, а также white и black. Логотип, название, typography и
+layout Facebook не копируются. Любое состояние сохраняет текст/icon/ARIA и не
+передаётся только цветом.
 
 Forms используют native `type`, `autocomplete`, `inputmode`, visible labels, associated errors/live status и responsive one-column fallback. Password fields имеют доступный Vite-managed show/hide control. Visual viewport удерживает dialogs/autocomplete в доступной зоне; `.app-keyboard-visible` скрывает только необязательный connection banner. Native scrolling, focus restoration и server/Livewire state остаются основой, поэтому закрытие keyboard или orientation change не выполняет submit.
 

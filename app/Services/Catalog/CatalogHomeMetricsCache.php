@@ -14,6 +14,8 @@ use App\Support\Cache\TieredCache;
 
 final class CatalogHomeMetricsCache
 {
+    private const VERSION_SCOPE = 'metrics';
+
     public function __construct(
         private readonly CatalogTitleQuery $titles,
         private readonly TieredCache $cache,
@@ -44,6 +46,8 @@ final class CatalogHomeMetricsCache
             ['audience' => 'public', 'locale' => app()->getLocale()],
             $this->ttl->for(CacheDomain::Homepage),
             fn (): array => $this->build(),
+            false,
+            self::VERSION_SCOPE,
         ];
         $result = $refresh
             ? $this->cache->refresh(...$arguments)
@@ -54,7 +58,7 @@ final class CatalogHomeMetricsCache
 
     public function forget(): void
     {
-        $this->versions->bump(CacheDomain::Homepage);
+        $this->versions->bump(CacheDomain::Homepage, self::VERSION_SCOPE);
     }
 
     /**

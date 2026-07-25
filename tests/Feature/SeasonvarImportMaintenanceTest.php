@@ -26,6 +26,7 @@ use App\Services\Media\ExternalMediaMetadata;
 use App\Services\Media\MediaSourceHealthManager;
 use App\Services\Seasonvar\SeasonvarCatalogImporter;
 use App\Services\Seasonvar\SeasonvarCatalogParser;
+use App\Services\Seasonvar\SeasonvarImportEventRecorder;
 use App\Services\Seasonvar\SeasonvarImportPipeline;
 use App\Services\Seasonvar\SeasonvarImportProcessInspector;
 use App\Services\Seasonvar\SeasonvarMediaAvailabilityChecker;
@@ -215,13 +216,24 @@ class SeasonvarImportMaintenanceTest extends TestCase
         $this->assertSame(206, $media->last_http_status);
         $this->assertNotNull($media->checked_at);
 
-        $event = SeasonvarImportEvent::query()
-            ->where('event', 'seasonvar-media-url-checked')
-            ->firstOrFail();
+        $events = SeasonvarImportEvent::query()
+            ->where('event', SeasonvarImportEventRecorder::AGGREGATE_EVENT)
+            ->get();
 
-        $this->assertSame('[redacted-url]', $event->context['url']);
-        $this->assertSame(206, $event->context['http_status']);
-        $this->assertStringNotContainsString('media.example.com', (string) json_encode($event->context));
+        $this->assertSame(
+            1,
+            $events->sum(
+                fn (SeasonvarImportEvent $event): int => (int) data_get(
+                    $event->context,
+                    'counts.seasonvar-media-url-checked',
+                    0,
+                ),
+            ),
+        );
+        $this->assertStringNotContainsString('media.example.com', (string) json_encode($events->pluck('context')));
+        $this->assertFalse(SeasonvarImportEvent::query()
+            ->where('event', 'seasonvar-media-url-checked')
+            ->exists());
     }
 
     public function test_it_limits_external_media_health_checks_per_import_cycle(): void

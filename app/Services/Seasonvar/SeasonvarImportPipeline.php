@@ -10,7 +10,6 @@ use App\Enums\SeasonvarImportStatus;
 use App\Models\CatalogTitle;
 use App\Models\LicensedMedia;
 use App\Models\Season;
-use App\Models\SeasonvarImportEvent;
 use App\Models\SeasonvarImportRun;
 use App\Models\SourcePage;
 use App\Services\Catalog\CatalogMetadataDeduplicator;
@@ -58,6 +57,7 @@ class SeasonvarImportPipeline
         private readonly LicensedMediaFileSizeBacklog $fileSizeBacklog,
         private readonly SeasonvarImportRunRecorder $runRecorder,
         private readonly ContentRequestImportRunLinker $contentRequests,
+        private readonly SeasonvarImportEventRecorder $eventRecorder,
     ) {}
 
     /**
@@ -1653,20 +1653,18 @@ class SeasonvarImportPipeline
      */
     private function recordImportEvent(SeasonvarImportRun $run, string $event, array $context): void
     {
-        try {
-            $storedContext = $this->storageMaintenance->sanitizeEventContext($context);
-
-            SeasonvarImportEvent::query()->create([
-                'seasonvar_import_run_id' => $run->id,
-                'source_page_id' => $context['source_page_id'] ?? null,
-                'catalog_title_id' => $context['catalog_title_id'] ?? null,
-                'event' => $event,
-                'level' => $this->eventLevel($event),
-                'context' => $storedContext,
-            ]);
-        } catch (Throwable) {
-            // Журнал событий не должен останавливать обновление каталога.
-        }
+        $this->eventRecorder->record(
+            event: $event,
+            context: $context,
+            importRunId: (int) $run->id,
+            sourcePageId: is_numeric($context['source_page_id'] ?? null)
+                ? (int) $context['source_page_id']
+                : null,
+            catalogTitleId: is_numeric($context['catalog_title_id'] ?? null)
+                ? (int) $context['catalog_title_id']
+                : null,
+            level: $this->eventLevel($event),
+        );
     }
 
     private function touchRunHeartbeat(SeasonvarImportRun $run): void

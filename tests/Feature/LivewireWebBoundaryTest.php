@@ -57,7 +57,6 @@ final class LivewireWebBoundaryTest extends TestCase
             'verification.verify',
             'settings.preferences.migrate',
             'titles.media.download',
-            'collections.cover',
             'issues.attachments.show',
             'profiles.media',
         ] as $name) {

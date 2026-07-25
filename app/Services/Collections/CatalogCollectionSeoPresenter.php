@@ -13,8 +13,6 @@ use App\Support\PlainText;
 
 final class CatalogCollectionSeoPresenter
 {
-    public function __construct(private readonly CatalogCollectionCoverService $covers) {}
-
     /** @return array<string, mixed> */
     public function collection(
         CatalogCollection $collection,
@@ -82,7 +80,6 @@ final class CatalogCollectionSeoPresenter
 
             $alternates['x-default'] = route('collections.show', ['collectionSlug' => $collection->slug]);
         }
-        $image = $this->covers->url($collection) ?? $collection->getAttribute('fallback_poster_url');
         $jsonLd = [];
 
         if ($indexable) {
@@ -92,7 +89,6 @@ final class CatalogCollectionSeoPresenter
                 'name' => $name,
                 'description' => $description,
                 'url' => $canonical,
-                'image' => $image,
                 'numberOfItems' => $count,
                 'inLanguage' => $contentLanguage,
                 'creator' => $owner === null ? null : array_filter([
@@ -110,8 +106,6 @@ final class CatalogCollectionSeoPresenter
             'robots' => $indexable ? 'index,follow,max-image-preview:large,max-snippet:-1' : 'noindex,nofollow',
             'social' => $collection->visibility !== CatalogCollectionVisibility::Private,
             'type' => 'website',
-            'image' => $image,
-            'image_alt' => __('collections.accessibility.collection_cover', ['name' => $name]),
             'published_time' => $indexable ? $collection->published_at?->toAtomString() : null,
             'updated_time' => $collection->updated_at?->toAtomString(),
             'section' => __('collections.navigation.collections'),

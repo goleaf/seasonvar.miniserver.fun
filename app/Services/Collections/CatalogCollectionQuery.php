@@ -8,10 +8,14 @@ use App\DTOs\CatalogCollectionItemCriteria;
 use App\Enums\CatalogCollectionModerationStatus;
 use App\Enums\CatalogCollectionReportStatus;
 use App\Enums\CatalogCollectionSort;
+use App\Enums\CatalogCollectionSourceScope;
 use App\Enums\CatalogCollectionType;
 use App\Enums\CatalogCollectionVisibility;
 use App\Models\CatalogCollection;
+use App\Models\CatalogCollectionCategory;
 use App\Models\CatalogCollectionItem;
+use App\Models\CatalogCollectionSource;
+use App\Models\CatalogCollectionSourceItem;
 use App\Models\CatalogCollectionSyncRun;
 use App\Models\CatalogStatus;
 use App\Models\CatalogTitle;
@@ -22,21 +26,36 @@ use App\Services\Catalog\CatalogTaxonomyRegistry;
 use App\Services\Catalog\CatalogTitleQuery;
 use App\Services\Catalog\CatalogUserCardStateLoader;
 use App\Services\Catalog\Search\CatalogSearchNormalizer;
+use App\Services\Collections\Import\HdRezkaCollectionTypeCompatibility;
 use App\Services\Comments\CommentRelationshipService;
 use App\Services\UserPortal\UserPortalCache;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 final class CatalogCollectionQuery
 {
+    private const SOURCE_MATCH_METHOD_METRIC_KEYS = [
+        'matched:primary' => 'matched_primary',
+        'matched:original' => 'matched_original',
+        'matched:alias' => 'matched_alias',
+        'matched:detail_original' => 'matched_detail_original',
+        'ambiguous:candidate_limit' => 'ambiguous_candidate_limit',
+        'ambiguous:insufficient_lead' => 'ambiguous_insufficient_lead',
+        'unmatched:no_exact_candidate' => 'unmatched_no_exact_candidate',
+        'unmatched:no_eligible_candidate' => 'unmatched_no_eligible_candidate',
+        'unmatched:low_confidence' => 'unmatched_low_confidence',
+    ];
+
     public function __construct(
         private readonly CatalogTitleQuery $titles,
         private readonly CatalogTaxonomyRegistry $taxonomies,
         private readonly CatalogUserCardStateLoader $cardStates,
         private readonly CatalogSearchNormalizer $search,
         private readonly CatalogCollectionSchema $schema,
+        private readonly HdRezkaCollectionTypeCompatibility $sourceTypes,
         private readonly CommentRelationshipService $relationships,
         private readonly UserPortalCache $userPortalCache,
     ) {}
@@ -47,6 +66,8 @@ final class CatalogCollectionQuery
         string $sort = 'featured',
         int $perPage = 18,
         string $pageName = 'collectionsPage',
+        ?string $category = null,
+        ?string $subcategory = null,
     ): LengthAwarePaginator {
         $perPage = max(6, min(36, $perPage));
 
@@ -55,7 +76,8 @@ final class CatalogCollectionQuery
         }
 
         $search = $this->search->display(mb_substr($search, 0, 100));
-        $query = $this->summaryQuery()
+        $query = CatalogCollection::query()
+            ->select('catalog_collections.id')
             ->publiclyListed()
             ->when($search !== '', fn (Builder $query): Builder => $query->where(function (Builder $query) use ($search): void {
                 $query->where('name', 'like', '%'.$search.'%')
@@ -67,6 +89,7 @@ final class CatalogCollectionQuery
                             ->orWhere('description', 'like', '%'.$search.'%')))
                     ->orWhereHas('owner', fn (Builder $query): Builder => $query->where('name', 'like', '%'.$search.'%'));
             }));
+        $this->applyCategoryFilter($query, $category, $subcategory);
 
         match ($sort) {
             'recent' => $query->orderByDesc('updated_at'),
@@ -74,7 +97,26 @@ final class CatalogCollectionQuery
             default => $query->orderByDesc('is_featured')->orderByDesc('updated_at'),
         };
 
-        return $query->orderByDesc('id')->paginate($perPage, pageName: $pageName);
+        $paginator = $query->orderByDesc('id')->paginate($perPage, pageName: $pageName);
+        $ids = $paginator->getCollection()
+            ->map(fn (CatalogCollection $collection): int => (int) $collection->id)
+            ->all();
+
+        if ($ids === []) {
+            return $paginator;
+        }
+
+        $summaries = $this->summaryQuery()
+            ->whereKey($ids)
+            ->get()
+            ->keyBy(fn (CatalogCollection $collection): int => (int) $collection->id);
+        $ordered = collect($ids)
+            ->map(fn (int $id): ?CatalogCollection => $summaries->get($id))
+            ->filter()
+            ->values();
+        $paginator->setCollection(new EloquentCollection($ordered->all()));
+
+        return $paginator;
     }
 
     /** @return Collection<int, CatalogCollection> */
@@ -440,7 +482,20 @@ final class CatalogCollectionQuery
     }
 
     /**
-     * @return array{status: string, counters: array{collections_processed: int, pages: int, items: int, matched: int, ambiguous: int, unmatched: int}, completed_at_label: string, completed_at_iso: string}|null
+     * @return array{
+     *     status: string,
+     *     counters: array{collections_processed: int, pages: int, items: int, matched: int, ambiguous: int, unmatched: int},
+     *     diagnostics: array{
+     *         empty_collections: int,
+     *         actionable_empty_collections: int,
+     *         unsupported_empty_collections: int,
+     *         match_coverage_percent: float,
+     *         source_scopes: array{supported: int, unsupported: int, unknown: int},
+     *         match_methods: array<string, int>
+     *     },
+     *     completed_at_label: string,
+     *     completed_at_iso: string
+     * }|null
      */
     public function latestSourceSyncSummary(): ?array
     {
@@ -472,8 +527,130 @@ final class CatalogCollectionQuery
         return [
             'status' => $run->status->value,
             'counters' => $counters,
+            'diagnostics' => $this->sourceSyncDiagnostics($run->id, $counters),
             'completed_at_label' => $timestamp->format('d.m.Y H:i'),
             'completed_at_iso' => $timestamp->toAtomString(),
+        ];
+    }
+
+    /**
+     * @param  array{collections_processed: int, pages: int, items: int, matched: int, ambiguous: int, unmatched: int}  $counters
+     * @return array{
+     *     empty_collections: int,
+     *     actionable_empty_collections: int,
+     *     unsupported_empty_collections: int,
+     *     match_coverage_percent: float,
+     *     source_scopes: array{supported: int, unsupported: int, unknown: int},
+     *     match_methods: array<string, int>
+     * }
+     */
+    private function sourceSyncDiagnostics(int $runId, array $counters): array
+    {
+        $emptyCollections = CatalogCollectionSource::query()
+            ->where('provider', 'hdrezka')
+            ->whereNotNull('catalog_collection_id')
+            ->whereNotIn(
+                'catalog_collection_id',
+                CatalogCollectionItem::query()->select('catalog_collection_id'),
+            )
+            ->count();
+        $scopeCounts = array_fill_keys(
+            array_map(
+                fn (CatalogCollectionSourceScope $scope): string => $scope->value,
+                CatalogCollectionSourceScope::cases(),
+            ),
+            0,
+        );
+        $emptyScopeState = [];
+        $scopeRows = CatalogCollectionSourceItem::query()
+            ->join(
+                'catalog_collection_sources',
+                'catalog_collection_sources.id',
+                '=',
+                'catalog_collection_source_items.catalog_collection_source_id',
+            )
+            ->where('catalog_collection_sources.provider', 'hdrezka')
+            ->where('catalog_collection_source_items.last_seen_run_id', $runId)
+            ->toBase()
+            ->select([
+                'catalog_collection_source_items.catalog_collection_source_id',
+                'catalog_collection_source_items.source_type',
+            ])
+            ->selectRaw('COUNT(*) AS aggregate')
+            ->selectRaw(
+                'CASE WHEN catalog_collection_sources.catalog_collection_id IS NOT NULL
+                    AND NOT EXISTS (
+                        SELECT 1
+                        FROM catalog_collection_items
+                        WHERE catalog_collection_items.catalog_collection_id = catalog_collection_sources.catalog_collection_id
+                    )
+                    THEN 1 ELSE 0 END AS collection_is_empty',
+            )
+            ->groupBy(
+                'catalog_collection_source_items.catalog_collection_source_id',
+                'catalog_collection_source_items.source_type',
+                'catalog_collection_sources.catalog_collection_id',
+            )
+            ->get();
+
+        foreach ($scopeRows as $row) {
+            $scope = $this->sourceTypes->sourceScope(
+                is_string($row->source_type) ? $row->source_type : null,
+            );
+            $scopeCounts[$scope->value] += max(0, (int) $row->aggregate);
+
+            if ((int) $row->collection_is_empty !== 1) {
+                continue;
+            }
+
+            $sourceId = (int) $row->catalog_collection_source_id;
+            $emptyScopeState[$sourceId] ??= false;
+
+            if ($scope !== CatalogCollectionSourceScope::Unsupported) {
+                $emptyScopeState[$sourceId] = true;
+            }
+        }
+
+        $unsupportedEmptyCollections = collect($emptyScopeState)
+            ->filter(fn (bool $actionable): bool => ! $actionable)
+            ->count();
+        $matchMethods = array_fill_keys(array_values(self::SOURCE_MATCH_METHOD_METRIC_KEYS), 0);
+        $rows = CatalogCollectionSourceItem::query()
+            ->whereIn(
+                'catalog_collection_source_id',
+                CatalogCollectionSource::query()
+                    ->select('id')
+                    ->where('provider', 'hdrezka'),
+            )
+            ->where('last_seen_run_id', $runId)
+            ->whereNotNull('match_method')
+            ->toBase()
+            ->select(['match_status', 'match_method'])
+            ->selectRaw('COUNT(*) AS aggregate')
+            ->groupBy('match_status', 'match_method')
+            ->get();
+
+        foreach ($rows as $row) {
+            $metricKey = self::SOURCE_MATCH_METHOD_METRIC_KEYS[
+                (string) $row->match_status.':'.(string) $row->match_method
+            ] ?? null;
+
+            if ($metricKey !== null) {
+                $matchMethods[$metricKey] = max(0, (int) $row->aggregate);
+            }
+        }
+
+        $matched = min($counters['matched'], $counters['items']);
+
+        return [
+            'empty_collections' => $emptyCollections,
+            'actionable_empty_collections' => max(0, $emptyCollections - $unsupportedEmptyCollections),
+            'unsupported_empty_collections' => $unsupportedEmptyCollections,
+            'match_coverage_percent' => $counters['items'] === 0
+                ? 0.0
+                : round(($matched / $counters['items']) * 100, 2),
+            'source_scopes' => $scopeCounts,
+            'match_methods' => $matchMethods,
         ];
     }
 
@@ -484,25 +661,26 @@ final class CatalogCollectionQuery
             ->publiclyListed()
             ->whereHas('items', fn (Builder $query): Builder => $query
                 ->whereIn('catalog_title_id', $this->visibleTitleIds()))
-            ->select(['id', 'public_id', 'slug', 'name', 'is_featured', 'updated_at', 'cover_path', 'cover_version'])
+            ->select(['id', 'public_id', 'slug', 'name', 'is_featured', 'updated_at'])
             ->orderBy('id');
     }
 
     /** @return Builder<CatalogCollection> */
     private function summaryQuery(): Builder
     {
-        $fallbackPoster = $this->titles->visibleTo(null)
-            ->join('catalog_collection_items as fallback_item', 'fallback_item.catalog_title_id', '=', 'catalog_titles.id')
-            ->whereColumn('fallback_item.catalog_collection_id', 'catalog_collections.id')
-            ->orderBy('fallback_item.position')
-            ->orderBy('fallback_item.id')
-            ->select('catalog_titles.poster_url')
-            ->limit(1);
-
         $query = CatalogCollection::query()
             ->select('catalog_collections.*')
-            ->selectSub($fallbackPoster, 'fallback_poster_url')
             ->with('owner:id,public_id,name')
+            ->with([
+                'category:id,public_id,parent_id,slug,position,is_active',
+                'category.translations' => fn ($query) => $query
+                    ->select(['id', 'catalog_collection_category_id', 'locale', 'name'])
+                    ->whereIn('locale', $this->searchLocales()),
+                'category.parent:id,public_id,parent_id,slug,position,is_active',
+                'category.parent.translations' => fn ($query) => $query
+                    ->select(['id', 'catalog_collection_category_id', 'locale', 'name'])
+                    ->whereIn('locale', $this->searchLocales()),
+            ])
             ->with(['translations' => fn ($query) => $query
                 ->select(['id', 'catalog_collection_id', 'locale', 'name', 'description', 'seo_title', 'seo_description'])
                 ->whereIn('locale', array_values(array_unique([
@@ -524,6 +702,77 @@ final class CatalogCollectionQuery
         }
 
         return $query;
+    }
+
+    /** @param Builder<CatalogCollection> $query */
+    private function applyCategoryFilter(
+        Builder $query,
+        ?string $category,
+        ?string $subcategory,
+    ): void {
+        $category = is_string($category) ? Str::lower(trim($category)) : null;
+        $subcategory = is_string($subcategory) ? Str::lower(trim($subcategory)) : null;
+        $category = $category !== '' ? $category : null;
+        $subcategory = $subcategory !== '' ? $subcategory : null;
+
+        if ($category === null) {
+            if ($subcategory !== null) {
+                $query->whereRaw('1 = 0');
+            }
+
+            return;
+        }
+
+        if ($category === 'uncategorized') {
+            $subcategory === null
+                ? $query->whereNull('catalog_collection_category_id')
+                : $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        if (! $this->validCategorySlug($category)
+            || ($subcategory !== null && ! $this->validCategorySlug($subcategory))) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $rootIds = CatalogCollectionCategory::query()
+            ->select('id')
+            ->whereNull('parent_id')
+            ->where('is_active', true)
+            ->where('slug', $category);
+
+        if ($subcategory !== null) {
+            $query->whereIn(
+                'catalog_collection_category_id',
+                CatalogCollectionCategory::query()
+                    ->select('id')
+                    ->where('is_active', true)
+                    ->where('slug', $subcategory)
+                    ->whereIn('parent_id', clone $rootIds),
+            );
+
+            return;
+        }
+
+        $query->where(function (Builder $query) use ($rootIds): void {
+            $query
+                ->whereIn('catalog_collection_category_id', clone $rootIds)
+                ->orWhereIn(
+                    'catalog_collection_category_id',
+                    CatalogCollectionCategory::query()
+                        ->select('id')
+                        ->where('is_active', true)
+                        ->whereIn('parent_id', clone $rootIds),
+                );
+        });
+    }
+
+    private function validCategorySlug(string $slug): bool
+    {
+        return preg_match('/^[a-z0-9][a-z0-9-]{0,119}$/D', $slug) === 1;
     }
 
     /** @return Builder<CatalogTitle> */

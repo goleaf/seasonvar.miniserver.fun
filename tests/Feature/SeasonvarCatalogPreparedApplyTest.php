@@ -6,11 +6,14 @@ namespace Tests\Feature;
 
 use App\DTOs\Seasonvar\SeasonvarCatalogData;
 use App\DTOs\Seasonvar\SeasonvarPreparedCatalogPage;
+use App\Enums\MediaFileSizeCheckStatus;
+use App\Enums\MediaHealthStatus;
 use App\Enums\ReleaseScheduleEntryType;
 use App\Enums\ReleaseScheduleSource;
 use App\Models\ApiSyncChange;
 use App\Models\CatalogTitle;
 use App\Models\Episode;
+use App\Models\LicensedMedia;
 use App\Models\ReleaseScheduleEntry;
 use App\Models\Source;
 use App\Models\SourcePage;
@@ -60,6 +63,63 @@ class SeasonvarCatalogPreparedApplyTest extends TestCase
             ->where('operation', ApiSyncChange::OPERATION_UPSERT)
             ->where('resource_key', 'ryzaia-8')
             ->count());
+    }
+
+    public function test_prepared_direct_media_apply_is_network_free_and_leaves_file_size_pending(): void
+    {
+        Http::preventStrayRequests();
+        $source = $this->seasonvarSource();
+        [$page, $prepared] = $this->preparedSeason($source, 1, 1, media: [[
+            'url' => 'https://media.example.com/ryzhaya-s01e01-1080p.mp4',
+            'title' => '1 серия 1080p',
+            'season_number' => 1,
+            'episode_number' => 1,
+            'source_url' => 'https://seasonvar.ru/playls2/serial-24212/plist.txt',
+            'kind' => 'file',
+            'storage_disk' => 'seasonvar_parsed',
+            'availability' => [
+                'available' => true,
+                'check_status' => 'reachable',
+                'http_status' => 206,
+                'checked_at' => '2026-07-24T10:00:00+03:00',
+                'latency_ms' => 37,
+                'error_category' => null,
+                'permanent_failure' => false,
+            ],
+        ]]);
+        $canonical = CatalogTitle::factory()->for($source)->create([
+            'source_page_id' => $page->id,
+            'external_id' => '24212',
+            'slug' => 'ryzaia-8',
+            'title' => 'Рыжая',
+            'source_url' => $page->url,
+            'source_url_hash' => hash('sha256', $page->url),
+        ]);
+        $events = [];
+
+        app(SeasonvarCatalogImporter::class)->applyPreparedPage(
+            $page,
+            $prepared,
+            $canonical,
+            progress: function (string $event, array $context) use (&$events): void {
+                $events[] = ['event' => $event, 'context' => $context];
+            },
+        );
+
+        $media = LicensedMedia::query()->sole();
+
+        Http::assertNothingSent();
+        $this->assertNotContains(
+            'seasonvar-media-size-check-started',
+            collect($events)->pluck('event')->all(),
+        );
+        $this->assertSame('published', $media->status);
+        $this->assertSame('reachable', $media->check_status);
+        $this->assertSame(206, $media->last_http_status);
+        $this->assertSame(MediaHealthStatus::Active, $media->health_status);
+        $this->assertSame(MediaFileSizeCheckStatus::Pending, $media->file_size_check_status);
+        $this->assertNull($media->file_size_bytes);
+        $this->assertNull($media->file_size_checked_at);
     }
 
     public function test_local_only_episode_survives_apply_and_is_reported_by_manifest(): void
@@ -163,13 +223,19 @@ class SeasonvarCatalogPreparedApplyTest extends TestCase
         $this->assertNull($episode->released_at);
     }
 
-    /** @return array{SourcePage, SeasonvarPreparedCatalogPage} */
+    /**
+     * @param  list<array{name: string, type: string, source?: string}>  $aliases
+     * @param  array<string, mixed>  $releaseStatus
+     * @param  list<array<string, mixed>>  $media
+     * @return array{SourcePage, SeasonvarPreparedCatalogPage}
+     */
     private function preparedSeason(
         Source $source,
         int $seasonNumber,
         int $episodeCount,
         array $aliases = [],
         array $releaseStatus = [],
+        array $media = [],
     ): array {
         $url = sprintf(
             'https://seasonvar.ru/serial-24212-Ryzhaya_psbdtie-%d-season.html',
@@ -211,7 +277,7 @@ class SeasonvarCatalogPreparedApplyTest extends TestCase
                 ...$releaseStatus,
             ]],
             'episodes' => $episodes,
-            'media' => [],
+            'media' => $media,
             'taxonomies' => [],
             'ratings' => [],
             'recommendation_signals' => [],
