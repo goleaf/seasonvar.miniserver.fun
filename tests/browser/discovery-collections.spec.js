@@ -115,7 +115,9 @@ test('discovery and collection taxonomy stay text-only and responsive', async ({
     await expect(classification.getByRole('heading', { level: 2, name: 'Классификация подборок' })).toBeVisible();
     await expect(classification.locator('[data-classification-summary]')).toBeVisible();
     await expect(classification.getByText('Браузерная подборка Netflix', { exact: true })).toBeVisible();
-    await expect(classification.getByText('Платформы — Netflix', { exact: true })).toBeVisible();
+    await expect(
+        classification.locator('p').filter({ hasText: 'Платформы и студии — Netflix' }),
+    ).toBeVisible();
     await expect(classification.getByText('Высокая уверенность', { exact: true })).toBeVisible();
     await expect(classification.locator('img')).toHaveCount(0);
     await classification.getByRole('button', { name: 'Выбрать с высокой уверенностью' }).click();
@@ -129,6 +131,10 @@ test('discovery and collection taxonomy stay text-only and responsive', async ({
     await expect(page.locator('[data-category-create-form]')).toBeVisible();
     await expect(page.getByText('Детективы и криминал', { exact: true })).toBeVisible();
     await assertResponsivePage(page);
+    await page.screenshot({
+        path: `output/playwright/collection-classification-${testInfo.project.name.toLowerCase().replaceAll(' ', '-')}.png`,
+        fullPage: true,
+    });
 
     expect(browserErrors).toEqual([]);
 });

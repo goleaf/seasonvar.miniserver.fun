@@ -2,6 +2,20 @@
 
 ## 2026-07-25
 
+- Ускорен гостевой холодный путь главной без повышения лимита response-cache.
+  `CatalogHomeContentAdditionQuery` ограничивает обзор восемью итоговыми
+  release rows на тайтл через оконный SQL и adaptive newest-event scan с
+  повторной проверкой текущих visibility scopes; same-snapshot результат 48
+  обновлений совпал с прежним полным агрегатом, а измерение запроса изменилось
+  с 3235,54 до 146,16 мс. Выбор video titles переведён на correlated
+  `EXISTS`, точные homepage metrics получили отдельную version scope, гостевая
+  рекомендация использует `RecentlyAdded`, а персональная авторизованная
+  ветка не изменена. Рабочий HTML уменьшился примерно с 1,55 МБ до 740 КБ:
+  после targeted invalidation первый HTTPS-ответ дал `MISS` и 0,834 с TTFB,
+  последующие `HIT` — 0,062–0,083 с. Добавлены RU/EN-ссылка на полный тайтл,
+  regression tests для SQL planner, cache/metrics и массовых additions;
+  schema, routes, зависимости, полные данные каталога и API snapshot не
+  изменены.
 - Восстановлены случайно удалённые версионируемые Git-хуки и закреплённый
   сценарий `.github/workflows/ci.yml`. `pre-commit` теперь разрешает обычную
   частичную фиксацию при наличии посторонних `unstaged` или `untracked` файлов:

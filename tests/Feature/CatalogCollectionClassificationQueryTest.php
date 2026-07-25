@@ -109,6 +109,21 @@ final class CatalogCollectionClassificationQueryTest extends TestCase
         ));
     }
 
+    public function test_search_includes_stable_slug_and_treats_like_wildcards_as_text(): void
+    {
+        $collection = $this->collection('Обычное название', [
+            'slug' => 'editorial-netflix-special',
+        ]);
+        $this->collection('Первая подборка');
+        $query = app(CatalogCollectionClassificationQuery::class);
+
+        $slugPage = $query->paginateUncategorized(search: 'editorial-netflix');
+        $wildcardPage = $query->paginateUncategorized(search: 'Первая_подборка');
+
+        $this->assertSame([$collection->public_id], $slugPage->pluck('public_id')->all());
+        $this->assertSame(0, $wildcardPage->total());
+    }
+
     /**
      * @param  array<string, mixed>  $attributes
      */

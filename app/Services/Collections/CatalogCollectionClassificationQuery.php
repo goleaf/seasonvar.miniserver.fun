@@ -81,6 +81,7 @@ final class CatalogCollectionClassificationQuery
         }
 
         $search = $this->search->display(mb_substr($search, 0, 100));
+        $searchPattern = $this->containsPattern($search);
         $visibilityFilter = CatalogCollectionVisibility::tryFrom($visibility);
         $typeFilter = CatalogCollectionType::tryFrom($type);
         $query = CatalogCollection::query()
@@ -106,20 +107,21 @@ final class CatalogCollectionClassificationQuery
                 $typeFilter !== null,
                 fn (Builder $query): Builder => $query->where('type', $typeFilter->value),
             )
-            ->when($search !== '', function (Builder $query) use ($search): void {
-                $query->where(function (Builder $query) use ($search): void {
+            ->when($search !== '', function (Builder $query) use ($searchPattern): void {
+                $query->where(function (Builder $query) use ($searchPattern): void {
                     $query
-                        ->where('name', 'like', '%'.$search.'%')
-                        ->orWhere('description', 'like', '%'.$search.'%')
+                        ->whereRaw("name LIKE ? ESCAPE '!'", [$searchPattern])
+                        ->orWhereRaw("description LIKE ? ESCAPE '!'", [$searchPattern])
+                        ->orWhereRaw("slug LIKE ? ESCAPE '!'", [$searchPattern])
                         ->orWhereHas('translations', fn (Builder $translations): Builder => $translations
                             ->whereIn('locale', $this->searchLocales())
-                            ->where(function (Builder $translations) use ($search): void {
+                            ->where(function (Builder $translations) use ($searchPattern): void {
                                 $translations
-                                    ->where('name', 'like', '%'.$search.'%')
-                                    ->orWhere('description', 'like', '%'.$search.'%');
+                                    ->whereRaw("name LIKE ? ESCAPE '!'", [$searchPattern])
+                                    ->orWhereRaw("description LIKE ? ESCAPE '!'", [$searchPattern]);
                             }))
                         ->orWhereHas('owner', fn (Builder $owner): Builder => $owner
-                            ->where('name', 'like', '%'.$search.'%'));
+                            ->whereRaw("name LIKE ? ESCAPE '!'", [$searchPattern]));
                 });
             });
 
@@ -221,6 +223,11 @@ final class CatalogCollectionClassificationQuery
             app()->currentLocale(),
             (string) config('catalog-collections.default_locale', 'ru'),
         ]));
+    }
+
+    private function containsPattern(string $value): string
+    {
+        return '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $value).'%';
     }
 
     /** @return LengthAwarePaginator<int, CatalogCollection> */
