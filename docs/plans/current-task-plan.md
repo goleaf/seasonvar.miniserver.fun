@@ -8494,7 +8494,7 @@ importer command и production DML не планируются.
 
 ## Task 62 — primary-key hydration эпизодов главной
 
-Статус: `verification_complete_delivery_pending`.
+Статус: `completed_commit_unresolved_push_authentication`.
 
 Дата начала: 26.07.2026.
 
@@ -8607,7 +8607,7 @@ key/version/invalidation lifecycle.
 | Repository-wide docs/hook baseline | `unresolved` | Task-scoped staged README/CHANGELOG policies and diff checks pass. Full managed-docs/pre-commit stops only on foreign uncommitted `docs/MAINTENANCE_LOG.md`; standalone current-plan policy also finds an extra historical H1 already present in `HEAD`. Task 62 does not rewrite or stage either foreign baseline |
 | Canonical docs/README/CHANGELOG | `completed` | Performance owner records diagnostic evidence; README visitor history and separate Russian implementation changelog item updated |
 | Final requirements/legacy scan | `completed` | Root/index/applicable canonical owners, approved design, detailed plan and Task 62 section re-read. Repository scan found one canonical query service/caller/view chain, the intentional recommendation index owner/migration, no related TODO/FIXME and no duplicate route/cache/service implementation |
-| Commit/push in `main` | `pending` | Exact Task 62 scope only |
+| Commit/push in `main` | `unresolved` | Exact implementation/docs commit `f601b54` создан в `main` с parent `b4500b6` и только восемью Task 62 paths. Configured HTTPS push выполнен и отклонён до передачи данных из-за отсутствующей GitHub-аутентификации: `fatal: could not read Username for 'https://github.com': No such device or address` |
 
 ### Безлимитный execution order
 
@@ -8623,3 +8623,14 @@ key/version/invalidation lifecycle.
 10. Выполнить final requirement/legacy scan.
 11. Exact commit только в `main`.
 12. Выполнить configured push или записать внешний отказ как `unresolved`.
+
+### Delivery evidence
+
+- Exact implementation/docs commit `f601b54` содержит только Task 62 code,
+  regression, performance owner, approved design, detailed plan, current
+  evidence, visitor history и русский technical changelog.
+- Foreign Task 63 staged/unstaged/untracked files и чужие изменения shared
+  documents не включены.
+- Configured HTTPS push завершился кодом `128` до передачи данных из-за
+  отсутствующей GitHub-аутентификации; force, branch/worktree или
+  credential mutation не применялись.
