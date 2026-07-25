@@ -7717,3 +7717,106 @@ production-runtime files не входят в Task 55.
 | Final requirement/legacy reread | `completed` | Root/index, code/architecture/development, multilingual/security, maintenance, production operations, system integration, approved spec, execution plan and Task 55 reread again on 26.07.2026; no new application legacy scope was introduced |
 | Commit/push in `main` | `unresolved` | Existing Task 55 commits remain in `main`; parallel Task 56 commit `ab55891` advanced HEAD during verification, а затем появились foreign Task 57/58 staged, unstaged и untracked изменения. Настоящий hardening commit изолирует ровно девять allowlisted Task 55 paths/section через alternate index; реальный mixed index и чужой working tree не входят в commit и сохраняются. The only doctor failure is the unchanged HTTPS credential mechanism, while exact canonical SSH read still returns `Permission denied (publickey)`. Strict clean-tree `pre-push` cannot run and no bypass is allowed |
 
+
+## Task 59 — grouped summary public-каталога подборок
+
+Статус: `implementation_verified_delivery_pending`.
+
+Дата начала: 26.07.2026.
+
+Approved design:
+[`2026-07-26-collection-directory-grouped-summary-design.md`](../superpowers/specs/2026-07-26-collection-directory-grouped-summary-design.md).
+
+Detailed implementation plan:
+[`2026-07-26-collection-directory-grouped-summary.md`](../superpowers/plans/2026-07-26-collection-directory-grouped-summary.md).
+
+### Цель и measured root cause
+
+Task 51 уже пагинирует eligible collection IDs до summary hydration и
+полностью удалил collection images/fallbacks. Новый read-only production-size
+замер первой страницы из 12 подборок дал `211,38 ms`, из которых ID query
+занял `1,60 ms`, а один bounded summary с двумя correlated `withCount()`
+subqueries — `180,78 ms`.
+
+Эквивалентный grouped aggregate по тем же exact 12 IDs и canonical
+guest-visible titles дал после прогрева `108,01–121,48 ms` с одинаковыми
+суммами `35 375 / 35 375`. Выбрана локальная query-оптимизация без projection,
+schema, cache или background reconciliation.
+
+### Изменяемые файлы
+
+- новый `app/Services/Collections/CatalogCollectionSummaryLoader.php`;
+- `app/Services/Collections/CatalogCollectionQuery.php`;
+- новый
+  `tests/Feature/CatalogCollectionPublicDirectoryQueryTest.php`;
+- при фактической необходимости соседние collection/discovery tests;
+- discovery master plan, approved spec, detailed plan и эта section;
+- `README.md` после подтверждённого visitor performance result;
+- `CHANGELOG.md`.
+
+`docs/performance.md` уже содержит canonical two-phase/grouped contract и
+изменяется только при необходимости добавить не дублирующее фактическое
+evidence. Migration, route, translation, cache key, permission, dependency,
+environment, queue, scheduler, JavaScript/CSS и production DML не планируются.
+
+### Protected contracts
+
+- `/discover/popular`, localized variants и все прежние 404 routes;
+- `collections_q`, `collections_sort`, category/subcategory keys и
+  `collectionsPage`;
+- exact eligibility, deterministic order, paginator metadata и 6–36 bounds;
+- public/approved/non-deleted/source visibility и
+  `CatalogTitleQuery::visibleTo(null)` для item counts;
+- owner/category/translations/source eager loads без N+1;
+- полностью text-only cards без image/fallback/upload/storage;
+- detail/profile/API/SEO/sitemap/importer/cache/private-user contracts;
+- SQLite и отсутствие persistent/operational change.
+
+### Cross-feature и production risks
+
+| Domain | Статус | Решение |
+| --- | --- | --- |
+| Public collection directory | `affected_performance_only` | Phase 1/order/paginator unchanged; only phase-2 SQL shape changes |
+| Visibility/authorization | `critical_compatible` | Same canonical guest-visible title subquery; no browser/user authority |
+| Counts | `affected` | Total includes every membership; visible includes only canonical guest-visible titles; empty uses zero |
+| Categories/search/sort/locale | `compatible` | Existing builder owns filters/order/relations |
+| UI/mobile/a11y | `unchanged` | No Blade/Tailwind/text/state change; browser smoke only |
+| Images/storage | `already_compliant` | No cover/poster fallback is introduced or saved |
+| Cache/SEO/API/sitemap/importer | `unchanged` | No keys, payloads or invalidation change |
+| Migration/data/dependency/env | `not_applicable` | Read-only query refactor |
+| Production | `affected_read_path` | Read-only benchmark/EXPLAIN; no activation/DML/service restart |
+| Rollback | `completed_preliminary` | Revert PHP change to bounded `withCount()`; no data/cache rollback |
+| Shared Git index | `risk_recorded` | Foreign Tasks 57/58 preserved; exact isolated commit only |
+
+### Task-specific requirement-compliance matrix
+
+| Requirement/domain | Статус | Evidence / следующий gate |
+| --- | --- | --- |
+| Root/index/canonical requirements fresh read | `completed` | Выполнено 26.07.2026 до edits |
+| Related collection/discovery/data/UI docs | `completed` | Architecture, data, performance, frontend and integration owners inspected |
+| Installed versions | `completed` | PHP 8.5.8, Laravel 13.22.0, Boost 2.4.13, Livewire 4.3.3, PHPUnit 12.5.32, Tailwind 4.3.2 |
+| Official Laravel behavior | `completed` | Boost Laravel 13 docs checked for `leftJoinSub`, grouped raw expressions, eager loads and pagination |
+| Existing implementation first | `completed` | Route → Livewire → ID phase → summaryQuery → card flow traced |
+| Read-only measured evidence | `completed` | Current 211,38/180,78 ms and grouped 108,01–121,48 ms; equal sums |
+| Alternatives/user authorization | `completed` | Keep-correlated and materialized projection rejected; user preauthorized recommended work |
+| Approved design and detailed plan | `completed` | Scope, data flow, errors, portability, TDD, rollback and exact files recorded |
+| TDD RED before implementation | `completed` | Exact test failed on missing `directory_counts` and exposed two correlated membership counts |
+| Minimal GREEN | `completed` | Dedicated grouped loader + `summaryQuery(false)` only for public directory |
+| Query plan/timing/count | `completed` | First read 211,38→138,83 ms; summary 180,78→111,48 ms; warm median ~117 ms / 6 statements; covering-index EXPLAIN |
+| Focused/static/docs/browser verification | `completed_with_independent_full_suite_blocker` | 71/457 collection, 21/96 adjacent discovery, Pint, loader PHPStan, docs, build and Playwright 2/2 GREEN; full process hit known GD 256 MB limit, exact test 1/12 GREEN |
+| README/CHANGELOG/final scan | `completed` | Russian visitor/technical entries added; requirements reread and active cover/correlated/Blade/debug duplicates scanned |
+| Commit/push in `main` | `pending_shared_index_guard` | Isolated Task 59 index; external push rejection honest |
+
+### Execution checklist
+
+1. `[completed]` Fresh requirements/skills/code/data inspection.
+2. `[completed]` Compare three approaches and write approved design/plan.
+3. `[completed]` RED test for correlated directory summary and count semantics.
+4. `[completed]` GREEN grouped summary loader using canonical guest visibility.
+5. `[completed]` Focused collection/discovery regression suite.
+6. `[completed]` Production-size read-only benchmark and EXPLAIN.
+7. `[completed]` Pint/PHPStan/docs/build/browser compatibility checks.
+8. `[completed]` Update README, Russian CHANGELOG and compliance evidence.
+9. `[completed]` Final requirements/legacy/diff audit.
+10. `[pending]` Exact Task 59 commit in `main`, then configured push.
+

@@ -546,7 +546,10 @@ php artisan schedule:list
 
 **Priority:** P0 performance.
 
-**Shared-worktree gate:** `app/Services/Collections/CatalogCollectionQuery.php` уже имеет чужие незавершённые изменения. Не редактировать до передачи ownership/reconciliation.
+**Execution status 26.07.2026:** `completed`. ID-first pagination реализована
+Task 51; Task 59 заменила оставшиеся correlated membership counts одним
+grouped aggregate по exact page IDs после подтверждённого clean ownership
+`CatalogCollectionQuery.php`.
 
 **Files:**
 
@@ -574,22 +577,34 @@ public function hydratePage(
 
 Phase 1 paginates only eligible collection IDs and deterministic sort columns. Phase 2 makes bounded queries for those IDs:
 
-1. collection rows/translations;
-2. grouped `COUNT(*)` total;
-3. grouped guest-visible count using canonical title visibility;
-4. ordered cover/poster fallback;
-5. restore page ID order in memory.
+1. collection rows/translations/owner/category/source relations;
+2. один bounded grouped aggregate total + guest-visible count using canonical
+   title visibility;
+3. restore page ID order in memory.
 
-Correlated membership/poster subqueries must not execute before `LIMIT`.
+Collection cover/poster fallback отсутствует по постоянному text-only
+контракту. Correlated membership subqueries must not execute before или после
+`LIMIT`; grouped aggregate ограничивается exact current-page IDs.
 
-- [ ] RED: seed 40 collections and large membership fixtures; assert summary queries only reference 12 page IDs.
-- [ ] RED: preserve search, sort, locale, public/approved/deleted rules and exact paginator metadata.
-- [ ] GREEN:
+- [x] RED/GREEN: bounded fixtures и production-size snapshot подтверждают,
+  что summary query получает только IDs текущей страницы.
+- [x] Сохранены search, sort, locale, public/approved/deleted rules, exact
+  paginator metadata и deterministic page order.
+- [x] GREEN:
 
 ```bash
 php artisan test tests/Feature/CatalogCollectionPublicDirectoryQueryTest.php tests/Feature/UnifiedDiscoveryCollectionsTest.php
 ./vendor/bin/pint --dirty --format agent
 ```
+
+Task 51 already satisfies ID-first pagination/category/order. Task 59 owns the
+remaining grouped-summary RED/GREEN and production-size read-only evidence.
+Task 59 прошла 71 collection tests / 457 assertions, adjacent discovery
+21 / 96, PHPStan нового loader, Pint, docs check, Vite build и Desktop/Mobile
+Playwright. На неизменном snapshot первый read стал `138,83 ms` вместо
+`211,38 ms`, grouped summary `111,48 ms` вместо `180,78 ms`; warm median
+полного directory около `117 ms` при 6 statements. Это локальное evidence, не
+SLA.
 
 ---
 

@@ -55,6 +55,7 @@ final class CatalogCollectionQuery
         private readonly CatalogUserCardStateLoader $cardStates,
         private readonly CatalogSearchNormalizer $search,
         private readonly CatalogCollectionSchema $schema,
+        private readonly CatalogCollectionSummaryLoader $summaryLoader,
         private readonly HdRezkaCollectionTypeCompatibility $sourceTypes,
         private readonly CommentRelationshipService $relationships,
         private readonly UserPortalCache $userPortalCache,
@@ -106,9 +107,8 @@ final class CatalogCollectionQuery
             return $paginator;
         }
 
-        $summaries = $this->summaryQuery()
-            ->whereKey($ids)
-            ->get()
+        $summaries = $this->summaryLoader
+            ->hydratePage($this->summaryQuery(withCounts: false), $ids)
             ->keyBy(fn (CatalogCollection $collection): int => (int) $collection->id);
         $ordered = collect($ids)
             ->map(fn (int $id): ?CatalogCollection => $summaries->get($id))
@@ -666,7 +666,7 @@ final class CatalogCollectionQuery
     }
 
     /** @return Builder<CatalogCollection> */
-    private function summaryQuery(): Builder
+    private function summaryQuery(bool $withCounts = true): Builder
     {
         $query = CatalogCollection::query()
             ->select('catalog_collections.*')
@@ -686,12 +686,15 @@ final class CatalogCollectionQuery
                 ->whereIn('locale', array_values(array_unique([
                     app()->currentLocale(),
                     (string) config('catalog-collections.default_locale', 'ru'),
-                ])))])
-            ->withCount([
+                ])))]);
+
+        if ($withCounts) {
+            $query->withCount([
                 'items as total_items_count',
                 'items as visible_items_count' => fn (Builder $query): Builder => $query
                     ->whereIn('catalog_title_id', $this->visibleTitleIds()),
             ]);
+        }
 
         if ($this->schema->sourceSyncAvailable()) {
             $query
