@@ -344,6 +344,58 @@ final class CatalogHomePerformanceTest extends TestCase
         $this->assertStringNotContainsString('LIST SUBQUERY', $plan);
     }
 
+    public function test_home_snapshot_reuses_year_buckets_until_the_facet_version_changes(): void
+    {
+        $this->travelTo(now()->setDate(2026, 7, 26)->setTime(12, 0));
+        CatalogTitle::factory()->create(['year' => 2026]);
+        CatalogTitle::factory()->create(['year' => 2025]);
+        CatalogTitle::factory()->create([
+            'year' => 2027,
+            'is_published' => false,
+        ]);
+        $versions = app(CacheVersionRegistry::class);
+        $versions->bump(CacheDomain::CatalogFacets);
+        $yearQueries = [];
+        DB::listen(function (QueryExecuted $query) use (&$yearQueries): void {
+            $sql = str($query->sql)
+                ->replace(['`', '"'], '')
+                ->lower()
+                ->squish()
+                ->toString();
+
+            if (str_contains($sql, 'select year, count(*) as titles_count')
+                && str_contains($sql, 'group by year')) {
+                $yearQueries[] = $sql;
+            }
+        });
+        $snapshot = app(CatalogHomeSnapshotCache::class);
+
+        $first = $snapshot->refresh();
+        $second = $snapshot->refresh();
+
+        $this->assertSame([
+            ['year' => 2026, 'titles_count' => 1],
+            ['year' => 2025, 'titles_count' => 1],
+        ], $first['year_buckets']);
+        $this->assertSame($first['year_buckets'], $second['year_buckets']);
+        $this->assertCount(1, $yearQueries);
+
+        CatalogTitle::factory()->create(['year' => 2026]);
+        $stillCached = $snapshot->refresh();
+
+        $this->assertSame($first['year_buckets'], $stillCached['year_buckets']);
+        $this->assertCount(1, $yearQueries);
+
+        $versions->bump(CacheDomain::CatalogFacets);
+        $rebuilt = $snapshot->refresh();
+
+        $this->assertSame([
+            ['year' => 2026, 'titles_count' => 2],
+            ['year' => 2025, 'titles_count' => 1],
+        ], $rebuilt['year_buckets']);
+        $this->assertCount(2, $yearQueries);
+    }
+
     public function test_catalog_page_invalidation_keeps_metrics_until_the_warmer_refreshes_them(): void
     {
         Queue::fake();

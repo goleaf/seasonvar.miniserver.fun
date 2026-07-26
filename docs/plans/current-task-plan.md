@@ -10657,3 +10657,127 @@ Resources/OpenAPI, visibility, tag eligibility/locale priority, pagination,
 SEO, warming, cache TTL/stale/lock/version, imports, administration и
 параллельный shared-tree scope. Migration, route, translation, permission,
 package, configuration, queue, scheduler и production DML не добавляются.
+
+---
+
+## Task 86 — facet snapshot годовых подборок главной
+
+Статус: `verification_complete_delivery_in_progress`.
+
+Дата начала: 26.07.2026.
+
+Approved design:
+[`2026-07-26-homepage-year-buckets-facet-snapshot-design.md`](../superpowers/specs/2026-07-26-homepage-year-buckets-facet-snapshot-design.md).
+
+Detailed implementation plan:
+[`2026-07-26-homepage-year-buckets-facet-snapshot.md`](../superpowers/plans/2026-07-26-homepage-year-buckets-facet-snapshot.md).
+
+### Цель и measured root cause
+
+Свежий private `CatalogHomeSnapshotCache::build()` на текущем `main`
+выполнил 16 SQL statements за `370,898 ms` wall / `194,54 ms` SQL. Самый
+дорогой statement повторно группировал все видимые тайтлы по году:
+`100,56 ms`. Следующая episode-availability проверка заняла `53,98 ms` и
+остаётся отдельным follow-up.
+
+Годы меняются только вместе с title visibility/year, но Homepage также
+инвалидируется release/calendar/collection событиями. Существующий
+`CatalogFacets` domain уже имеет scalar snapshots и повышается вместе с
+Homepage при `CatalogCacheInvalidator::catalogChanged()`.
+
+Выбран отдельный compact year-bucket resource внутри существующего
+`CatalogFacetSnapshotCache`. Прежний authoritative query сохраняется как
+rebuild/failure fallback; migration/index/table/queue не добавляются.
+
+### Expected changed files
+
+- `app/Services/Catalog/CatalogHomeSnapshotCache.php`;
+- `tests/Feature/CatalogHomePerformanceTest.php`;
+- linked Task 86 design и detailed plan;
+- exact Task 86 sections в `docs/caching.md`, `docs/performance.md` и этом
+  current plan;
+- exact Task 86 entries в `README.md` и `CHANGELOG.md`.
+
+### Protected files и public contracts
+
+- `/`, `/ru`, `/en`, homepage Livewire/Blade/SEO;
+- `/api/v1/home`, `CatalogHomeResource`, full `data()`/bounded `webData()`;
+- exact `year_buckets` key, integer shape, order and limit 12;
+- `CatalogTitleQuery::visibleTo(null)` publication, audience, windows,
+  soft-delete, Premium/region/legal compatibility;
+- Homepage resource/key/dimensions/version/TTL/stale/lock/invalidation;
+- CatalogFacets resource lifecycle and `CatalogCacheInvalidator`;
+- importer/admin/search/recommendation/sitemap/notification/account state;
+- routes, translations, UI/assets, schema/index/data, queue and dependencies;
+- весь foreign Task 76–85 staged/unstaged scope.
+
+### Cross-feature, cache и production risks
+
+| Domain | Статус | Решение / gate |
+| --- | --- | --- |
+| Exact year values/order | `critical_affected` | Visibility fixture plus exact scalar assertions |
+| CatalogFacets cache resource | `critical_affected` | Existing TieredCache/version/TTL/lock/failure boundary only |
+| Homepage cache | `protected_critical` | Existing outer snapshot unchanged |
+| Invalidation | `critical_affected` | Homepage-only reuse; CatalogFacets bump forces rebuild |
+| Calendar year rollover | `critical_affected` | Current year in dimensions and upper bound |
+| Cache outage | `protected_critical` | Authoritative SQL fallback |
+| Web/API/SEO/warming | `protected_critical` | Related regression and browser/API smoke |
+| Auth/security/privacy/legal | `already_compliant` | Public scalar data and canonical visibility only |
+| SQLite/other DB | `protected_critical` | Portable existing Eloquent aggregate |
+| Schema/index/DML | `not_applicable` | No migration, index, backfill or write |
+| Routes/translations/UI/assets | `not_applicable` | No public contract or presentation change |
+| Dependencies/environment | `not_applicable` | No package/config secret/.env change |
+| Production/rollback | `affected_low` | Code-only revert; no restore/reindex/flush |
+| Shared Git state | `critical_risk_recorded` | Exact alternate-index Task 86 commits only |
+
+### Task-specific requirement-compliance matrix
+
+| Requirement/domain | Статус | Evidence / следующий gate |
+| --- | --- | --- |
+| Skills/root/index/canonical fresh read | `completed` | 26.07.2026 before Task 86 application edit |
+| Architecture/development/multilingual/security/performance/cache/UI/frontend/ops/maintenance/integration | `completed` | Homepage/cache/data contracts traced |
+| Installed runtime/packages/database | `completed` | PHP 8.5.8, Laravel 13.22.0, Boost 2.4.13, Livewire 4.3.3, PHPUnit 12.5.32, SQLite |
+| Official version-dependent docs | `completed` | Laravel 13 query listener/subqueries/aggregates and Boost app info |
+| Existing implementation/dependants first | `completed` | Snapshot/builder/facets/TieredCache/invalidation/tests/indexes traced |
+| Read-only root-cause profile | `completed` | 16-query build and isolated four-index comparison |
+| Alternatives/user authorization | `completed` | Existing facet snapshot selected under explicit autonomous approval |
+| Design/spec self-review | `completed` | Linked Task 86 design; no placeholders, contradictions or scope gaps |
+| Detailed plan/files/contracts/risks | `completed` | Linked exact TDD plan and manifests above |
+| TDD RED/GREEN | `completed` | RED: 1 test / 3 assertions, duplicate aggregate count `2`; final GREEN: targeted 1 / 7; initial full class 10 / 47 |
+| Cache resource/invalidation/failure | `completed` | Existing `CatalogFacets` resource only; final focused lifecycle matrix 21 / 94 GREEN |
+| Production parity/profile | `completed` | 7 isolated pairs: rebuild 10 queries / 1 year query, repeat 9 / 0; exact hash/counts; median 533,735→420,621 ms wall, 296,83→134,02 ms SQL; year SQL 150,32 ms |
+| Related web/API/cache regression | `completed` | Final cache lifecycle 21 / 94; homepage/API/discovery/page-cache/warming 204 / 1 539 GREEN |
+| Static/style/build/browser | `completed` | Exact Pint/syntax/PHPStan/Rector GREEN; Vite 8.1.4 build GREEN; Chromium desktop/mobile/API 200-contract, 12 updates/years, no overflow/console/network errors |
+| Full suite/shared repository | `completed_with_foreign_failures` | Temporary 1G config: 2 009 tests, 1 990 passed, 200 820 assertions, 11 skipped, 7 failures + 1 error in concurrent Task 87/catalog-quality/UI/account/importer scope; no Task 86/Homepage/CatalogFacets failure; temporary file removed |
+| Docs/README/CHANGELOG | `completed` | Cache/performance owners, visitor history and Russian technical history updated; managed docs check and 34 documentation tests GREEN |
+| Final requirements/legacy/debug/secret audit | `completed` | Applicable requirements reread; resource/aggregate/dependant search reviewed; no Task 86 duplicate, debug call, secret, temporary config/script/screenshot or whitespace defect |
+| Commit/push main | `pending` | Hook-enabled exact commits; external failure honest |
+
+### Безлимитный execution order
+
+1. `[completed]` Fresh skills, requirements, owners, versions and Git audit.
+2. `[completed]` Existing snapshot/page/facet/cache/invalidation/test trace.
+3. `[completed]` Fresh private build profile and exact query ranking.
+4. `[completed]` Existing-index comparison and aborted safe-copy covering
+   index experiment; source unchanged, exact temporary files removed.
+5. `[completed]` Four alternatives and autonomously approved facet design.
+6. `[completed]` Design self-review and exact design commit `0e82565`; hook
+   passed with an exact alternate-index CHANGELOG boundary.
+7. `[completed]` Detailed TDD plan, files/contracts/risks/compliance update.
+8. `[completed]` Prepared plan reread; RED failed only because two Homepage
+   rebuilds executed two year aggregates instead of one.
+9. `[completed]` Minimal CatalogFacets year resource implementation.
+10. `[completed]` Focused GREEN, exact Pint, syntax, PHPStan and Rector.
+11. `[completed]` Exact version-bump lifecycle test, payload parity and
+    seven-pair repeated profile.
+12. `[completed]` Related homepage/API/cache/warming regression matrix:
+    final 204 tests / 1 539 assertions GREEN.
+13. `[completed]` Full suite assessed with unrelated concurrent failures;
+    Vite and desktop/mobile/API Chromium QA completed.
+14. `[completed]` Caching/performance owners, README and Russian CHANGELOG.
+15. `[completed]` Final requirements/legacy/debug/secret/exact diff audit and
+    fresh focused/static/Vite/Chromium gates.
+16. `[in_progress]` Exact Task 86 implementation/docs commit on existing
+    `main`.
+17. `[pending]` Configured non-force push; external failure stays
+    `unresolved`.

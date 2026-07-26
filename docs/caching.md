@@ -158,6 +158,27 @@ fallback. `CatalogCacheInvalidator::catalogChanged()` и
 owner и автоматически наполняет ресурсы; отдельная job, queue или scheduler
 не добавлены.
 
+## Годовые подборки главной страницы
+
+`CatalogHomeSnapshotCache` хранит `year_buckets` отдельным компактным
+ресурсом `homepage-year-buckets-v1` внутри существующего
+`CatalogFacetSnapshotCache`. Dimensions фиксируют публичную аудиторию, лимит
+12 и текущий календарный год; payload содержит только целые `year` и
+`titles_count`, отсортированные по году в обратном порядке. Внешний Homepage
+snapshot, его ключи, сроки и response shape не меняются.
+
+`CatalogCacheInvalidator::catalogChanged()` уже повышает версии Homepage и
+`CatalogFacets` после успешного commit. Поэтому изменение видимости или года
+тайтла перестраивает годовые значения, а Homepage-only invalidation
+календарём релизов или подборкой контента переиспользует их без повторного
+полного `GROUP BY`. Текущий год входит в dimensions, поэтому переход года
+создаёт новую identity без scan или общего flush.
+
+На cache miss или при недоступном store прежний authoritative
+`CatalogTitleQuery::visibleTo(null)` выполняет тот же ограниченный агрегат в
+БД через штатный fallback `TieredCache`. Новая таблица, индекс, миграция,
+очередь, scheduler или зависимость для этой границы не добавлены.
+
 ## Eloquent AutoCache для фильтров Top 100
 
 `wddyousuf/eloquent-autocache` подключён строго в режиме `opt-in` и не заменяет `TieredCache`, version registry или полностраничный кеш. Trait проекта `CachesCatalogFilterOptions` используют только модели `Country` и `Genre`; `CatalogTitle`, `User`, импортёр, отзывы, комментарии, media/access и любые личные данные в эту границу не входят.

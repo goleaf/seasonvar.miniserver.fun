@@ -16,6 +16,7 @@ final class CatalogHomeSnapshotCache
     public function __construct(
         private readonly CatalogTitleQuery $titles,
         private readonly CatalogHomeContentAdditionQuery $contentAdditions,
+        private readonly CatalogFacetSnapshotCache $facetSnapshots,
         private readonly TieredCache $cache,
         private readonly CacheTtlPolicy $ttl,
     ) {}
@@ -108,21 +109,7 @@ final class CatalogHomeSnapshotCache
             ->pluck('id')
             ->map(fn (mixed $id): int => (int) $id)
             ->all();
-        $yearBuckets = $this->titles->visibleTo(null)
-            ->select('year')
-            ->selectRaw('count(*) as titles_count')
-            ->whereNotNull('year')
-            ->where('year', '>=', 1900)
-            ->where('year', '<=', (int) now()->format('Y') + 1)
-            ->groupBy('year')
-            ->orderByDesc('year')
-            ->limit(12)
-            ->get()
-            ->map(fn ($bucket): array => [
-                'year' => (int) $bucket->year,
-                'titles_count' => (int) $bucket->getAttribute('titles_count'),
-            ])
-            ->all();
+        $yearBuckets = $this->yearBuckets();
         $subtitleTagQuery = Tag::query()->select(['id', 'name', 'slug']);
 
         if (Tag::usesCanonicalSchema()) {
@@ -146,6 +133,38 @@ final class CatalogHomeSnapshotCache
             'year_buckets' => $yearBuckets,
             'subtitle_tag' => $subtitleTag?->getAttributes(),
         ];
+    }
+
+    /**
+     * @return list<array{year: int, titles_count: int}>
+     */
+    private function yearBuckets(): array
+    {
+        $currentYear = (int) now()->format('Y');
+
+        return $this->facetSnapshots->remember(
+            'homepage-year-buckets-v1',
+            [
+                'audience' => 'public',
+                'limit' => 12,
+                'year' => $currentYear,
+            ],
+            fn (): array => $this->titles->visibleTo(null)
+                ->select('year')
+                ->selectRaw('count(*) as titles_count')
+                ->whereNotNull('year')
+                ->where('year', '>=', 1900)
+                ->where('year', '<=', $currentYear + 1)
+                ->groupBy('year')
+                ->orderByDesc('year')
+                ->limit(12)
+                ->get()
+                ->map(fn ($bucket): array => [
+                    'year' => (int) $bucket->year,
+                    'titles_count' => (int) $bucket->getAttribute('titles_count'),
+                ])
+                ->all(),
+        );
     }
 
     /** @return array<string, mixed> */

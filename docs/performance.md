@@ -842,6 +842,46 @@ translation, schema/index/DML, dependency, environment или cache contract н�
 изменены; rollback — обычный revert кода без restore, reindex или cache
 flush.
 
+## Повторное использование годовых подборок главной
+
+Следующий профиль 26.07.2026 показал, что после оптимизации новых материалов
+самым дорогим повторяемым запросом private build главной оставался
+authoritative `GROUP BY catalog_titles.year`: в исходном снимке из 16
+statement он занял `100,56 ms`. Сравнение четырёх существующих индексных
+планов не дало основания закреплять SQLite-specific hint, а эксперимент с
+новым покрывающим индексом был остановлен до изменения source database.
+Материализованная таблица и отдельная очередь отклонены как лишний источник
+истины.
+
+`CatalogHomeSnapshotCache` теперь получает тот же ограниченный public
+aggregate через отдельный scalar resource существующего
+`CatalogFacetSnapshotCache`. Authoritative query, сортировка `year DESC`,
+лимит 12, допустимый диапазон лет и `CatalogTitleQuery::visibleTo(null)`
+сохранены. Версия `CatalogFacets` повышается вместе с Homepage при изменении
+каталога, но не при Homepage-only invalidation; текущий год входит в
+dimensions. Cache outage по-прежнему выполняет исходный SQL через штатный
+fallback.
+
+Семь fresh-process пар после прогрева schema memo стабильно сохранили SHA-256
+`9b7739340a54728fc0d995940c33425f3141c69093c1037f4b2e019c92475669`
+и counts `48/12/8/12/12`. Rebuild новой `CatalogFacets` generation выполнил
+10 запросов, включая один year aggregate; повторная Homepage-сборка в той же
+generation — 9 запросов и ноль year aggregate. Медиана целевого запроса
+составила `150,32 ms`, общая медиана SQL — `296,83→134,02 ms`, wall —
+`533,74→420,62 ms`. Абсолютное wall time зашумлено параллельными процессами и
+является локальной диагностикой, а не p95/SLA.
+
+TDD прошёл RED на втором year query и итоговый GREEN 10 тестов с 46
+утверждениями; финальный cache lifecycle прошёл 21/94, shared
+homepage/API/discovery/page-cache/warming matrix — 204/1 539. `Pint`, PHP syntax, `PHPStan`,
+`Rector`, Vite и Chromium desktop/mobile/API завершились успешно. Полный
+suite с временным test-only лимитом 1 ГБ выполнил 2 009 тестов: 1 990 passed,
+11 skipped, а 7 failures и 1 error относятся к параллельным незавершённым
+catalog-quality/playback/UI/account/importer изменениям; отказов Task 86,
+Homepage или `CatalogFacets` нет. Route, API, UI, translation,
+schema/index/DML, dependency, queue и environment contracts не менялись.
+Rollback — обычный revert кода без restore, migration или cache flush.
+
 ## Bounded name-order справочников каталога
 
 Follow-up 26.07.2026 локализовал глобальный grouped aggregate внутри
