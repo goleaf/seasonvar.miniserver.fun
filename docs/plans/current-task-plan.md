@@ -10224,7 +10224,7 @@ foreign shared-worktree scope.
 
 ## Task 82 — коррелированные счётчики name-order справочников
 
-Статус: `final_audit_complete_commit_pending`.
+Статус: `completed_commit_unresolved_push_authentication`.
 
 Дата начала: 26.07.2026.
 
@@ -10286,7 +10286,7 @@ revert без restore, reindex или cache flush.
 | Docs/README/CHANGELOG | `completed` | Owners and visitor/technical histories updated; final `project:docs-refresh --check` and docs CI green |
 | HTTPS smoke | `completed` | `/actors?sort=name_asc` and API returned 200; API returned 20 requested values |
 | Final requirements/diff/legacy/debug/secret audit | `completed` | Canonical owners reread; task-scoped diff check green; no duplicate or debug path found |
-| Final audit/commit/push | `pending` | Exact Task 82 scope only; shared/external failure honest |
+| Final audit/commit/push | `completed_commit_unresolved_push_authentication` | Exact 9-file commit `d8c6710` created on `main`; `git push origin main` exited 128 before transfer because GitHub HTTPS credentials are unavailable |
 
 ### Безлимитный execution order
 
@@ -10303,5 +10303,8 @@ revert без restore, reindex или cache flush.
 11. `[completed]` Performance/catalog-search owners, README and Russian
     CHANGELOG; final managed-doc and docs CI gates green.
 12. `[completed]` Final requirements/legacy/debug/secret/diff audit.
-13. `[pending]` Exact Task 82 commit on existing `main`.
-14. `[pending]` Configured non-force push or honest unresolved blocker.
+13. `[completed]` Exact 9-file Task 82 commit `d8c6710` created on existing
+    `main` through repository hooks.
+14. `[completed_unresolved_authentication]` Configured non-force
+    `git push origin main` exited 128 before transfer:
+    `fatal: could not read Username for 'https://github.com': No such device or address`.
