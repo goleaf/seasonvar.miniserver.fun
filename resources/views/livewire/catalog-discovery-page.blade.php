@@ -58,17 +58,23 @@
                     </h2>
                     <p class="mt-2 text-sm leading-6 text-slate-600">{{ __('recommendations.preferences.description') }}</p>
                 </div>
-                <button
-                    type="button"
-                    wire:click="resetRecommendationProfile"
-                    wire:confirm="{{ __('recommendations.preferences.reset_confirm') }}"
-                    wire:loading.attr="disabled"
-                    wire:target="resetRecommendationProfile"
-                    class="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-control border border-rose-200 bg-white px-4 py-2 text-sm font-bold text-rose-700 hover:bg-rose-50 disabled:cursor-wait disabled:opacity-60"
-                >
-                    <x-ui.icon name="fa-solid fa-rotate-left" />
-                    <span>{{ __('recommendations.preferences.reset') }}</span>
-                </button>
+                <div class="flex flex-col gap-2 sm:flex-row">
+                    <a href="{{ $tasteOnboardingUrl }}" wire:navigate class="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-control border border-emerald-300 bg-white px-4 py-2 text-sm font-bold text-emerald-800 hover:bg-emerald-50">
+                        <x-ui.icon name="fa-solid fa-sliders" />
+                        <span>{{ __('recommendations.preferences.edit_tastes') }}</span>
+                    </a>
+                    <button
+                        type="button"
+                        wire:click="resetRecommendationProfile"
+                        wire:confirm="{{ __('recommendations.preferences.reset_confirm') }}"
+                        wire:loading.attr="disabled"
+                        wire:target="resetRecommendationProfile"
+                        class="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-control border border-rose-200 bg-white px-4 py-2 text-sm font-bold text-rose-700 hover:bg-rose-50 disabled:cursor-wait disabled:opacity-60"
+                    >
+                        <x-ui.icon name="fa-solid fa-rotate-left" />
+                        <span>{{ __('recommendations.preferences.reset') }}</span>
+                    </button>
+                </div>
             </div>
 
             <div class="mt-5 grid gap-5 lg:grid-cols-2">

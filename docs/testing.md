@@ -94,3 +94,15 @@ npm run test:browser
 Task 20 по прямому условию выполнен без создания и запуска automated tests. Его acceptance использует task-scoped Pint/PHP syntax/static source scans, disposable SQLite migration/rollback/FK/integrity/index/query-plan inspection, manual transactional lifecycle smoke, route/middleware/translation/cache/SEO inspection, Vite build и read-only browser/accessibility/responsive smoke. Это локальное исключение не ослабляет общий проектный test policy; evidence и known limitations находятся в [`technical-issues.md`](technical-issues.md).
 
 Task 21 по прямому условию также не создаёт и не запускает automated tests. Обязательная замена для этой задачи: Pint/PHP syntax/static scans, disposable SQLite migration/FK/integrity/index/query-plan и manual lifecycle smoke, route/middleware/translation/sanitizer/search/cache/SEO/sitemap inspection, Vite build и Playwright accessibility/responsive smoke. Это не меняет общий TDD/CI контракт; task-specific checklist и ограничения находятся в [`help-center.md`](help-center.md).
+
+Task 71 onboarding покрывают
+`CatalogTasteOnboardingSchemaTest`, `CatalogTasteOnboardingTest`,
+`CatalogTasteOnboardingRecommendationTest`,
+`WebEmailVerificationTest` и `CatalogTitleUserDataMergerTest`. Матрица
+проверяет migration/rollback/FK/index plans, guest/unverified/verified routes,
+5/10 boundaries, invalid/duplicate/overlapping/invisible IDs, atomic replace,
+settings preservation, query budget, legacy/v2 ranking, hard exclusions,
+truthful features, reset/merge/export и verification redirect compatibility.
+`tests/browser/taste-onboarding.spec.js` выполняет idempotent owner journey в
+desktop/mobile/tablet, проверяет a11y labels, загрузку/сохранение, console,
+network и overflow.

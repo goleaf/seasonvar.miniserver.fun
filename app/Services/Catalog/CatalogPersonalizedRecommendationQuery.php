@@ -187,7 +187,16 @@ final class CatalogPersonalizedRecommendationQuery
     {
         $signals = [];
         $historyLimit = max(10, min(500, (int) config('recommendations.history_title_limit', 120)));
-        $resetAt = $this->preferences->forUser($user)->profileResetAt;
+        $preferences = $this->preferences->forUser($user);
+        $resetAt = $preferences->profileResetAt;
+
+        foreach ($preferences->likedTitleIds as $titleId) {
+            $this->rememberSignal($signals, $titleId, [
+                'weight' => (int) config('recommendations.onboarding.source_weight', 200),
+                'source' => CatalogRecommendationSource::UserFeedback,
+                'reason' => CatalogRecommendationReason::BecauseOnboarding,
+            ]);
+        }
 
         if (Schema::hasColumn('catalog_title_user_states', 'recommendation_feedback')) {
             $feedbackTitleIds = $this->orderBySignalActivity(CatalogTitleUserState::query()

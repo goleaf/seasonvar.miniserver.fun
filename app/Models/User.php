@@ -80,6 +80,24 @@ class User extends Authenticatable implements HasLocalePreference, MustVerifyEma
         return $this->hasMany(CatalogTitleUserState::class);
     }
 
+    /** @return HasMany<CatalogRecommendationOnboardingTitle, $this> */
+    public function recommendationOnboardingTitles(): HasMany
+    {
+        return $this->hasMany(CatalogRecommendationOnboardingTitle::class);
+    }
+
+    /** @return HasMany<CatalogRecommendationPreferredGenre, $this> */
+    public function recommendationPreferredGenres(): HasMany
+    {
+        return $this->hasMany(CatalogRecommendationPreferredGenre::class);
+    }
+
+    /** @return HasMany<CatalogRecommendationPreferredCountry, $this> */
+    public function recommendationPreferredCountries(): HasMany
+    {
+        return $this->hasMany(CatalogRecommendationPreferredCountry::class);
+    }
+
     /** @return HasMany<AdminUserRole, $this> */
     public function adminRoleMemberships(): HasMany
     {

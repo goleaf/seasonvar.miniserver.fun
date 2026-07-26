@@ -105,6 +105,22 @@ final class AccountSettingsService
         ]);
     }
 
+    public function updateOnboardingPreferences(
+        User $user,
+        string $locale,
+        ?bool $subtitlesEnabled,
+    ): AccountSettingsData {
+        $this->ensureLocale($locale);
+
+        $attributes = ['locale' => $locale];
+
+        if ($subtitlesEnabled !== null) {
+            $attributes['subtitles_enabled'] = $subtitlesEnabled;
+        }
+
+        return $this->mutate($user, $attributes);
+    }
+
     public function updateCollectionDefault(User $user, CatalogCollectionVisibility $visibility): AccountSettingsData
     {
         return $this->mutate($user, [

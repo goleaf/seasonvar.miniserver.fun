@@ -329,3 +329,28 @@ Player Task 22 закрепляет чёрный фон как собствен�
 Страница lazy-loads только выбранный section и переиспользует existing title cards, collection routes, Continue Watching и History actions. Status/bookmark/feedback/update controls вызывают canonical server actions; Blade не вычисляет status/counter/update/progress и не запрашивает модели. Marker section показывает one explicit resume point per episode и доступные update/delete actions. В player доступны manual watched/unwatched и save/delete moment; JavaScript только передаёт текущую позицию, а validation/ownership/progress interaction остаются на сервере.
 
 Empty/loading/failure/authorization/unavailable states локализованы в `lang/{ru,en}/library.php`; raw translation key не является visible fallback. Drag-and-drop и bulk destructive controls не добавлены: collection ordering уже имеет keyboard alternatives в canonical collection UI, а доказанной безопасной необходимости массового изменения личных статусов нет.
+
+## Frontend lifecycle onboarding вкусов Task 71
+
+После первого подтверждения email verified пользователь получает короткую
+full-page Livewire форму: выбирает 5–10 знакомых понравившихся сериалов,
+необязательные исключения, жанры, страны, язык интерфейса, режим
+озвучки/субтитров, завершённость и длину серий. Existing
+`PortalSearchSuggestionQuery` обслуживает bounded autocomplete; добавление и
+удаление выбранного title выполняется server action, поэтому браузер не
+становится источником trusted ID.
+
+Все labels/help/error/success тексты находятся в `lang/{ru,en}/onboarding.php`.
+Native radio/checkbox/button controls имеют явные labels и 44 px target,
+секции складываются в одну колонку на телефоне и не создают horizontal
+overflow. Поиск, отсутствие результатов, пустая выбранная коллекция, saving,
+validation и unexpected error имеют отдельные live states; save блокируется
+на время request и не допускает двойной submit. Skip использует ту же
+server-side save boundary с нейтральными optional preferences.
+
+Повторное редактирование открывается по owner-only ссылке из персональных
+рекомендаций. URL не хранит выбранные IDs или preference values; browser
+back/forward не публикует private state. Guest и unverified accounts не видят
+страницу. Playwright проверяет desktop, narrow mobile и tablet, keyboard
+labels, loading/save path, отсутствие console/page/network errors и
+горизонтального переполнения.

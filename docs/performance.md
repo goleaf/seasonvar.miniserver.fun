@@ -659,3 +659,28 @@ import-batcher изменениям вне этой задачи. Migration, rou
 translation, dependency, environment, queue, production DML или cache
 generation не добавлены; rollback — обычный revert PHP-кода без очистки
 данных или кеша.
+
+## Производительность onboarding вкусов Task 71
+
+Autocomplete ограничен существующим suggestion query и не гидратирует полный
+каталог. Owner state читается одной preference row и одним `UNION ALL` для
+liked/excluded/genre/country relations; selected title summaries загружаются
+одним bounded запросом. Save принимает 5–10 liked, не более 10 excluded и до
+8 значений каждой taxonomy, предварительно проверяет все ID grouped queries и
+в одной короткой транзакции выполняет bounded replace без запроса на элемент.
+
+Recommendation profile получает onboarding signals одним owner query; hard
+exclusions добавляются к уже bounded exclusion set. Feature extractor
+агрегирует translation, subtitle, status и positive duration только для
+candidate IDs, а reranker работает в памяти над уже ограниченным batch.
+Unknown duration/status не запускают fallback scan и не получают score.
+Отдельный cache не добавлен: profile memo invalidation использует существующую
+recommendation boundary.
+
+Query-count regression сравнивает минимальный и максимальный допустимый
+selection set и фиксирует постоянное число запросов. Disposable SQLite
+`EXPLAIN QUERY PLAN` выбирает unique owner/title, owner/kind, owner/genre и
+owner/country indexes, добавленные migration. Новые индексы соответствуют
+реальным owner/exclusion/merge reads; дополнительных broad или дублирующих
+индексов нет. Это structural/query-plan evidence, а не p95 или production
+latency SLA.

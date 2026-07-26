@@ -10,11 +10,15 @@ use App\Enums\CatalogRecommendationType;
 use App\Enums\CatalogWatchStatus;
 use App\Models\CatalogTitleUserState;
 use App\Models\EpisodeViewProgress;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 final class CatalogRecommendationExclusionService
 {
-    public function __construct(private readonly CatalogRecommendationRepeatSuppressor $repeats) {}
+    public function __construct(
+        private readonly CatalogRecommendationRepeatSuppressor $repeats,
+        private readonly CatalogTasteOnboardingSchema $onboardingSchema,
+    ) {}
 
     /** @return list<int> */
     public function hardExclusions(CatalogRecommendationContext $context, bool $includeRecent = false): array
@@ -31,6 +35,13 @@ final class CatalogRecommendationExclusionService
                     CatalogRecommendationFeedback::values(),
                 )
                 ->limit(5_000)
+                ->pluck('catalog_title_id'));
+        }
+
+        if ($user !== null && $this->onboardingSchema->ready()) {
+            $ids = $ids->merge(DB::table('catalog_recommendation_onboarding_titles')
+                ->where('user_id', $user->id)
+                ->limit(20)
                 ->pluck('catalog_title_id'));
         }
 

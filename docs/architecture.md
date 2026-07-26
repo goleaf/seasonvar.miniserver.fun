@@ -532,3 +532,35 @@ HTML season lane получает episode metadata/counts, source summaries — 
 `CatalogManualPlaybackService` хранит episode-level manual completion provenance в существующем progress и ровно один явный playback marker на user/episode. Маркер является независимой resume-точкой и не переписывает automatic progress до явного перехода пользователя. `CatalogPersonalUpdateQuery` сравнивает только опубликованные и доступные meaningful `ReleaseScheduleEntry` с server-owned acknowledgment; технический `updated_at`, hidden/unpublished/deleted/inaccessible content не считается обновлением. Existing calendar subscriptions/notification preferences не заменяются.
 
 Один full-page `UserLibraryPage` обслуживает `/library` и совместимые section/locale aliases. URL хранит только allowlisted section/filter/sort/page codes, а Livewire public state не содержит owner ID, Eloquent graph, marker row, private progress или collection membership. Collection CRUD/visibility/order остаются у существующего collection domain; библиотека только ведёт к нему и не связывает membership с bookmark/status/progress. Anonymous bookmark/status/blacklist merge отсутствует и не симулируется; anonymous playback progress продолжает принадлежать playback boundary.
+
+## Архитектурная граница onboarding вкусов Task 71
+
+`TasteOnboardingPage` — единственный full-page Livewire owner маршрутов
+`/onboarding/tastes` и `/{locale}/onboarding/tastes`. Компонент отвечает за
+locked selected IDs, bounded autocomplete, UX-состояние и orchestration;
+`CatalogTasteOnboardingQuery` подготавливает options/search/state, а
+`CatalogTasteOnboardingService` авторизует, повторно валидирует видимость и
+taxonomy, блокирует owner row и атомарно заменяет данные. Blade не выполняет
+запросов и не принимает user ID.
+
+Первое подтверждение email перенаправляет только matching authenticated owner
+с готовой схемой на localized onboarding. Anonymous и повторные verification
+ссылки сохраняют прежние destinations. Route использует `auth` и `verified`,
+а write boundary дополнительно проверяет `account.private` и named rate limit.
+Rolling deployment guard оставляет старый flow работоспособным до применения
+миграции.
+
+Onboarding не создаёт второй recommender. Liked titles поступают в существующие
+legacy/v2 profile builders как typed evidence, все выбранные titles становятся
+hard exclusions, а genre/country/playback/completion/duration preferences дают
+только capped positive boost в существующем taste reranker. Feature extractor
+читает фактические translation/subtitle/status/duration relations grouped
+queries; неизвестный status или `NULL` duration остаётся neutral. Сброс
+профиля, title merge и account export расширены через прежние lifecycle
+services. Public routes/API, shared discovery cache, importer, similarity
+builds и notification contracts не меняются.
+
+Подробные решения и ограничение cold-start находятся в
+[`taste onboarding design`](superpowers/specs/2026-07-26-taste-onboarding-design.md),
+а проверяемый checklist — в
+[`taste onboarding plan`](superpowers/plans/2026-07-26-taste-onboarding.md).

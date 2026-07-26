@@ -73,6 +73,17 @@ return [
         'rating_weight' => 130,
         'public_fallback_limit' => 24,
     ],
+    'onboarding' => [
+        'source_weight' => 200,
+        'genre_weight' => 35,
+        'genre_cap' => 70,
+        'country_weight' => 35,
+        'playback_weight' => 30,
+        'completion_weight' => 25,
+        'episode_length_weight' => 20,
+        'positive_total_cap' => 140,
+        'short_episode_max_seconds' => 2_700,
+    ],
     'personalized_v2' => [
         'enabled' => filter_var(env('RECOMMENDATIONS_PERSONALIZED_V2_ENABLED', false), FILTER_VALIDATE_BOOL),
         'rollout_percent' => (int) env('RECOMMENDATIONS_PERSONALIZED_V2_PERCENT', 0),

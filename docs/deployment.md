@@ -654,3 +654,28 @@ php artisan seasonvar:import --queued --force --sitemap-tail=1000
 Production evidence 20.07.2026: targeted run `#953` завершил контрольный тайтл вне XML-tail. Run `#954` сохранил `sitemap_tail_limit=1000`/`sitemap_tail_selected=1000`, расширил те же catalog-title groups sibling seasons до `1592/1592` и завершился `completed` с нулём page failures, active/problem groups и live claims. Возникшие пять claims уже terminal staging rows выявили окно base-dispatch/sibling discovery; исправленный group finalizer освобождает только exact same-run page/run/token claim. Recovery использовал обычный `queue:restart` и canonical watchdog signal, без `queue:clear`, `cache:clear`, массового retry или прямой смены run/group state.
 
 Application rollback возвращает прежний PHP-код и выполняет graceful reload/`queue:restart`; schema и importer source data не откатываются. Уже созданные provider events остаются корректной историей и могут быть обновлены следующим совместимым импортом. Если требуется скрыть ошибочно импортированные provider rows, сначала определить точный source-page identity и выполнить отдельное audited исправление с сохранением manual locks, editorial/portal entries, сезонов, серий и media; широкое удаление запрещено.
+
+## Rollout onboarding вкусов Task 71
+
+Перед deploy сделать штатный backup SQLite, проверить свободное место,
+`php artisan migrate:status`, отсутствие длительного importer writer и
+возможность остановить новые web writes на короткое окно. Migration
+`2026_07_26_231000_add_taste_onboarding_to_catalog_recommendations.php`
+additive: она добавляет nullable/default preference columns и три пустые
+relation table, без backfill каталога.
+
+Безопасный порядок: deploy совместимого PHP-кода со schema guard, выполнить
+`php artisan migrate --force`, затем проверить route list, verified onboarding
+save/edit, personalized recommendations и account export на тестовом owner.
+Очистка общего cache, очереди или sessions не требуется; preference write
+инвалидирует только существующий owner recommendation memo. Недоступный
+autocomplete или recommendation candidate pool не повреждает сохранённое
+состояние: пользователь получает empty/error state и может повторить действие.
+
+При partial deploy старый verification destination сохраняется, пока schema
+guard не увидит новые таблицы/columns. Application rollback выполняется
+возвратом PHP-кода без `migrate:rollback`; новые nullable/table данные старому
+коду не мешают. Schema rollback допустим только после backup и остановки
+writers: `down()` удалит onboarding relations и preference columns, то есть
+приватные выбранные вкусы будут потеряны. Queue, importer, provider, storage,
+service worker и external credentials этой функцией не изменяются.

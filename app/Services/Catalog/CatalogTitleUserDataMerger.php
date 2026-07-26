@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Services\Catalog;
 
 use App\Enums\CatalogRecommendationFeedback;
+use App\Enums\CatalogRecommendationOnboardingTitleKind;
 use App\Enums\CatalogWatchStatus;
 use App\Enums\PlaybackCompletionSource;
 use App\Models\CatalogRecommendationFeedbackDetail;
+use App\Models\CatalogRecommendationOnboardingTitle;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleUpdateState;
 use App\Models\CatalogTitleUserState;
@@ -128,6 +130,7 @@ final class CatalogTitleUserDataMerger
             });
 
         $this->mergeRecommendationFeedbackDetails($duplicate, $canonical);
+        $this->mergeRecommendationOnboardingTitles($duplicate, $canonical);
 
         EpisodeViewProgress::query()
             ->where('catalog_title_id', $duplicate->id)
@@ -247,6 +250,39 @@ final class CatalogTitleUserDataMerger
                 $incoming->delete();
             }
         }
+    }
+
+    private function mergeRecommendationOnboardingTitles(
+        CatalogTitle $duplicate,
+        CatalogTitle $canonical,
+    ): void {
+        if (! Schema::hasTable('catalog_recommendation_onboarding_titles')) {
+            return;
+        }
+
+        CatalogRecommendationOnboardingTitle::query()
+            ->whereBelongsTo($duplicate)
+            ->eachById(function (CatalogRecommendationOnboardingTitle $incoming) use ($canonical): void {
+                $existing = CatalogRecommendationOnboardingTitle::query()
+                    ->whereBelongsTo($canonical)
+                    ->where('user_id', $incoming->user_id)
+                    ->first();
+
+                if (! $existing instanceof CatalogRecommendationOnboardingTitle) {
+                    $incoming->forceFill(['catalog_title_id' => $canonical->id])->save();
+
+                    return;
+                }
+
+                if ($incoming->kind === CatalogRecommendationOnboardingTitleKind::Excluded
+                    && $existing->kind !== CatalogRecommendationOnboardingTitleKind::Excluded) {
+                    $existing->forceFill([
+                        'kind' => CatalogRecommendationOnboardingTitleKind::Excluded,
+                    ])->save();
+                }
+
+                $incoming->delete();
+            });
     }
 
     public function moveEpisode(

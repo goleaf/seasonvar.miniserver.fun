@@ -6,6 +6,7 @@ namespace Tests\Feature\Web;
 
 use App\Livewire\Auth\VerifyEmailPage;
 use App\Models\User;
+use App\Models\UserAccountSetting;
 use App\Notifications\VerifyAccountEmail;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -61,7 +62,7 @@ final class WebEmailVerificationTest extends TestCase
         Event::assertDispatchedTimes(Verified::class, 1);
     }
 
-    public function test_signed_verification_returns_the_matching_authenticated_owner_to_library(): void
+    public function test_signed_verification_returns_the_matching_authenticated_owner_to_taste_onboarding(): void
     {
         $user = User::factory()->unverified()->create();
         $url = URL::temporarySignedRoute('verification.verify', now()->addHour(), [
@@ -71,8 +72,28 @@ final class WebEmailVerificationTest extends TestCase
 
         $this->actingAs($user)
             ->get($url)
-            ->assertRedirect(route('library.index'))
+            ->assertRedirect(route('onboarding.tastes'))
             ->assertSessionHas('status', 'Адрес электронной почты подтверждён.');
+    }
+
+    public function test_signed_verification_uses_the_owners_localized_onboarding_route(): void
+    {
+        $user = User::factory()->unverified()->create();
+        UserAccountSetting::query()->create([
+            'user_id' => $user->id,
+            'locale' => 'en',
+            'settings_version' => 1,
+        ]);
+        $url = URL::temporarySignedRoute('verification.verify', now()->addHour(), [
+            'id' => $user->id,
+            'hash' => sha1($user->getEmailForVerification()),
+            'locale' => 'en',
+        ]);
+
+        $this->actingAs($user)
+            ->get($url)
+            ->assertRedirect(route('localized.onboarding.tastes', ['locale' => 'en']))
+            ->assertSessionHas('status', 'The email address has been verified.');
     }
 
     public function test_tampered_expired_and_wrong_hash_links_render_a_safe_russian_error(): void

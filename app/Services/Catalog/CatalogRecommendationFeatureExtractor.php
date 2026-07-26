@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Catalog;
 
 use App\Models\CatalogTitle;
+use App\Models\LicensedMedia;
 use App\Models\Tag;
 use Illuminate\Support\Facades\DB;
 
@@ -51,6 +52,13 @@ final class CatalogRecommendationFeatureExtractor
             ->each(function (object $row) use (&$features): void {
                 $features[(int) $row->catalog_title_id][] = 'country:'.(int) $row->country_id;
             });
+        DB::table('catalog_title_translation')
+            ->whereIn('catalog_title_id', $titleIds)
+            ->distinct()
+            ->pluck('catalog_title_id')
+            ->each(function (mixed $titleId) use (&$features): void {
+                $features[(int) $titleId][] = 'availability:dubbed';
+            });
         DB::table('catalog_title_actor')
             ->whereIn('catalog_title_id', $titleIds)
             ->get(['catalog_title_id', 'actor_id'])
@@ -94,17 +102,55 @@ final class CatalogRecommendationFeatureExtractor
             ->each(function (mixed $titleId) use (&$features): void {
                 $features[(int) $titleId][] = 'rating:low';
             });
-        DB::table('catalog_status_catalog_title')
+        LicensedMedia::query()
+            ->whereIn('catalog_title_id', $titleIds)
+            ->where('status', 'published')
+            ->withPlaybackLocation()
+            ->groupBy('catalog_title_id')
+            ->selectRaw('catalog_title_id')
+            ->selectRaw('MAX(CASE WHEN has_subtitles = 1 THEN 1 ELSE 0 END) AS has_subtitles')
+            ->selectRaw('AVG(CASE WHEN duration_seconds > 0 THEN duration_seconds ELSE NULL END) AS average_duration')
+            ->get()
+            ->each(function (LicensedMedia $media) use (&$features): void {
+                $titleId = (int) $media->catalog_title_id;
+
+                if ((int) $media->getAttribute('has_subtitles') === 1) {
+                    $features[$titleId][] = 'availability:subtitles';
+                }
+
+                $duration = (float) $media->getAttribute('average_duration');
+
+                if ($duration <= 0) {
+                    return;
+                }
+
+                $threshold = max(60, (int) config(
+                    'recommendations.onboarding.short_episode_max_seconds',
+                    2_700,
+                ));
+                $features[$titleId][] = $duration <= $threshold
+                    ? 'duration:short'
+                    : 'duration:long';
+            });
+        $statusRows = DB::table('catalog_status_catalog_title')
             ->join('catalog_statuses', 'catalog_statuses.id', '=', 'catalog_status_catalog_title.catalog_status_id')
             ->whereIn('catalog_status_catalog_title.catalog_title_id', $titleIds)
-            ->whereNotIn('catalog_statuses.slug', (array) config(
-                'recommendations.feedback.completed_status_slugs',
-                ['zavershen', 'completed', 'finished'],
-            ))
-            ->pluck('catalog_status_catalog_title.catalog_title_id')
-            ->each(function (mixed $titleId) use (&$features): void {
-                $features[(int) $titleId][] = 'status:unfinished';
-            });
+            ->get([
+                'catalog_status_catalog_title.catalog_title_id',
+                'catalog_statuses.slug',
+            ])
+            ->groupBy('catalog_title_id');
+        $completedSlugs = (array) config(
+            'recommendations.feedback.completed_status_slugs',
+            ['zavershen', 'completed', 'finished'],
+        );
+
+        $statusRows->each(function ($rows, mixed $titleId) use (&$features, $completedSlugs): void {
+            $completed = $rows->contains(
+                static fn (object $row): bool => in_array((string) $row->slug, $completedSlugs, true),
+            );
+            $features[(int) $titleId][] = $completed ? 'status:completed' : 'status:unfinished';
+        });
 
         foreach ($features as &$titleFeatures) {
             $titleFeatures = array_values(array_unique($titleFeatures));

@@ -6,7 +6,10 @@ namespace App\Services\Auth;
 
 use App\Models\CatalogRecommendationFeedbackDetail;
 use App\Models\CatalogRecommendationHiddenGenre;
+use App\Models\CatalogRecommendationOnboardingTitle;
 use App\Models\CatalogRecommendationPreference;
+use App\Models\CatalogRecommendationPreferredCountry;
+use App\Models\CatalogRecommendationPreferredGenre;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleUpdateState;
 use App\Models\CatalogTitleUserState;
@@ -15,6 +18,7 @@ use App\Models\EpisodeViewProgress;
 use App\Models\User;
 use App\Models\UserTag;
 use App\Services\Catalog\CatalogRecommendationPreferenceSchema;
+use App\Services\Catalog\CatalogTasteOnboardingSchema;
 use App\Services\Catalog\PersonalLibrarySchema;
 use App\Services\Collections\CatalogCollectionAccountService;
 use App\Services\Comments\CommentAccountService;
@@ -51,6 +55,7 @@ final class AccountDataExportService
         private readonly AccountSettingsService $settings,
         private readonly PersonalLibrarySchema $personalLibrarySchema,
         private readonly CatalogRecommendationPreferenceSchema $recommendationSchema,
+        private readonly CatalogTasteOnboardingSchema $onboardingSchema,
     ) {}
 
     /** @return array<string, mixed> */
@@ -169,9 +174,18 @@ final class AccountDataExportService
                     'diversity' => 'balanced',
                     'freshness' => 'balanced',
                     'profile_reset_at' => null,
+                    'onboarding_completed_at' => null,
+                    'playback_preference' => 'any',
+                    'completion_preference' => 'any',
+                    'episode_length_preference' => 'any',
                 ],
                 'feedback' => [],
                 'temporarily_hidden_genres' => [],
+                'onboarding' => [
+                    'titles' => [],
+                    'genres' => [],
+                    'countries' => [],
+                ],
             ];
         }
 
@@ -215,15 +229,76 @@ final class AccountDataExportService
                 'updated_at' => $hidden->updated_at?->toAtomString(),
             ])
             ->all();
+        $onboarding = $this->onboardingExport($user);
+
+        $onboardingReady = $this->onboardingSchema->ready();
 
         return [
             'preferences' => [
                 'diversity' => $preference?->diversity->value ?? 'balanced',
                 'freshness' => $preference?->freshness->value ?? 'balanced',
                 'profile_reset_at' => $preference?->profile_reset_at?->toAtomString(),
+                'onboarding_completed_at' => $onboardingReady
+                    ? $preference?->onboarding_completed_at?->toAtomString()
+                    : null,
+                'playback_preference' => $onboardingReady
+                    ? ($preference?->playback_preference->value ?? 'any')
+                    : 'any',
+                'completion_preference' => $onboardingReady
+                    ? ($preference?->completion_preference->value ?? 'any')
+                    : 'any',
+                'episode_length_preference' => $onboardingReady
+                    ? ($preference?->episode_length_preference->value ?? 'any')
+                    : 'any',
             ],
             'feedback' => $feedback,
             'temporarily_hidden_genres' => $hiddenGenres,
+            'onboarding' => $onboarding,
+        ];
+    }
+
+    /** @return array{titles: list<array{slug: string|null, title: string|null, kind: string}>, genres: list<string>, countries: list<string>} */
+    private function onboardingExport(User $user): array
+    {
+        if (! $this->onboardingSchema->ready()) {
+            return ['titles' => [], 'genres' => [], 'countries' => []];
+        }
+
+        $titles = CatalogRecommendationOnboardingTitle::query()
+            ->whereBelongsTo($user)
+            ->with(['catalogTitle' => fn ($query) => $query->withTrashed()->select(['id', 'slug', 'title'])])
+            ->orderBy('kind')
+            ->orderBy('catalog_title_id')
+            ->get()
+            ->map(fn (CatalogRecommendationOnboardingTitle $row): array => [
+                'slug' => $row->catalogTitle?->slug,
+                'title' => $row->catalogTitle?->title,
+                'kind' => $row->kind->value,
+            ])
+            ->all();
+        $genres = CatalogRecommendationPreferredGenre::query()
+            ->whereBelongsTo($user)
+            ->with('genre:id,name')
+            ->orderBy('genre_id')
+            ->get()
+            ->pluck('genre.name')
+            ->filter(static fn (mixed $name): bool => is_string($name))
+            ->values()
+            ->all();
+        $countries = CatalogRecommendationPreferredCountry::query()
+            ->whereBelongsTo($user)
+            ->with('country:id,name')
+            ->orderBy('country_id')
+            ->get()
+            ->pluck('country.name')
+            ->filter(static fn (mixed $name): bool => is_string($name))
+            ->values()
+            ->all();
+
+        return [
+            'titles' => $titles,
+            'genres' => $genres,
+            'countries' => $countries,
         ];
     }
 

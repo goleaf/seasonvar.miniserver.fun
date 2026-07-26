@@ -2,6 +2,28 @@
 
 ## 2026-07-26
 
+- Добавлен быстрый onboarding вкусов после первого подтверждения email.
+  Full-page Livewire маршрут `/onboarding/tastes` позволяет verified owner
+  выбрать 5–10 знакомых сериалов, точные исключения, жанры, страны, locale,
+  режим озвучки/субтитров, завершённость и длину серий; выбранное состояние
+  повторно валидируется на сервере, сохраняется атомарно и доступно для
+  повторного редактирования из персональных рекомендаций. Additive migration
+  добавляет три нормализованные relation table, три enum-настройки и
+  completion timestamp с FK, unique и owner/query indexes. Liked titles
+  встроены в существующие legacy/v2 recommendation profiles, все выбранные
+  titles исключаются из выдачи, а достоверные genre/country/translation/
+  subtitle/status/duration признаки получают bounded positive rerank без
+  эвристик для неизвестных metadata. Reset, title merge, account settings и
+  безопасный account export расширены единым lifecycle; public API, shared
+  cache, importer и notification contracts не изменены. Проверены
+  migration/rollback/remigration и `EXPLAIN QUERY PLAN`; итоговая матрица
+  прошла 52 теста с 73 746 проверками, Pint, Larastan и scoped Rector
+  завершились без ошибок, Vite собрал assets, а Playwright прошёл desktop,
+  mobile и tablet 3/3. Полный test-only suite выполнил 1 909 тестов:
+  1 895 прошли, 11 пропущены; единственный onboarding-отказ исправлен и
+  повторно проверен, а два отказа и одна ошибка остались в параллельных
+  account-session/importer изменениях вне этой функции.
+
 - Консолидированы точные запросы прямого rebuild `/stats` без изменения
   публичного snapshot, маршрутов, cache key/TTL, schema или write paths.
   `CatalogStatsPageBuilder` теперь одним visibility-aware aggregate считает

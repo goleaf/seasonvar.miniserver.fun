@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Services\Catalog;
 
 use App\DTOs\CatalogRecommendationPreferenceData;
+use App\Enums\CatalogRecommendationCompletionPreference;
 use App\Enums\CatalogRecommendationDiversityPreference;
+use App\Enums\CatalogRecommendationEpisodeLengthPreference;
 use App\Enums\CatalogRecommendationFreshnessPreference;
+use App\Enums\CatalogRecommendationPlaybackPreference;
 use App\Models\CatalogRecommendationFeedbackDetail;
 use App\Models\CatalogRecommendationHiddenGenre;
 use App\Models\CatalogRecommendationPreference;
@@ -23,6 +26,7 @@ final class CatalogRecommendationPreferenceService
         private readonly CatalogRecommendationPreferenceSchema $schema,
         private readonly CatalogRecommendationPreferenceQuery $query,
         private readonly CatalogRecommendationRepeatSuppressor $repeats,
+        private readonly CatalogTasteOnboardingSchema $onboardingSchema,
     ) {}
 
     public function update(
@@ -92,9 +96,24 @@ final class CatalogRecommendationPreferenceService
                 'freshness' => CatalogRecommendationFreshnessPreference::Balanced,
                 'profile_reset_at' => now(),
             ]);
+
+            if ($this->onboardingSchema->ready()) {
+                $preference->forceFill([
+                    'playback_preference' => CatalogRecommendationPlaybackPreference::Any,
+                    'completion_preference' => CatalogRecommendationCompletionPreference::Any,
+                    'episode_length_preference' => CatalogRecommendationEpisodeLengthPreference::Any,
+                    'onboarding_completed_at' => null,
+                ]);
+            }
             $this->saveIfChanged($preference);
             CatalogRecommendationFeedbackDetail::query()->whereBelongsTo($user)->delete();
             CatalogRecommendationHiddenGenre::query()->whereBelongsTo($user)->delete();
+
+            if ($this->onboardingSchema->ready()) {
+                DB::table('catalog_recommendation_onboarding_titles')->where('user_id', $user->id)->delete();
+                DB::table('catalog_recommendation_preferred_genres')->where('user_id', $user->id)->delete();
+                DB::table('catalog_recommendation_preferred_countries')->where('user_id', $user->id)->delete();
+            }
         }, attempts: 3);
 
         $this->repeats->forget($user);

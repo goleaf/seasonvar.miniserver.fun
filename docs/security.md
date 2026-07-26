@@ -283,3 +283,27 @@ Bookmark, rating, status, feedback/blacklist, progress, marker, acknowledgment �
 Manual marker хранит только stable episode identity и seconds; optional source/audio/subtitle/provider context намеренно не сохраняется. Personal update определяется server-side published release records и canonical visibility, поэтому client timestamp, technical `updated_at`, hidden/premium/region-inaccessible entry не может создать или снять badge. Public profile/API/SEO/sitemap/shared cache не получают exact status, marker, progress, blacklist или acknowledgment. Public collection presenter сохраняет существующий strict allowlist и не показывает owner private overlay.
 
 Account export содержит semantic codes/timestamps/positions без private media URL; account deletion использует existing cascade/lifecycle. Title merge выполняет server-side precedence и unique reconciliation, поэтому duplicate merge не ослабляет blacklist и не теряет explicit status/marker/update state. Anonymous bookmark/status/blacklist storage не добавлено; существующее anonymous playback storage не расширяется персональными списками.
+
+## Security и privacy onboarding вкусов Task 71
+
+Onboarding — private authenticated state. HTML routes защищены `auth` и
+`verified`, mutation дополнительно вызывает canonical `account.private` gate,
+CSRF Livewire и owner-scoped limiter `12/min`. User ID не входит в public
+state или request; сохранение всегда использует `Auth::user()`. Selected
+title IDs повторно проверяются на тип, uniqueness, непересечение
+`liked/excluded` и доступность через canonical visibility query; genre/country
+IDs проверяются по canonical taxonomy.
+
+Mass assignment отсутствует: сервис получает typed DTO и явно пишет
+allowlisted поля. Title labels и ошибки выводятся escaped Blade. Поиск
+нормализуется и ограничивается 120 символами, result/selection sets имеют hard
+caps, raw SQL с пользовательским вводом отсутствует. Unexpected exceptions
+репортятся без preference payload и показывают локализованное общее сообщение.
+
+Private state не включается в public API, SEO, sitemap, shared cache,
+notifications или analytics. Account export содержит только codes и safe
+labels без database IDs; delete использует FK cascade, merge переносит только
+owner rows. Rolling schema guard не раскрывает состояние при частично
+развёрнутой миграции. Проверки покрывают guest, unverified user, invisible и
+unknown title ID, duplicate/overlap, чужой ресурс, rate-bound write,
+reset/merge/export и отсутствие selected IDs в query string.

@@ -9707,3 +9707,125 @@ model отложен до отдельного consistency/invalidation/rollback
 15. `[completed_unresolved_authentication]` Remote doctor was blocked by
     root Composer policy; configured non-force push was attempted and GitHub
     rejected it before transfer because HTTPS credentials are unavailable.
+
+## Task 71 — быстрый onboarding вкусов
+
+Статус: `implementation_verified_commit_pending`.
+
+Дата начала: 26.07.2026.
+
+Approved design:
+[`2026-07-26-taste-onboarding-design.md`](../superpowers/specs/2026-07-26-taste-onboarding-design.md).
+
+Detailed implementation plan:
+[`2026-07-26-taste-onboarding.md`](../superpowers/plans/2026-07-26-taste-onboarding.md).
+
+### Цель и verified evidence
+
+После первого подтверждения email новый пользователь выбирает 5–10 знакомых
+и понравившихся сериалов, любимые жанры/страны, locale, озвучку/субтитры,
+finished/ongoing, short/long episodes и exact exclusions. State встраивается
+в один existing recommender и устраняет cold start без analytics/event log.
+
+Read-only SQLite evidence: 32 980 опубликованных тайтлов, 21 жанр, 67 стран,
+21 103 тайтла с translation relation и 17 193 с опубликованным subtitle
+availability. `licensed_media.duration_seconds` существует, но все 880 589
+rows имеют `NULL`; status taxonomy не связана с тайтлами. Эти две preference
+применяются только к реально известным metadata, unknown остаётся neutral.
+Interface locale не изображается audio/subtitle language.
+
+### Expected changed files
+
+- additive migration и три onboarding models;
+- three stable preference enums, DTO, schema/query/write services;
+- `User`, `CatalogRecommendationPreference`, preference DTO/query/service;
+- profile builder, legacy query, exclusion, feature extractor, taste
+  reranker, title-user-data merger и account export/settings;
+- auth verification responder, `routes/web.php`, new full-page Livewire
+  component/view and owner edit link;
+- RU/EN onboarding/recommendation translations and config;
+- focused auth/schema/service/ranking/reset/merge/export/browser tests;
+- canonical data/architecture/frontend/security/performance/deployment docs,
+  README, CHANGELOG and task evidence.
+
+### Protected contracts
+
+Existing `main`, public discovery routes/query/pagination/API shape, title
+binding/visibility, normal feedback/library/notification behavior,
+recommendation builds/cache keys/TTL, importer, account settings outside
+locale/subtitles, locale identifiers, guest output and all foreign shared
+worktree changes remain compatible.
+
+### Cross-feature и risk matrix
+
+| Domain | Статус | Решение / gate |
+| --- | --- | --- |
+| Registration/verification | `critical_affected` | First matching verified owner only; anonymous/idempotent behavior protected |
+| Recommendations | `critical_affected` | Existing source/rerank/exclusion owners only; no second engine |
+| Account settings | `affected_bounded` | Reuse locale/subtitles; preserve all other playback state |
+| Database/lifecycle | `critical_affected` | Additive FK state; reset/merge/export/delete covered |
+| Authorization/privacy | `critical_affected` | Verified owner, gate, visibility, CSRF, locked selected IDs, no shared cache |
+| Multilingual | `affected` | RU/EN exact parity; interface locale separated from media language |
+| Frontend/mobile/a11y | `affected` | Full-page Livewire, native controls, 44px, responsive browser matrix |
+| Importer/catalog metadata | `protected_with_limitation` | No heuristic status/duration; unknown is neutral |
+| API/SEO/service worker | `not_applicable_protected` | No public payload/index/cache additions |
+| Production/rollback | `affected` | Additive migration, backup/writer window, code-first rollback |
+| Shared Git state | `critical_risk_recorded` | Exact alternate-index commit in existing `main` |
+
+### Task-specific requirement-compliance matrix
+
+| Requirement/domain | Статус | Evidence / следующий gate |
+| --- | --- | --- |
+| Root/index/canonical requirements fresh read | `completed` | 26.07.2026 before edits |
+| Applicable recommendation/auth/account/data/UI/cache/ops docs | `completed` | Canonical owners and related Markdown traced |
+| Installed versions/database | `completed` | Boost/CLI exact inventory; SQLite schema read-only |
+| Official framework behavior | `completed` | Laravel 13 verification/transaction/validation and Livewire 4 full-page/forms docs via Boost |
+| Existing implementation first | `completed` | Registration, verification, settings, profile, legacy/v2, exclusions, reset, export and merge traced |
+| Read-only data/coverage audit | `completed` | Counts and missing duration/status evidence recorded |
+| Alternatives/design/files/contracts/risks | `completed` | Linked approved design and detailed unlimited plan |
+| TDD RED | `completed` | Initial 11 tests: 5 passed, 2 failures, 4 errors; recommendation RED: 5 tests, 2 failures, 3 errors, all on missing Task 71 behavior |
+| Implementation | `completed` | Additive schema, typed services, full-page Livewire, recommendation/lifecycle integration and docs implemented |
+| Verification/docs | `completed` | Task matrix 52/52 (73 746 assertions), final 27/27 (73 610), schema rollback/EXPLAIN, Pint/PHPStan/Rector/docs/Vite and Playwright 3/3 GREEN |
+| Full-suite foreign state | `unresolved` | Full 1 GiB suite 1 895/1 909 passed; two foreign failures and one foreign missing-class error remain outside Task 71 |
+| Commit/push | `pending` | Exact Task 71 scope only |
+
+### Execution checklist
+
+1. `[completed][critical]` Fresh requirements, versions, Git/shared-tree,
+   implementation and corpus discovery.
+2. `[completed][critical]` Alternatives, approved normalized design,
+   protected contracts, production/rollback and exact file map.
+3. `[completed][critical]` TDD RED route/schema/service/ranking contracts.
+4. `[completed][critical]` Additive schema, typed state and transactional owner
+   service.
+5. `[completed][high]` Verified full-page Livewire flow and localized redirect.
+6. `[completed][critical]` v2/legacy sources, feature boosts, exclusions, reset,
+   merge and export lifecycle.
+7. `[completed][high]` Responsive RU/EN UI and owner edit entry point.
+8. `[completed][critical]` SQL/security/architecture/performance/compatibility
+   review.
+9. `[completed][critical]` Focused/broad/full/static/build/browser/docs
+   verification.
+10. `[completed][critical]` Canonical docs, README, CHANGELOG and final
+    compliance reread.
+11. `[pending][critical]` Exact isolated commit on existing `main`.
+12. `[pending][critical]` Configured non-force push; external rejection is
+    recorded as unresolved.
+
+### Verification evidence
+
+- Isolated SQLite migration/rollback/remigration прошла; schema test закрепляет
+  FK, unique/index names и реальные `EXPLAIN QUERY PLAN`.
+- Task-focused final matrix прошла 52 tests / 73 746 assertions; после
+  устранения запрещённого visible-text `truncate` точная финальная матрица
+  прошла 27 tests / 73 610 assertions.
+- Scoped Pint и Rector, full PHPStan, Composer validation, docs refresh check
+  и Vite build прошли. Fresh uncached route list содержит оба onboarding route
+  с `auth`/`verified`; локальный stale route cache не очищался.
+- Playwright desktop/mobile/tablet прошёл 3/3 после final UX correction.
+- Default full suite достиг project-wide 256 MiB cumulative limit; exact
+  interrupted test прошёл отдельно. Эквивалентный 1 GiB suite выполнил
+  1 909 tests: 1 895 passed, 11 skipped. Task 71 Blade failure исправлен и
+  повторно прошёл; unresolved foreign failures — account-session flash и
+  отсутствующий `SeasonvarImportDispatchBatcher` из параллельной importer
+  работы.

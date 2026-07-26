@@ -59,6 +59,7 @@ use App\Livewire\Settings\AccountSettingsPage;
 use App\Livewire\StatsDashboard;
 use App\Livewire\Tags\PersonalTagManager;
 use App\Livewire\Tags\TagAdministrationManager;
+use App\Livewire\TasteOnboardingPage;
 use App\Livewire\TechnicalIssues\MyTechnicalIssuesPage;
 use App\Livewire\TechnicalIssues\TechnicalIssueAdministrationManager;
 use App\Livewire\TechnicalIssues\TechnicalIssueDetailPage;
@@ -218,6 +219,13 @@ Route::middleware(['auth', 'auth.session', 'account.private', 'account.active'])
         ->middleware('throttle:media-downloads')
         ->name('titles.media.download');
     Route::get('/email/verify', VerifyEmailPage::class)->name('verification.notice');
+    Route::get('/onboarding/tastes', TasteOnboardingPage::class)
+        ->middleware('verified')
+        ->name('onboarding.tastes');
+    Route::get('/{locale}/onboarding/tastes', TasteOnboardingPage::class)
+        ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
+        ->middleware(['collection.locale', 'verified'])
+        ->name('localized.onboarding.tastes');
     Route::get('/confirm-password', ConfirmPasswordPage::class)->name('password.confirm');
     Route::get('/profile', ProfilePage::class)->name('profile.show');
     Route::get('/profile/discussions', DiscussionPage::class)->name('profile.discussions');

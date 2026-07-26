@@ -17,6 +17,7 @@ use App\Enums\CatalogRecommendationFreshnessPreference;
 use App\Enums\CatalogRecommendationType;
 use App\Models\Genre;
 use App\Models\User;
+use App\Services\Auth\AuthenticationRedirectService;
 use App\Services\Catalog\CatalogFacetQuery;
 use App\Services\Catalog\CatalogRecommendationFeedbackOptionQuery;
 use App\Services\Catalog\CatalogRecommendationFeedbackService;
@@ -120,6 +121,8 @@ final class CatalogDiscoveryPage extends Component
 
     protected CatalogRecommendationFeedbackOptionQuery $feedbackOptions;
 
+    protected AuthenticationRedirectService $authenticationRedirects;
+
     protected ?CatalogRecommendationResult $resolvedResult = null;
 
     protected bool $resolvedResultPrepared = false;
@@ -134,6 +137,7 @@ final class CatalogDiscoveryPage extends Component
         CatalogRecommendationPreferenceService $preferenceService,
         CatalogRecommendationPreferenceQuery $preferenceQuery,
         CatalogRecommendationFeedbackOptionQuery $feedbackOptions,
+        AuthenticationRedirectService $authenticationRedirects,
     ): void {
         $this->recommendations = $recommendations;
         $this->presenter = $presenter;
@@ -144,6 +148,7 @@ final class CatalogDiscoveryPage extends Component
         $this->preferenceService = $preferenceService;
         $this->preferenceQuery = $preferenceQuery;
         $this->feedbackOptions = $feedbackOptions;
+        $this->authenticationRedirects = $authenticationRedirects;
     }
 
     public function mount(string $type): void
@@ -476,6 +481,10 @@ final class CatalogDiscoveryPage extends Component
             'hasFilters' => $hasFilters,
             'isAuthenticated' => $this->user() !== null,
             'showRecommendationPreferences' => $type === CatalogRecommendationType::Personalized && $this->user() !== null,
+            'tasteOnboardingUrl' => $this->authenticationRedirects->guestUrl(
+                'onboarding.tastes',
+                locale: app()->currentLocale(),
+            ),
             'hiddenRecommendationGenres' => $this->user() !== null
                 ? $this->feedbackOptions->activeHiddenGenres($this->user())
                 : collect(),

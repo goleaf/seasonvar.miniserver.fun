@@ -606,3 +606,35 @@ Status precedence при merge: `dropped > completed > paused > watching > plann
 `user-portal` cache не добавляет таблиц и не становится связью данных: он хранит только derived owner-scoped ID pages/counts по `users.public_id` и версии. После извлечения ID canonical Eloquent queries снова применяют owner/visibility; exact positions, tag text, notification/session/token state остаются только в authoritative storage.
 
 Индексы добавлены только для выполняемых запросов: marker unique owner/episode, recent owner list и title/episode ownership lookup; update-state unique owner/title. Existing user-state indexes обслуживают owner/status/watchlist/feedback/time queries, existing progress indexes — history/continue/completion. Дубликаты user/title и user/episode до migration audit отсутствовали; additive schema не выполняет destructive backfill и откатывается удалением только новых tables/column.
+
+## Быстрый onboarding вкусов Task 71
+
+`catalog_recommendation_preferences` остаётся одной owner-row на пользователя и
+получает nullable `onboarding_completed_at` плюс три стабильных enum-code:
+`playback_preference`, `completion_preference` и
+`episode_length_preference`. Значение `any` является нейтральным и не
+изображает отсутствующие metadata.
+
+Три additive relation table хранят только нормализованное приватное состояние:
+
+| Таблица | Целостность и индексируемый запрос |
+| --- | --- |
+| `catalog_recommendation_onboarding_titles` | Одна unique `(user_id,catalog_title_id)` строка с `kind=liked|excluded`; отдельные `(user_id,kind,id)` и `(catalog_title_id,user_id)` обслуживают owner/kind чтение, exclusion и merge. |
+| `catalog_recommendation_preferred_genres` | Одна unique `(user_id,genre_id)` строка; обратный `(genre_id,user_id)` поддерживает integrity/audit без дублирования taxonomy. |
+| `catalog_recommendation_preferred_countries` | Одна unique `(user_id,country_id)` строка; обратный `(country_id,user_id)` сохраняет тот же contract для стран. |
+
+Все FK используют cascade при удалении owner или taxonomy/title. Save заменяет
+bounded наборы в одной транзакции; 5–10 `liked`, не более 10 `excluded`, до 8
+жанров и до 8 стран валидируются до записи. Merge тайтлов сохраняет один
+canonical row с precedence `excluded > liked`. Reset удаляет только onboarding
+relations, обнуляет completion timestamp и возвращает три enum к `any`, не
+затрагивая библиотеку, прогресс, оценки и обычный feedback. Account export
+возвращает только safe codes/labels без внутренних ID.
+
+Migration
+`2026_07_26_231000_add_taste_onboarding_to_catalog_recommendations.php`
+additive и обратима. `down()` удаляет только новые relations/columns; это
+намеренно удаляет onboarding state и потому допустимо только после backup и
+осознанного rollback. Disposable SQLite migration/rollback/remigration,
+foreign-key integrity и `EXPLAIN QUERY PLAN` для каждого нового owner index
+зафиксированы тестом схемы.

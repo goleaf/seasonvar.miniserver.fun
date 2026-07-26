@@ -34,7 +34,8 @@ final class CatalogPersonalPreferenceProfileBuilder
     public function forUser(User $user): CatalogPersonalPreferenceProfile
     {
         $limit = max(10, min(500, (int) config('recommendations.personalized_v2.history_limit', 120)));
-        $resetAt = $this->preferences->forUser($user)->profileResetAt;
+        $preferences = $this->preferences->forUser($user);
+        $resetAt = $preferences->profileResetAt;
         $progress = $this->progressRows($user, $limit, $resetAt);
         $states = $this->stateRows($user, $limit);
         $collections = $this->collectionRows($user, $limit, $resetAt);
@@ -45,6 +46,18 @@ final class CatalogPersonalPreferenceProfileBuilder
         );
         $evidence = [];
         $negativeTitleIds = [];
+
+        foreach ($preferences->likedTitleIds as $titleId) {
+            $this->addEvidence(
+                $evidence,
+                $titleId,
+                CatalogPersonalEvidence::Onboarding,
+                CatalogRecommendationReason::BecauseOnboarding,
+                max(1, (int) config('recommendations.onboarding.source_weight', 200)),
+                $preferences->onboardingCompletedAt,
+                $resetAt,
+            );
+        }
 
         foreach ($progress as $row) {
             $titleId = (int) $row->catalog_title_id;
