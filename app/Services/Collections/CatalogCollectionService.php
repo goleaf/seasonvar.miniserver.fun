@@ -179,6 +179,13 @@ final class CatalogCollectionService
                 $nextFeatured = false;
             }
 
+            if ($locked->type === CatalogCollectionType::Editorial
+                && $visibilityChanged
+                && $data->visibility === CatalogCollectionVisibility::Public) {
+                $nextModeration = CatalogCollectionModerationStatus::Pending;
+                $nextFeatured = false;
+            }
+
             if ($data->visibility !== CatalogCollectionVisibility::Public) {
                 $nextFeatured = false;
             }
@@ -335,6 +342,11 @@ final class CatalogCollectionService
 
     private function initialModeration(CatalogCollectionData $data, User $owner): CatalogCollectionModerationStatus
     {
+        if ($data->type === CatalogCollectionType::Editorial
+            && $data->visibility === CatalogCollectionVisibility::Public) {
+            return CatalogCollectionModerationStatus::Pending;
+        }
+
         if ($data->type !== CatalogCollectionType::User || Gate::forUser($owner)->allows('manage-catalog')) {
             return CatalogCollectionModerationStatus::Approved;
         }

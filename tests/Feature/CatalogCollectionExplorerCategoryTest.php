@@ -9,6 +9,8 @@ use App\Enums\CatalogCollectionVisibility;
 use App\Livewire\Collections\CatalogCollectionExplorer;
 use App\Models\CatalogCollection;
 use App\Models\CatalogCollectionCategory;
+use App\Models\CatalogCollectionItem;
+use App\Models\CatalogTitle;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
@@ -25,7 +27,7 @@ final class CatalogCollectionExplorerCategoryTest extends TestCase
         $otherRoot = CatalogCollectionCategory::query()->where('slug', 'format')->firstOrFail();
         $this->collection('Корневая', $root);
         $this->collection('Дочерняя', $child);
-        $this->collection('Без категории');
+        $this->collection('Без категории', uncategorized: true);
         $this->collection('Приватная', $child, CatalogCollectionVisibility::Private);
 
         Livewire::withQueryParams([
@@ -41,7 +43,7 @@ final class CatalogCollectionExplorerCategoryTest extends TestCase
             ->assertSeeText('Детективы и криминал')
             ->assertDontSeeText('Долгие истории')
             ->assertDontSeeText('Формат')
-            ->assertSeeText(__('collections.directory.uncategorized'))
+            ->assertDontSeeText(__('collections.directory.uncategorized'))
             ->assertSeeText('Дочерняя')
             ->assertDontSeeText('Корневая')
             ->set('category', $otherRoot->slug)
@@ -102,8 +104,17 @@ final class CatalogCollectionExplorerCategoryTest extends TestCase
         string $name,
         ?CatalogCollectionCategory $category = null,
         CatalogCollectionVisibility $visibility = CatalogCollectionVisibility::Public,
+        bool $uncategorized = false,
     ): CatalogCollection {
-        return CatalogCollection::query()->create([
+        if ($category === null
+            && $visibility === CatalogCollectionVisibility::Public
+            && ! $uncategorized) {
+            $category = CatalogCollectionCategory::query()
+                ->where('slug', 'themes-and-genres')
+                ->firstOrFail();
+        }
+
+        $collection = CatalogCollection::query()->create([
             'public_id' => (string) Str::uuid(),
             'catalog_collection_category_id' => $category?->id,
             'name' => $name,
@@ -112,5 +123,15 @@ final class CatalogCollectionExplorerCategoryTest extends TestCase
             'moderation_status' => CatalogCollectionModerationStatus::Approved,
             'published_at' => $visibility === CatalogCollectionVisibility::Public ? now() : null,
         ]);
+
+        if ($visibility === CatalogCollectionVisibility::Public) {
+            CatalogCollectionItem::query()->create([
+                'catalog_collection_id' => $collection->id,
+                'catalog_title_id' => CatalogTitle::factory()->create()->id,
+                'position' => 1,
+            ]);
+        }
+
+        return $collection;
     }
 }

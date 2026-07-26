@@ -9,14 +9,17 @@ use App\Enums\CatalogCollectionType;
 use App\Enums\CatalogCollectionVisibility;
 use App\Models\CatalogCollection;
 use App\Models\User;
+use App\Services\Collections\CatalogCollectionQuery;
 use Illuminate\Auth\Access\Response;
 use Illuminate\Support\Facades\Gate;
 
 final class CatalogCollectionPolicy
 {
+    public function __construct(private readonly CatalogCollectionQuery $collections) {}
+
     public function view(?User $user, CatalogCollection $collection): Response
     {
-        if ($collection->isPubliclyViewable()) {
+        if ($this->isPubliclyViewable($collection)) {
             return Response::allow();
         }
 
@@ -88,7 +91,7 @@ final class CatalogCollectionPolicy
     {
         return $user->hasVerifiedEmail()
             && ! $collection->isOwnedBy($user)
-            && $collection->isPubliclyViewable();
+            && $this->isPubliclyViewable($collection);
     }
 
     private function canManage(?User $user, CatalogCollection $collection): bool
@@ -97,5 +100,15 @@ final class CatalogCollectionPolicy
             $collection->isOwnedBy($user)
             || Gate::forUser($user)->allows('manage-catalog')
         );
+    }
+
+    private function isPubliclyViewable(CatalogCollection $collection): bool
+    {
+        if (! $collection->isPubliclyViewable()) {
+            return false;
+        }
+
+        return $collection->visibility !== CatalogCollectionVisibility::Public
+            || $this->collections->isPubliclyListed($collection);
     }
 }

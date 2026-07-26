@@ -331,7 +331,7 @@
 <!-- project-docs:start -->
 ## Автоматически обновляемое состояние документации
 
-- Последнее автоматическое обновление блоков документации: 25.07.2026.
+- Последнее автоматическое обновление блоков документации: 26.07.2026.
 - Команда обновления: `php artisan project:docs-refresh`.
 - Хук автокоммита: `.githooks/post-commit` через `scripts/docs-autocommit-push.sh`; отправка в Git включается только через `SEASONVAR_DOCS_AUTO_PUSH=1`.
 - Основной sitemap для robots и поисковых систем: `https://seasonvar.miniserver.fun/sitemap-index.xml`.
@@ -456,6 +456,7 @@
 - `2026_07_25_140300_drop_catalog_collection_cover_columns.php`
 - `2026_07_25_220709_create_release_calendar_feeds_table.php`
 - `2026_07_26_120000_replace_recommendation_feedback_index_for_activity_order.php`
+- `2026_07_26_230000_create_catalog_recommendation_feedback_preferences.php`
 <!-- project-docs:end -->
 
 ## 2026-07-16 — recommendation/discovery task 18

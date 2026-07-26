@@ -110,14 +110,15 @@ final class DemoCatalogCorpusStageTest extends TestCase
             }
         }
 
-        $this->assertEqualsCanonicalizing(
-            array_column(CatalogCollectionVisibility::cases(), 'value'),
+        $this->assertSame(
+            [CatalogCollectionVisibility::Private->value],
             CatalogCollection::query()->get(['visibility'])->pluck('visibility')
                 ->map(static fn (CatalogCollectionVisibility $visibility): string => $visibility->value)
                 ->unique()
                 ->values()
                 ->all(),
         );
+        $this->assertSame(0, CatalogCollection::query()->whereNotNull('published_at')->count());
         $this->assertEqualsCanonicalizing(
             array_column(CatalogCollectionSort::cases(), 'value'),
             CatalogCollection::query()->get(['sort_mode'])->pluck('sort_mode')

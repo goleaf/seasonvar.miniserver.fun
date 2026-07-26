@@ -11,6 +11,7 @@ use App\Enums\CatalogCollectionType;
 use App\Enums\CatalogCollectionVisibility;
 use App\Enums\CatalogRecommendationType;
 use App\Models\CatalogCollection;
+use App\Models\CatalogCollectionCategory;
 use App\Models\CatalogCollectionItem;
 use App\Models\CatalogCollectionSource;
 use App\Models\CatalogTitle;
@@ -71,9 +72,15 @@ final class CatalogEditorialDiscoveryTest extends TestCase
 
     private function collection(string $slug, mixed $publishedAt): CatalogCollection
     {
+        $category = CatalogCollectionCategory::query()->create([
+            'slug' => 'editorial-'.$slug,
+            'position' => 1,
+            'is_active' => true,
+        ]);
         $collection = CatalogCollection::query()->create([
             'public_id' => (string) Str::uuid(),
             'owner_id' => null,
+            'catalog_collection_category_id' => $category->id,
             'name' => str($slug)->replace('-', ' ')->title()->toString(),
             'description' => null,
             'slug' => $slug,

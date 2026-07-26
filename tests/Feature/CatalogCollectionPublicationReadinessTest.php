@@ -13,6 +13,7 @@ use App\Enums\CatalogCollectionVisibility;
 use App\Livewire\Collections\CatalogCollectionAdministrationManager;
 use App\Models\AdminAuditEvent;
 use App\Models\CatalogCollection;
+use App\Models\CatalogCollectionCategory;
 use App\Models\CatalogCollectionItem;
 use App\Models\CatalogCollectionSource;
 use App\Models\CatalogTitle;
@@ -146,6 +147,39 @@ final class CatalogCollectionPublicationReadinessTest extends TestCase
         self::assertSame(
             [CatalogCollectionReadinessReason::Deleted->value],
             $results[$deleted->id]['reason_codes'],
+        );
+    }
+
+    #[Test]
+    public function readiness_reports_missing_inactive_and_oversized_public_structure(): void
+    {
+        config(['catalog-collections.maximum_public_items_per_collection' => 12]);
+        $missingCategory = $this->collection('missing-category');
+        $inactiveCategory = $this->collection('inactive-category');
+        $oversized = $this->collection('oversized');
+        $missingCategory->forceFill(['catalog_collection_category_id' => null])->save();
+        $inactiveCategory->category()->update(['is_active' => false]);
+        $this->attachWatchableTitles($missingCategory, 12);
+        $this->attachWatchableTitles($inactiveCategory, 12);
+        $this->attachWatchableTitles($oversized, 13);
+
+        $results = app(CatalogCollectionPublicationReadiness::class)->evaluateMany([
+            $missingCategory,
+            $inactiveCategory,
+            $oversized,
+        ]);
+
+        self::assertSame(
+            [CatalogCollectionReadinessReason::MissingCategory->value],
+            $results[$missingCategory->id]['reason_codes'],
+        );
+        self::assertSame(
+            [CatalogCollectionReadinessReason::InactiveCategory->value],
+            $results[$inactiveCategory->id]['reason_codes'],
+        );
+        self::assertSame(
+            [CatalogCollectionReadinessReason::TooManyItems->value],
+            $results[$oversized->id]['reason_codes'],
         );
     }
 
@@ -318,9 +352,17 @@ final class CatalogCollectionPublicationReadinessTest extends TestCase
 
     private function collection(string $slug, bool $published = true): CatalogCollection
     {
+        $category = CatalogCollectionCategory::query()->create([
+            'public_id' => (string) Str::uuid(),
+            'slug' => 'readiness-'.$slug,
+            'position' => 100,
+            'is_active' => true,
+        ]);
+
         return CatalogCollection::query()->create([
             'public_id' => (string) Str::uuid(),
             'owner_id' => null,
+            'catalog_collection_category_id' => $category->id,
             'name' => str($slug)->replace('-', ' ')->title()->toString(),
             'description' => null,
             'slug' => $slug,

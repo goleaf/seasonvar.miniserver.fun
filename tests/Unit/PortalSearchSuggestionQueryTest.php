@@ -13,6 +13,8 @@ use App\Enums\TagType;
 use App\Enums\TagVisibility;
 use App\Enums\UserProfileVisibility;
 use App\Models\CatalogCollection;
+use App\Models\CatalogCollectionCategory;
+use App\Models\CatalogCollectionItem;
 use App\Models\CatalogTitle;
 use App\Models\ContentRequest;
 use App\Models\Genre;
@@ -104,14 +106,33 @@ final class PortalSearchSuggestionQueryTest extends TestCase
 
     private function collection(string $name, string $slug, bool $public): CatalogCollection
     {
-        return CatalogCollection::query()->create([
+        $category = $public
+            ? CatalogCollectionCategory::query()->create([
+                'slug' => 'search-'.$slug,
+                'position' => 1,
+                'is_active' => true,
+            ])
+            : null;
+        $collection = CatalogCollection::query()->create([
             'public_id' => (string) Str::uuid(),
+            'catalog_collection_category_id' => $category?->id,
             'name' => $name,
             'slug' => $slug,
             'type' => CatalogCollectionType::User,
             'visibility' => $public ? CatalogCollectionVisibility::Public : CatalogCollectionVisibility::Private,
             'moderation_status' => CatalogCollectionModerationStatus::Approved,
+            'published_at' => $public ? now() : null,
         ]);
+
+        if ($public) {
+            CatalogCollectionItem::query()->create([
+                'catalog_collection_id' => $collection->id,
+                'catalog_title_id' => CatalogTitle::factory()->create()->id,
+                'position' => 1,
+            ]);
+        }
+
+        return $collection;
     }
 
     private function contentRequest(string $title, bool $public): ContentRequest

@@ -4,22 +4,22 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Services\DemoData\DemoUserPortalRepairer;
+use App\Services\Collections\CatalogCollectionPublicQualityRepairer;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Throwable;
 
-#[Signature('demo:repair-user-portal
+#[Signature('catalog-collections:repair-public-quality
     {--dry-run : Только показать агрегатное состояние без записи}
-    {--force : Разрешить ограниченный repair известных demo accounts}
+    {--force : Разрешить exact provenance quarantine}
     {--backup-confirmed : Подтвердить проверенный backup перед production write}
     {--writers-paused : Подтвердить остановку production writers}
     {--json : Вывести машинно-читаемый JSON}')]
-#[Description('Проверяет и исправляет user portal и legacy public tag/collection footprint известных demo data')]
-final class RepairDemoUserPortal extends Command
+#[Description('Проверяет и изолирует exact demo/source шум публичных подборок')]
+final class RepairCatalogCollectionPublicQuality extends Command
 {
-    public function handle(DemoUserPortalRepairer $repairer): int
+    public function handle(CatalogCollectionPublicQualityRepairer $repairer): int
     {
         $dryRun = (bool) $this->option('dry-run') || ! (bool) $this->option('force');
 
@@ -37,18 +37,23 @@ final class RepairDemoUserPortal extends Command
                 : ['mode' => 'repair', ...$repairer->repair()];
         } catch (Throwable $exception) {
             report($exception);
-            $this->error('Demo portal repair остановлен. Подробности записаны в закрытый журнал.');
+            $this->error('Repair качества подборок остановлен. Подробности записаны в закрытый журнал.');
 
             return self::FAILURE;
         }
 
         if ((bool) $this->option('json')) {
-            $this->line((string) json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT));
+            $this->line((string) json_encode(
+                $result,
+                JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT,
+            ));
 
             return self::SUCCESS;
         }
 
-        $this->info($dryRun ? 'Dry-run завершён; данные не изменялись.' : 'Ограниченный repair завершён; прогрев поставлен в очередь.');
+        $this->info($dryRun
+            ? 'Dry-run качества подборок завершён; данные не изменялись.'
+            : 'Exact collection quarantine завершён.');
 
         foreach (($dryRun ? $result['state'] : $result['after']) as $name => $value) {
             $this->line("{$name}: {$value}");

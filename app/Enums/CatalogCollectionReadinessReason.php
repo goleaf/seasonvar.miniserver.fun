@@ -12,6 +12,9 @@ enum CatalogCollectionReadinessReason: string
     case NotPublished = 'not_published';
     case Deleted = 'deleted';
     case SourceMissing = 'source_missing';
+    case MissingCategory = 'missing_category';
+    case InactiveCategory = 'inactive_category';
+    case TooManyItems = 'too_many_items';
     case InsufficientVisibleItems = 'insufficient_visible_items';
     case UnavailableItems = 'unavailable_items';
 

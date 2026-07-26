@@ -192,12 +192,17 @@ Filters reuse `CatalogTaxonomyRegistry`, task 04 facet SQL and canonical visibil
 
 Редакционный discovery и featured-блок главной принимают только одну и ту же
 readiness-passing подборку: editorial, public, approved, published, не
-удалённую, с доступным source record и без недоступных гостю membership.
+удалённую, с активной категорией, доступным source record, не более чем
+500 membership и без недоступных гостю membership.
 Минимум составляет 12 воспроизводимых тайтлов для локальной подборки и 4 для
 source-managed. Тонкая или ставшая недоступной featured-подборка исключается
 целиком, а не отдаёт частичный список; прошедшие подборки сохраняют
 publication order, manual item order и unique title IDs. Обычный каталог
-подборок, detail, API и sitemap этим rollout-фильтром не сужаются.
+подборок, detail, API, profile/search suggestions и sitemap используют более
+широкий общий quality scope: active category, published public/approved state,
+доступный source и от 1 до 500 membership. Uncategorized, empty и oversized
+records не появляются даже по прямому публичному slug; owner/admin сохраняют
+управление ими.
 
 Все девять discovery type сохраняют прежние route identities. Явное
 обновление выполняет один server resolve уже с новым seed. Deterministic guest

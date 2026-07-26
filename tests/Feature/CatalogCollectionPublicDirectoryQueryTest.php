@@ -10,6 +10,7 @@ use App\Enums\CatalogCollectionType;
 use App\Enums\CatalogCollectionVisibility;
 use App\Enums\ContentAudience;
 use App\Models\CatalogCollection;
+use App\Models\CatalogCollectionCategory;
 use App\Models\CatalogCollectionItem;
 use App\Models\CatalogTitle;
 use App\Services\Collections\CatalogCollectionQuery;
@@ -34,11 +35,19 @@ final class CatalogCollectionPublicDirectoryQueryTest extends TestCase
             'audience' => ContentAudience::Authenticated,
         ]);
 
+        foreach ($collections as $collection) {
+            CatalogCollectionItem::query()->create([
+                'catalog_collection_id' => $collection->id,
+                'catalog_title_id' => CatalogTitle::factory()->create()->id,
+                'position' => 1,
+            ]);
+        }
+
         foreach ([$visibleTitle, $hiddenTitle, $authenticatedTitle] as $position => $title) {
             CatalogCollectionItem::query()->create([
                 'catalog_collection_id' => $target->id,
                 'catalog_title_id' => $title->id,
-                'position' => $position + 1,
+                'position' => $position + 2,
             ]);
         }
 
@@ -88,11 +97,11 @@ final class CatalogCollectionPublicDirectoryQueryTest extends TestCase
         );
 
         $this->assertInstanceOf(CatalogCollection::class, $hydratedTarget);
-        $this->assertSame(3, (int) $hydratedTarget->total_items_count);
-        $this->assertSame(1, (int) $hydratedTarget->visible_items_count);
+        $this->assertSame(4, (int) $hydratedTarget->total_items_count);
+        $this->assertSame(2, (int) $hydratedTarget->visible_items_count);
         $this->assertInstanceOf(CatalogCollection::class, $emptyCollection);
-        $this->assertSame(0, (int) $emptyCollection->total_items_count);
-        $this->assertSame(0, (int) $emptyCollection->visible_items_count);
+        $this->assertSame(1, (int) $emptyCollection->total_items_count);
+        $this->assertSame(1, (int) $emptyCollection->visible_items_count);
         $this->assertSame(8, $page->total());
         $this->assertSame(6, $page->perPage());
         $this->assertSame(1, $page->currentPage());
@@ -105,8 +114,13 @@ final class CatalogCollectionPublicDirectoryQueryTest extends TestCase
 
     private function collection(string $name): CatalogCollection
     {
+        $category = CatalogCollectionCategory::query()
+            ->where('slug', 'themes-and-genres')
+            ->firstOrFail();
+
         return CatalogCollection::query()->create([
             'public_id' => (string) Str::uuid(),
+            'catalog_collection_category_id' => $category->id,
             'name' => $name,
             'slug' => Str::slug($name).'-'.Str::lower(Str::random(8)),
             'type' => CatalogCollectionType::Editorial,

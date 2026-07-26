@@ -480,6 +480,19 @@ Existing per-minute `schedule:run` обслуживает `catalog-collections:p
 
 Operational rollback начинается с `HDREZKA_COLLECTION_SYNC_ENABLED=false`, config-cache rebuild и graceful worker reload: существующие локальные подборки продолжают открываться, а новые runs не стартуют. После production writes сохраняйте source audit и collections в verified database backup; migration rollback удалит audit и exact-match индексы, поэтому выполняется только вместе с совместимым code rollback. Collection images не восстанавливаются. Не используйте `cache:clear`, `queue:clear`, `migrate:fresh` или `db:wipe`.
 
+### Quarantine прежнего шума публичных подборок
+
+1. До остановки writers выполните только `php artisan catalog-collections:repair-public-quality --dry-run --json` и сохраните агрегатный отчёт без идентификаторов пользователей или source URL. Нулевой `publicly_listed_records` при ненулевом legacy public count является ожидаемым fail-closed состоянием до cleanup, а не разрешением на запись.
+2. Штатно остановите единственный Seasonvar importer, collection sync, queue workers/scheduler и другие database writers; убедитесь, что active run/build counters равны нулю. Создайте отдельный verified SQLite backup, выполните quick/FK checks и подтвердите место для rollback.
+3. Выполните `php artisan catalog-collections:repair-public-quality --force --backup-confirmed --writers-paused --json`. Команда повторно проверяет exact demo UUID/owner footprint, ownerless uncategorized HDRezka provenance и active writers. Она переводит найденные collections в private review, удаляет только недействительные `editorial_collection` signals/materialized recommendations и не удаляет membership/source/comments/reports/users.
+4. Повторите dry-run: quarantine candidates и source signals должны стать нулевыми. Затем возобновите workers, проверьте `/discover/popular`, collection search/API/sitemap и одну вручную одобренную categorized collection. Глобальный cache flush не требуется: repair использует существующие targeted generation boundaries.
+
+Rollback не выполняется массовым обратным `UPDATE`: прежняя автоматическая
+публикация не является допустимым состоянием. При ошибочном exact match
+остановите writers и восстановите verified backup; при частичном прерывании
+повторите идемпотентную команду после устранения причины. Code rollback
+оставляет private rows безопасно скрытыми.
+
 Rollback до появления production collection writes: остановить writers, вернуть code/assets, выполнить additive migration rollback в обратном порядке и восстановить caches. После реальных writes сначала выгрузить collection/account JSON и сделать verified database backup: `down()` базовых migrations удаляет новые data tables и `users.public_id`, поэтому rollback без экспорта теряет collection domain data. Destructive cover migration восстанавливает только пустые legacy columns и не является media rollback. Процедура не должна использовать `migrate:fresh`, `db:wipe` или затрагивать watchlist/progress/history. Roll-forward предпочтителен после начала пользовательской записи.
 
 ## Rollout обсуждений

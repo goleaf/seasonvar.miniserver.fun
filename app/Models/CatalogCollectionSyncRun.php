@@ -5,10 +5,19 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\CatalogCollectionSyncStatus;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property int $id
+ * @property string $provider
+ * @property CatalogCollectionSyncStatus $status
+ * @property array<string, int>|null $counters
+ * @property CarbonImmutable|null $started_at
+ * @property CarbonImmutable|null $completed_at
+ */
 #[Fillable([
     'provider',
     'status',

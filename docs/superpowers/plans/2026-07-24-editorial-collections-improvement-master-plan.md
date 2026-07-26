@@ -129,6 +129,12 @@ Research является редакционным ориентиром, а не
 
 Tasks 3, 5, 8–18 may be planned or implemented in code without production activation. Provider HTTP, production DML, feature activation and migrations remain separate explicit gates.
 
+С 26.07.2026 private review является принудительной runtime-границей:
+source sync создаёт новые строки `private/archived`, а public directory,
+detail, API, search, sitemap и recommendation signals принимают только
+категоризированные непустые collections размером не более 500. Это уточнение
+заменяет историческое auto-public поведение ранней реализации sync.
+
 ## 4. Task 1 — безопасная диагностика здоровья
 
 **Priority:** P0.

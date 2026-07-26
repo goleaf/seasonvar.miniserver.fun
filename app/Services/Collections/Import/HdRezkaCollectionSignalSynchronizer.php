@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services\Collections\Import;
 
-use App\Enums\CatalogCollectionModerationStatus;
 use App\Enums\CatalogCollectionSourceMatchStatus;
 use App\Enums\CatalogCollectionSyncStatus;
 use App\Enums\CatalogCollectionType;
-use App\Enums\CatalogCollectionVisibility;
+use App\Models\CatalogCollection;
 use App\Models\CatalogCollectionSourceItem;
 use App\Models\CatalogCollectionSyncRun;
 use App\Models\CatalogTitleRecommendationSignal;
@@ -26,6 +25,10 @@ final class HdRezkaCollectionSignalSynchronizer
             1000,
             (int) config('recommendations.similarity_v6.editorial_collection_signal_weight', 280),
         ));
+        $eligibleCollectionIds = CatalogCollection::query()
+            ->select('catalog_collections.id')
+            ->publiclyListed()
+            ->where('type', CatalogCollectionType::Editorial->value);
         $query = CatalogCollectionSourceItem::query()
             ->select(['id', 'catalog_collection_source_id', 'catalog_title_id'])
             ->where('last_seen_run_id', $run->id)
@@ -34,10 +37,7 @@ final class HdRezkaCollectionSignalSynchronizer
             ->whereHas('source', fn (Builder $source): Builder => $source
                 ->where('provider', $run->provider)
                 ->whereHas('collection', fn (Builder $collection): Builder => $collection
-                    ->where('type', CatalogCollectionType::Editorial->value)
-                    ->where('visibility', CatalogCollectionVisibility::Public->value)
-                    ->where('moderation_status', CatalogCollectionModerationStatus::Approved->value)
-                    ->whereNotNull('published_at')))
+                    ->whereIn('catalog_collections.id', $eligibleCollectionIds)))
             ->with('source:id,source_key')
             ->orderBy('id');
 

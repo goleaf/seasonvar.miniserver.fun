@@ -9163,6 +9163,82 @@ temporary B-tree.
   Configured HTTPS push завершился кодом 128 до передачи данных:
   `could not read Username for 'https://github.com'`.
 
+## Task 67 — качество публичных подборок
+
+Статус: `implementation_complete_commit_pending`.
+
+Дата начала: 26.07.2026.
+
+Approved design:
+[`2026-07-26-public-collection-quality-design.md`](../superpowers/specs/2026-07-26-public-collection-quality-design.md).
+
+Detailed implementation plan:
+[`2026-07-26-public-collection-quality.md`](../superpowers/plans/2026-07-26-public-collection-quality.md).
+
+### Цель и evidence
+
+Read-only SQLite census доказал, что все 501 public/approved collection без
+категории принадлежат двум точным источникам: 447 deterministic
+`seasonvar-demo-v1` user rows и 54 ownerless HDRezka source rows. Demo
+collections имеют 1 527–4 201 membership и 19 повторяющихся названий;
+source rows включают 39 пустых. 99 recommendation signals доверяют 15
+неклассифицированным source collections.
+
+Выбран единый fail-closed public scope, private-by-default generation/import
+и reversible provenance repair. Collection/item/source/comment/report/user
+data не удаляются.
+
+### Ожидаемые файлы и protected contracts
+
+Exact manifest, зависимости, риски, rollback и unlimited checklist находятся
+в linked detailed plan. Сохраняются `main`, существующие web/API routes и
+resource shape, Livewire URL state, collection identity/items/order,
+policies/audit/cache domains, source provenance/exact matcher, text-only UI,
+SQLite и все foreign changes shared worktree.
+
+### Task-specific requirement-compliance matrix
+
+| Requirement/domain | Статус | Evidence / следующий gate |
+| --- | --- | --- |
+| Root/index/canonical requirements | `completed` | Fresh read выполнен до edits |
+| Versions/stack/database | `completed` | PHP 8.5.8, Laravel 13.22.0, Livewire 4.3.3, SQLite |
+| Existing implementation/data audit | `completed` | Public/import/demo/readiness/signals and 501-row provenance traced |
+| Design/plan/files/contracts/risks | `completed` | Linked spec and detailed checklist |
+| Migration/index | `not_applicable` | SQLite EXPLAIN использует existing public/category/source/covering membership indexes; новый почти дублирующий индекс не оправдан |
+| TDD/backend/repair/frontend | `completed` | Canonical scope, direct policy/API/SEO, moderation, limits, private-by-default generators, exact repair и RU/EN errors покрыты focused tests |
+| Production DML | `unresolved` | Dry-run: 501 raw public, 0 eligible, 897 demo + 54 source candidates и 99 signals; verified backup/writer pause отсутствуют, один Seasonvar writer активен |
+| Documentation | `completed` | Architecture, data relations, search, development, deployment, master plan, README и CHANGELOG обновлены |
+| Focused verification | `completed` | 78 tests / 6 183 assertions; Pint, exact PHPStan, Rector dry-run, Composer validation, Vite build, routes/config/migrations и dry-run green |
+| Browser verification | `completed` | Managed Chromium: desktop/mobile/tablet, 3/3 scenarios, no console/page/HTTP errors |
+| Full default PHPUnit process | `unresolved` | `256M` process exhausts memory; explicit 1G run reached 1 893 tests with 1 877 pass and 196 813 assertions, then reported 4 foreign failures + 1 missing foreign importer class |
+| Managed documentation refresh | `unresolved` | `project:docs-refresh --check` reports concurrent drift in README/CODE_STANDARDS/DATA_RELATIONS/SOURCE_PARITY/MAINTENANCE_LOG; broad rewrite not run over shared tree |
+| Commit/push | `pending` | Exact Task 67 scope only |
+
+### Execution checklist
+
+1. `[completed][critical]` Fresh requirements, versions, Git/shared-tree и
+   фактический 501-row census.
+2. `[completed][critical]` Root-cause trace через demo generator, HDRezka
+   reconciler, public scopes, SEO/search/sitemap и recommendation signals.
+3. `[completed][critical]` Approved design, exact file/protected-contract
+   maps, rollback и task-specific compliance matrix.
+4. `[completed][critical]` TDD RED/GREEN canonical public eligibility,
+   direct web/API access, moderation и public/private membership limits.
+5. `[completed][critical]` Private-by-default demo/source generation,
+   public-only recommendation signals и removal лишнего unreviewed rebuild.
+6. `[completed][critical]` Exact reversible quarantine command with dry-run,
+   production confirmations, active-writer gates, idempotence и preservation
+   assertions.
+7. `[completed][high]` SQLite EXPLAIN/index review и live dry-run without DML.
+8. `[completed][high]` Related collection fixture compatibility and
+   readiness reason coverage.
+9. `[completed][medium]` Canonical/product/operations docs, README и
+   CHANGELOG.
+10. `[completed][critical]` Exact formatting/static/full/backend/frontend
+    verification, final requirement reread and repository legacy scan.
+11. `[in_progress][critical]` Exact isolated commit on existing `main`.
+12. `[pending][critical]` Configured non-force push; external rejection is
+    recorded as unresolved.
 
 ## Task 68 — компактная web-проекция главной страницы
 

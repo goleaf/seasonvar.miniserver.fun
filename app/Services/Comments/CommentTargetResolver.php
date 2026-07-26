@@ -142,7 +142,18 @@ final class CommentTargetResolver
         bool $lock,
     ): CommentTarget {
         $query = CatalogCollection::query()
-            ->select(['id', 'slug', 'name', 'owner_id', 'type', 'visibility', 'moderation_status', 'deleted_at'])
+            ->select([
+                'id',
+                'slug',
+                'name',
+                'owner_id',
+                'catalog_collection_category_id',
+                'type',
+                'visibility',
+                'moderation_status',
+                'published_at',
+                'deleted_at',
+            ])
             ->with('translations:id,catalog_collection_id,locale,name');
 
         if ($lock) {

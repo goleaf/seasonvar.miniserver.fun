@@ -8,6 +8,8 @@ use App\Enums\CatalogCollectionModerationStatus;
 use App\Enums\CatalogCollectionVisibility;
 use App\Models\CatalogCollection;
 use App\Models\CatalogCollectionCategory;
+use App\Models\CatalogCollectionItem;
+use App\Models\CatalogTitle;
 use App\Services\Collections\CatalogCollectionQuery;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -28,7 +30,7 @@ final class CatalogCollectionDirectoryCategoryTest extends TestCase
         $rootCollection = $this->collection('Корневая', $root);
         $childCollection = $this->collection('Дочерняя', $child);
         $otherCollection = $this->collection('Другая', $other);
-        $uncategorized = $this->collection('Без категории');
+        $uncategorized = $this->collection('Без категории', uncategorized: true);
         $query = app(CatalogCollectionQuery::class);
 
         $rootResults = $query->publicDirectory(category: $root->slug);
@@ -40,7 +42,8 @@ final class CatalogCollectionDirectoryCategoryTest extends TestCase
             $rootResults->getCollection()->modelKeys(),
         );
         $this->assertSame([$childCollection->id], $childResults->getCollection()->modelKeys());
-        $this->assertSame([$uncategorized->id], $uncategorizedResults->getCollection()->modelKeys());
+        $this->assertSame([], $uncategorizedResults->getCollection()->modelKeys());
+        $this->assertNotContains($uncategorized->id, $rootResults->getCollection()->modelKeys());
         $this->assertNotContains($otherCollection->id, $rootResults->getCollection()->modelKeys());
         $this->assertSame('Темы и жанры', $rootResults->getCollection()->firstWhere('id', $rootCollection->id)?->category?->display_name);
     }
@@ -118,14 +121,14 @@ final class CatalogCollectionDirectoryCategoryTest extends TestCase
         );
 
         $this->assertIsString($idPageQuery);
-        $this->assertStringNotContainsString('catalog_collection_items', $idPageQuery);
+        $this->assertStringContainsString('catalog_collection_items', $idPageQuery);
         $this->assertIsString($summaryQuery);
         $this->assertMatchesRegularExpression(
             '/"catalog_collections"\\."id" in \\((?:\\d+, ){5}\\d+\\)/',
             $summaryQuery,
         );
         $this->assertIsString($countQuery);
-        $this->assertStringNotContainsString('catalog_collection_items', $countQuery);
+        $this->assertStringContainsString('catalog_collection_items', $countQuery);
 
         $emptySql = [];
         DB::listen(static function (QueryExecuted $query) use (&$emptySql): void {
@@ -142,7 +145,14 @@ final class CatalogCollectionDirectoryCategoryTest extends TestCase
         string $name,
         ?CatalogCollectionCategory $category = null,
         ?string $updatedAt = null,
+        bool $uncategorized = false,
     ): CatalogCollection {
+        if ($category === null && ! $uncategorized) {
+            $category = CatalogCollectionCategory::query()
+                ->where('slug', 'themes-and-genres')
+                ->firstOrFail();
+        }
+
         $collection = CatalogCollection::query()->create([
             'public_id' => (string) Str::uuid(),
             'catalog_collection_category_id' => $category?->id,
@@ -151,6 +161,11 @@ final class CatalogCollectionDirectoryCategoryTest extends TestCase
             'visibility' => CatalogCollectionVisibility::Public,
             'moderation_status' => CatalogCollectionModerationStatus::Approved,
             'published_at' => now(),
+        ]);
+        CatalogCollectionItem::query()->create([
+            'catalog_collection_id' => $collection->id,
+            'catalog_title_id' => CatalogTitle::factory()->create()->id,
+            'position' => 1,
         ]);
 
         if ($updatedAt !== null) {

@@ -13,6 +13,7 @@ use App\Enums\CatalogCollectionSyncStatus;
 use App\Enums\CatalogCollectionType;
 use App\Enums\CatalogCollectionVisibility;
 use App\Models\CatalogCollection;
+use App\Models\CatalogCollectionCategory;
 use App\Models\CatalogCollectionSource;
 use App\Models\CatalogCollectionSyncRun;
 use App\Models\CatalogTitle;
@@ -21,6 +22,7 @@ use App\Services\Catalog\Search\CatalogSearchNormalizer;
 use App\Services\Collections\Import\HdRezkaCollectionReconciler;
 use App\Services\Collections\Import\HdRezkaCollectionSignalSynchronizer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 final class HdRezkaCollectionReconciliationTest extends TestCase
@@ -57,10 +59,10 @@ final class HdRezkaCollectionReconciliationTest extends TestCase
         $this->assertSame(0, $result['removed']);
         $this->assertNull($collection->owner_id);
         $this->assertSame(CatalogCollectionType::Editorial, $collection->type);
-        $this->assertSame(CatalogCollectionVisibility::Public, $collection->visibility);
-        $this->assertSame(CatalogCollectionModerationStatus::Approved, $collection->moderation_status);
+        $this->assertSame(CatalogCollectionVisibility::Private, $collection->visibility);
+        $this->assertSame(CatalogCollectionModerationStatus::Archived, $collection->moderation_status);
         $this->assertSame('Про любовь', $collection->name);
-        $this->assertNotNull($collection->published_at);
+        $this->assertNull($collection->published_at);
         $this->assertSame(1, $collection->content_version);
         $this->assertSame($collection->id, $source->catalog_collection_id);
         $this->assertSame($run->id, $source->last_seen_run_id);
@@ -218,9 +220,32 @@ final class HdRezkaCollectionReconciliationTest extends TestCase
 
         $initial = $signalSync->synchronizeForRun($complete->refresh());
 
-        $this->assertSame(2, $initial['upserted']);
+        $this->assertSame(0, $initial['upserted']);
         $this->assertSame(0, $initial['deleted']);
-        $this->assertEqualsCanonicalizing([$first->id, $second->id], $initial['title_ids']);
+        $this->assertSame([], $initial['title_ids']);
+        $this->assertDatabaseMissing('catalog_title_recommendation_signals', [
+            'source' => 'hdrezka',
+            'signal_type' => 'editorial_collection',
+            'signal_key' => $this->definition()->sourceKey,
+        ]);
+
+        $category = CatalogCollectionCategory::query()->create([
+            'public_id' => (string) Str::uuid(),
+            'slug' => 'reviewed-source-collection',
+            'position' => 100,
+            'is_active' => true,
+        ]);
+        CatalogCollection::query()->firstOrFail()->forceFill([
+            'catalog_collection_category_id' => $category->id,
+            'visibility' => CatalogCollectionVisibility::Public,
+            'moderation_status' => CatalogCollectionModerationStatus::Approved,
+            'published_at' => now(),
+        ])->save();
+        $published = $signalSync->synchronizeForRun($complete->refresh());
+
+        $this->assertSame(2, $published['upserted']);
+        $this->assertSame(0, $published['deleted']);
+        $this->assertEqualsCanonicalizing([$first->id, $second->id], $published['title_ids']);
         $this->assertDatabaseHas('catalog_title_recommendation_signals', [
             'catalog_title_id' => $first->id,
             'source' => 'hdrezka',

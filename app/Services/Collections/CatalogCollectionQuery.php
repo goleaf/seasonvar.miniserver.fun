@@ -292,6 +292,14 @@ final class CatalogCollectionQuery
         return $this->summaryQuery()->whereKey($collection->id)->firstOrFail();
     }
 
+    public function isPubliclyListed(CatalogCollection $collection): bool
+    {
+        return CatalogCollection::query()
+            ->publiclyListed()
+            ->whereKey($collection->id)
+            ->exists();
+    }
+
     /** @return Collection<int, CatalogCollection> */
     public function related(CatalogCollection $collection, ?User $viewer = null, int $limit = 6): Collection
     {

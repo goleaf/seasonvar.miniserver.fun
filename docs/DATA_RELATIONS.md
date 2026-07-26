@@ -1,6 +1,6 @@
 # Связи данных и фильтры
 
-Обновлено: 25.07.2026
+Обновлено: 26.07.2026
 
 ## Основные связи
 
@@ -259,6 +259,7 @@ Source relations: `CatalogCollection::sourceRecord()`, `CatalogCollectionSource:
 - `catalog_collections_featured_idx(type, is_featured, visibility, moderation_status)` — bounded homepage/editorial featured query.
 - `catalog_collection_items_manual_order_idx(catalog_collection_id, position, id)` — manual page/order normalization; unique collection/title одновременно обслуживает membership existence.
 - `catalog_collection_items_title_lookup_idx(catalog_title_id, catalog_collection_id)` — title page discovery, merge reconciliation и bounded import-driven public collection cache lookup.
+- Public collection eligibility не требует новой таблицы или stored counter: `catalog_collections_public_order_idx` сужает visibility/moderation/deleted rows, category/source проверяются их PK/unique indexes, а диапазон `1..500` использует covering `catalog_collection_items_collection_title_unique`. `EXPLAIN QUERY PLAN` на рабочем SQLite подтвердил эти пути; отдельный почти дублирующий индекс не добавлен, чтобы не увеличивать стоимость importer/user writes.
 - Translation locale/name, slug history collection/time и report collection/status/public-identity/queue indexes соответствуют editorial lookup, redirects, preserved evidence и admin queue. Дополнительные likes/follows/collaborator indexes не добавлялись, потому что таких таблиц нет.
 - Source-run provider/status/latest indexes обслуживают один current admin summary и lifecycle audit; source provider/success/last-seen indexes — bounded retry/reconciliation. Source-item unique identity вместе с `(source,last_seen_run,position,id)`, match retry и title fan-out indexes поддерживает bulk upsert, stale comparison и dirty-title propagation без table scan.
 - `catalog_title_search_documents` получает `(normalized_title_key,catalog_title_id)` и `(normalized_original_title_key,catalog_title_id)`: matcher выполняет bounded indexed exact lookup, а не fuzzy scan всего каталога. Existing alias indexes остаются authority для approved aliases.

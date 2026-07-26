@@ -39,7 +39,9 @@ final class CatalogCollectionController extends Controller
         $resolved = $resolver->resolve($collectionSlug);
         $collection = $collections->summary($resolved['collection']);
         abort_unless(
-            $collection->visibility === CatalogCollectionVisibility::Public && $collection->isPubliclyViewable(),
+            $collection->visibility === CatalogCollectionVisibility::Public
+                && $collection->isPubliclyViewable()
+                && $collections->isPubliclyListed($collection),
             404,
         );
         $items = $collections->items(

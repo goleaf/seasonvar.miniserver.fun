@@ -11,6 +11,8 @@ use App\Enums\CatalogCollectionVisibility;
 use App\Livewire\CatalogAdministrationPage;
 use App\Livewire\CatalogDiscoveryPage;
 use App\Models\CatalogCollection;
+use App\Models\CatalogCollectionCategory;
+use App\Models\CatalogCollectionItem;
 use App\Models\CatalogTitle;
 use App\Models\LicensedMedia;
 use App\Models\User;
@@ -108,8 +110,14 @@ final class UnifiedDiscoveryCollectionsTest extends TestCase
 
     private function collection(): CatalogCollection
     {
-        return CatalogCollection::query()->create([
+        $category = CatalogCollectionCategory::query()->create([
+            'slug' => 'unified-discovery',
+            'position' => 1,
+            'is_active' => true,
+        ]);
+        $collection = CatalogCollection::query()->create([
             'public_id' => (string) Str::uuid(), 'owner_id' => null,
+            'catalog_collection_category_id' => $category->id,
             'name' => 'Подборка внутри рекомендаций', 'description' => 'Проверка единой страницы.',
             'slug' => 'unified-'.Str::lower(Str::random(8)), 'type' => CatalogCollectionType::Editorial,
             'visibility' => CatalogCollectionVisibility::Public,
@@ -117,5 +125,12 @@ final class UnifiedDiscoveryCollectionsTest extends TestCase
             'sort_mode' => CatalogCollectionSort::Manual, 'content_locale' => 'ru',
             'is_featured' => true, 'content_version' => 1, 'published_at' => now(),
         ]);
+        CatalogCollectionItem::query()->create([
+            'catalog_collection_id' => $collection->id,
+            'catalog_title_id' => CatalogTitle::factory()->create()->id,
+            'position' => 1,
+        ]);
+
+        return $collection;
     }
 }

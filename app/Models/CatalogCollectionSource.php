@@ -4,11 +4,17 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property CarbonInterface|null $last_retry_at
+ * @property CarbonInterface|null $last_successful_sync_at
+ * @property CarbonInterface|null $missing_since_at
+ */
 #[Fillable([
     'provider',
     'source_key',

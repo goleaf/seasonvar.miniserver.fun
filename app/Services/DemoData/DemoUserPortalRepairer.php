@@ -28,6 +28,7 @@ final readonly class DemoUserPortalRepairer
         private DemoCatalogActivityStage $catalogActivity,
         private DemoContentRequestStage $contentRequests,
         private DemoPublicTagAssignmentCleaner $publicTagAssignments,
+        private DemoPublicCollectionCleaner $publicCollections,
         private UserPortalCacheInvalidator $userPortalCache,
     ) {}
 
@@ -38,6 +39,7 @@ final readonly class DemoUserPortalRepairer
         $users = $this->users($options);
         $userIds = $users->pluck('id');
         $publicTagState = $this->publicTagAssignments->inspect($options);
+        $publicCollectionState = $this->publicCollections->inspect($options);
 
         return [
             'users' => $users->count(),
@@ -67,6 +69,10 @@ final readonly class DemoUserPortalRepairer
             'legacy_demo_match_basis_points' => $publicTagState['match_basis_points'],
             'orphaned_demo_public_tag_assignments' => $publicTagState['cleanup_candidates'],
             'archivable_demo_public_tags' => $publicTagState['archivable_demo_tags'],
+            'demo_public_collections' => $publicCollectionState['demo_public_collections'],
+            'demo_unlisted_collections' => $publicCollectionState['demo_unlisted_collections'],
+            'demo_oversized_collections' => $publicCollectionState['demo_oversized_collections'],
+            'demo_collection_quarantine_candidates' => $publicCollectionState['demo_quarantine_candidates'],
         ];
     }
 
@@ -83,7 +89,15 @@ final readonly class DemoUserPortalRepairer
         $needsContentRequests = $before['users_without_requests'] > 0;
         $needsPublicTagCleanup = $before['orphaned_demo_public_tag_assignments'] > 0
             || $before['archivable_demo_public_tags'] > 0;
+        $needsPublicCollectionCleanup = $before['demo_collection_quarantine_candidates'] > 0;
         $stageCounters = [];
+
+        if ($needsPublicCollectionCleanup) {
+            $publicCollectionCleanup = $this->publicCollections->repair($options);
+            $stageCounters['demo_collections_quarantined'] = $publicCollectionCleanup[
+                'demo_collections_quarantined'
+            ];
+        }
 
         if ($needsPublicTagCleanup) {
             $publicTagCleanup = $this->publicTagAssignments->repair($options);
@@ -119,7 +133,11 @@ final readonly class DemoUserPortalRepairer
             ];
         }
 
-        if ($needsProfileImages || $needsOrganization || $needsCatalogActivity || $needsContentRequests) {
+        if ($needsProfileImages
+            || $needsOrganization
+            || $needsCatalogActivity
+            || $needsContentRequests
+            || $needsPublicCollectionCleanup) {
             foreach ($users as $user) {
                 $this->userPortalCache->changed($user);
             }

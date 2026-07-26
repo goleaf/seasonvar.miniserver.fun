@@ -15,6 +15,8 @@ use App\Models\AdminRole;
 use App\Models\AdminUserRole;
 use App\Models\CatalogCollection;
 use App\Models\CatalogCollectionCategory;
+use App\Models\CatalogCollectionItem;
+use App\Models\CatalogTitle;
 use App\Models\User;
 use App\Services\Collections\CatalogCollectionCategoryQuery;
 use App\Services\Collections\CatalogCollectionCategoryService;
@@ -237,6 +239,11 @@ final class CatalogCollectionClassificationAdministrationTest extends TestCase
         $category = CatalogCollectionCategory::query()->where('slug', 'netflix')->firstOrFail();
         $root = CatalogCollectionCategory::query()->findOrFail($category->parent_id);
         $collection = $this->collection('Публичная Netflix');
+        CatalogCollectionItem::query()->create([
+            'catalog_collection_id' => $collection->id,
+            'catalog_title_id' => CatalogTitle::factory()->create()->id,
+            'position' => 1,
+        ]);
         $categories = app(CatalogCollectionCategoryQuery::class);
         $beforeTree = $categories->publicDirectoryTree();
         $versions = app(CacheVersionRegistry::class);
@@ -261,7 +268,7 @@ final class CatalogCollectionClassificationAdministrationTest extends TestCase
             ?->children
             ->firstWhere('id', $category->id);
 
-        $this->assertSame(1, $beforeTree['uncategorized']);
+        $this->assertSame(0, $beforeTree['uncategorized']);
         $this->assertSame(0, $afterTree['uncategorized']);
         $this->assertSame(1, $afterTree['total']);
         $this->assertSame(1, $afterCategory?->public_collections_count);

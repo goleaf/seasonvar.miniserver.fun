@@ -9,6 +9,7 @@ use App\Enums\CatalogCollectionSort;
 use App\Enums\CatalogCollectionType;
 use App\Enums\CatalogCollectionVisibility;
 use App\Models\CatalogCollection;
+use App\Models\CatalogCollectionCategory;
 use App\Models\CatalogCollectionItem;
 use App\Models\CatalogTitle;
 use App\Services\Collections\CatalogCollectionQuery;
@@ -65,9 +66,14 @@ final class CatalogCollectionTitleQueryTest extends TestCase
         bool $featured = false,
         CatalogCollectionVisibility $visibility = CatalogCollectionVisibility::Public,
     ): CatalogCollection {
+        $category = CatalogCollectionCategory::query()
+            ->where('slug', 'themes-and-genres')
+            ->firstOrFail();
+
         return CatalogCollection::query()->create([
             'public_id' => (string) Str::uuid(),
             'owner_id' => null,
+            'catalog_collection_category_id' => $category->id,
             'name' => str($slug)->replace('-', ' ')->title()->toString(),
             'slug' => $slug,
             'type' => CatalogCollectionType::Editorial,

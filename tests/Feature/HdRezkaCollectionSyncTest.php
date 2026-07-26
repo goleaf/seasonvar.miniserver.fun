@@ -15,6 +15,8 @@ use App\Services\Catalog\CatalogCacheWarmRequestStore;
 use App\Services\Catalog\Search\CatalogSearchDocumentBuilder;
 use App\Services\Collections\Import\HdRezkaCollectionSyncService;
 use GuzzleHttp\Promise\PromiseInterface;
+use Illuminate\Cache\ArrayStore;
+use Illuminate\Cache\Repository;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
@@ -47,7 +49,7 @@ final class HdRezkaCollectionSyncTest extends TestCase
         ]);
     }
 
-    public function test_full_two_page_sync_reconciles_all_items_signals_and_defers_warm_until_recommendations_activate(): void
+    public function test_full_two_page_sync_reconciles_items_without_publishing_or_signaling_unreviewed_source(): void
     {
         Queue::fake();
         $titles = [
@@ -76,8 +78,8 @@ final class HdRezkaCollectionSyncTest extends TestCase
         $this->assertDatabaseCount('catalog_collection_sources', 1);
         $this->assertDatabaseCount('catalog_collection_source_items', 3);
         $this->assertDatabaseCount('catalog_collection_items', 3);
-        $this->assertDatabaseCount('catalog_title_recommendation_signals', 3);
-        $this->assertDatabaseCount('catalog_recommendation_dirty_titles', 3);
+        $this->assertDatabaseCount('catalog_title_recommendation_signals', 0);
+        $this->assertDatabaseCount('catalog_recommendation_dirty_titles', 0);
         $collection = CatalogCollection::query()->firstOrFail();
         $this->assertSame(array_column($titles, 'id'), $collection->items()->pluck('catalog_title_id')->all());
         $this->assertSame(
@@ -85,7 +87,7 @@ final class HdRezkaCollectionSyncTest extends TestCase
             CatalogCollectionSyncRun::query()->findOrFail($result->runId)->status,
         );
         $this->assertNull(app(CatalogCacheWarmRequestStore::class)->claim(10));
-        Queue::assertPushed(RebuildCatalogRecommendationsAfterCollectionSync::class, 1);
+        Queue::assertNotPushed(RebuildCatalogRecommendationsAfterCollectionSync::class);
         Http::assertSentCount(3);
         Http::assertNotSent(fn ($request): bool => str_contains($request->url(), '/uploads/mini/'));
     }
@@ -177,9 +179,9 @@ final class HdRezkaCollectionSyncTest extends TestCase
         $this->assertSame(1, $partial->counters['collection_failures']);
         $this->assertNotEmpty($partial->errors);
         $this->assertDatabaseCount('catalog_collection_items', 3);
-        $this->assertDatabaseCount('catalog_title_recommendation_signals', 3);
+        $this->assertDatabaseCount('catalog_title_recommendation_signals', 0);
         $this->assertDatabaseHas('catalog_collection_items', ['catalog_title_id' => $second->id]);
-        $this->assertDatabaseHas('catalog_title_recommendation_signals', [
+        $this->assertDatabaseMissing('catalog_title_recommendation_signals', [
             'catalog_title_id' => $second->id,
             'source' => 'hdrezka',
             'signal_type' => 'editorial_collection',
@@ -248,16 +250,16 @@ final class HdRezkaCollectionSyncTest extends TestCase
         $this->assertSame(0, $result->counters['collection_failures']);
         $this->assertSame([], $result->errors);
         $this->assertDatabaseCount('catalog_collection_items', 3);
-        $this->assertDatabaseCount('catalog_title_recommendation_signals', 3);
+        $this->assertDatabaseCount('catalog_title_recommendation_signals', 0);
 
         foreach ($titles as $title) {
-            $this->assertDatabaseHas('catalog_recommendation_dirty_titles', [
+            $this->assertDatabaseMissing('catalog_recommendation_dirty_titles', [
                 'catalog_title_id' => $title->id,
             ]);
         }
 
         $this->assertNull(app(CatalogCacheWarmRequestStore::class)->claim(10));
-        Queue::assertPushed(RebuildCatalogRecommendationsAfterCollectionSync::class, 1);
+        Queue::assertNotPushed(RebuildCatalogRecommendationsAfterCollectionSync::class);
         Http::assertNotSent(fn ($request): bool => str_contains($request->url(), '/uploads/mini/'));
     }
 
@@ -317,15 +319,15 @@ final class HdRezkaCollectionSyncTest extends TestCase
             'source' => 'hdrezka',
             'signal_type' => 'editorial_collection',
         ]);
-        $this->assertDatabaseHas('catalog_title_recommendation_signals', [
+        $this->assertDatabaseMissing('catalog_title_recommendation_signals', [
             'catalog_title_id' => $first->id,
             'source' => 'hdrezka',
             'signal_type' => 'editorial_collection',
         ]);
-        $this->assertDatabaseHas('catalog_recommendation_dirty_titles', [
+        $this->assertDatabaseMissing('catalog_recommendation_dirty_titles', [
             'catalog_title_id' => $second->id,
         ]);
-        $this->assertSame(1, CatalogCollection::query()->publiclyListed()->count());
+        $this->assertSame(0, CatalogCollection::query()->publiclyListed()->count());
         $this->assertFalse($missingSource->collection->load('sourceRecord')->isPubliclyViewable());
 
         $reappeared = app(HdRezkaCollectionSyncService::class)->sync();
@@ -337,19 +339,23 @@ final class HdRezkaCollectionSyncTest extends TestCase
             'catalog_collection_id' => $missingSource->catalog_collection_id,
             'catalog_title_id' => $second->id,
         ]);
-        $this->assertDatabaseHas('catalog_title_recommendation_signals', [
+        $this->assertDatabaseMissing('catalog_title_recommendation_signals', [
             'catalog_title_id' => $second->id,
             'source' => 'hdrezka',
             'signal_type' => 'editorial_collection',
         ]);
-        $this->assertSame(2, CatalogCollection::query()->publiclyListed()->count());
-        Queue::assertPushed(RebuildCatalogRecommendationsAfterCollectionSync::class, 1);
+        $this->assertSame(0, CatalogCollection::query()->publiclyListed()->count());
+        Queue::assertNotPushed(RebuildCatalogRecommendationsAfterCollectionSync::class);
     }
 
     public function test_active_distributed_lock_returns_safe_failed_result_without_http_or_writes(): void
     {
         Http::fake();
-        $lock = Cache::store('array')->lock('catalog-collections:sync:hdrezka', 300);
+        $repository = Cache::store('array');
+        $this->assertInstanceOf(Repository::class, $repository);
+        $store = $repository->getStore();
+        $this->assertInstanceOf(ArrayStore::class, $store);
+        $lock = $store->lock('catalog-collections:sync:hdrezka', 300);
         $this->assertTrue($lock->get());
 
         try {

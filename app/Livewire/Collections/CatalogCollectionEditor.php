@@ -215,7 +215,9 @@ final class CatalogCollectionEditor extends Component
             'collectionModerationLabel' => $collection->moderation_status->label(),
             'isEditorial' => $isEditorial,
             'isPendingModeration' => $collection->moderation_status->value === 'pending',
-            'canOpenPublicPage' => $collection->isPubliclyViewable(),
+            'canOpenPublicPage' => $collection->isPubliclyViewable()
+                && ($collection->visibility !== CatalogCollectionVisibility::Public
+                    || $query->isPubliclyListed($collection)),
             'itemsTitle' => trans_choice('collections.page.items', $totalItems, ['count' => $totalItems]),
             'visibilityOptions' => array_map(static fn (CatalogCollectionVisibility $option): array => [
                 'value' => $option->value,

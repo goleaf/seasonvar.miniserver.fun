@@ -65,7 +65,7 @@ final readonly class HdRezkaCollectionReconciler
 
             if (! $collection instanceof CatalogCollection) {
                 $created = true;
-                $collection = $this->createCollection($name, publiclyListed: ! $source instanceof CatalogCollectionSource);
+                $collection = $this->createCollection($name);
             }
 
             if (! $source instanceof CatalogCollectionSource) {
@@ -229,7 +229,7 @@ final readonly class HdRezkaCollectionReconciler
         return $result;
     }
 
-    private function createCollection(string $name, bool $publiclyListed): CatalogCollection
+    private function createCollection(string $name): CatalogCollection
     {
         $publicId = (string) Str::uuid();
 
@@ -240,17 +240,13 @@ final readonly class HdRezkaCollectionReconciler
             'description' => null,
             'slug' => $this->slugs->generate($name, $publicId),
             'type' => CatalogCollectionType::Editorial,
-            'visibility' => $publiclyListed
-                ? CatalogCollectionVisibility::Public
-                : CatalogCollectionVisibility::Private,
-            'moderation_status' => $publiclyListed
-                ? CatalogCollectionModerationStatus::Approved
-                : CatalogCollectionModerationStatus::Archived,
+            'visibility' => CatalogCollectionVisibility::Private,
+            'moderation_status' => CatalogCollectionModerationStatus::Archived,
             'sort_mode' => CatalogCollectionSort::Manual,
             'content_locale' => 'ru',
             'is_featured' => false,
             'content_version' => 1,
-            'published_at' => $publiclyListed ? now() : null,
+            'published_at' => null,
         ]);
     }
 
@@ -264,12 +260,8 @@ final readonly class HdRezkaCollectionReconciler
         $seen = [];
 
         foreach ($items as $value) {
-            $item = $value['item'] ?? null;
-            $match = $value['match'] ?? null;
-
-            if (! $item instanceof HdRezkaCollectionItemData || ! $match instanceof CatalogCollectionSourceMatch) {
-                throw new InvalidArgumentException('Некорректная source item запись коллекции.');
-            }
+            $item = $value['item'];
+            $match = $value['match'];
 
             if ($item->sourceItemKey === '' || isset($seen[$item->sourceItemKey])) {
                 continue;

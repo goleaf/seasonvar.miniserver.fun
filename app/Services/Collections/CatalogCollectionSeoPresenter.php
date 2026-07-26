@@ -41,6 +41,15 @@ final class CatalogCollectionSeoPresenter
             : route('collections.show', ['collectionSlug' => $collection->slug]);
         $owner = $collection->relationLoaded('owner') ? $collection->owner : null;
         $count = (int) ($collection->visible_items_count ?? 0);
+        $totalCount = (int) ($collection->total_items_count ?? 0);
+        $maximumItems = max(
+            1,
+            (int) config('catalog-collections.maximum_public_items_per_collection', 500),
+        );
+        $category = $collection->relationLoaded('category') ? $collection->category : null;
+        $categoryActive = $category?->is_active === true
+            && ($category->parent_id === null
+                || ($category->relationLoaded('parent') && $category->parent?->is_active === true));
         $name = (string) $collection->display_name;
         $description = PlainText::clean($collection->display_seo_description ?? $collection->display_description, 180);
 
@@ -59,7 +68,10 @@ final class CatalogCollectionSeoPresenter
 
         $publiclyIndexable = $collection->visibility === CatalogCollectionVisibility::Public
             && $collection->isPubliclyViewable()
-            && $count > 0;
+            && $categoryActive
+            && $count > 0
+            && $totalCount > 0
+            && $totalCount <= $maximumItems;
         $indexable = $publiclyIndexable
             && ! $statefulVariant
             && (! $localizedAlias || $localizedCanonical);

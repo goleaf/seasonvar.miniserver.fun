@@ -69,6 +69,8 @@ final class CatalogCollectionPublicationReadiness
             $collectionMissing = $metrics === null;
             $sourceManaged = ! $collectionMissing && (bool) $metrics->source_managed;
             $sourceMissing = ! $collectionMissing && (bool) $metrics->source_missing;
+            $categoryPresent = ! $collectionMissing && (bool) $metrics->category_present;
+            $categoryActive = ! $collectionMissing && (bool) $metrics->category_active;
             $totalItems = $collectionMissing ? 0 : (int) $metrics->total_items;
             $visibleItems = $collectionMissing ? 0 : (int) $metrics->visible_items;
             $unavailableItems = max(0, $totalItems - $visibleItems);
@@ -83,6 +85,16 @@ final class CatalogCollectionPublicationReadiness
 
             if ($sourceMissing) {
                 $reasonCodes[] = CatalogCollectionReadinessReason::SourceMissing->value;
+            }
+
+            if (! $collectionMissing && ! $categoryPresent) {
+                $reasonCodes[] = CatalogCollectionReadinessReason::MissingCategory->value;
+            } elseif (! $collectionMissing && ! $categoryActive) {
+                $reasonCodes[] = CatalogCollectionReadinessReason::InactiveCategory->value;
+            }
+
+            if ($totalItems > $this->maximumPublicItems()) {
+                $reasonCodes[] = CatalogCollectionReadinessReason::TooManyItems->value;
             }
 
             if ($visibleItems < $requiredItems) {
@@ -118,8 +130,13 @@ final class CatalogCollectionPublicationReadiness
             ->whereNotNull('readiness_collections.published_at')
             ->whereNull('readiness_collections.deleted_at')
             ->whereNull('readiness_sources.missing_since_at')
+            ->where('readiness_categories.is_active', true)
+            ->where(fn (Builder $query): Builder => $query
+                ->whereNull('readiness_categories.parent_id')
+                ->orWhere('readiness_parent_categories.is_active', true))
             ->groupBy('readiness_collections.id')
             ->havingRaw('COUNT(readiness_items.id) = COUNT(readiness_titles.id)')
+            ->havingRaw('COUNT(readiness_items.id) <= ?', [$this->maximumPublicItems()])
             ->havingRaw(
                 'COUNT(readiness_titles.id) >= CASE WHEN MAX(CASE WHEN readiness_sources.id IS NULL THEN 0 ELSE 1 END) = 1 THEN ? ELSE ? END',
                 [self::SOURCE_REQUIRED_ITEMS, self::LOCAL_REQUIRED_ITEMS],
@@ -140,6 +157,12 @@ final class CatalogCollectionPublicationReadiness
             )
             ->selectRaw(
                 'MAX(CASE WHEN readiness_sources.missing_since_at IS NULL THEN 0 ELSE 1 END) as source_missing',
+            )
+            ->selectRaw(
+                'MAX(CASE WHEN readiness_categories.id IS NULL THEN 0 ELSE 1 END) as category_present',
+            )
+            ->selectRaw(
+                'MAX(CASE WHEN readiness_categories.is_active = 1 AND (readiness_categories.parent_id IS NULL OR readiness_parent_categories.is_active = 1) THEN 1 ELSE 0 END) as category_active',
             )
             ->whereIn('readiness_collections.id', $ids)
             ->groupBy('readiness_collections.id');
@@ -163,6 +186,18 @@ final class CatalogCollectionPublicationReadiness
                 'readiness_items.catalog_collection_id',
                 '=',
                 'readiness_collections.id',
+            )
+            ->leftJoin(
+                'catalog_collection_categories as readiness_categories',
+                'readiness_categories.id',
+                '=',
+                'readiness_collections.catalog_collection_category_id',
+            )
+            ->leftJoin(
+                'catalog_collection_categories as readiness_parent_categories',
+                'readiness_parent_categories.id',
+                '=',
+                'readiness_categories.parent_id',
             )
             ->leftJoinSub(
                 $watchableTitles,
@@ -199,5 +234,13 @@ final class CatalogCollectionPublicationReadiness
         }
 
         return $reasonCodes;
+    }
+
+    private function maximumPublicItems(): int
+    {
+        return max(
+            1,
+            (int) config('catalog-collections.maximum_public_items_per_collection', 500),
+        );
     }
 }

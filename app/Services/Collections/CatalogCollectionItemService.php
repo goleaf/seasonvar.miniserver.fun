@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Collections;
 
+use App\Enums\CatalogCollectionVisibility;
 use App\Models\CatalogCollection;
 use App\Models\CatalogCollectionItem;
 use App\Models\CatalogTitle;
@@ -47,7 +48,7 @@ final class CatalogCollectionItemService
                 ->first();
             $count = (int) ($summary->aggregate ?? 0);
 
-            if ($count >= max(1, (int) config('catalog-collections.maximum_items_per_collection', 5_000))) {
+            if ($count >= $this->maximumItems($locked)) {
                 throw ValidationException::withMessages(['collection' => [__('collections.errors.item_limit')]]);
             }
 
@@ -138,7 +139,6 @@ final class CatalogCollectionItemService
             }
 
             $selected = array_fill_keys($selectedCollectionPublicIds, true);
-            $maximumItems = max(1, (int) config('catalog-collections.maximum_items_per_collection', 5_000));
             $existingItems = CatalogCollectionItem::query()
                 ->whereIn('catalog_collection_id', $manageable->modelKeys())
                 ->where('catalog_title_id', $currentTitle->id)
@@ -159,7 +159,7 @@ final class CatalogCollectionItemService
 
             foreach ($manageable as $collection) {
                 if ($additions->contains('id', $collection->id)
-                    && (int) ($summaries->get($collection->id)->aggregate ?? 0) >= $maximumItems) {
+                    && (int) ($summaries->get($collection->id)->aggregate ?? 0) >= $this->maximumItems($collection)) {
                     throw ValidationException::withMessages(['collection' => [__('collections.errors.item_limit')]]);
                 }
             }
@@ -456,5 +456,25 @@ final class CatalogCollectionItemService
             'content_version' => $collection->content_version + 1,
             'updated_at' => now(),
         ])->save();
+    }
+
+    private function maximumItems(CatalogCollection $collection): int
+    {
+        $storageMaximum = max(
+            1,
+            (int) config('catalog-collections.maximum_items_per_collection', 5_000),
+        );
+
+        if ($collection->visibility === CatalogCollectionVisibility::Private) {
+            return $storageMaximum;
+        }
+
+        return min(
+            $storageMaximum,
+            max(
+                1,
+                (int) config('catalog-collections.maximum_public_items_per_collection', 500),
+            ),
+        );
     }
 }

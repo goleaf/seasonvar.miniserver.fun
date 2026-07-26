@@ -165,13 +165,35 @@ final class CatalogCollection extends Model
     }
 
     /** @param Builder<CatalogCollection> $query */
+    public function scopeEligibleForPublicListing(Builder $query): void
+    {
+        $maximumItems = max(
+            1,
+            (int) config('catalog-collections.maximum_public_items_per_collection', 500),
+        );
+
+        $query
+            ->whereNotNull('catalog_collection_category_id')
+            ->whereHas('category', fn (Builder $category): Builder => $category
+                ->where('is_active', true)
+                ->where(fn (Builder $category): Builder => $category
+                    ->whereNull('parent_id')
+                    ->orWhereHas('parent', fn (Builder $parent): Builder => $parent
+                        ->where('is_active', true))))
+            ->has('items')
+            ->has('items', '<=', $maximumItems)
+            ->whereDoesntHave('sourceRecord', fn (Builder $source): Builder => $source
+                ->whereNotNull('missing_since_at'));
+    }
+
+    /** @param Builder<CatalogCollection> $query */
     public function scopePubliclyListed(Builder $query): void
     {
         $query
             ->where('visibility', CatalogCollectionVisibility::Public->value)
             ->where('moderation_status', CatalogCollectionModerationStatus::Approved->value)
-            ->whereDoesntHave('sourceRecord', fn (Builder $source): Builder => $source
-                ->whereNotNull('missing_since_at'));
+            ->whereNotNull('published_at')
+            ->eligibleForPublicListing();
     }
 
     public function isOwnedBy(?User $user): bool
@@ -183,6 +205,8 @@ final class CatalogCollection extends Model
     {
         return $this->visibility->isDirectlyViewable()
             && $this->moderation_status->isPubliclyViewable()
+            && $this->catalog_collection_category_id !== null
+            && ($this->visibility !== CatalogCollectionVisibility::Public || $this->published_at !== null)
             && (! $this->relationLoaded('sourceRecord') || $this->sourceRecord?->missing_since_at === null)
             && $this->deleted_at === null;
     }

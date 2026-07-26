@@ -12,7 +12,9 @@ use App\Jobs\RebuildCatalogRecommendationsAfterCollectionSync;
 use App\Models\CatalogCollectionSyncRun;
 use App\Services\Catalog\CatalogRecommendationDirtyTitleTracker;
 use App\Services\Crawler\PoliteHttpClient;
+use Illuminate\Cache\Repository;
 use Illuminate\Contracts\Cache\Lock;
+use Illuminate\Contracts\Cache\LockProvider;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use LogicException;
@@ -44,11 +46,7 @@ final readonly class HdRezkaCollectionSyncService
         }
 
         $provider = (string) config('catalog-collection-imports.hdrezka.provider', 'hdrezka');
-        $lock = Cache::store((string) config('catalog-collection-imports.hdrezka.lock_store', 'redis-locks'))
-            ->lock(
-                'catalog-collections:sync:'.$provider,
-                $this->boundedConfig('catalog-collection-imports.hdrezka.lock_seconds', 21_600, 60, 86_400),
-            );
+        $lock = $this->lock($provider);
 
         if (! $lock->get()) {
             return new CatalogCollectionSyncResult(
@@ -116,7 +114,7 @@ final readonly class HdRezkaCollectionSyncService
         }
 
         $materialChanged = false;
-        $matchedTitleIds = [];
+        $recommendationTitleIds = [];
 
         foreach ($definitions as $index => $definition) {
             try {
@@ -144,10 +142,6 @@ final readonly class HdRezkaCollectionSyncService
             }
 
             $materialChanged = $materialChanged || $processed['material_changed'];
-
-            foreach ($processed['matched_title_ids'] as $catalogTitleId) {
-                $matchedTitleIds[$catalogTitleId] = true;
-            }
         }
 
         $status = $limited || $counters['collection_failures'] > 0
@@ -160,10 +154,6 @@ final readonly class HdRezkaCollectionSyncService
                 $counters['sources_missing'] += $missing['sources_missing'];
                 $counters['removed'] += $missing['removed'];
                 $materialChanged = $materialChanged || $missing['sources_missing'] > 0;
-
-                foreach ($missing['title_ids'] as $catalogTitleId) {
-                    $matchedTitleIds[$catalogTitleId] = true;
-                }
             } catch (Throwable) {
                 $status = CatalogCollectionSyncStatus::Partial;
                 $this->addError($errors, 'Исчезнувшие подборки источника не удалось безопасно сверить.');
@@ -184,14 +174,14 @@ final readonly class HdRezkaCollectionSyncService
                 $counters['signals_deleted'] = $signalResult['deleted'];
 
                 foreach ($signalResult['title_ids'] as $catalogTitleId) {
-                    $matchedTitleIds[$catalogTitleId] = true;
+                    $recommendationTitleIds[$catalogTitleId] = true;
                 }
             } catch (Throwable) {
                 $status = CatalogCollectionSyncStatus::Partial;
                 $this->addError($errors, 'Recommendation signals обновлены не полностью.');
             }
 
-            $titleIds = array_map('intval', array_keys($matchedTitleIds));
+            $titleIds = array_map('intval', array_keys($recommendationTitleIds));
 
             if ($materialChanged && $titleIds !== []) {
                 $this->dirtyTitles->markMany($titleIds, 'editorial-collection-sync');
@@ -233,7 +223,7 @@ final readonly class HdRezkaCollectionSyncService
 
     /**
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
-     * @return array{counters: array<string, int>, errors: list<string>, material_changed: bool, matched_title_ids: list<int>}
+     * @return array{counters: array<string, int>, errors: list<string>, material_changed: bool}
      */
     private function processCollection(
         HdRezkaCollectionDefinition $definition,
@@ -378,16 +368,7 @@ final readonly class HdRezkaCollectionSyncService
             $materialChanged = $reconciliation['created']
                 || $reconciliation['membership_changed']
                 || $reconciliation['source_reactivated'];
-
         }
-
-        $matchedTitleIds = collect($resolved)
-            ->filter(fn (array $value): bool => $value['match']->status === CatalogCollectionSourceMatchStatus::Matched)
-            ->pluck('match.catalogTitleId')
-            ->filter(fn (mixed $id): bool => is_int($id) && $id > 0)
-            ->unique()
-            ->values()
-            ->all();
 
         $this->report($progress, 'catalog-collection-processed', [
             'position' => $collectionPosition,
@@ -399,7 +380,6 @@ final readonly class HdRezkaCollectionSyncService
             'counters' => $counters,
             'errors' => $errors,
             'material_changed' => $materialChanged,
-            'matched_title_ids' => $matchedTitleIds,
         ];
     }
 
@@ -426,7 +406,7 @@ final readonly class HdRezkaCollectionSyncService
             throw new RuntimeException('Внешний источник вернул ошибку HTTP.');
         }
 
-        $contentType = mb_strtolower(trim(explode(';', $response->header('Content-Type'))[0] ?? ''));
+        $contentType = mb_strtolower(trim(explode(';', $response->header('Content-Type'))[0]));
 
         if (! in_array($contentType, ['text/html', 'application/xhtml+xml'], true)) {
             throw new RuntimeException('Внешний источник вернул неожиданный тип документа.');
@@ -462,7 +442,10 @@ final readonly class HdRezkaCollectionSyncService
         );
     }
 
-    /** @param array<string, int> $counters */
+    /**
+     * @param  array<string, int>  $counters
+     * @param  list<string>  $errors
+     */
     private function finish(
         ?CatalogCollectionSyncRun $run,
         CatalogCollectionSyncStatus $status,
@@ -534,12 +517,42 @@ final readonly class HdRezkaCollectionSyncService
         return max($minimum, min($maximum, (int) config($key, $default)));
     }
 
-    /** @param (callable(string, array<string, mixed>): void)|null $progress */
+    /**
+     * @param  (callable(string, array<string, mixed>): void)|null  $progress
+     * @param  array<string, mixed>  $context
+     */
     private function report(?callable $progress, string $event, array $context): void
     {
         if ($progress !== null) {
             $progress($event, $context);
         }
+    }
+
+    private function lock(string $provider): Lock
+    {
+        $repository = Cache::store(
+            (string) config('catalog-collection-imports.hdrezka.lock_store', 'redis-locks'),
+        );
+
+        if (! $repository instanceof Repository) {
+            throw new LogicException('Настроенное cache repository не поддерживает проверку distributed lock.');
+        }
+
+        $store = $repository->getStore();
+
+        if (! $store instanceof LockProvider) {
+            throw new LogicException('Настроенное cache store не поддерживает distributed lock.');
+        }
+
+        return $store->lock(
+            'catalog-collections:sync:'.$provider,
+            $this->boundedConfig(
+                'catalog-collection-imports.hdrezka.lock_seconds',
+                21_600,
+                60,
+                86_400,
+            ),
+        );
     }
 
     private function release(Lock $lock): void

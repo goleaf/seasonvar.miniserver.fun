@@ -12,6 +12,7 @@ use App\Enums\CatalogCollectionType;
 use App\Enums\CatalogCollectionVisibility;
 use App\Livewire\Collections\CatalogCollectionPage;
 use App\Models\CatalogCollection;
+use App\Models\CatalogCollectionCategory;
 use App\Models\CatalogCollectionItem;
 use App\Models\CatalogCollectionSource;
 use App\Models\CatalogCollectionSourceItem;
@@ -30,7 +31,7 @@ final class HdRezkaCollectionPresentationTest extends TestCase
 
     public function test_collection_route_is_owned_by_full_page_livewire_and_keeps_private_headers(): void
     {
-        $collection = $this->collection();
+        $collection = $this->collection(withItem: true);
 
         $this->assertSame(
             CatalogCollectionPage::class,
@@ -39,7 +40,7 @@ final class HdRezkaCollectionPresentationTest extends TestCase
 
         $response = $this->get(route('collections.show', ['collectionSlug' => $collection->slug]))
             ->assertOk()
-            ->assertSeeLivewire('collections.catalog-collection-page');
+            ->assertSee('wire:snapshot=', false);
 
         $cacheControl = (string) $response->headers->get('Cache-Control');
         $this->assertStringContainsString('private', $cacheControl);
@@ -201,20 +202,25 @@ final class HdRezkaCollectionPresentationTest extends TestCase
 
     public function test_public_collection_comment_status_region_has_an_accessible_role(): void
     {
-        $collection = $this->collection();
+        $collection = $this->collection(withItem: true);
 
         $this->get(route('collections.show', ['collectionSlug' => $collection->slug]))
             ->assertOk()
             ->assertSee('role="status" aria-live="polite" aria-atomic="true" aria-label="Результат действия с комментариями"', false);
     }
 
-    private function collection(): CatalogCollection
+    private function collection(bool $withItem = false): CatalogCollection
     {
         $publicId = (string) Str::uuid();
+        $category = CatalogCollectionCategory::query()
+            ->where('is_active', true)
+            ->orderBy('id')
+            ->firstOrFail();
 
-        return CatalogCollection::query()->create([
+        $collection = CatalogCollection::query()->create([
             'public_id' => $publicId,
             'owner_id' => null,
+            'catalog_collection_category_id' => $category->id,
             'name' => 'Лучшие фильмы года',
             'description' => null,
             'slug' => 'luchshie-filmy-goda-'.Str::lower(Str::random(8)),
@@ -227,6 +233,16 @@ final class HdRezkaCollectionPresentationTest extends TestCase
             'content_version' => 1,
             'published_at' => now(),
         ]);
+
+        if ($withItem) {
+            CatalogCollectionItem::query()->create([
+                'catalog_collection_id' => $collection->id,
+                'catalog_title_id' => CatalogTitle::factory()->create()->id,
+                'position' => 1,
+            ]);
+        }
+
+        return $collection;
     }
 
     private function source(CatalogCollection $collection): CatalogCollectionSource

@@ -15,6 +15,7 @@ return [
     'report_resolution_batch_size' => 100,
     'items_per_page' => 24,
     'maximum_items_per_collection' => 5_000,
+    'maximum_public_items_per_collection' => 500,
     'maximum_collections_per_user' => 100,
     'maximum_reorder_items' => 500,
     'supported_locales' => ['ru', 'en'],

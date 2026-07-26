@@ -36,6 +36,24 @@ final class CatalogCollectionModerationService
                 && $locked->visibility === CatalogCollectionVisibility::Public;
             $shouldBePublished = $status === CatalogCollectionModerationStatus::Approved
                 && $locked->visibility === CatalogCollectionVisibility::Public;
+
+            if ($shouldBePublished && ! CatalogCollection::query()
+                ->eligibleForPublicListing()
+                ->whereKey($locked->id)
+                ->exists()) {
+                throw ValidationException::withMessages([
+                    'moderation' => [__('collections.errors.public_quality_not_ready', [
+                        'count' => max(
+                            1,
+                            (int) config(
+                                'catalog-collections.maximum_public_items_per_collection',
+                                500,
+                            ),
+                        ),
+                    ])],
+                ]);
+            }
+
             $publishedAt = $shouldBePublished ? ($locked->published_at ?? now()) : null;
             $moderationChanged = $locked->moderation_status !== $status;
             $featuredChanged = $locked->is_featured !== $featured;

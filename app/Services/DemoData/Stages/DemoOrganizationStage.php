@@ -221,7 +221,6 @@ final readonly class DemoOrganizationStage implements DemoDataStage
             $options->collectionMinimum,
             $options->collectionMaximum,
         );
-        $visibilityCases = CatalogCollectionVisibility::cases();
         $sortCases = CatalogCollectionSort::cases();
         $versionHash = substr(hash('sha256', $options->version), 0, 12);
         $rows = [];
@@ -229,7 +228,6 @@ final readonly class DemoOrganizationStage implements DemoDataStage
         for ($ordinal = 0; $ordinal < $count; $ordinal++) {
             $copy = $this->text->collection($persona, $ordinal);
             $publicId = $this->stable->uuid("organization:user:{$userIndex}:collection:{$ordinal}");
-            $visibility = $visibilityCases[($userIndex + $ordinal - 1) % count($visibilityCases)];
             $rows[] = [
                 'public_id' => $publicId,
                 'owner_id' => $user->id,
@@ -237,13 +235,13 @@ final readonly class DemoOrganizationStage implements DemoDataStage
                 'description' => $copy['description'],
                 'slug' => "demo-{$versionHash}-{$userIndex}-".($ordinal + 1),
                 'type' => CatalogCollectionType::User->value,
-                'visibility' => $visibility->value,
+                'visibility' => CatalogCollectionVisibility::Private->value,
                 'moderation_status' => CatalogCollectionModerationStatus::Approved->value,
                 'sort_mode' => $sortCases[($userIndex + $ordinal - 1) % count($sortCases)]->value,
                 'content_locale' => 'ru',
                 'is_featured' => false,
                 'content_version' => 1,
-                'published_at' => $visibility === CatalogCollectionVisibility::Private ? null : $createdAt,
+                'published_at' => null,
                 'deleted_at' => null,
                 'created_at' => $createdAt->addHours($ordinal),
                 'updated_at' => $updatedAt->addHours($ordinal),
