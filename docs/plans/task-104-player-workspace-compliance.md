@@ -23,7 +23,7 @@
 | RU/EN localization parity | completed | player dictionary keys updated in both locales; focused contract passed |
 | Focused/full tests, Pint, build, browser QA | completed_with_external_regressions | final Task 104 + translation parity run: 33 focused PHP tests / 80,915 assertions passed; Pint, PHPStan, Rector, Composer validation, routes and Vite passed; Playwright 8 passed / 1 skipped. Full PHPUnit executed 2,176 tests with 2,148 passed, 11 skipped and 17 parallel-workstream failures/errors unrelated to Task 104; exact evidence archived |
 | README/CHANGELOG/evidence | completed | canonical docs, visitor news, dated changelog and archive evidence updated |
-| `main` exact commit and ordinary push | unresolved | final Git gates pending |
+| `main` exact commit and ordinary push | unresolved | implementation commit `ed77c9eb` (`feat: redesign player workspace`) created on `main` through hooks; `GIT_TERMINAL_PROMPT=0 git push origin main` failed with `fatal: could not read Username for 'https://github.com': terminal prompts disabled` |
 
 ## Cross-feature impact
 

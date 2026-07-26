@@ -35,7 +35,7 @@
 
 | Workstream | Status | Evidence |
 | --- | --- | --- |
-| Task 104 — theatre mode, compact context, descriptive episode navigation и recovery UX | `in_progress: commit and push` | [Design](../superpowers/specs/2026-07-26-player-workspace-redesign-design.md), [implementation checklist](../superpowers/plans/2026-07-26-player-workspace-redesign.md), [compliance](task-104-player-workspace-compliance.md) |
+| Task 104 — theatre mode, compact context, descriptive episode navigation и recovery UX | `unresolved: local commit complete, push authentication unavailable` | [Design](../superpowers/specs/2026-07-26-player-workspace-redesign-design.md), [implementation checklist](../superpowers/plans/2026-07-26-player-workspace-redesign.md), [compliance](task-104-player-workspace-compliance.md) |
 
 ## Приоритеты и живой checklist
 
@@ -44,7 +44,7 @@
 | critical | completed | Повторно прочитать permanent requirements, player docs, фактические версии и реализацию, чтобы не создать второй lifecycle | `AGENTS.md`, `docs/requirements/*`, player docs/code; Laravel 13.22, Livewire 4.3 | скрытый конфликт с playback/PWA/security | audit evidence, Boost application info/docs |
 | critical | completed | Получить exclusive lease и сохранить чужие staged/unstaged изменения | repository guard, точный declared scope | пересечение shared docs/index | lease status и exact-path staging |
 | critical | completed | Сначала закрепить постоянный theatre/context/recovery contract | `docs/UI_STANDARDS.md`, `docs/frontend.md`, `docs/architecture.md`, `docs/views.md`, playback report | расходящиеся требования | повторное чтение canonical sections |
-| critical | completed | Добавить RED tests для server projection, Blade markers и JS lifecycle | focused PHP/unit/browser tests | тесты могут зафиксировать markup вместо поведения | RED зафиксировал отсутствующие workspace contracts; GREEN: 31 тест, 306 утверждений |
+| critical | completed | Добавить RED tests для server projection, Blade markers и JS lifecycle | focused PHP/unit/browser tests | тесты могут зафиксировать markup вместо поведения | RED зафиксировал отсутствующие workspace contracts; финальный GREEN с translation parity: 33 теста, 80 915 утверждений |
 | critical | completed | Подготовить truthful media context без raw URL и Blade query | playback query, view model, transition factory/DTO | stale context после in-place swap | payload содержит только display metadata и public query; browser hot-swap обновляет context controls |
 | high | completed | Перестроить player Blade в один спокойный workspace | player/detail Blade, existing components | потеря старых actions или `wire:ignore` ownership | сохранён один keyed `wire:ignore`, обычные ссылки и существующие report/download actions |
 | high | completed | Реализовать theatre lifecycle с focus return и modal/fullscreen Escape priority | `player-navigation.js`, CSS | разрушение media DOM или застрявший body class | Playwright проверил scope, Escape, возврат фокуса и геометрию |
@@ -54,8 +54,8 @@
 | medium | completed | Проверить query columns/N+1/indexes; не добавлять speculative DDL | playback query/schema | лишняя media hydration или потеря позднего выбранного source | точечная projection и eager-loaded relations; UI ограничен 24 уникальными options после active-first, DB-выборка не отбрасывает доступные media; DDL не требуется |
 | medium | completed | Запустить focused → full PHP, Pint, Vite и browser QA | existing test/build stack | широкий regression или flaky browser | Task 104 + translation parity: 33/33 PHP и 8 passed/1 skipped Playwright; полный PHPUnit выполнен с отдельным 1G config и выявил только параллельные repository regressions |
 | medium | completed | Обновить visitor/product docs и evidence | README, CHANGELOG, archive evidence | неактуальная документация | canonical docs, README, CHANGELOG, compliance и archive evidence обновлены |
-| critical | in_progress | Проверить точный diff, staged scope, secrets/debug и main | Git/lease guard | чужие файлы в commit | alternate-index staged diff и guard verify |
-| critical | pending | Создать осмысленный commit и выполнить ordinary push | `main`, configured remote | dirty shared checkout блокирует pre-push | hash, command output; честный unresolved при отказе |
+| critical | completed | Проверить точный diff, staged scope, secrets/debug и main | Git/lease guard | чужие файлы в commit | alternate-index staged diff, secret/debug scan и guard verify прошли для 32 путей |
+| critical | unresolved | Создать осмысленный commit и выполнить ordinary push | `main`, configured remote | отсутствие HTTPS credentials | commit `ed77c9eb` создан; `git push origin main` отклонён: terminal prompts disabled |
 
 ## Неизменяемые public contracts
 

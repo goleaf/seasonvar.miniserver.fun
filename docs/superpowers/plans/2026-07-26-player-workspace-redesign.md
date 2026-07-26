@@ -60,9 +60,12 @@
     matrix with exact evidence/unresolved.
 24. `[completed][medium]` Update README visitor history, CHANGELOG and archived
     evidence. Verify: docs checks.
-25. `[in_progress][critical]` Inspect status/diff/stat/untracked/staged, secret/
+25. `[completed][critical]` Inspect status/diff/stat/untracked/staged, secret/
     debug/format scans and exact lease scope.
-26. `[pending][critical]` Stage only Task 104 paths via safe alternate index,
-    verify staged diff, commit on `main`, ordinary push, release lease.
+26. `[unresolved_external_auth][critical]` Staged exactly 32 Task 104 paths via
+    approved alternate index and committed `ed77c9eb` on `main`; ordinary
+    `git push origin main` reached the HTTPS remote and failed because
+    terminal authentication was unavailable. Lease is released after this
+    evidence commit attempt.
 
 Rollback: revert Task 104 commit; no DDL/data/package/cache/route rollback.

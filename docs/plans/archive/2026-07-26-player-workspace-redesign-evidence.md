@@ -60,3 +60,14 @@ URL property/mount/season query.
 - Transition payload не содержит `source_url`, signed playback grant, cookie,
   token или client-trusted entitlement.
 - Rollback: revert Task 104 commit. Данные и схема не требуют отката.
+
+## Delivery
+
+- Ветка: `main`.
+- Implementation commit: `ed77c9eb` — `feat: redesign player workspace`.
+- Commit создан через project hooks из отдельного одобренного index с ровно
+  32 Task 104 paths; параллельные staged/unstaged изменения не включены.
+- Ordinary push: `GIT_TERMINAL_PROMPT=0 git push origin main`.
+- Результат push: `unresolved`; настроенный HTTPS remote ответил
+  `fatal: could not read Username for 'https://github.com': terminal prompts disabled`.
+  Force push, смена remote, обход hooks и переписывание истории не выполнялись.
