@@ -12103,3 +12103,96 @@ queue, scheduler, config или environment change не планируется. 
 | Verification | `completed_with_foreign_full_suite_failures` | Focused 12/66; Blade/translation 83/79 084; related 95/1 818; Playwright 3/3; Vite/Pint/routes/Composer GREEN. Full 2 086: 2 056 pass, 11 skip, 18 foreign failures and 1 foreign error |
 | Managed docs refresh | `completed` | Inventory дополнен отсутствовавшей `234000` и новой `235500`; `project:docs-refresh --check` прошёл |
 | Git delivery | `unresolved_remote_auth` | `cd7242390f21005b3e3de351ec6047f41242e247` создан в `main`; `git push origin main` получил `fatal: could not read Username for 'https://github.com': terminal prompts disabled` |
+
+## Task 99 — season-bound «Продолжить просмотр» на главной
+
+Статус: `final_audit_completed_commit_pending`.
+
+Канонический design:
+[`2026-07-26-homepage-continue-watching-season-bound-design.md`](../superpowers/specs/2026-07-26-homepage-continue-watching-season-bound-design.md).
+
+Безлимитный живой implementation checklist:
+[`2026-07-26-homepage-continue-watching-season-bound.md`](../superpowers/plans/2026-07-26-homepage-continue-watching-season-bound.md).
+
+### Фактический baseline и выбранное решение
+
+- PHP `8.5.8`, Laravel `13.22.0`, Boost `2.4.13`, Livewire `4.3.3`,
+  PHPUnit `12.5.32`, Pint `1.29.3`, Tailwind `4.3.2`, Vite `8.1.4`,
+  SQLite.
+- Guest homepage уже даёт browser LCP около `0,47–0,96 s`; bottleneck
+  относится к authenticated personalized branch.
+- Auth `CatalogHomePageBuilder::webData()` выполнял `91–118` SQL за
+  `1,48–1,97 s`; один Continue Watching query занимал `1,42–1,90 s`.
+- SQLite materialized `watchable_episode_ids` через глобальный
+  `episodes_recommendation_release_events_idx` по `729 494` episodes, хотя
+  owner batch ограничен `96` title IDs.
+- Exact season-ID semi-join дал `85–172 ms`, тот же ordered result и plan с
+  существующими `seasons_publication_lookup_idx` и
+  `episodes_publication_lookup_idx`.
+- Migration/index/private cache/global playback rewrite отклонены как
+  необоснованные. Rollback — обычный revert без data/cache operations.
+
+### Expected changed files
+
+- `app/Services/Catalog/CatalogViewingActivityQuery.php`;
+- новый `tests/Feature/CatalogViewingActivityQueryPlanTest.php`;
+- Task 99 design/implementation plan;
+- append-only этот Task 99 section;
+- task-specific `docs/performance.md`, `README.md`, `CHANGELOG.md` hunks.
+
+Route, DTO, API Resource, Livewire/Blade/JS/CSS, translation, cache
+key/policy/invalidation, migration/index/data, dependency, queue, scheduler,
+config и environment change не планируются.
+
+### Protected contracts
+
+- все foreign Tasks 92–98 staged/unstaged/untracked hunks;
+- existing `main`, routes `/`, `/{locale}`, `/watching`, `/api/v1/home` и
+  mobile library/playback API;
+- owner activity order, batch/limit, completion and current/next semantics;
+- `CatalogContinueWatchingItem` shape and localized labels;
+- title/season/episode/media publication, audience, Premium, region,
+  availability and soft-delete boundaries;
+- guest response cache, authenticated no-store/bypass, cache keys/TTL/warming;
+- homepage HTML/SEO/locales, player, library, recommendation and importer
+  contracts.
+
+### Cross-feature и compliance snapshot
+
+| Contract/domain | Status | Evidence / gate |
+| --- | --- | --- |
+| Requirements/design/versions/Git | `completed` | Fresh canonical read, Boost/CLI/schema/status |
+| Existing flow and bottleneck | `completed` | Routes → Livewire → builder → activity/playback traced |
+| HTTP/browser/SQL/EXPLAIN | `completed` | Guest/auth separated; target statement isolated |
+| Alternatives/rollback | `completed` | Four approaches in linked design |
+| Detailed plan/compliance | `completed` | Linked no-limit checklist |
+| Prepared-plan reread | `completed` | Design, implementation plan и Task 99 перечитаны; critical gaps нет |
+| TDD RED | `completed` | 1 test/8 assertions; semantics passed, expected SQL-shape failure |
+| Implementation/GREEN | `completed` | Caller-local season-ID semi-join; 1 test/12 assertions |
+| Validation/input | `not_applicable` | No new request input; existing limit clamp |
+| Authorization/privacy/security | `completed` | Owner/access scopes retained; bound SQL; no shared personal cache |
+| Migration/index/data mutation | `not_applicable` | Existing indexes; no DDL/DML |
+| Cache/API/routes/SEO/locales | `already_compliant` | No public boundary change; related regression matrix passed |
+| UI/mobile/accessibility | `already_compliant` | No frontend diff; desktop/mobile guest Chromium clean |
+| Errors/logging/concurrency | `not_applicable` | Read-only local query |
+| Tests/static/build/browser | `completed` | 147/1 425 related GREEN; full foreign failures classified; static/build/browser complete |
+| Docs/README/CHANGELOG | `completed` | Canonical performance, visitor history and Russian technical history updated |
+| Final audit/commit/push | `in_progress` | Requirement/identity/debug/secret/diff gates complete; exact commit next |
+
+### Execution order
+
+1. `[completed]` Requirements, skills, versions, architecture and shared Git
+   audit.
+2. `[completed]` Guest/auth HTTP/browser and direct builder baseline.
+3. `[completed]` Target SQL isolation, production-scale EXPLAIN and alternatives.
+4. `[completed]` Approved design, rollback, expected/protected manifests.
+5. `[completed]` Detailed implementation plan and compliance matrix.
+6. `[completed]` Reread prepared plan; isolated RED next.
+7. `[completed]` RED, exact season-bound implementation and focused GREEN.
+8. `[completed]` Result parity, repeated profile and EXPLAIN.
+9. `[completed]` Security/cache/API/cross-feature review and regressions.
+10. `[completed]` Full/static/build/browser checks.
+11. `[completed]` Canonical performance docs, README, CHANGELOG and evidence.
+12. `[completed]` Requirement/legacy/debug/secret/final diff audit.
+13. `[pending]` Exact logical Task 99 commits on existing `main`.
+14. `[pending]` Ordinary configured push; external refusal remains unresolved.

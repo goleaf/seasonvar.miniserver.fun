@@ -186,7 +186,7 @@ parallel Tasks 96–98.
 ### Task 3.1 — Создать isolated query-plan regression
 
 **Приоритет:** critical
-**Статус:** pending
+**Статус:** completed
 
 **Что:** создать отдельный PHPUnit Feature test с двумя visible titles,
 available seasons/episodes/media и owner progress.
@@ -208,7 +208,7 @@ alias `watchable_episode_sequence`.
 ### Task 3.2 — Проверить current/next/owner isolation
 
 **Приоритет:** critical
-**Статус:** pending
+**Статус:** completed
 
 **Что:** незавершённый current episode остаётся current; завершённый episode
 получает next; чужая activity и unavailable target не протекают.
@@ -226,7 +226,7 @@ alias `watchable_episode_sequence`.
 ### Task 3.3 — Доказать RED на SQL shape/plan
 
 **Приоритет:** critical
-**Статус:** pending
+**Статус:** completed
 
 **Команда:**
 
@@ -243,6 +243,10 @@ php artisan test --filter=CatalogViewingActivityQueryPlanTest
 **Проверка:** нормализовать SQL case/whitespace; EXPLAIN использовать exact
 captured bindings.
 
+**Evidence:** 1 test / 8 assertions; current/next/foreign-owner assertions
+прошли, expected failure возник только на отсутствии direct
+`episodes.season_id` semi-join.
+
 ---
 
 ## Этап 4. Backend и SQL implementation
@@ -250,7 +254,7 @@ captured bindings.
 ### Task 4.1 — Добавить exact season-ID constraint
 
 **Приоритет:** critical
-**Статус:** pending
+**Статус:** completed
 
 **Что:** после title constraint в `$watchableEpisodeIds` добавить
 `whereIn(episodes.season_id, Season::availableTo($user)->whereIn(
@@ -271,7 +275,7 @@ row sets exact; test + production snapshot hash.
 ### Task 4.2 — Не менять shared playback abstraction
 
 **Приоритет:** high
-**Статус:** pending
+**Статус:** completed
 
 **Что/почему:** оставить `CatalogTitlePlaybackQuery` без diff, потому что
 batch title IDs принадлежат caller-specific boundary.
@@ -287,7 +291,7 @@ batch title IDs принадлежат caller-specific boundary.
 ### Task 4.3 — Format и syntax
 
 **Приоритет:** high
-**Статус:** pending
+**Статус:** completed
 
 **Команды:**
 
@@ -309,7 +313,7 @@ files/hunks.
 ### Task 5.1 — Получить focused GREEN
 
 **Приоритет:** critical
-**Статус:** pending
+**Статус:** completed
 
 **Проверка:** Task 99 test полностью проходит и доказывает DTO semantics,
 season-bound SQL и lookup indexes.
@@ -317,7 +321,7 @@ season-bound SQL и lookup indexes.
 ### Task 5.2 — Проверить exact production-snapshot parity
 
 **Приоритет:** critical
-**Статус:** pending
+**Статус:** completed
 
 **Что:** выполнить old/new equivalent read-only queries либо сохранить
 pre-change result и сравнить ordered row IDs/action targets.
@@ -332,7 +336,7 @@ pre-change result и сравнить ordered row IDs/action targets.
 ### Task 5.3 — Повторить SQL timing и EXPLAIN
 
 **Приоритет:** high
-**Статус:** pending
+**Статус:** completed
 
 **Что:** минимум три fresh-process samples auth builder/target query.
 
@@ -345,7 +349,7 @@ time, builder wall и indexes.
 ### Task 5.4 — Оценить secondary homepage queries
 
 **Приоритет:** medium
-**Статус:** pending
+**Статус:** completed
 
 **Что/почему:** после primary fix повторно отсортировать statements по time.
 Расширять scope только при отдельном material bottleneck и безопасном
@@ -363,7 +367,7 @@ time, builder wall и indexes.
 ### Task 6.1 — Validation/normalization review
 
 **Приоритет:** high
-**Статус:** pending
+**Статус:** not_applicable
 
 **Что:** подтвердить отсутствие нового request input; limit сохраняет clamp
 `1..24`; IDs берутся из owner rows.
@@ -380,7 +384,7 @@ validation с объяснением.
 ### Task 6.2 — Authorization/privacy/security audit
 
 **Приоритет:** critical
-**Статус:** pending
+**Статус:** completed
 
 **Что:** проверить owner scope, IDOR, SQL injection, personal cache leak,
 visibility/Premium/region predicates.
@@ -397,7 +401,7 @@ SQL, no shared-cache change.
 ### Task 6.3 — Error/logging/concurrency review
 
 **Приоритет:** medium
-**Статус:** pending
+**Статус:** not_applicable
 
 **Что:** подтвердить отсутствие write/transaction/race/error-handling change.
 
@@ -413,7 +417,7 @@ SQL, no shared-cache change.
 ### Task 7.1 — Continue Watching, history и player
 
 **Приоритет:** critical
-**Статус:** pending
+**Статус:** completed
 
 **Что:** запустить существующие tests для owner activity, navigation,
 completion и visibility.
@@ -426,7 +430,7 @@ baseline не маскировать.
 ### Task 7.2 — Homepage guest/auth и library/API
 
 **Приоритет:** critical
-**Статус:** pending
+**Статус:** completed
 
 **Что:** запустить homepage builder/render/cache, personalized homepage,
 library summary и mobile Continue Watching regressions.
@@ -438,7 +442,7 @@ library summary и mobile Continue Watching regressions.
 ### Task 7.3 — Routes, API, SEO, locale, cache
 
 **Приоритет:** high
-**Статус:** pending
+**Статус:** completed
 
 **Что/почему:** доказать отсутствие public contract drift.
 
@@ -448,7 +452,7 @@ resource, translation or cache key.
 ### Task 7.4 — Database migration/index review
 
 **Приоритет:** high
-**Статус:** pending
+**Статус:** completed
 
 **Что:** проверить duplicate/missing indexes и отказаться от migration при
 выборе existing indexes.
@@ -463,7 +467,7 @@ resource, translation or cache key.
 ### Task 8.1 — UI/UX code review
 
 **Приоритет:** medium
-**Статус:** pending
+**Статус:** completed
 
 **Что:** подтвердить отсутствие Blade/Livewire/JS/CSS diff; current loading,
 empty, responsive, localized labels и reset behavior не меняются.
@@ -473,7 +477,7 @@ empty, responsive, localized labels и reset behavior не меняются.
 ### Task 8.2 — Browser QA
 
 **Приоритет:** high
-**Статус:** pending
+**Статус:** completed
 
 **Что:** desktop/mobile guest checks; authenticated check только через
 безопасную existing test session без публикации credentials.
@@ -482,16 +486,26 @@ empty, responsive, localized labels и reset behavior не меняются.
 console/page/request errors, no horizontal overflow; report TTFB/LCP as local
 observation.
 
+**Evidence:** Chromium guest desktop `1440×1200` и mobile `390×844` получили
+`200`, один `h1`, отсутствие horizontal overflow, console/page/request
+errors; desktop `TTFB 1 014 ms`, `FCP 1 296 ms`, mobile `TTFB 56 ms`,
+`FCP 180 ms`. Безопасной existing authenticated browser session не было,
+поэтому private flow проверен Feature/Livewire tests и прямым профилем без
+создания production account.
+
 ### Task 8.3 — Asset build applicability
 
 **Приоритет:** low
-**Статус:** pending
+**Статус:** completed
 
 **Что:** frontend assets не меняются; `npm run build` всё равно выполнить как
 wide verification, если shared tree build contract требует.
 
 **Проверка:** exact command/result recorded; no generated artifact committed
 unless already tracked and task-owned.
+
+**Evidence:** `npm run build` завершён успешно: Vite `8.1.4`, 26 modules;
+Task 99 generated artifacts не добавляет.
 
 ---
 
@@ -500,7 +514,7 @@ unless already tracked and task-owned.
 ### Task 9.1 — Focused tests
 
 **Приоритет:** critical
-**Статус:** pending
+**Статус:** completed
 
 **Команды:** task-specific test, Continue Watching exact test, personalized
 homepage and library/API related classes.
@@ -510,7 +524,7 @@ homepage and library/API related classes.
 ### Task 9.2 — Full PHPUnit
 
 **Приоритет:** critical
-**Статус:** pending
+**Статус:** completed
 
 **Команда:** `php artisan test`; если repository process limit завершит suite,
 повторить только с безопасным temporary CLI memory limit и честно записать
@@ -521,10 +535,18 @@ homepage and library/API related classes.
 **Проверка:** не использовать `|| true`; каждый failure классифицировать по
 точному test и relationship к Task 99.
 
+**Evidence:** обычный `php artisan test` завершился OOM на закреплённых
+`256M`; `-d memory_limit=1G` не переопределил `phpunit.xml`. Повтор с
+временной root-level копией config и test-only `1G` выполнил 2 103 теста:
+2 069 passed, 21 failed, 2 errors, 11 skipped, 2 warnings, 204 522
+assertions. Все 23 failure/error относятся к незавершённым foreign изменениям
+Blade/search/PWA/title merge/web sessions/import batch; Task 99 test и
+связанные классы в списке отсутствуют. Временные файлы удалены.
+
 ### Task 9.3 — Static/style/toolchain
 
 **Приоритет:** high
-**Статус:** pending
+**Статус:** completed
 
 **Что:** Pint, PHP syntax, Composer validate, installed PHPStan/Rector checks,
 route/config checks по применимости.
@@ -534,16 +556,26 @@ route/config checks по применимости.
 **Проверка:** запускать только реально установленные scripts/tools; exact
 exit/result.
 
+**Evidence:** Pint exact task files, PHP syntax, `composer validate --strict`,
+task-scoped PHPStan, full `composer analyse`, task-scoped Rector, route list,
+docs refresh/policy checks и Vite build прошли. Full Rector указал только
+foreign `void` → `never` candidates в двух collection-classification files;
+Task 99 files не затронуты.
+
 ### Task 9.4 — Code-review cleanup
 
 **Приоритет:** high
-**Статус:** pending
+**Статус:** completed
 
 **Что:** проверить imports/types/names/dead code/TODO/debug/raw SQL/Blade
 queries и diff scope.
 
 **Проверка:** repository searches scoped к feature identity плюс full diff
 review.
+
+**Evidence:** feature-identity search подтвердил один canonical service и
+существующих consumers; task code/test не содержат debug/TODO/dead
+implementation, secret patterns или unrelated formatting.
 
 ---
 
@@ -552,7 +584,7 @@ review.
 ### Task 10.1 — Обновить canonical performance owner
 
 **Приоритет:** high
-**Статус:** pending
+**Статус:** completed
 
 **Что:** добавить фактические before/after/query-plan/parity observations.
 
@@ -566,7 +598,7 @@ change.
 ### Task 10.2 — Проверить README и visitor history
 
 **Приоритет:** critical
-**Статус:** pending
+**Статус:** completed
 
 **Что:** добавить meaningful Russian visitor-facing result, поскольку
 авторизованная homepage заметно меняется по скорости.
@@ -581,7 +613,7 @@ visitor copy.
 ### Task 10.3 — Обновить Russian CHANGELOG
 
 **Приоритет:** critical
-**Статус:** pending
+**Статус:** completed
 
 **Что:** отдельная dated technical entry без сокращения старых записей.
 
@@ -592,7 +624,7 @@ visitor copy.
 ### Task 10.4 — Завершить plan/compliance evidence
 
 **Приоритет:** critical
-**Статус:** pending
+**Статус:** completed
 
 **Что:** обновить statuses, commands, failures, commits/push.
 
@@ -607,7 +639,7 @@ visitor copy.
 ### Task 11.1 — Перечитать применимые требования
 
 **Приоритет:** critical
-**Статус:** pending
+**Статус:** completed
 
 **Проверка:** root/index/performance/security/data/playback/production/current
 plan reread; compliance statuses reconciled.
@@ -615,7 +647,7 @@ plan reread; compliance statuses reconciled.
 ### Task 11.2 — Проверить final diff и secrets/debug
 
 **Приоритет:** critical
-**Статус:** pending
+**Статус:** completed
 
 **Команды:** branch/status, unstaged/staged diff/stat/name/status, untracked,
 remote/upstream, secret/debug/TODO search, whitespace check.
@@ -624,6 +656,12 @@ remote/upstream, secret/debug/TODO search, whitespace check.
 
 **Проверка:** exact task paths/hunks only; no `.env`, logs, dumps, generated
 cache, credentials or unrelated formatting.
+
+**Evidence:** branch `main`; Task 99 path/hunk manifest совпал с планом;
+whitespace, syntax, debug/TODO и secret-pattern gates чисты. Shared staged,
+unstaged и untracked изменения Tasks 96–100 сохранены и исключаются через
+isolated index. `project:docs-refresh --check` сейчас сообщает только foreign
+`docs/MAINTENANCE_LOG.md`; Task 99 не меняет managed inventory.
 
 ### Task 11.3 — Создать logical commits на `main`
 
@@ -664,19 +702,19 @@ commit/hash сохранён.
 | Reproduction/measurement/EXPLAIN | `completed` | Auth query `1,42–1,90 s`; exact plan/index evidence |
 | Alternatives/design/rollback | `completed` | Four approaches in linked design |
 | Prepared-plan reread | `completed` | Design, implementation plan и Task 99 перечитаны; critical gaps нет |
-| TDD RED | `pending` | Isolated semantics + SQL/EXPLAIN regression |
-| Minimal implementation/GREEN | `pending` | One caller-local season semi-join |
+| TDD RED | `completed` | 1 test/8 assertions; expected SQL-shape failure after semantic pass |
+| Minimal implementation/GREEN | `completed` | One caller-local season semi-join; 1 test/12 assertions |
 | Input/validation | `not_applicable` | No new request input; existing limit clamp |
-| Authorization/privacy/security | `pending` | Owner + availability + no shared personal cache |
-| SQL parity/performance | `pending` | Exact rows/hash, repeated samples, selected indexes |
+| Authorization/privacy/security | `completed` | Owner isolation, all availability scopes, bound SQL, no personal cache |
+| SQL parity/performance | `completed` | Exact rows; 188,53–192,63 ms; both lookup indexes, no release index |
 | Migration/index/data safety | `not_applicable` | No DDL/DML; existing indexes sufficient |
-| Cache/invalidation | `already_compliant` | No key/policy/write-path change; final review pending |
-| API/routes/SEO/locales | `already_compliant` | No public contract file change; regression pending |
-| UI/mobile/accessibility | `already_compliant` | No frontend diff; browser verification pending |
+| Cache/invalidation | `already_compliant` | No key/policy/write-path change; related tests passed |
+| API/routes/SEO/locales | `already_compliant` | No public contract file change; related tests passed |
+| UI/mobile/accessibility | `already_compliant` | No frontend diff; desktop/mobile guest Chromium clean |
 | Error/logging/concurrency | `not_applicable` | Read-only query, no external I/O/write |
-| Tests/static/build/browser | `pending` | Focused → related → full → tools/browser |
-| Docs/README/CHANGELOG | `pending` | After verified measurements |
-| Final legacy/debug/secret audit | `pending` | Before commit |
+| Tests/static/build/browser | `completed` | 147/1 425 related GREEN; full foreign failures classified; static/build/browser complete |
+| Docs/README/CHANGELOG | `completed` | Canonical performance, visitor history and Russian technical history updated |
+| Final legacy/debug/secret audit | `completed` | Requirement reread; identity/debug/secret/diff/route checks complete |
 | Commit main | `pending` | Exact Task 99 scope |
 | Push main | `pending` | Ordinary non-force; auth failure honest |
 
@@ -688,13 +726,13 @@ commit/hash сохранён.
 4. `[completed]` Alternatives, approved design, production/rollback analysis.
 5. `[completed]` Detailed plan and compliance matrix creation.
 6. `[completed]` Prepared-plan reread.
-7. `[pending]` Isolated behavioral/query-plan RED.
-8. `[pending]` One caller-local season-ID constraint.
-9. `[pending]` Focused GREEN and exact parity.
-10. `[pending]` Repeated auth profile and EXPLAIN.
-11. `[pending]` Security/cache/API/route/cross-feature review.
-12. `[pending]` Related/full/static/build/browser verification.
-13. `[pending]` Performance owner, README, CHANGELOG and final evidence.
-14. `[pending]` Requirements/legacy/debug/secret/diff audit.
+7. `[completed]` Isolated behavioral/query-plan RED.
+8. `[completed]` One caller-local season-ID constraint.
+9. `[completed]` Focused GREEN and exact parity.
+10. `[completed]` Repeated auth profile and EXPLAIN.
+11. `[completed]` Security/cache/API/route/cross-feature review.
+12. `[completed]` Related/full/static/build/browser verification.
+13. `[completed]` Performance owner, README, CHANGELOG and verified evidence.
+14. `[completed]` Requirements/legacy/debug/secret/diff audit.
 15. `[pending]` Exact logical commits on existing `main`.
 16. `[pending]` Configured ordinary push.

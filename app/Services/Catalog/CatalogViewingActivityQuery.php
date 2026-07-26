@@ -87,6 +87,13 @@ final class CatalogViewingActivityQuery
             $watchableEpisodeIds = $this->playback
                 ->watchableEpisodesForVisibleTitles($user)
                 ->whereIn($season->qualifyColumn('catalog_title_id'), $catalogTitleIds)
+                ->whereIn(
+                    $episode->qualifyColumn('season_id'),
+                    Season::query()
+                        ->availableTo($user)
+                        ->whereIn('catalog_title_id', $catalogTitleIds)
+                        ->select('id'),
+                )
                 ->reorder()
                 ->select($episode->qualifyColumn('id'));
             $watchableSequence = $this->playback

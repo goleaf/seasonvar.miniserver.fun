@@ -1238,3 +1238,71 @@ config и environment не менялись. Existing after-commit catalog/tag
 invalidation обновляет `CatalogFacets`; cache miss/outage выполняет
 authoritative query. Rollback — обычный code/docs revert без restore,
 reindex, backfill или cache flush.
+
+## Season-bound Continue Watching главной Task 99
+
+Отдельный authenticated profile 26.07.2026 показал, что guest homepage уже
+даёт browser LCP `0,47–0,96 s`, но персональная ветка тратила
+`1,42–1,90 s` на один
+`CatalogViewingActivityQuery::continueWatching()` statement.
+`EXPLAIN QUERY PLAN` materialized `watchable_episode_ids` с глобального
+`episodes_recommendation_release_events_idx` по корпусу из `729 494`
+episodes, хотя latest owner activity передавала не более 96 title IDs.
+
+`CatalogViewingActivityQuery` теперь передаёт тем же watchable predicates
+точные `episodes.season_id` из доступных сезонов текущего title batch.
+Owner-scoped progress, visible title, season/episode/media publication,
+audience, availability window, Premium/region, health и soft-delete
+предикаты сохранены; общий `CatalogTitlePlaybackQuery`, ordering,
+completion/current-next semantics и DTO не изменены.
+
+Новый production-like plan materializes bounded subset через:
+
+- `episodes_publication_lookup_idx` по
+  `(season_id, publication_status, audience, deleted_at)`;
+- `seasons_publication_lookup_idx` по
+  `(catalog_title_id, publication_status, audience, deleted_at)`;
+- `catalog_titles_publication_lookup_idx` для прежней visibility recheck.
+
+Release-event index в этом plan больше не выбирается. Migration и новый
+index не добавлены, потому что существующие индексы уже соответствуют
+точному запросу.
+
+Пять последовательных read-only samples вернули один и тот же ordered набор
+из шести действий `next`: целевой SQL занял `188,53–192,63 ms`, весь
+`continueWatching()` — `302,84–327,33 ms`, по пять SQL statements. До
+изменения paired old/new probe на том же наборе вернул одинаковые rows, но
+прежняя форма занимала `1 447–1 904 ms`, season-bound форма —
+`85–172 ms`. После изменения три полных authenticated
+`CatalogHomePageBuilder::webData()` под текущей SQLite/import нагрузкой
+заняли `1,86–2,58 s`; целевой statement внутри них — `305,80–387,58 ms`.
+Это локальные diagnostic observations, а не production p95/SLA.
+
+TDD RED сначала прошёл восемь semantic assertions и упал только на отсутствии
+direct season semi-join; GREEN прошёл 1 тест с 12 утверждениями и проверил
+оба planner index. Existing Continue Watching regression прошёл 1/20.
+Связанные homepage, library, API, playback и authorization классы вместе
+прошли 147 тестов с 1 425 утверждениями. `Pint`, PHP syntax, task-scoped
+`PHPStan`, `Rector` и Composer manifest прошли до широкого verification.
+
+Стандартный полный процесс остановился на закреплённом `256M` с исчерпанием
+памяти в compiled Blade во время Premium test. Тот же suite с временной
+копией PHPUnit config и test-only `1G` завершил 2 103 теста: 2 069 прошли,
+11 пропущены, 21 отказ и 2 ошибки принадлежат параллельным Blade/Task 98,
+search/tag, PWA, title-merge, web-session и importer changes. Среди них нет
+`CatalogViewingActivityQueryPlanTest` или связанных Task 99 classes.
+Предупреждения PWA относятся к отсутствующим
+`resources/js/pwa.js`/`pwa-storage.js`; ошибки — к отсутствующим
+`WebPushSubscription` и `SeasonvarImportDispatchBatcher`.
+
+Полный `PHPStan` прошёл без ошибок; full Rector dry-run предложил только
+foreign `never` return types в двух collection-classification файлах.
+`npm run build` собрал 26 модулей. Chromium desktop/mobile вернул HTTP 200,
+по одному H1, без horizontal overflow, console/page/request errors; cold
+desktop TTFB/FCP были `1 014/1 296 ms`, следующий mobile —
+`56/180 ms`. Guest не получил персональную секцию.
+
+Authenticated responses по-прежнему не попадают в shared response cache.
+Route, API Resource, Livewire/Blade, locale, SEO, cache key/TTL/invalidation,
+schema/data, dependency, queue, config и environment не изменены. Rollback —
+обычный code/docs revert без restore, reindex, backfill или cache flush.
