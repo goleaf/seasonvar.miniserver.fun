@@ -54,11 +54,11 @@
                     <div>
                         <h3 class="font-black text-slate-800">{{ $event->actionLabel }}</h3>
                         <p class="mt-1 text-sm text-slate-600">{{ $event->resourceLabel }}</p>
-                        <code class="mt-1 block break-all text-xs text-slate-400">{{ $event->resourcePublicId }}</code>
+                                    <code class="mt-1 block break-all text-xs text-slate-600">{{ $event->resourcePublicId }}</code>
                     </div>
                     <div class="text-sm text-slate-600">
                         <p>{{ __('administration.audit.actor', ['name' => $event->actorName]) }}</p>
-                        <code class="mt-1 block break-all text-xs text-slate-400">{{ $event->actorPublicId }}</code>
+                                    <code class="mt-1 block break-all text-xs text-slate-600">{{ $event->actorPublicId }}</code>
                         @if ($event->changedFieldLabels !== [])
                             <p class="mt-2">{{ __('administration.audit.changed_fields', ['fields' => implode(', ', $event->changedFieldLabels)]) }}</p>
                         @endif

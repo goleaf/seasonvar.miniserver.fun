@@ -10,7 +10,7 @@
     {{ $attributes }}
 >
     <div class="flex flex-wrap items-center gap-1.5">
-        <span class="mr-1 text-xs font-bold uppercase tracking-wide text-slate-600">{{ __('catalog.catalog.alphabet.label') }}:</span>
+        <span class="mr-1 text-xs font-semibold text-slate-600">{{ __('catalog.catalog.alphabet.label') }}:</span>
         <a
             data-catalog-alphabet-option
             data-alphabet-letter=""

@@ -2,7 +2,7 @@
     <div
         wire:loading.flex
         wire:target="period,ratingSource,genre,country,tag,actor,director,translation,studio,yearFrom,yearTo,quality,subtitles,ratingMin,votesMin,clearFilters,previousPage,nextPage,refreshRecommendations,setFeedback,setFeedbackReason,undoFeedback,updateRecommendationPreferences,hideRecommendationGenre,restoreRecommendationGenre,resetRecommendationProfile"
-        class="fixed inset-x-3 bottom-4 z-40 mx-auto max-w-md items-center justify-center gap-3 rounded-panel bg-slate-900/95 px-5 py-4 text-sm font-bold text-white shadow-xl sm:inset-x-auto sm:right-6"
+        class="fixed inset-x-3 bottom-4 z-40 mx-auto max-w-md items-center justify-center gap-3 rounded-control bg-slate-900/95 px-5 py-4 text-sm font-bold text-white shadow-elevated sm:inset-x-auto sm:right-6"
         role="status"
         aria-live="polite"
     >
@@ -10,27 +10,27 @@
         <span>{{ __('recommendations.page.loading') }}</span>
     </div>
 
-    <header data-discovery-heading class="overflow-hidden rounded-panel border border-slate-200 bg-white shadow-panel">
-        <div class="border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-6">
-            <nav aria-label="{{ __('recommendations.page.breadcrumbs') }}" class="flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-500">
-                <a href="{{ route('home') }}" class="min-h-11 py-3 hover:text-emerald-700">{{ __('catalog.navigation.home') }}</a>
+    <header data-discovery-heading class="border-b border-slate-200 px-1 pb-6 sm:px-2 lg:pb-8">
+        <div class="border-b border-slate-200">
+            <nav aria-label="{{ __('recommendations.page.breadcrumbs') }}" class="flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-600">
+                <a href="{{ route('home') }}" class="min-h-11 py-3 hover:text-emerald-800">{{ __('catalog.navigation.home') }}</a>
                 <x-ui.icon name="fa-solid fa-chevron-right text-[10px] text-slate-300" />
                 <span aria-current="page" class="py-3 text-slate-700">{{ __('recommendations.navigation.discover') }}</span>
             </nav>
         </div>
-        <div class="px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        <div class="py-6 lg:py-8">
             <div class="max-w-4xl">
-                <div class="inline-flex items-center gap-2 text-sm font-black uppercase tracking-[0.14em] text-emerald-700">
+                <div class="inline-flex items-center gap-2 text-sm font-semibold text-emerald-700">
                     <x-ui.icon name="fa-solid fa-compass" />
                     <span>{{ __('recommendations.page.eyebrow') }}</span>
                 </div>
-                <h1 class="mt-3 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl lg:text-5xl">{{ $presentation['title'] }}</h1>
+                <h1 class="mt-3 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">{{ $presentation['title'] }}</h1>
                 <p class="mt-3 max-w-3xl text-base leading-7 text-slate-600 sm:text-lg">{{ $presentation['description'] }}</p>
             </div>
         </div>
     </header>
 
-    <nav aria-label="{{ __('recommendations.navigation.all') }}" class="rounded-panel border border-slate-200 bg-white p-2 shadow-sm shadow-slate-200/70">
+    <nav aria-label="{{ __('recommendations.navigation.all') }}" class="rounded-panel border border-slate-200 bg-white p-2">
         <div class="flex flex-wrap gap-1">
             @foreach ($typeLinks as $typeLink)
                 <a
@@ -40,7 +40,7 @@
                     @class([
                         'inline-flex min-h-11 items-center rounded-control px-4 py-2 text-sm font-bold focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200',
                         'bg-emerald-700 text-white' => $typeLink['active'],
-                        'text-slate-700 hover:bg-emerald-50 hover:text-emerald-700' => ! $typeLink['active'],
+                        'text-slate-700 hover:bg-emerald-50 hover:text-emerald-800' => ! $typeLink['active'],
                     ])
                     @if ($typeLink['active']) aria-current="page" @endif
                 >{{ $typeLink['label'] }}</a>
@@ -49,10 +49,10 @@
     </nav>
 
     @if ($showRecommendationPreferences)
-        <section class="rounded-panel border border-emerald-200 bg-emerald-50/60 p-4 shadow-sm sm:p-6" aria-labelledby="recommendation-preferences-title" data-recommendation-preferences>
+        <section class="rounded-panel border border-emerald-200 bg-emerald-50/60 p-4 sm:p-6" aria-labelledby="recommendation-preferences-title" data-recommendation-preferences>
             <div class="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
                 <div class="max-w-3xl">
-                    <h2 id="recommendation-preferences-title" class="flex items-center gap-2 text-lg font-black text-slate-900">
+                    <h2 id="recommendation-preferences-title" class="flex items-center gap-2 text-2xl font-semibold text-slate-900">
                         <x-ui.icon name="fa-solid fa-wand-magic-sparkles text-emerald-700" />
                         <span>{{ __('recommendations.preferences.title') }}</span>
                     </h2>
@@ -69,7 +69,7 @@
                         wire:confirm="{{ __('recommendations.preferences.reset_confirm') }}"
                         wire:loading.attr="disabled"
                         wire:target="resetRecommendationProfile"
-                        class="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-control border border-rose-200 bg-white px-4 py-2 text-sm font-bold text-rose-700 hover:bg-rose-50 disabled:cursor-wait disabled:opacity-60"
+                        class="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-control border border-red-200 bg-white px-4 py-2 text-sm font-bold text-red-700 hover:bg-red-50 disabled:cursor-wait disabled:opacity-60"
                     >
                         <x-ui.icon name="fa-solid fa-rotate-left" />
                         <span>{{ __('recommendations.preferences.reset') }}</span>
@@ -79,7 +79,7 @@
 
             <div class="mt-5 grid gap-5 lg:grid-cols-2">
                 <fieldset>
-                    <legend class="text-sm font-black text-slate-800">{{ __('recommendations.preferences.diversity') }}</legend>
+                    <legend class="text-sm font-semibold text-slate-800">{{ __('recommendations.preferences.diversity') }}</legend>
                     <div class="mt-2 grid gap-2 sm:grid-cols-3">
                         @foreach ([
                             'focused' => __('recommendations.preferences.focused'),
@@ -103,7 +103,7 @@
                 </fieldset>
 
                 <fieldset>
-                    <legend class="text-sm font-black text-slate-800">{{ __('recommendations.preferences.freshness') }}</legend>
+                    <legend class="text-sm font-semibold text-slate-800">{{ __('recommendations.preferences.freshness') }}</legend>
                     <div class="mt-2 grid gap-2 sm:grid-cols-3">
                         @foreach ([
                             'newer' => __('recommendations.preferences.newer'),
@@ -129,7 +129,7 @@
 
             @if ($hiddenRecommendationGenres->isNotEmpty())
                 <div class="mt-5 border-t border-emerald-200 pt-4">
-                    <h3 class="text-sm font-black text-slate-800">{{ __('recommendations.preferences.hidden_genres') }}</h3>
+                    <h3 class="text-sm font-semibold text-slate-800">{{ __('recommendations.preferences.hidden_genres') }}</h3>
                     <div class="mt-2 flex flex-wrap gap-2">
                         @foreach ($hiddenRecommendationGenres as $hiddenGenre)
                             <button
@@ -147,9 +147,9 @@
                 </div>
             @endif
 
-            <p class="mt-4 text-xs leading-5 text-slate-500">{{ __('recommendations.preferences.reset_hint') }}</p>
+            <p class="mt-4 text-xs leading-5 text-slate-600">{{ __('recommendations.preferences.reset_hint') }}</p>
             @if ($errors->has('recommendationPreferences'))
-                <p class="mt-3 rounded-control border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800" role="alert">{{ $errors->first('recommendationPreferences') }}</p>
+                <p class="mt-3 rounded-control border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-800" role="alert">{{ $errors->first('recommendationPreferences') }}</p>
             @endif
         </section>
     @endif
@@ -164,7 +164,7 @@
                 @foreach ($discoverySectionNavigation as $sectionLink)
                     <a
                         href="{{ $sectionLink['url'] }}"
-                        class="inline-flex min-h-11 items-center rounded-control px-4 py-2 text-sm font-black text-emerald-800 transition hover:bg-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
+                        class="inline-flex min-h-11 items-center rounded-control px-4 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
                     >{{ $sectionLink['label'] }}</a>
                 @endforeach
             </div>
@@ -175,15 +175,15 @@
         </div>
     @endif
 
-    <details data-discovery-filters @if ($hasFilters) open @endif class="group rounded-panel border border-slate-200 bg-white shadow-sm shadow-slate-200/70">
+    <details data-discovery-filters @if ($hasFilters) open @endif class="group rounded-panel border border-slate-200 bg-white">
         <summary class="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 sm:px-6">
             <span class="flex min-w-0 items-center gap-3">
                 <span class="grid h-9 w-9 shrink-0 place-items-center rounded-control bg-emerald-50 text-emerald-700">
                     <x-ui.icon name="fa-solid fa-sliders" />
                 </span>
                 <span class="min-w-0">
-                    <span class="block text-base font-black text-slate-900">{{ __('recommendations.page.filters') }}</span>
-                    <span class="block text-sm font-medium text-slate-500">
+                    <span class="block text-base font-semibold text-slate-900">{{ __('recommendations.page.filters') }}</span>
+                    <span class="block text-sm font-medium text-slate-600">
                         {{ $hasFilters ? __('recommendations.page.filters_active') : __('recommendations.page.filters_hint') }}
                     </span>
                 </span>
@@ -194,7 +194,7 @@
         <div class="border-t border-slate-200 p-4 sm:p-6">
             @if ($hasFilters)
                 <div class="mb-4 flex justify-end">
-                    <button type="button" wire:click="clearFilters" class="inline-flex min-h-11 items-center gap-2 rounded-control px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 hover:text-emerald-700">
+                    <button type="button" wire:click="clearFilters" class="inline-flex min-h-11 items-center gap-2 rounded-control px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 hover:text-emerald-800">
                         <x-ui.icon name="fa-solid fa-rotate-left" />
                         <span>{{ __('recommendations.page.clear_filters') }}</span>
                     </button>
@@ -308,7 +308,7 @@
     @endif
 
     @if ($errors->has('recommendations') || $errors->has('recommendationFeedback'))
-        <div role="alert" aria-live="assertive" class="rounded-control border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">
+        <div role="alert" aria-live="assertive" class="rounded-control border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800">
             {{ $errors->first('recommendations') ?: $errors->first('recommendationFeedback') }}
         </div>
     @endif
@@ -331,22 +331,22 @@
         <div class="rounded-panel border border-sky-200 bg-sky-50 p-4 text-sm leading-6 text-sky-900">{{ __('recommendations.page.upcoming_notice') }}</div>
     @endif
 
-    <section @if ($type === 'popular') id="popular-titles" @endif data-discovery-title-results aria-labelledby="discovery-results" aria-busy="false" class="scroll-mt-28 rounded-panel border border-slate-200 bg-slate-50/60 p-4 sm:p-6">
+    <section @if ($type === 'popular') id="popular-titles" @endif data-discovery-title-results aria-labelledby="discovery-results" aria-busy="false" class="scroll-mt-28 border-t border-slate-200 pt-5">
         <div class="flex flex-wrap items-end justify-between gap-3">
             <div>
-                <p class="text-sm font-black uppercase tracking-[0.12em] text-emerald-700">{{ __('recommendations.page.series_section_eyebrow') }}</p>
-                <h2 id="discovery-results" class="mt-1 text-2xl font-black tracking-tight text-slate-900">{{ __('recommendations.page.series_section_title') }}</h2>
+                <p class="text-sm font-semibold text-emerald-700">{{ __('recommendations.page.series_section_eyebrow') }}</p>
+                <h2 id="discovery-results" class="mt-1 text-2xl font-semibold tracking-tight text-slate-900">{{ __('recommendations.page.series_section_title') }}</h2>
                 <p class="mt-1 max-w-2xl text-sm leading-6 text-slate-600">
                     {{ $type === 'popular' ? __('recommendations.page.series_section_description') : $presentation['description'] }}
                 </p>
-                <p class="mt-2 text-sm font-semibold text-slate-500">{{ trans_choice('recommendations.page.result_count', $viewItems->count()) }} · {{ __('recommendations.page.page_number', ['page' => $result->page]) }}</p>
+                <p class="mt-2 text-sm font-semibold text-slate-600">{{ trans_choice('recommendations.page.result_count', $viewItems->count()) }} · {{ __('recommendations.page.page_number', ['page' => $result->page]) }}</p>
             </div>
             <button
                 type="button"
                 wire:click="refreshRecommendations"
                 wire:loading.attr="disabled"
                 data-discovery-refresh-secondary
-                class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:border-emerald-300 hover:text-emerald-700 disabled:cursor-wait disabled:opacity-60"
+                class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:border-emerald-300 hover:text-emerald-800 disabled:cursor-wait disabled:opacity-60"
             >
                 <x-ui.icon name="fa-solid fa-arrows-rotate" />
                 <span>{{ $type === 'random' ? __('recommendations.page.show_another') : __('recommendations.page.refresh') }}</span>
@@ -354,13 +354,13 @@
         </div>
 
         @if ($viewItems->isEmpty())
-            <div class="mt-4 rounded-panel bg-white px-5 py-12 text-center shadow-sm shadow-slate-200/70" role="status" aria-live="polite">
+            <div class="mt-4 border-t border-slate-200 px-5 py-12 text-center" role="status" aria-live="polite">
                 <x-ui.icon name="fa-solid fa-compass text-3xl text-slate-300" />
-                <h3 class="mt-4 text-lg font-black text-slate-800">{{ __('recommendations.page.empty') }}</h3>
+                <h3 class="mt-4 text-lg font-semibold text-slate-900">{{ __('recommendations.page.empty') }}</h3>
                 <p class="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-600">{{ __('recommendations.page.empty_hint') }}</p>
                 <div class="mt-5 flex flex-wrap justify-center gap-2">
                     @if ($hasFilters)
-                        <button type="button" wire:click="clearFilters" class="min-h-11 rounded-control bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-600">{{ __('recommendations.page.clear_filters') }}</button>
+                        <button type="button" wire:click="clearFilters" class="min-h-11 rounded-control bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-800">{{ __('recommendations.page.clear_filters') }}</button>
                     @endif
                     <a href="{{ $popularUrl }}" wire:navigate class="inline-flex min-h-11 items-center rounded-control bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200">{{ __('recommendations.page.browse_popular') }}</a>
                     <a href="{{ route('titles.index') }}" class="inline-flex min-h-11 items-center rounded-control px-4 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-50">{{ __('recommendations.page.open_catalog') }}</a>
@@ -369,7 +369,7 @@
         @else
             <ol class="mt-4 grid min-w-0 gap-4 xl:grid-cols-2" aria-label="{{ $presentation['accessibility'] }}" data-recommendation-list>
                 @foreach ($viewItems as $recommendationItem)
-                    <li wire:key="discovery-{{ $type }}-{{ $result->page }}-{{ $recommendationItem->title->id }}" class="min-w-0 overflow-hidden rounded-panel border border-slate-200 bg-white shadow-sm shadow-slate-200/60" data-recommendation-row>
+                    <li wire:key="discovery-{{ $type }}-{{ $result->page }}-{{ $recommendationItem->title->id }}" class="min-w-0 border-b border-slate-200 last:border-b-0 xl:odd:border-r xl:odd:pr-4 xl:even:pl-4" data-recommendation-row>
                         <x-catalog.title-card
                             :title="$recommendationItem->title"
                             layout="recommendation"
@@ -386,12 +386,12 @@
 
         @if ($result->page > 1 || $result->hasMore)
             <nav class="mt-7 flex flex-wrap items-center justify-center gap-3" aria-label="{{ __('catalog.directories.pagination') }}">
-                <button type="button" wire:click="previousPage" @disabled($result->page <= 1) class="inline-flex min-h-11 items-center gap-2 rounded-control bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm disabled:cursor-not-allowed disabled:opacity-50">
+                <button type="button" wire:click="previousPage" @disabled($result->page <= 1) class="inline-flex min-h-11 items-center gap-2 rounded-control border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:border-emerald-700 hover:text-emerald-800 disabled:cursor-not-allowed disabled:opacity-50">
                     <x-ui.icon name="fa-solid fa-arrow-left" />
                     <span>{{ __('recommendations.page.previous') }}</span>
                 </button>
                 <span class="text-sm font-bold text-slate-600">{{ __('recommendations.page.page_number', ['page' => $result->page]) }}</span>
-                <button type="button" wire:click="nextPage" @disabled(! $result->hasMore) class="inline-flex min-h-11 items-center gap-2 rounded-control bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm disabled:cursor-not-allowed disabled:opacity-50">
+                <button type="button" wire:click="nextPage" @disabled(! $result->hasMore) class="inline-flex min-h-11 items-center gap-2 rounded-control border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:border-emerald-700 hover:text-emerald-800 disabled:cursor-not-allowed disabled:opacity-50">
                     <span>{{ __('recommendations.page.next') }}</span>
                     <x-ui.icon name="fa-solid fa-arrow-right" />
                 </button>

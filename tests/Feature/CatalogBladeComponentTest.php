@@ -17,6 +17,25 @@ class CatalogBladeComponentTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_title_card_name_is_the_primary_typographic_element(): void
+    {
+        $title = CatalogTitle::factory()->make([
+            'title' => 'Главное название сериала',
+            'year' => 2026,
+        ]);
+
+        foreach ([
+            Blade::render('<x-catalog.title-card :title="$title" layout="list" />', ['title' => $title]),
+            Blade::render('<x-catalog.title-card :title="$title" layout="recommendation" />', ['title' => $title]),
+        ] as $html) {
+            $this->assertMatchesRegularExpression(
+                '/<h3[^>]*class="[^"]*text-lg[^"]*font-semibold[^"]*"[^>]*>.*text-slate-900.*Главное название сериала.*<\/h3>/s',
+                $html,
+            );
+            $this->assertStringContainsString('text-xs font-semibold', $html);
+        }
+    }
+
     public function test_header_keeps_logo_search_and_auth_actions_above_the_wrapping_navigation(): void
     {
         $html = $this->get(route('home'))->assertOk()->getContent();
@@ -65,8 +84,8 @@ class CatalogBladeComponentTest extends TestCase
             $this->assertStringContainsString('data-ui-poster-card', $html);
             $this->assertStringContainsString('data-ui-poster-frame', $html);
             $this->assertStringContainsString('href="'.route('titles.show', $catalogTitle).'"', $html);
-            $this->assertStringContainsString('href="'.route('titles.taxonomy', ['type' => 'genre', 'taxonomy' => $genre->slug]).'"', $html);
-            $this->assertStringNotContainsString('href="'.route('titles.taxonomy', ['type' => 'country', 'taxonomy' => $country->slug]).'"', $html);
+            $this->assertStringContainsString('href="'.route('titles.taxonomy', ['type' => 'genre', 'taxonomy' => 'detektiv']).'"', $html);
+            $this->assertStringNotContainsString('href="'.route('titles.taxonomy', ['type' => 'country', 'taxonomy' => 'ispaniia']).'"', $html);
         }
     }
 
@@ -249,7 +268,8 @@ class CatalogBladeComponentTest extends TestCase
             ->assertSeeText('2 серия')
             ->assertSeeText('видео')
             ->assertSeeText('1 видео')
-            ->assertSee('grid min-h-16 content-center gap-1 rounded-lg bg-slate-50 px-3 py-3', false)
+            ->assertSee('grid min-h-16 content-center gap-1 border-b border-slate-200 py-3 last:border-b-0', false)
+            ->assertDontSee('grid min-h-16 content-center gap-1 rounded-lg bg-slate-50', false)
             ->assertDontSeeText('плеер готов');
     }
 

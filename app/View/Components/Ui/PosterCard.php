@@ -14,7 +14,7 @@ class PosterCard extends Component
         'list' => 'grid grid-cols-[4rem_minmax(0,1fr)] gap-3 p-3 hover:bg-emerald-50/60 sm:grid-cols-[5rem_minmax(0,1fr)] sm:gap-4 sm:p-4 md:grid-cols-[6rem_minmax(0,1fr)]',
         'compact' => 'grid grid-cols-[3.5rem_minmax(0,1fr)] gap-3 p-3 hover:bg-emerald-50/60 sm:grid-cols-[4rem_minmax(0,1fr)]',
         'recommendation' => 'grid grid-cols-[4rem_minmax(0,1fr)] gap-3 p-3 hover:bg-emerald-50/60 sm:grid-cols-[5rem_minmax(0,1fr)] sm:gap-4 sm:p-4 md:grid-cols-[6rem_minmax(0,1fr)]',
-        'stats' => 'grid grid-cols-[5.5rem_minmax(0,1fr)] shadow-panel sm:flex sm:h-full sm:flex-col motion-safe:hover:-translate-y-0.5 motion-safe:hover:shadow-panel-hover',
+        'stats' => 'grid grid-cols-[5.5rem_minmax(0,1fr)] sm:flex sm:h-full sm:flex-col',
     ];
 
     /**

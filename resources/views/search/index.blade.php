@@ -1,7 +1,7 @@
 <div class="space-y-5">
         <section class="rounded-panel border border-slate-200 bg-white p-4 shadow-panel sm:p-6">
             <div class="max-w-3xl">
-                <p class="text-xs font-black uppercase tracking-[0.12em] text-emerald-700">{{ __('catalog.global_search.eyebrow') }}</p>
+                <p class="text-xs font-semibold text-emerald-700">{{ __('catalog.global_search.eyebrow') }}</p>
                 <h1 class="mt-1 break-words text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">{{ __('catalog.global_search.title') }}</h1>
                 <p class="mt-2 text-sm leading-6 text-slate-600">{{ __('catalog.global_search.description') }}</p>
 
@@ -15,7 +15,7 @@
                         container-class="min-w-0 flex-1"
                         input-class="min-h-11 min-w-0 flex-1 border-0 bg-transparent px-3 py-2.5 text-sm text-slate-700 outline-none placeholder:text-slate-500"
                     />
-                    <button type="submit" class="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
+                    <button type="submit" class="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
                         <x-ui.icon name="fa-solid fa-magnifying-glass" />
                         <span class="hidden sm:inline">{{ __('catalog.header_search.submit') }}</span>
                     </button>
@@ -36,7 +36,7 @@
             <div class="rounded-panel border border-rose-200 bg-rose-50 px-4 py-8 text-center shadow-panel" role="alert">
                 <x-ui.icon name="fa-solid fa-triangle-exclamation text-2xl text-rose-500" />
                 <p class="mt-3 font-bold text-rose-900">{{ __('catalog.global_search.temporary_error') }}</p>
-                <a href="{{ route('titles.index') }}" class="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-white px-4 py-2 text-sm font-bold text-emerald-800 shadow-sm transition hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
+                <a href="{{ route('titles.index') }}" class="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-control border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-emerald-700 transition hover:border-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
                     <x-ui.icon name="fa-solid fa-table-cells-large" />
                     <span>{{ __('catalog.global_search.open_catalog') }}</span>
                 </a>
@@ -44,7 +44,7 @@
         @else
             <div class="flex flex-wrap items-end justify-between gap-3">
                 <div>
-                    <p class="text-xs font-black uppercase tracking-[0.12em] text-slate-500">{{ __('catalog.global_search.results') }}</p>
+                    <p class="text-xs font-semibold text-slate-600">{{ __('catalog.global_search.results') }}</p>
                     <h2 class="mt-1 break-words text-xl font-black text-slate-900">«{{ $query }}»</h2>
                     <p class="mt-1 text-sm font-semibold text-slate-600" role="status" aria-live="polite">
                         {{ __('catalog.global_search.result_summary', ['titles' => $title_count_label, 'portal' => $portal_count]) }}
@@ -79,7 +79,7 @@
                     <p class="mt-1 text-sm text-amber-900">{{ __('catalog.global_search.possible_matches_hint') }}</p>
                     <div class="mt-3 flex flex-wrap gap-2">
                         @foreach ($search_suggestions as $suggestion)
-                            <a href="{{ route($searchRouteName, [...$searchRouteParameters, 'q' => $suggestion->display_title]) }}" class="inline-flex min-h-11 items-center rounded-control bg-white px-3 py-2 text-sm font-bold text-amber-950 shadow-sm transition hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-200">
+                            <a href="{{ route($searchRouteName, [...$searchRouteParameters, 'q' => $suggestion->display_title]) }}" class="inline-flex min-h-11 items-center rounded-control border border-amber-200 bg-white px-3 py-2 text-sm font-bold text-amber-950 transition hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-200">
                                 {{ $suggestion->display_title }}
                             </a>
                         @endforeach
@@ -93,7 +93,7 @@
                     <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                         @foreach ($portal_groups as $group)
                             <section aria-label="{{ $group['label'] }}" class="min-w-0 rounded-panel border border-slate-200 bg-white p-2 shadow-panel">
-                                <h3 class="px-2 py-2 text-xs font-black uppercase tracking-[0.12em] text-slate-500">{{ $group['label'] }}</h3>
+                                <h3 class="px-2 py-2 text-xs font-semibold text-slate-600">{{ $group['label'] }}</h3>
                                 <div class="space-y-0.5">
                                     @foreach ($group['items'] as $item)
                                         <a href="{{ $item['url'] }}" class="flex min-h-11 min-w-0 items-center justify-between gap-3 rounded-control px-2 py-2 text-sm transition hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300">
@@ -113,7 +113,7 @@
                     <p class="font-bold text-slate-700">{{ __('catalog.global_search.empty', ['query' => $query]) }}</p>
                     <p class="mx-auto mt-2 max-w-2xl text-sm leading-6 text-slate-600">{{ __('catalog.global_search.empty_hint') }}</p>
                     <div class="mt-5 flex flex-wrap justify-center gap-2">
-                        <a href="{{ route('titles.index') }}" class="inline-flex min-h-11 items-center rounded-control bg-emerald-700 px-4 py-2 text-sm font-bold text-white transition hover:bg-emerald-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">{{ __('catalog.global_search.open_catalog') }}</a>
+                        <a href="{{ route('titles.index') }}" class="inline-flex min-h-11 items-center rounded-control bg-emerald-700 px-4 py-2 text-sm font-bold text-white transition hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">{{ __('catalog.global_search.open_catalog') }}</a>
                         <a href="{{ route('discover.index', ['type' => 'popular']) }}" class="inline-flex min-h-11 items-center rounded-control bg-slate-100 px-4 py-2 text-sm font-bold text-slate-800 transition hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-200">{{ __('catalog.global_search.open_popular') }}</a>
                         <a href="{{ route('discover.index', ['type' => 'recently_added']) }}" class="inline-flex min-h-11 items-center rounded-control bg-slate-100 px-4 py-2 text-sm font-bold text-slate-800 transition hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-200">{{ __('catalog.global_search.open_new') }}</a>
                         <a href="{{ route('discover.index', ['type' => 'random']) }}" class="inline-flex min-h-11 items-center rounded-control bg-slate-100 px-4 py-2 text-sm font-bold text-slate-800 transition hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-200">{{ __('catalog.global_search.open_random') }}</a>

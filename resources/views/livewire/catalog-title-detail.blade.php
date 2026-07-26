@@ -9,34 +9,34 @@
     data-livewire-catalog-title-detail
 >
     <section class="grid min-w-0 gap-5 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)]">
-        <aside class="space-y-4">
-            <section class="h-full overflow-hidden rounded-panel bg-white shadow-panel">
-                <div class="bg-slate-50 px-4 py-3">
+        <aside class="order-2 space-y-4 lg:order-1">
+            <section class="h-full overflow-hidden rounded-panel border border-slate-200 bg-white">
+                <div class="border-b border-slate-200 bg-white px-4 py-3">
                     <div class="flex items-center gap-2">
                         <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-control bg-emerald-50 text-emerald-700">
                             <x-ui.icon name="fa-solid fa-compass" />
                         </span>
-                        <h2 class="text-sm font-bold text-slate-700">{{ __('catalog.title.quick_access') }}</h2>
+                        <h2 class="text-2xl font-semibold text-slate-900">{{ __('catalog.title.quick_access') }}</h2>
                     </div>
                 </div>
                 <div class="space-y-4 p-4">
                     <nav aria-label="{{ __('catalog.title.quick_navigation') }}" data-title-quick-navigation class="-mx-2 grid gap-1">
-                        <a data-title-quick-link href="#player" class="relative inline-flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-bold text-slate-600 transition before:absolute before:inset-y-2 before:left-0 before:w-1 before:rounded-full before:bg-transparent hover:bg-slate-50 hover:text-emerald-700 aria-[current=location]:bg-emerald-50 aria-[current=location]:font-black aria-[current=location]:text-emerald-700 aria-[current=location]:before:bg-emerald-600">
+                        <a data-title-quick-link href="#player" class="relative inline-flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 transition before:absolute before:inset-y-2 before:left-0 before:w-1 before:rounded-full before:bg-transparent hover:bg-slate-50 hover:text-emerald-800 aria-[current=location]:bg-emerald-50 aria-[current=location]:font-semibold aria-[current=location]:text-emerald-700 aria-[current=location]:before:bg-emerald-800">
                             <x-ui.icon name="fa-solid fa-circle-play" />
                             <span>{{ __('catalog.title.watch') }}</span>
                         </a>
 
-                        <a data-title-quick-link href="#seasons" class="relative inline-flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-bold text-slate-600 transition before:absolute before:inset-y-2 before:left-0 before:w-1 before:rounded-full before:bg-transparent hover:bg-slate-50 hover:text-emerald-700 aria-[current=location]:bg-emerald-50 aria-[current=location]:font-black aria-[current=location]:text-emerald-700 aria-[current=location]:before:bg-emerald-600">
+                        <a data-title-quick-link href="#seasons" class="relative inline-flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 transition before:absolute before:inset-y-2 before:left-0 before:w-1 before:rounded-full before:bg-transparent hover:bg-slate-50 hover:text-emerald-800 aria-[current=location]:bg-emerald-50 aria-[current=location]:font-semibold aria-[current=location]:text-emerald-700 aria-[current=location]:before:bg-emerald-800">
                             <x-ui.icon name="fa-solid fa-layer-group text-slate-400" />
                             <span>{{ __('catalog.title.seasons') }}</span>
                         </a>
 
-                        <a data-title-quick-link href="#data-title-reference" class="relative inline-flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-bold text-slate-600 transition before:absolute before:inset-y-2 before:left-0 before:w-1 before:rounded-full before:bg-transparent hover:bg-slate-50 hover:text-emerald-700 aria-[current=location]:bg-emerald-50 aria-[current=location]:font-black aria-[current=location]:text-emerald-700 aria-[current=location]:before:bg-emerald-600">
+                        <a data-title-quick-link href="#data-title-reference" class="relative inline-flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 transition before:absolute before:inset-y-2 before:left-0 before:w-1 before:rounded-full before:bg-transparent hover:bg-slate-50 hover:text-emerald-800 aria-[current=location]:bg-emerald-50 aria-[current=location]:font-semibold aria-[current=location]:text-emerald-700 aria-[current=location]:before:bg-emerald-800">
                             <x-ui.icon name="fa-solid fa-circle-info text-slate-400" />
                             <span>{{ __('catalog.title.about') }}</span>
                         </a>
 
-                        <a data-title-quick-link href="#reviews" class="relative inline-flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-bold text-slate-600 transition before:absolute before:inset-y-2 before:left-0 before:w-1 before:rounded-full before:bg-transparent hover:bg-slate-50 hover:text-emerald-700 aria-[current=location]:bg-emerald-50 aria-[current=location]:font-black aria-[current=location]:text-emerald-700 aria-[current=location]:before:bg-emerald-600">
+                        <a data-title-quick-link href="#reviews" class="relative inline-flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 transition before:absolute before:inset-y-2 before:left-0 before:w-1 before:rounded-full before:bg-transparent hover:bg-slate-50 hover:text-emerald-800 aria-[current=location]:bg-emerald-50 aria-[current=location]:font-semibold aria-[current=location]:text-emerald-700 aria-[current=location]:before:bg-emerald-800">
                             <x-ui.icon name="fa-solid fa-star-half-stroke text-slate-400" />
                             <span>{{ __('reviews.section.label') }}</span>
                         </a>
@@ -53,28 +53,28 @@
                     </a>
 
                     <div class="grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
-                        <div class="grid min-h-16 content-center gap-1 rounded-lg bg-slate-50 px-3 py-3">
+                        <div class="grid min-h-16 content-center gap-1 border-b border-slate-200 py-3 last:border-b-0">
                             <div class="flex items-center justify-between gap-2">
-                                <div class="text-xs font-bold uppercase leading-none tracking-wide text-slate-500">{{ __('catalog.title.seasons') }}</div>
+                                <div class="text-xs font-semibold leading-none text-slate-600">{{ __('catalog.title.seasons') }}</div>
                                 <x-ui.icon name="fa-solid fa-layer-group text-slate-400" />
                             </div>
-                            <div class="text-lg font-black leading-none tabular-nums text-slate-800">{{ $showView->parsedSeasonCount }}</div>
+                            <div class="text-lg font-semibold leading-none tabular-nums text-slate-900">{{ $showView->parsedSeasonCount }}</div>
                         </div>
 
-                        <div class="grid min-h-16 content-center gap-1 rounded-lg bg-slate-50 px-3 py-3">
+                        <div class="grid min-h-16 content-center gap-1 border-b border-slate-200 py-3 last:border-b-0">
                             <div class="flex items-center justify-between gap-2">
-                                <div class="text-xs font-bold uppercase leading-none tracking-wide text-slate-500">{{ __('catalog.title.episodes') }}</div>
+                                <div class="text-xs font-semibold leading-none text-slate-600">{{ __('catalog.title.episodes') }}</div>
                                 <x-ui.icon name="fa-solid fa-list-ol text-slate-400" />
                             </div>
-                            <div class="text-lg font-black leading-none tabular-nums text-slate-800">{{ $showView->episodeCount }}</div>
+                            <div class="text-lg font-semibold leading-none tabular-nums text-slate-900">{{ $showView->episodeCount }}</div>
                         </div>
 
-                        <div class="grid min-h-16 content-center gap-1 rounded-lg bg-slate-50 px-3 py-3">
+                        <div class="grid min-h-16 content-center gap-1 border-b border-slate-200 py-3 last:border-b-0">
                             <div class="flex items-center justify-between gap-2">
-                                <div class="text-xs font-bold uppercase leading-none tracking-wide text-slate-500">{{ __('catalog.title.video') }}</div>
+                                <div class="text-xs font-semibold leading-none text-slate-600">{{ __('catalog.title.video') }}</div>
                                 <x-ui.icon name="fa-solid fa-file-video text-slate-400" />
                             </div>
-                            <div class="text-lg font-black leading-none tabular-nums text-slate-800">{{ $showView->mediaCount }}</div>
+                            <div class="text-lg font-semibold leading-none tabular-nums text-slate-900">{{ $showView->mediaCount }}</div>
                         </div>
                     </div>
 
@@ -82,10 +82,10 @@
             </section>
         </aside>
 
-        <div class="min-w-0 space-y-5">
-            <x-ui.panel data-title-hero :pad="false" class="overflow-hidden border-emerald-100">
-                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3">
-                    <a href="{{ route('titles.index') }}" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
+        <div class="order-1 min-w-0 space-y-5 lg:order-2">
+            <x-ui.panel data-title-hero :pad="false" class="overflow-hidden">
+                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-3">
+                    <a href="{{ route('titles.index') }}" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800">
                         <x-ui.icon name="fa-solid fa-arrow-left" />
                         <span>{{ __('catalog.title.back_to_catalog') }}</span>
                     </a>
@@ -98,17 +98,17 @@
                             data-share-success="{{ __('mobile.share.success') }}"
                             data-share-error="{{ __('mobile.share.error') }}"
                             aria-describedby="catalog-title-share-status"
-                            class="inline-flex min-h-11 items-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-60"
+                            class="inline-flex min-h-11 items-center gap-2 rounded-control border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 disabled:opacity-60"
                         >
                             <x-ui.icon name="fa-solid fa-share-nodes" />
                             <span>{{ __('mobile.share.action') }}</span>
                         </button>
                         @if ($refreshStatus !== null)
                             <span @class([
-                                'inline-flex min-h-9 items-center gap-2 rounded-control px-3 py-2 text-xs font-bold',
+                                'inline-flex min-h-9 items-center gap-2 rounded-full px-3 py-2 text-xs font-semibold',
                                 'bg-sky-50 text-sky-700' => $refreshStatus['tone'] === 'active',
                                 'bg-emerald-50 text-emerald-700' => $refreshStatus['tone'] === 'completed',
-                                'bg-rose-50 text-rose-700' => $refreshStatus['tone'] === 'failed',
+                                'bg-red-50 text-red-700' => $refreshStatus['tone'] === 'failed',
                             ]) data-title-refresh-status>
                                 <x-ui.icon :name="$refreshStatus['icon']" />
                                 <span>{{ $refreshStatus['label'] }}</span>
@@ -118,21 +118,21 @@
                     <p id="catalog-title-share-status" class="sr-only" role="status" aria-live="polite"></p>
                 </div>
 
-                <article class="grid gap-5 bg-gradient-to-br from-white via-white to-emerald-50 p-4 md:grid-cols-[minmax(150px,220px)_minmax(0,1fr)] md:p-5">
+                <article class="grid gap-5 bg-white p-4 md:grid-cols-[minmax(150px,220px)_minmax(0,1fr)] md:p-5">
                     <x-ui.poster-frame
                         :src="$title->poster_url"
                         :alt="__('catalog.seo.poster_alt', ['title' => $title->display_title])"
                         loading="eager"
-                        class="mx-auto aspect-[2/3] w-44 max-w-full rounded-panel shadow-panel sm:w-52 md:w-full"
+                        class="mx-auto aspect-[2/3] w-44 max-w-full rounded-panel sm:w-52 md:w-full"
                     />
 
                     <div class="min-w-0">
-                        <h1 class="flex min-w-0 items-start gap-3 text-2xl font-black tracking-tight text-slate-800 sm:text-3xl">
+                        <h1 class="flex min-w-0 items-start gap-3 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
                             <x-ui.icon name="fa-solid fa-clapperboard text-emerald-700" align="start" />
                             <span class="min-w-0 break-words">{{ $showView->displayTitle }}</span>
                         </h1>
                         @if ($showView->displayOriginalTitle !== '')
-                            <div class="mt-2 break-words text-sm font-semibold text-slate-500">{{ $showView->displayOriginalTitle }}</div>
+                            <div class="mt-2 break-words text-sm font-semibold text-slate-600">{{ $showView->displayOriginalTitle }}</div>
                         @endif
 
                         <div class="mt-4 flex flex-wrap gap-2 text-xs font-bold">
@@ -147,12 +147,12 @@
                             <x-ui.taxonomy-chip icon="fa-solid fa-file-video">{{ trans_choice('catalog.counts.videos', $mediaCount) }}</x-ui.taxonomy-chip>
                         </div>
 
-                        <section class="mt-5 rounded-control border border-slate-200 bg-white p-4">
-                            <h2 class="flex items-center gap-2 text-sm font-bold text-slate-700">
+                        <section class="mt-5 border-t border-slate-200 pt-4">
+                            <h2 class="flex items-center gap-2 text-2xl font-semibold text-slate-900">
                                 <x-ui.icon name="fa-solid fa-book-open text-slate-400" />
                                 <span>{{ __('catalog.title.description') }}</span>
                             </h2>
-                            <p class="mt-2 text-sm leading-6 text-slate-600">{{ $showView->displayDescription !== '' ? $showView->displayDescription : __('catalog.title.description_missing') }}</p>
+                            <p class="mt-2 text-base leading-7 text-slate-700">{{ $showView->displayDescription !== '' ? $showView->displayDescription : __('catalog.title.description_missing') }}</p>
                         </section>
 
                         <div class="mt-4">
@@ -197,7 +197,7 @@
                     @foreach ($taxonomyRows as $row)
                         @if ($row['items']->isNotEmpty())
                             <div class="grid gap-2 py-3 sm:grid-cols-[120px_minmax(0,1fr)]">
-                                <dt class="inline-flex items-center gap-2 font-bold text-slate-500">
+                                <dt class="inline-flex items-center gap-2 font-semibold text-slate-600">
                                     <x-ui.icon name="{{ $row['icon'] ?? 'fa-solid fa-tag' }} text-slate-400" />
                                     <span>{{ $row['label'] }}</span>
                                 </dt>
@@ -211,7 +211,7 @@
                     @endforeach
                     @if ($aliases->isNotEmpty())
                         <div class="grid gap-2 py-3 sm:grid-cols-[120px_minmax(0,1fr)]">
-                            <dt class="inline-flex items-center gap-2 font-bold text-slate-500">
+                            <dt class="inline-flex items-center gap-2 font-semibold text-slate-600">
                                 <x-ui.icon name="fa-solid fa-signature text-slate-400" />
                                 <span>{{ __('catalog.title.other_names') }}</span>
                             </dt>
@@ -224,7 +224,7 @@
                     @endif
                     @if ($ratings->isNotEmpty())
                         <div class="grid gap-2 py-3 sm:grid-cols-[120px_minmax(0,1fr)]">
-                            <dt class="inline-flex items-center gap-2 font-bold text-slate-500">
+                            <dt class="inline-flex items-center gap-2 font-semibold text-slate-600">
                                 <x-ui.icon name="fa-solid fa-star text-slate-400" />
                                 <span>{{ __('catalog.title.ratings') }}</span>
                             </dt>
@@ -239,7 +239,7 @@
                     @endif
                     @if ($title->year)
                         <div class="grid gap-2 py-3 sm:grid-cols-[120px_minmax(0,1fr)]">
-                            <dt class="inline-flex items-center gap-2 font-bold text-slate-500">
+                            <dt class="inline-flex items-center gap-2 font-semibold text-slate-600">
                                 <x-ui.icon name="fa-solid fa-calendar-days" class="text-slate-400" />
                                 <span>{{ __('catalog.title.released') }}</span>
                             </dt>
@@ -267,7 +267,7 @@
             @endif
 
             @if ($errors->has('recommendationFeedback'))
-                <div role="alert" aria-live="assertive" class="rounded-control border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">{{ $errors->first('recommendationFeedback') }}</div>
+                <div role="alert" aria-live="assertive" class="rounded-control border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800">{{ $errors->first('recommendationFeedback') }}</div>
             @endif
 
             @if ($relatedRecommendationItems->isNotEmpty())
@@ -306,12 +306,10 @@
                         @endforeach
                     </ol>
                 @else
-                    <div class="p-3">
-                        <div class="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
-                            <div class="inline-flex items-center gap-2">
-                                <x-ui.icon name="fa-solid fa-circle-info text-slate-400" />
-                                <span>{{ __('recommendations.page.empty') }}</span>
-                            </div>
+                    <div class="border-t border-slate-200 p-4 text-sm text-slate-600">
+                        <div class="inline-flex items-center gap-2">
+                            <x-ui.icon name="fa-solid fa-circle-info text-slate-400" />
+                            <span>{{ __('recommendations.page.empty') }}</span>
                         </div>
                     </div>
                 @endif
@@ -319,7 +317,7 @@
 
             @if ($publicCollections->isNotEmpty())
                 <section aria-labelledby="title-public-collections">
-                    <h2 id="title-public-collections" class="mb-3 flex items-center gap-2 text-lg font-black text-slate-800">
+                    <h2 id="title-public-collections" class="mb-3 flex items-center gap-2 text-2xl font-semibold text-slate-900">
                         <x-ui.icon name="fa-solid fa-layer-group text-emerald-700" />
                         <span>{{ __('collections.page.contains_title') }}</span>
                     </h2>

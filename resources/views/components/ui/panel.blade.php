@@ -1,17 +1,16 @@
 @props(['title' => null, 'subtitle' => null, 'pad' => true, 'icon' => null])
 
-<section {{ $attributes->merge(['class' => 'overflow-hidden rounded-panel border border-slate-200 bg-white shadow-panel']) }}>
+<section data-ui-panel {{ $attributes->merge(['class' => 'overflow-hidden rounded-panel border border-slate-200 bg-white']) }}>
     @if ($title || $subtitle)
-        <div class="border-b border-slate-200 bg-slate-50 px-4 py-3">
+        <div class="border-b border-slate-200 bg-white px-4 py-4 sm:px-5">
             <div @class([
-                'flex gap-2',
+                'flex gap-3',
                 'items-start' => $subtitle,
                 'items-center' => ! $subtitle,
             ])>
                 @if ($icon)
                     <span @class([
-                        'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-control bg-emerald-50 text-emerald-700',
-                        'mt-0.5' => $subtitle,
+                        'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-emerald-50 text-emerald-700',
                     ])>
                         <x-ui.icon name="{{ $icon }}" />
                     </span>
@@ -19,10 +18,10 @@
 
                 <div class="min-w-0">
                     @if ($title)
-                        <h2 class="text-sm font-bold text-slate-700">{{ $title }}</h2>
+                        <h2 class="text-2xl font-semibold text-slate-900">{{ $title }}</h2>
                     @endif
                     @if ($subtitle)
-                        <p class="mt-1 text-xs leading-5 text-slate-500">{{ $subtitle }}</p>
+                        <p class="mt-1 text-sm leading-5 text-slate-600">{{ $subtitle }}</p>
                     @endif
                 </div>
             </div>
@@ -30,7 +29,7 @@
     @endif
 
     @if ($pad)
-        <div class="p-4">{{ $slot }}</div>
+        <div class="p-4 sm:p-5">{{ $slot }}</div>
     @else
         {{ $slot }}
     @endif

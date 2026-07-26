@@ -28,7 +28,7 @@
         </div>
 
         @if ($userPrimaryAction)
-            <a href="{{ $userPrimaryAction['url'] }}" class="mt-2 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700">
+            <a href="{{ $userPrimaryAction['url'] }}" class="mt-2 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800">
                 <x-ui.icon name="fa-solid fa-play" />
                 <span>{{ $userPrimaryAction['label'] }}</span>
             </a>

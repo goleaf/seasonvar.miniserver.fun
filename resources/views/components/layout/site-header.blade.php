@@ -1,6 +1,6 @@
 @props(['siteName', 'searchQuery' => '', 'header'])
 
-<header data-site-header {{ $attributes->class(['border-b border-slate-200 bg-white shadow-panel lg:sticky lg:top-0 lg:z-50']) }}>
+<header data-site-header {{ $attributes->class(['border-b border-slate-200 bg-white lg:sticky lg:top-0 lg:z-50 lg:shadow-elevated']) }}>
     <div data-site-header-primary class="app-safe-inline mx-auto flex max-w-[1760px] min-w-0 flex-wrap items-center gap-2 py-3 sm:gap-3">
         <a href="{{ $header['home_url'] }}" aria-label="{{ $siteName }}" class="flex min-w-11 shrink-0 items-center gap-3 rounded-control sm:min-w-0 sm:max-w-48 lg:max-w-72">
             <span class="grid h-11 w-11 shrink-0 place-items-center rounded-control bg-emerald-50 text-lg text-emerald-700">

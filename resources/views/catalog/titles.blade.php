@@ -1,7 +1,7 @@
 <section class="space-y-5">
         @island(name: 'catalog-live', with: $this->catalogPage)
         @if ($errors->any())
-            <div role="alert" class="col-span-full rounded-panel border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+            <div role="alert" class="col-span-full rounded-panel border border-red-200 bg-red-50 p-4 text-sm text-red-700">
                 <div class="flex items-start gap-3">
                     <x-ui.icon name="fa-solid fa-triangle-exclamation" align="start" />
                     <div>
@@ -21,7 +21,7 @@
                 @island(name: 'catalog-live', with: $this->catalogPage)
                 <div class="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
                     <div>
-                        <h1 class="inline-flex items-center gap-2 text-3xl font-bold text-slate-700">
+                        <h1 class="inline-flex items-center gap-2 text-3xl font-semibold text-slate-900">
                             <x-ui.icon name="fa-solid fa-clapperboard text-emerald-700" />
                             <span>{{ $seo['h1'] ?? __('catalog.navigation.all_titles') }}</span>
                         </h1>
@@ -66,7 +66,7 @@
                                         </x-ui.taxonomy-chip>
                                     @endforeach
                                 </div>
-                                <div class="flex flex-wrap gap-3 text-slate-500">
+                                <div class="flex flex-wrap gap-3 text-slate-600">
                                     <span class="hidden sm:inline"><x-ui.icon name="fa-solid fa-diagram-project text-slate-400" /> {{ $filterView->activeFilterCountLabel() }}</span>
                                     @if ($invalidYear)
                                         <span class="hidden sm:inline"><x-ui.icon name="fa-solid fa-calendar-xmark text-amber-600" /> {{ __('catalog.catalog.invalid_year_summary', ['year' => $requestedYear]) }}</span>
@@ -78,14 +78,14 @@
                                         <span class="hidden sm:inline"><x-ui.icon name="fa-solid fa-clapperboard text-slate-400" /> {{ __('catalog.catalog.title_context_summary', ['title' => $titleContext->display_title]) }}</span>
                                     @endif
                                     <span><x-ui.icon name="fa-solid fa-magnifying-glass text-slate-400" /> {{ __('catalog.catalog.found_now', ['results' => $filterView->resultCountLabel($titles->total())]) }}</span>
-                                    <a href="{{ route('titles.index') }}" wire:click.prevent="resetAll" class="hidden items-center gap-1 font-semibold text-emerald-700 hover:text-emerald-600 sm:inline-flex">
+                                    <a href="{{ route('titles.index') }}" wire:click.prevent="resetAll" class="hidden items-center gap-1 font-semibold text-emerald-700 hover:text-emerald-800 sm:inline-flex">
                                         <x-ui.icon name="fa-solid fa-rotate-left" />
                                         <span>{{ __('catalog.catalog.reset_all') }}</span>
                                     </a>
                                 </div>
                             </div>
                         @else
-                            <div class="mt-3 text-sm text-slate-500">
+                            <div class="mt-3 text-sm text-slate-600">
                                 <x-ui.icon name="fa-solid fa-magnifying-glass text-slate-400" />
                                 {{ __('catalog.catalog.found', ['results' => $filterView->resultCountLabel($titles->total())]) }}
                             </div>
@@ -151,7 +151,7 @@
 
                         @if ($tagPage->aliases !== [])
                             <div class="mt-4">
-                                <h3 class="text-xs font-black uppercase tracking-wide text-slate-500">{{ __('tags.page.aliases') }}</h3>
+                                <h3 class="text-xs font-semibold text-slate-600">{{ __('tags.page.aliases') }}</h3>
                                 <div class="mt-2 flex flex-wrap gap-2">
                                     @foreach ($tagPage->aliases as $alias)
                                         <x-ui.status-pill variant="muted">{{ $alias }}</x-ui.status-pill>
@@ -162,13 +162,13 @@
 
                         @if ($tagPage->related !== [])
                             <nav aria-labelledby="related-tags-{{ $tagPage->publicId }}" class="mt-4">
-                                <h3 id="related-tags-{{ $tagPage->publicId }}" class="text-xs font-black uppercase tracking-wide text-slate-500">{{ __('tags.page.related') }}</h3>
+                                <h3 id="related-tags-{{ $tagPage->publicId }}" class="text-xs font-semibold text-slate-600">{{ __('tags.page.related') }}</h3>
                                 <div class="mt-2 flex flex-wrap gap-2">
                                     @foreach ($tagPage->related as $relatedTag)
                                         <a href="{{ route('titles.taxonomy', ['type' => 'tag', 'taxonomy' => $relatedTag['slug']]) }}" class="inline-flex min-h-11 max-w-full items-center gap-2 rounded-full bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-emerald-100 hover:text-emerald-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
                                             <x-ui.icon name="fa-solid fa-tag text-emerald-700" />
                                             <span class="min-w-0 break-words">{{ $relatedTag['name'] }}</span>
-                                            <span class="tabular-nums text-slate-500">{{ $relatedTag['count'] }}</span>
+                                            <span class="tabular-nums text-slate-600">{{ $relatedTag['count'] }}</span>
                                         </a>
                                     @endforeach
                                 </div>
@@ -182,7 +182,7 @@
                         <a data-catalog-sort-option href="{{ route('titles.index', $filterView->sortQuery($sortKey)) }}" rel="nofollow" wire:click.prevent="sortBy('{{ $sortKey }}')" @if ($filterView->isActiveSort($sortKey)) aria-current="true" @endif @class([
                             'inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold',
                             'bg-emerald-50 text-emerald-700' => $filterView->isActiveSort($sortKey),
-                            'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! $filterView->isActiveSort($sortKey),
+                            'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-800' => ! $filterView->isActiveSort($sortKey),
                         ])>
                             <x-ui.icon name="{{ $filterView->sortIcon($sortKey) }}" />
                             <span>{{ $sortLabel }}</span>
@@ -196,7 +196,7 @@
                         <a data-catalog-page-size-option href="{{ route('titles.index', $filterView->perPageQuery($pageSize)) }}" rel="nofollow" wire:click.prevent="setPerPage({{ $pageSize }})" @class([
                             'inline-flex min-h-11 min-w-11 items-center justify-center rounded-full px-3 py-2 tabular-nums',
                             'bg-emerald-50 text-emerald-700' => $perPage === $pageSize,
-                            'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => $perPage !== $pageSize,
+                            'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-800' => $perPage !== $pageSize,
                         ])>{{ $pageSize }}</a>
                     @endforeach
                 </div>
@@ -216,7 +216,7 @@
                             <a href="{{ route('titles.index', $filterView->sortQuery($sortKey)) }}" rel="nofollow" wire:click.prevent="sortBy('{{ $sortKey }}')" @if ($filterView->isActiveSort($sortKey)) aria-current="true" @endif @class([
                                 'inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold',
                                 'bg-emerald-50 text-emerald-700' => $filterView->isActiveSort($sortKey),
-                                'bg-white text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! $filterView->isActiveSort($sortKey),
+                                'bg-white text-slate-600 hover:bg-emerald-50 hover:text-emerald-800' => ! $filterView->isActiveSort($sortKey),
                             ])>
                                 <x-ui.icon name="{{ $filterView->sortIcon($sortKey) }}" />
                                 <span>{{ $sortLabel }}</span>
@@ -224,13 +224,13 @@
                         @endforeach
                     </div>
                     <div data-catalog-mobile-page-size-controls class="mt-3 border-t border-slate-200 pt-3">
-                        <div class="text-xs font-black uppercase tracking-wide text-slate-500">{{ __('catalog.catalog.page_size_label') }}</div>
+                        <div class="text-xs font-semibold text-slate-600">{{ __('catalog.catalog.page_size_label') }}</div>
                         <div class="mt-2 flex flex-wrap gap-2">
                             @foreach ([24, 48, 96] as $pageSize)
                                 <a href="{{ route('titles.index', $filterView->perPageQuery($pageSize)) }}" rel="nofollow" wire:click.prevent="setPerPage({{ $pageSize }})" @class([
                                     'inline-flex min-h-11 min-w-11 items-center justify-center rounded-full px-3 py-2 text-xs font-bold tabular-nums',
                                     'bg-emerald-50 text-emerald-700' => $perPage === $pageSize,
-                                    'bg-white text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => $perPage !== $pageSize,
+                                    'bg-white text-slate-600 hover:bg-emerald-50 hover:text-emerald-800' => $perPage !== $pageSize,
                                 ])>{{ $pageSize }}</a>
                             @endforeach
                         </div>
@@ -274,7 +274,7 @@
                             <x-ui.icon name="fa-solid fa-layer-group text-emerald-700" />
                             <span>{{ __('collections.directory.search_results') }}</span>
                         </h2>
-                        <a href="{{ route('discover.index', ['type' => 'popular', 'collections_q' => $search]).'#collections' }}" class="text-sm font-bold text-emerald-700 hover:text-emerald-600">{{ __('collections.navigation.public_collections') }}</a>
+                        <a href="{{ route('discover.index', ['type' => 'popular', 'collections_q' => $search]).'#collections' }}" class="text-sm font-bold text-emerald-700 hover:text-emerald-800">{{ __('collections.navigation.public_collections') }}</a>
                     </div>
                     <div class="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                         @foreach ($collectionSuggestions as $collectionSuggestion)
@@ -311,11 +311,11 @@
                                     @endif
                                 </div>
                                 @if ($insufficientSearch)
-                                    <p class="mt-1 text-sm text-slate-500">{{ __('catalog.catalog.empty.insufficient_hint') }}</p>
+                                    <p class="mt-1 text-sm text-slate-600">{{ __('catalog.catalog.empty.insufficient_hint') }}</p>
                                 @elseif ($search !== '')
-                                    <p class="mt-1 text-sm text-slate-500">{{ __('catalog.catalog.empty.query_hint') }}</p>
+                                    <p class="mt-1 text-sm text-slate-600">{{ __('catalog.catalog.empty.query_hint') }}</p>
                                 @else
-                                    <p class="mt-1 text-sm text-slate-500">{{ __('catalog.catalog.empty.filters_hint') }}</p>
+                                    <p class="mt-1 text-sm text-slate-600">{{ __('catalog.catalog.empty.filters_hint') }}</p>
                                 @endif
                             </div>
                             @if ($searchSuggestions->isNotEmpty())
@@ -342,7 +342,7 @@
                                         @foreach ($directorySuggestions as $directorySuggestion)
                                             <a
                                                 href="{{ route($directorySuggestion->indexRouteName) }}"
-                                                class="inline-flex min-h-11 items-center gap-2 py-2 text-sm font-bold text-sky-800 hover:text-emerald-700 hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
+                                                class="inline-flex min-h-11 items-center gap-2 py-2 text-sm font-bold text-sky-800 hover:text-emerald-800 hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
                                             >
                                                 <x-ui.icon :name="$directorySuggestion->icon" />
                                                 <span>{{ $directorySuggestion->title }}</span>
@@ -353,13 +353,13 @@
                             @endif
                             <div class="flex flex-wrap gap-2">
                                 @if ($search !== '')
-                                    <a href="{{ route('titles.index', $filterView->withoutSearchQuery) }}" rel="nofollow" wire:click.prevent="clearSearch" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-slate-50 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
+                                    <a href="{{ route('titles.index', $filterView->withoutSearchQuery) }}" rel="nofollow" wire:click.prevent="clearSearch" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-slate-50 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-800">
                                         <x-ui.icon name="fa-solid fa-magnifying-glass-minus" />
                                         <span>{{ __('catalog.catalog.clear_search') }}</span>
                                     </a>
                                 @endif
                                 @if ($filterView->hasActiveFilters() || $titleContext !== null || $filterView->selectedYears() !== [] || $invalidYear)
-                                    <a href="{{ route('titles.index', $filterView->withoutFiltersQuery) }}" rel="nofollow" wire:click.prevent="resetAll" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-slate-50 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
+                                    <a href="{{ route('titles.index', $filterView->withoutFiltersQuery) }}" rel="nofollow" wire:click.prevent="resetAll" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-slate-50 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-800">
                                         <x-ui.icon name="fa-solid fa-filter-circle-xmark" />
                                         <span>{{ __('catalog.catalog.remove_filters') }}</span>
                                     </a>

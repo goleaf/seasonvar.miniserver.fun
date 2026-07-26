@@ -2,7 +2,7 @@
         <header class="overflow-hidden rounded-panel border border-slate-200 bg-white shadow-panel">
             <div class="grid min-w-0 gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,28rem)] lg:items-end lg:px-8 lg:py-8">
                 <div class="min-w-0 max-w-4xl">
-                    <p class="inline-flex items-center gap-2 text-sm font-black uppercase tracking-[0.14em] text-emerald-700">
+                    <p class="inline-flex items-center gap-2 text-sm font-semibold text-emerald-700">
                         <x-ui.icon name="fa-solid fa-trophy" />
                         <span>{{ __('top_lists.eyebrow') }}</span>
                     </p>
@@ -42,7 +42,7 @@
             </div>
         </header>
 
-        <nav aria-label="{{ __('top_lists.all_categories') }}" class="rounded-panel border border-slate-200 bg-white p-2 shadow-sm shadow-slate-200/70">
+        <nav aria-label="{{ __('top_lists.all_categories') }}" class="rounded-panel border border-slate-200 bg-white p-2">
             <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                 @foreach ($categoryLinks as $categoryLink)
                     <a
@@ -67,7 +67,7 @@
             </div>
         </nav>
 
-        <section data-top-list-filters class="rounded-panel border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/70 sm:p-5" aria-labelledby="top-list-filters-title">
+        <section data-top-list-filters class="rounded-panel border border-slate-200 bg-white p-4 sm:p-5" aria-labelledby="top-list-filters-title">
             <div class="max-w-3xl">
                 <h2 id="top-list-filters-title" class="flex items-center gap-2 text-lg font-black text-slate-950">
                     <x-ui.icon name="fa-solid fa-sliders text-emerald-700" />
@@ -90,7 +90,7 @@
                         max="{{ $filterForm['maximumYear'] }}"
                         value="{{ $filterForm['yearFrom'] }}"
                         @if ($errors->has('year_from')) aria-invalid="true" aria-describedby="top-list-year-from-error" @endif
-                        class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100"
+                                class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none transition placeholder:text-slate-600 focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100"
                     >
                     <x-form.input-error for="year_from" id="top-list-year-from-error" />
                 </div>
@@ -106,7 +106,7 @@
                         max="{{ $filterForm['maximumYear'] }}"
                         value="{{ $filterForm['yearTo'] }}"
                         @if ($errors->has('year_to')) aria-invalid="true" aria-describedby="top-list-year-to-error" @endif
-                        class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100"
+                                class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none transition placeholder:text-slate-600 focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100"
                     >
                     <x-form.input-error for="year_to" id="top-list-year-to-error" />
                 </div>
@@ -144,7 +144,7 @@
                 </div>
 
                 <div class="flex min-w-0 flex-col gap-2 sm:col-span-2 sm:flex-row xl:col-span-1">
-                    <button type="submit" class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2 text-sm font-bold text-white transition hover:bg-emerald-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
+                    <button type="submit" class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2 text-sm font-bold text-white transition hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
                         <x-ui.icon name="fa-solid fa-filter" />
                         <span>{{ __('top_lists.filters.submit') }}</span>
                     </button>
@@ -159,13 +159,13 @@
         </section>
 
         @if ($items->isEmpty())
-            <section class="rounded-panel border border-slate-200 bg-white px-5 py-14 text-center shadow-sm shadow-slate-200/70" role="status">
-                <span class="mx-auto flex size-14 items-center justify-center rounded-full bg-slate-100 text-2xl text-slate-400">
+            <section class="rounded-panel border border-slate-200 bg-white px-5 py-14 text-center" role="status">
+                    <span aria-hidden="true" class="mx-auto flex size-14 items-center justify-center rounded-full bg-slate-100 text-2xl text-slate-400">
                     <x-ui.icon :name="$emptyState['icon']" />
                 </span>
                 <h2 class="mt-4 text-xl font-black text-slate-900">{{ $emptyState['title'] }}</h2>
                 <p class="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-600">{{ $emptyState['description'] }}</p>
-                <a href="{{ $emptyState['url'] }}" class="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
+                <a href="{{ $emptyState['url'] }}" class="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
                     <x-ui.icon name="fa-solid fa-list-ul" />
                     <span>{{ $emptyState['action'] }}</span>
                 </a>
@@ -174,7 +174,7 @@
             <section aria-labelledby="top-list-leaders">
                 <div class="flex flex-wrap items-end justify-between gap-3">
                     <div>
-                        <p class="text-sm font-black uppercase tracking-[0.12em] text-emerald-700">{{ __('top_lists.navigation') }}</p>
+                        <p class="text-sm font-semibold text-emerald-700">{{ __('top_lists.navigation') }}</p>
                         <h2 id="top-list-leaders" class="mt-1 text-2xl font-black tracking-tight text-slate-950">{{ __('top_lists.leaders') }}</h2>
                     </div>
                 </div>
@@ -185,7 +185,7 @@
                             data-top-list-row
                             data-top-list-rank="{{ $item->rank }}"
                             @class([
-                                'min-w-0 overflow-hidden rounded-panel border bg-white shadow-sm',
+                                'min-w-0 overflow-hidden rounded-panel border bg-white',
                                 'border-amber-300 shadow-amber-100' => $item->rank === 1,
                                 'border-slate-300 shadow-slate-200/80' => $item->rank === 2,
                                 'border-orange-200 shadow-orange-100' => $item->rank === 3,
@@ -208,7 +208,7 @@
                     <h2 id="top-list-remaining" class="text-xl font-black tracking-tight text-slate-950">{{ __('top_lists.remaining') }}</h2>
                     <ol start="4" class="mt-4 grid min-w-0 gap-4 xl:grid-cols-2" aria-label="{{ $category->accessibilityLabel() }}">
                         @foreach ($rankedItems as $item)
-                            <li data-top-list-row data-top-list-rank="{{ $item->rank }}" class="min-w-0 overflow-hidden rounded-panel border border-slate-200 bg-white shadow-sm shadow-slate-200/60">
+                            <li data-top-list-row data-top-list-rank="{{ $item->rank }}" class="min-w-0 overflow-hidden rounded-panel border border-slate-200 bg-white">
                                 <x-catalog.title-card
                                     :title="$item->title"
                                     layout="recommendation"

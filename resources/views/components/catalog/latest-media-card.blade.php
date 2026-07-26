@@ -4,13 +4,13 @@
     layout="list"
     data-home-latest-media-group="{{ $title->id }}"
 >
-    <h3 class="font-bold leading-5 text-slate-700">
-        <a href="{{ $titleUrl }}" class="break-words hover:text-emerald-700 hover:underline">
+    <h3 class="text-lg font-semibold leading-6 text-slate-900">
+        <a href="{{ $titleUrl }}" class="break-words hover:text-emerald-800 hover:underline">
             {{ $displayTitle }}
         </a>
     </h3>
     @if ($title->display_original_title)
-        <p class="mt-0.5 break-words text-xs font-semibold leading-5 text-slate-500">{{ $title->display_original_title }}</p>
+        <p class="mt-0.5 break-words text-xs font-semibold leading-5 text-slate-600">{{ $title->display_original_title }}</p>
     @endif
     <div class="mt-3 divide-y divide-slate-100 border-t border-slate-100">
         @foreach ($items as $item)
@@ -40,7 +40,7 @@
 
                 <div class="mt-2 space-y-1.5">
                     @forelse ($item['media'] as $mediaItem)
-                        <a href="{{ $mediaItem['url'] }}" aria-label="{{ $mediaItem['accessibility_label'] }}" class="flex min-h-11 min-w-0 flex-wrap items-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-xs text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
+                        <a href="{{ $mediaItem['url'] }}" aria-label="{{ $mediaItem['accessibility_label'] }}" class="flex min-h-11 min-w-0 flex-wrap items-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-xs text-slate-600 hover:bg-emerald-50 hover:text-emerald-800">
                             @if ($mediaItem['quality'])
                                 <span aria-label="{{ __('home.updates.quality', ['quality' => $mediaItem['quality']]) }}" class="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-50 px-2 py-1 font-bold text-amber-700">
                                     <x-ui.icon name="fa-solid fa-display" />
@@ -63,7 +63,7 @@
                             @endif
                         </a>
                     @empty
-                        <p class="text-xs text-slate-500">{{ __('home.updates.video_missing') }}</p>
+                        <p class="text-xs text-slate-600">{{ __('home.updates.video_missing') }}</p>
                     @endforelse
                 </div>
             </article>

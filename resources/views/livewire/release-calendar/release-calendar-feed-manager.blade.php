@@ -63,7 +63,7 @@
                                 <x-ui.icon name="fa-solid fa-check mr-1" />{{ $selectedTitle->display_title }}
                             </p>
                         @elseif ($titleSuggestions->isNotEmpty())
-                            <ul class="absolute z-20 mt-1 w-full rounded-control border border-slate-200 bg-white p-1 shadow-lg" aria-label="{{ __('calendar.feeds.title_results') }}">
+                            <ul class="absolute z-20 mt-1 w-full rounded-control border border-slate-200 bg-white p-1 shadow-elevated" aria-label="{{ __('calendar.feeds.title_results') }}">
                                 @foreach ($titleSuggestions as $title)
                                     <li>
                                         <button type="button" wire:click="selectTitle({{ $title->id }})" class="flex min-h-11 w-full items-center justify-between gap-3 rounded-control px-3 py-2 text-left text-sm text-slate-800 hover:bg-emerald-50">

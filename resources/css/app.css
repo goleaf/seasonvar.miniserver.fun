@@ -9,10 +9,40 @@
     --color-aurora-50: oklch(0.98 0.02 183);
     --color-aurora-100: oklch(0.95 0.045 183);
     --color-aurora-600: oklch(0.55 0.13 183);
-    --radius-control: 0.875rem;
-    --radius-panel: 1.25rem;
-    --shadow-panel: 0 18px 45px -34px oklch(0.42 0.08 183 / 0.45), 0 1px 2px oklch(0.2 0.02 250 / 0.06);
-    --shadow-panel-hover: 0 24px 55px -34px oklch(0.5 0.13 183 / 0.55), 0 8px 20px -16px oklch(0.2 0.02 250 / 0.18);
+    --radius-control: 0.5rem;
+    --radius-panel: 0.75rem;
+    --shadow-panel: 0 0 #0000;
+    --shadow-panel-hover: 0 0 #0000;
+    --shadow-elevated: 0 18px 40px -20px oklch(0.21 0.034 264.665 / 0.28), 0 4px 12px -6px
+        oklch(0.21 0.034 264.665 / 0.16);
+}
+
+@theme inline {
+    --color-page: var(--color-slate-50);
+    --color-surface-primary: var(--color-white);
+    --color-surface-secondary: var(--color-slate-100);
+    --color-border: var(--color-slate-200);
+    --color-text-primary: var(--color-slate-900);
+    --color-text-body: var(--color-slate-700);
+    --color-text-secondary: var(--color-slate-600);
+    --color-accent: var(--color-emerald-700);
+    --color-accent-hover: var(--color-emerald-800);
+    --color-success: var(--color-emerald-700);
+    --color-warning: var(--color-amber-700);
+    --color-error: var(--color-red-700);
+    --color-information: var(--color-sky-700);
+    --color-neutral: var(--color-slate-600);
+    --color-rose-50: var(--color-red-50);
+    --color-rose-100: var(--color-red-100);
+    --color-rose-200: var(--color-red-200);
+    --color-rose-300: var(--color-red-300);
+    --color-rose-400: var(--color-red-400);
+    --color-rose-500: var(--color-red-500);
+    --color-rose-600: var(--color-red-600);
+    --color-rose-700: var(--color-red-700);
+    --color-rose-800: var(--color-red-800);
+    --color-rose-900: var(--color-red-900);
+    --color-rose-950: var(--color-red-950);
 }
 
 @layer base {
@@ -50,8 +80,6 @@
         overflow-x: clip;
         overflow-wrap: anywhere;
         background-color: var(--color-slate-50);
-        background-image: radial-gradient(circle at top left, var(--color-emerald-50), transparent 34rem),
-            radial-gradient(circle at top right, var(--color-cyan-50), transparent 30rem);
     }
 
     ::selection {
@@ -114,6 +142,25 @@
     .app-shell-main {
         inline-size: 100%;
         flex: 1 0 auto;
+    }
+
+    .ui-body-copy {
+        color: var(--color-slate-700);
+        font-size: 1rem;
+        line-height: 1.5;
+    }
+
+    .ui-metadata {
+        color: var(--color-slate-600);
+        font-size: 0.875rem;
+        line-height: 1.4;
+    }
+
+    .ui-micro-label {
+        color: var(--color-slate-600);
+        font-size: 0.75rem;
+        font-weight: 600;
+        line-height: 1.35;
     }
 
     .app-safe-inline {
@@ -199,7 +246,7 @@
     }
 
     .ui-progress--critical {
-        --ui-progress-color: var(--color-rose-500);
+        --ui-progress-color: var(--color-red-600);
         background-color: white;
     }
 
@@ -208,9 +255,13 @@
         background-color: white;
     }
 
-    .ui-progress--info,
+    .ui-progress--info {
+        --ui-progress-color: var(--color-sky-600);
+        background-color: white;
+    }
+
     .ui-progress--slate {
-        --ui-progress-color: var(--color-slate-400);
+        --ui-progress-color: var(--color-slate-600);
         background-color: white;
     }
 
@@ -324,6 +375,36 @@
         background: var(--color-slate-50);
         color: var(--color-slate-900);
         font-weight: 800;
+    }
+}
+
+.app-shell h1:not(.sr-only):not(:where([data-player-shell] *, .catalog-player-menu *)) {
+    color: var(--color-slate-900);
+    font-size: 1.875rem;
+    font-weight: 600;
+    line-height: 1.15;
+    text-wrap: balance;
+}
+
+.app-shell h2:not(.sr-only):not(:where([data-player-shell] *, .catalog-player-menu *)) {
+    color: var(--color-slate-900);
+    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1.25;
+    text-wrap: balance;
+}
+
+.app-shell h3:not(.sr-only):not(:where([data-player-shell] *, .catalog-player-menu *)) {
+    color: var(--color-slate-900);
+    font-size: 1.125rem;
+    font-weight: 600;
+    line-height: 1.35;
+    text-wrap: balance;
+}
+
+@media (min-width: 40rem) {
+    .app-shell h1:not(.sr-only):not(:where([data-player-shell] *, .catalog-player-menu *)) {
+        font-size: 2.25rem;
     }
 }
 

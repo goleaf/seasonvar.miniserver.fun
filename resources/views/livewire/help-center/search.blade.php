@@ -62,7 +62,7 @@
                 <h2 class="font-black text-slate-900">{{ __('help.categories.title') }}</h2>
                 <ul class="mt-3 space-y-1">
                     @foreach ($categories as $item)
-                        <li><a href="{{ $item->url }}" class="flex min-h-11 items-center justify-between gap-2 rounded-control px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 hover:text-emerald-700"><span>{{ $item->title }}</span><span class="text-xs text-slate-400">{{ $item->articleCount }}</span></a></li>
+                        <li><a href="{{ $item->url }}" class="flex min-h-11 items-center justify-between gap-2 rounded-control px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 hover:text-emerald-800"><span>{{ $item->title }}</span><span class="text-xs text-slate-600">{{ $item->articleCount }}</span></a></li>
                     @endforeach
                 </ul>
             </aside>

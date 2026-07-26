@@ -7,6 +7,46 @@ use Tests\TestCase;
 
 class FrontendAssetContractTest extends TestCase
 {
+    public function test_light_visual_system_exposes_canonical_tailwind_tokens(): void
+    {
+        $styles = File::get(resource_path('css/app.css'));
+
+        foreach ([
+            '--color-page: var(--color-slate-50);',
+            '--color-surface-primary: var(--color-white);',
+            '--color-surface-secondary: var(--color-slate-100);',
+            '--color-border: var(--color-slate-200);',
+            '--color-text-primary: var(--color-slate-900);',
+            '--color-text-body: var(--color-slate-700);',
+            '--color-text-secondary: var(--color-slate-600);',
+            '--color-accent: var(--color-emerald-700);',
+            '--color-accent-hover: var(--color-emerald-800);',
+            '--color-success: var(--color-emerald-700);',
+            '--color-warning: var(--color-amber-700);',
+            '--color-error: var(--color-red-700);',
+            '--color-information: var(--color-sky-700);',
+            '--color-neutral: var(--color-slate-600);',
+            '--color-rose-700: var(--color-red-700);',
+            '--radius-control: 0.5rem;',
+            '--radius-panel: 0.75rem;',
+            '--shadow-panel: 0 0 #0000;',
+            '--shadow-panel-hover: 0 0 #0000;',
+            '--shadow-elevated:',
+        ] as $token) {
+            $this->assertStringContainsString($token, $styles);
+        }
+
+        $this->assertStringContainsString('.app-shell h1:not(.sr-only)', $styles);
+        $this->assertStringContainsString('font-size: 1.875rem;', $styles);
+        $this->assertStringContainsString('.app-shell h2:not(.sr-only)', $styles);
+        $this->assertStringContainsString('font-size: 1.5rem;', $styles);
+        $this->assertStringContainsString('.app-shell h3:not(.sr-only)', $styles);
+        $this->assertStringContainsString('font-size: 1.125rem;', $styles);
+        $this->assertStringContainsString('font-size: 2.25rem;', $styles);
+        $this->assertStringNotContainsString('background-image: radial-gradient', $styles);
+        $this->assertStringNotContainsString('Instrument Sans', $styles);
+    }
+
     public function test_frontend_assets_are_local_and_cyrillic_safe(): void
     {
         $app = File::get(resource_path('js/app.js'));

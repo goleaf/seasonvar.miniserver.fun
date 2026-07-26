@@ -137,7 +137,7 @@
                             <label @class([
                                 'inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-control px-3 py-2 text-sm font-semibold transition',
                                 'bg-emerald-50 text-emerald-700' => in_array($quality, $filterView->listState('quality'), true),
-                                'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! in_array($quality, $filterView->listState('quality'), true),
+                                'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-800' => ! in_array($quality, $filterView->listState('quality'), true),
                             ])>
                                 <input type="checkbox" wire:model.live="filters.qualities" name="quality[]" value="{{ $quality }}" class="h-5 w-5 accent-emerald-700">
                                 <span>{{ $quality }}</span>
@@ -176,7 +176,7 @@
                 <x-ui.icon name="fa-solid fa-xmark" />
                 <span>{{ __('catalog.catalog.exact_filters.cancel') }}</span>
             </button>
-            <a href="{{ route('titles.index') }}" rel="nofollow" wire:click.prevent="resetAll" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control px-3 py-2 text-sm font-bold text-slate-600 transition hover:bg-emerald-50 hover:text-emerald-700">
+            <a href="{{ route('titles.index') }}" rel="nofollow" wire:click.prevent="resetAll" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control px-3 py-2 text-sm font-bold text-slate-600 transition hover:bg-emerald-50 hover:text-emerald-800">
                 <x-ui.icon name="fa-solid fa-rotate-left" />
                 <span>{{ __('catalog.catalog.exact_filters.reset') }}</span>
             </a>

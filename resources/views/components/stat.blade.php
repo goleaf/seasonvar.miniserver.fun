@@ -1,8 +1,8 @@
-<div {{ $attributes->merge(['class' => 'rounded-panel border border-slate-200 bg-white p-5 shadow-panel']) }}>
+<div {{ $attributes->merge(['class' => 'rounded-panel border border-slate-200 bg-white p-5']) }}>
     <div class="flex items-start justify-between gap-4">
         <div class="min-w-0">
-            <div class="text-3xl font-bold text-emerald-700">{{ $formattedValue }}</div>
-            <div class="mt-1 text-sm text-slate-500">{{ $label }}</div>
+            <div class="text-3xl font-semibold text-emerald-700">{{ $formattedValue }}</div>
+            <div class="mt-1 text-sm text-slate-600">{{ $label }}</div>
         </div>
 
         @if ($icon)

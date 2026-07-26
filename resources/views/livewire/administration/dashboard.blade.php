@@ -26,7 +26,7 @@
                                 <p class="mt-1 text-sm leading-5 text-slate-500">{{ $section->description }}</p>
                             </div>
                         </div>
-                        <time class="shrink-0 text-xs text-slate-400" datetime="{{ $section->readAtIso }}">{{ $section->readAtLabel }}</time>
+                                    <time class="shrink-0 text-xs text-slate-600" datetime="{{ $section->readAtIso }}">{{ $section->readAtLabel }}</time>
                     </header>
 
                     @if ($section->available)

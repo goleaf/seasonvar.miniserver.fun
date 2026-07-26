@@ -16,6 +16,42 @@ Production asset и operational UI changes дополнительно следу
 - Livewire 4 используется для интерактивного каталога `/titles`, одиннадцати directory hubs, полной динамической оболочки и playback-island карточки `/titles/{slug}`, регистрации/входа, профиля, безопасности, личной библиотеки `/library/*` и live-страницы `/stats`; styles/scripts подключаются layout один раз на всех routes и не дублируются в компонентах.
 - Volt не установлен и не используется. Все Livewire-компоненты conventional class-based, а Blade остаётся presentation-only без PHP tags, database/cache/service calls.
 
+## Светлая визуальная система
+
+Основная тема каталога использует одну фиксированную иерархию: фон страницы
+`slate-50`, самостоятельные поверхности `white`, вторичные поверхности
+`slate-100`, границы `slate-200`, основной текст `slate-900`, обычный
+`slate-700`, вторичный `slate-600`, действие `emerald-700` и hover
+`emerald-800`. Семантические состояния закреплены за `emerald`, `amber`,
+`red`, `sky` и `slate`; прежние `rose`-переменные остаются только
+совместимыми aliases к `red`, а не отдельной ошибочной палитрой.
+
+`rounded-panel` равен `0.75rem` и применяется только к самостоятельной
+панели, `rounded-control` равен `0.5rem` и принадлежит input/button/dropdown,
+а `rounded-full` ограничен статусами, тегами и компактными фильтрами.
+Обычная секция использует заголовок, отступ и `border-slate-200` без
+внешней карточки. `shadow-panel` намеренно не рисует тень для обратной
+совместимости старого markup; настоящая `shadow-elevated` разрешена только
+sticky header, dropdown/autocomplete, dialog, player menu, toast и
+skip-link.
+
+Шрифт остаётся системным sans-serif. В оболочке продукта `h1` имеет
+`30 px` и `36 px` с `sm`, `h2` — `24 px`, `h3` — `18 px`; все три уровня
+используют `font-semibold` и `slate-900`. Обычный текст остаётся
+`15.5 px`, metadata — `13–14 px`, micro-label — `12 px` без постоянного
+`uppercase`. Значимый текст не использует `text-slate-400`: этот тон
+разрешён только декоративным icons, skeleton и disabled state.
+
+Карточка тайтла показывает название как самый заметный `h3`, а metadata,
+жанры, описание, рейтинг и счётчики остаются вторичными. На мобильной
+странице тайтла hero и player идут до quick-navigation; на desktop
+quick-navigation остаётся левой колонкой. Цвета, радиусы, тени, overflow,
+heading scale и доступность основных публичных маршрутов проверяются
+`CatalogVisualSystemTest`, `FrontendAssetContractTest` и
+`tests/browser/visual-system.spec.js` в Chromium на desktop, tablet и
+mobile. Результат технического аудита зафиксирован в
+[`audits/visual-system-refresh-audit.md`](audits/visual-system-refresh-audit.md).
+
 ## Адаптивная оболочка
 
 `x-layout.site-header` использует один подготовленный набор navigation/action

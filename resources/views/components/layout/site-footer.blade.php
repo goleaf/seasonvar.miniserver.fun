@@ -76,7 +76,7 @@
 
         <div data-site-footer-bottom class="flex flex-col gap-3 border-t border-slate-200 py-5 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
             <p class="min-w-0 break-words">© {{ $footer['current_year'] }} {{ $siteName }}</p>
-            <a href="#main-content" class="inline-flex min-h-11 items-center gap-2 self-start rounded-control px-3 py-2 font-semibold text-slate-600 transition hover:bg-emerald-50 hover:text-emerald-700 sm:self-auto">
+            <a href="#main-content" class="inline-flex min-h-11 items-center gap-2 self-start rounded-control px-3 py-2 font-semibold text-slate-600 transition hover:bg-emerald-50 hover:text-emerald-800 sm:self-auto">
                 <x-ui.icon name="fa-solid fa-arrow-up" />
                 <span>{{ __('catalog.layout.back_to_top') }}</span>
             </a>

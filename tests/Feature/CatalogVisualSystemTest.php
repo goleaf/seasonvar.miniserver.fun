@@ -12,11 +12,172 @@ use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\File;
 use Illuminate\Testing\TestResponse;
 use Livewire\Drawer\Utils;
+use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
 
 class CatalogVisualSystemTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_shared_panels_use_one_flat_structural_surface(): void
+    {
+        $html = Blade::render(
+            '<x-ui.panel title="Основная панель" subtitle="Вторичный текст">Содержимое</x-ui.panel>',
+        );
+
+        $this->assertStringContainsString('rounded-panel border border-slate-200 bg-white', $html);
+        $this->assertStringNotContainsString('shadow-panel', $html);
+        $this->assertStringContainsString('border-b border-slate-200 bg-white', $html);
+        $this->assertStringContainsString(
+            '<h2 class="text-2xl font-semibold text-slate-900">Основная панель</h2>',
+            $html,
+        );
+        $this->assertStringContainsString('text-sm leading-5 text-slate-600', $html);
+        $this->assertSame(1, substr_count($html, 'border border-slate-200 bg-white'));
+    }
+
+    public function test_status_pills_cover_error_and_information_semantics(): void
+    {
+        $error = Blade::render('<x-ui.status-pill variant="error">Ошибка</x-ui.status-pill>');
+        $information = Blade::render('<x-ui.status-pill variant="info">Информация</x-ui.status-pill>');
+
+        $this->assertStringContainsString('rounded-full', $error);
+        $this->assertStringContainsString('bg-red-50 text-red-700', $error);
+        $this->assertStringContainsString('rounded-full', $information);
+        $this->assertStringContainsString('bg-sky-50 text-sky-700', $information);
+    }
+
+    public function test_important_text_never_uses_slate_400(): void
+    {
+        $violations = [];
+
+        foreach (File::allFiles(resource_path('views')) as $file) {
+            if (! str_ends_with($file->getFilename(), '.blade.php')) {
+                continue;
+            }
+
+            foreach (preg_split('/\R/', File::get($file->getPathname())) ?: [] as $lineNumber => $line) {
+                if (! str_contains($line, 'text-slate-400')) {
+                    continue;
+                }
+
+                if (
+                    str_contains($line, '<x-ui.icon')
+                    || str_contains($line, "'iconClass'")
+                    || str_contains($line, 'disabled:text-slate-400')
+                    || str_contains($line, 'aria-hidden="true"')
+                    || str_contains($line, 'animate-pulse')
+                    || str_contains($line, 'aria-disabled="true"')
+                ) {
+                    continue;
+                }
+
+                $violations[] = sprintf(
+                    '%s:%d %s',
+                    str_replace('\\', '/', $file->getRelativePathname()),
+                    $lineNumber + 1,
+                    trim($line),
+                );
+            }
+        }
+
+        $this->assertSame(
+            [],
+            $violations,
+            "text-slate-400 допустим только для декоративной графики и disabled-состояний.\n".implode("\n", $violations),
+        );
+    }
+
+    public function test_blade_uses_real_shadows_only_for_raised_surfaces(): void
+    {
+        $violations = [];
+
+        foreach (File::allFiles(resource_path('views')) as $file) {
+            if (! str_ends_with($file->getFilename(), '.blade.php')) {
+                continue;
+            }
+
+            foreach (preg_split('/\R/', File::get($file->getPathname())) ?: [] as $lineNumber => $line) {
+                if (preg_match('/\bshadow-(?:2xs|xs|sm|md|lg|xl|2xl)(?:\/\d+)?\b/', $line) !== 1) {
+                    continue;
+                }
+
+                if (
+                    str_contains($line, '<dialog')
+                    || str_contains($line, 'fixed ')
+                    || str_contains($line, 'absolute ')
+                    || str_contains($line, 'data-skip-link')
+                ) {
+                    continue;
+                }
+
+                $violations[] = sprintf(
+                    '%s:%d %s',
+                    str_replace('\\', '/', $file->getRelativePathname()),
+                    $lineNumber + 1,
+                    trim($line),
+                );
+            }
+        }
+
+        $this->assertSame(
+            [],
+            $violations,
+            "Обычные surfaces не должны иметь real shadow utilities.\n".implode("\n", $violations),
+        );
+    }
+
+    public function test_primary_catalog_surfaces_use_the_canonical_accent_hover_and_micro_labels(): void
+    {
+        $paths = [
+            resource_path('views/catalog/titles.blade.php'),
+            resource_path('views/layouts/app.blade.php'),
+            resource_path('views/livewire/catalog-directory-browser.blade.php'),
+            resource_path('views/livewire/catalog-discovery-page.blade.php'),
+            resource_path('views/livewire/catalog-home-page.blade.php'),
+            resource_path('views/livewire/catalog-title-detail.blade.php'),
+            resource_path('views/livewire/catalog-title-player.blade.php'),
+            resource_path('views/livewire/catalog-top-list-page.blade.php'),
+            resource_path('views/livewire/stats-dashboard.blade.php'),
+            resource_path('views/search/index.blade.php'),
+        ];
+
+        foreach ([
+            resource_path('views/components/catalog'),
+            resource_path('views/components/layout'),
+            resource_path('views/components/ui'),
+        ] as $directory) {
+            foreach (File::allFiles($directory) as $file) {
+                $paths[] = $file->getPathname();
+            }
+        }
+
+        $violations = [];
+
+        foreach (array_unique($paths) as $path) {
+            foreach (preg_split('/\R/', File::get($path)) ?: [] as $lineNumber => $line) {
+                if (
+                    preg_match('/hover:(?:bg|text)-emerald-(?:500|600|700)\b/', $line) !== 1
+                    && preg_match('/\buppercase\b/', $line) !== 1
+                ) {
+                    continue;
+                }
+
+                $violations[] = sprintf(
+                    '%s:%d %s',
+                    str_replace(resource_path('views').DIRECTORY_SEPARATOR, '', $path),
+                    $lineNumber + 1,
+                    trim($line),
+                );
+            }
+        }
+
+        $this->assertSame(
+            [],
+            $violations,
+            "Primary catalog surfaces используют emerald-800 hover и micro-label без постоянного uppercase.\n".implode("\n", $violations),
+        );
+    }
 
     public function test_public_shell_has_accessible_landmarks_and_current_navigation(): void
     {
@@ -395,7 +556,7 @@ class CatalogVisualSystemTest extends TestCase
         $cardHtml = Blade::render('<x-catalog.title-card :title="$title" layout="list" />', ['title' => $title]);
         $rowHtml = Blade::render('<x-catalog.title-card :title="$title" layout="compact" />', ['title' => $title]);
         $showUrl = route('titles.show', $title);
-        $genreUrl = route('titles.taxonomy', ['type' => 'genre', 'taxonomy' => $genre->slug]);
+        $genreUrl = route('titles.taxonomy', ['type' => 'genre', 'taxonomy' => 'detektiv']);
 
         $this->assertSame([
             'card' => 2,
@@ -694,7 +855,10 @@ class CatalogVisualSystemTest extends TestCase
         return $initialContent.$deferredContent;
     }
 
-    /** @param array<string, mixed> $snapshot */
+    /**
+     * @param  array<string, mixed>  $snapshot
+     * @return TestResponse<Response>
+     */
     private function livewireUpdate(array $snapshot, string $method): TestResponse
     {
         return $this

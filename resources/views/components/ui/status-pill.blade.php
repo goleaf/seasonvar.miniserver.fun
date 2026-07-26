@@ -1,4 +1,4 @@
-<span {{ $attributes->merge(['class' => $classes()]) }}>
+<span data-ui-status-pill {{ $attributes->merge(['class' => $classes()]) }}>
     @if ($icon)
         <x-ui.icon name="{{ $icon }}" />
     @endif

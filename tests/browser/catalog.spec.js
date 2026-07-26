@@ -193,7 +193,7 @@ test('Top 100 genre filter submits, resets and keeps responsive geometry', async
 
     for (const width of widthsByProject[testInfo.project.name] ?? [1440]) {
         await page.setViewportSize({ width, height: width < 800 ? 1024 : 1200 });
-        await page.goto('/top/movies');
+        await page.goto('/top/series');
 
         const genre = page.locator('#top-list-genre');
 
@@ -203,7 +203,7 @@ test('Top 100 genre filter submits, resets and keeps responsive geometry', async
         await expect.poll(() => new URL(page.url()).searchParams.get('genre')).toBe('brauzernaia-drama');
         await expect(genre).toHaveValue('brauzernaia-drama');
         await expect(page.getByText('Browser Smoke', { exact: true }).first()).toBeVisible();
-        await expect(page.getByRole('link', { name: 'Сериалы', exact: true })).toHaveAttribute('href', /genre=brauzernaia-drama/);
+        await expect(page.getByRole('link', { name: 'Фильмы', exact: true })).toHaveAttribute('href', /genre=brauzernaia-drama/);
         await assertPageGeometry(page);
         await assertAccessibility(page);
 
@@ -218,7 +218,7 @@ test('Top 100 genre filter submits, resets and keeps responsive geometry', async
 
         expect(controlHeights.every((height) => height >= 44)).toBe(true);
         await page.getByRole('link', { name: 'Сбросить' }).click();
-        await expect(page).toHaveURL(/\/top\/movies$/);
+        await expect(page).toHaveURL(/\/top\/series$/);
     }
 
     expect(browserErrors.localAssetFailures).toEqual([]);
@@ -302,7 +302,7 @@ test('header autocomplete works by keyboard and keeps two responsive rows', asyn
     await expect(titleOption).toContainText('Browser Smoke');
     await expect(titleOption).toContainText('2025');
     await expect(titleOption).toContainText('1 сезон');
-    await expect(titleOption).toContainText('1 серия');
+    await expect(titleOption).toContainText('3 серии');
     await expect(titleOption.locator('img')).toBeVisible();
     await expect.poll(() => titleOption.locator('img').evaluate((image) => image.naturalWidth)).toBeGreaterThan(0);
     await expect(page.getByRole('option', { name: /Browser Smoke category/ })).toHaveCount(0);
@@ -363,7 +363,9 @@ test('header autocomplete works by keyboard and keeps two responsive rows', asyn
     await search.press('Enter');
     await expect(page).toHaveURL(/\/titles\/browser-smoke$/);
     await page.waitForLoadState('domcontentloaded');
-    await expect(page.locator('#site-search')).toHaveCSS('min-height', '44px');
+    await expect.poll(async () => page.locator('#site-search').evaluate(
+        (input) => input.getBoundingClientRect().height,
+    )).toBeGreaterThanOrEqual(44);
 
     expect(browserErrors.localAssetFailures).toEqual([]);
     expect(browserErrors.consoleErrors).toEqual([]);

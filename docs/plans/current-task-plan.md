@@ -10339,6 +10339,62 @@ foreign shared-worktree scope.
 ---
 
 
+## Task 79 — Единая светлая визуальная система
+
+Статус: `verified_ready_to_commit`.
+
+Дата начала: 26.07.2026.
+
+Approved design:
+[`2026-07-26-visual-system-refresh-design.md`](../superpowers/specs/2026-07-26-visual-system-refresh-design.md).
+
+Detailed implementation plan:
+[`2026-07-26-visual-system-refresh.md`](../superpowers/plans/2026-07-26-visual-system-refresh.md).
+
+### Scope
+
+Canonical Tailwind 4 colors/radii/elevation/typography, flat shared panels,
+title prominence, important-text contrast and targeted migration of main
+catalog surfaces. Routes, Livewire state, queries, schema, cache,
+permissions, translations, player lifecycle and dependencies stay
+protected.
+
+### Task-specific compliance matrix
+
+| Requirement/domain | Статус | Evidence / gate |
+| --- | --- | --- |
+| Fresh requirements/versions/existing UI | `completed` | Mandatory order, Boost and repository inventory |
+| Design/plan/files/contracts/risks | `completed` | Linked Task 79 documents |
+| Canonical UI owner before implementation | `completed` | `docs/UI_STANDARDS.md` updated and reread |
+| TDD RED/GREEN | `completed` | Intended RED, then 62 tests / 858 assertions GREEN |
+| Colors/radius/shadows/type/title hierarchy | `completed` | CSS/components/main routes plus mobile title-first order implemented |
+| DB/migration/index/SQL/Form Request | `not_applicable` | Presentation-only |
+| Routes/API/cache/permissions/translations | `already_compliant` | No contract changes; focused and browser regressions GREEN |
+| Security/performance/mobile/a11y/player | `completed` | Static guards, related 174/1 709, Vite, three-viewport visual audit, axe and player fixture gate GREEN |
+| Full repository suite | `completed_with_2_unrelated_failures` | 1 969 total; 1 956 passed, 11 skipped, 199 592 assertions; missing importer class and stale auth flash assertion remain independent |
+| Docs/README/CHANGELOG | `completed` | Canonical UI/frontend, audit, visitor history, Russian changelog; docs gate GREEN |
+| Final audit | `completed_with_foreign_tree_limits` | Requirements, legacy/design, debug/secret and task-only diff checks GREEN; three foreign EOF whitespace errors remain outside Task 79 |
+| Commit/push main | `in_progress` | Exact alternate index; shared/external failure honest |
+
+### Checklist
+
+1. `[completed]` Requirements, versions, structure, Git and UI audit.
+2. `[completed]` Alternatives, approved design, detailed plan and scope.
+3. `[completed]` Canonical UI owner.
+4. `[completed]` RED tests for tokens, shared components and guards.
+5. `[completed]` CSS-first tokens and compatibility aliases.
+6. `[completed]` Shared component and title-card implementation.
+7. `[completed]` Main route-family hierarchy/contrast/elevation migration.
+8. `[completed]` Focused tests, Pint/static/query regressions and Vite build.
+9. `[completed]` Mobile/tablet/desktop browser visual/a11y QA; screenshot
+   review additionally moved the title hero before quick navigation on mobile.
+10. `[completed]` Docs, README, Russian CHANGELOG and evidence.
+11. `[completed_with_foreign_tree_limits]` Final requirement/legacy/debug/
+    secret/task-only diff audit; three foreign EOF whitespace errors excluded.
+12. `[in_progress]` Exact Task 79 commit and configured non-force push.
+
+---
+
 ## Task 82 — коррелированные счётчики name-order справочников
 
 Статус: `completed_commit_unresolved_push_authentication`.

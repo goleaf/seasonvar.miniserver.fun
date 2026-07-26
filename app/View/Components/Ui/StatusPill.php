@@ -13,8 +13,10 @@ class StatusPill extends Component
     private const VARIANT_CLASSES = [
         'success' => 'bg-emerald-50 text-emerald-700',
         'warning' => 'bg-amber-50 text-amber-700',
+        'error' => 'bg-red-50 text-red-700',
+        'info' => 'bg-sky-50 text-sky-700',
         'neutral' => 'bg-slate-50 text-slate-600',
-        'muted' => 'bg-slate-50 text-slate-500',
+        'muted' => 'bg-slate-50 text-slate-600',
     ];
 
     /**
@@ -45,7 +47,7 @@ class StatusPill extends Component
     public function classes(): string
     {
         return implode(' ', [
-            'inline-flex max-w-full items-center gap-1 font-bold',
+            'inline-flex max-w-full items-center gap-1 font-semibold',
             self::VARIANT_CLASSES[$this->variant] ?? self::VARIANT_CLASSES['neutral'],
             self::SIZE_CLASSES[$this->size] ?? self::SIZE_CLASSES['sm'],
             self::SHAPE_CLASSES[$this->shape] ?? self::SHAPE_CLASSES['pill'],

@@ -6,11 +6,13 @@
     {{ $attributes }}
 >
     <div class="min-w-0">
-        <a href="{{ route('titles.show', $title) }}" class="block break-words text-base font-bold leading-6 text-slate-700 after:absolute after:inset-0 hover:text-emerald-700">
-            {{ $displayTitle }}
-        </a>
+        <h3 class="text-lg font-semibold leading-6">
+            <a href="{{ route('titles.show', $title) }}" class="block break-words text-slate-900 after:absolute after:inset-0 hover:text-emerald-800">
+                {{ $displayTitle }}
+            </a>
+        </h3>
         @if ($title->display_original_title)
-            <span class="mt-1 block break-words text-sm leading-5 text-slate-500">{{ $title->display_original_title }}</span>
+            <span class="mt-1 block break-words text-sm leading-5 text-slate-600">{{ $title->display_original_title }}</span>
         @endif
     </div>
 
@@ -48,7 +50,7 @@
     <a
         data-title-card-details
         href="{{ route('titles.show', $title) }}"
-        class="relative z-10 mt-2 inline-flex min-h-11 items-center gap-2 rounded-control px-3 py-2 text-sm font-bold text-emerald-700 transition hover:bg-emerald-50"
+        class="relative z-10 mt-2 inline-flex min-h-11 items-center gap-2 rounded-control px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-800"
     >
         <span>{{ __('catalog.title.more_details') }}</span>
         <x-ui.icon name="fa-solid fa-arrow-right text-xs" />

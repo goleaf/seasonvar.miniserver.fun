@@ -8,19 +8,19 @@
     <div class="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
         <div class="min-w-0">
             @if ($rank)
-                <span class="text-xs font-bold uppercase tracking-wide text-emerald-700" data-recommendation-rank="{{ $rank }}">
+                <span class="text-xs font-semibold text-emerald-700" data-recommendation-rank="{{ $rank }}">
                     {{ __('recommendations.card.rank', ['rank' => $rank]) }}
                 </span>
             @endif
 
-            <h3 class="mt-1 text-base font-bold leading-5 sm:text-lg sm:leading-6">
-                <a href="{{ route('titles.show', $title) }}" class="break-words text-slate-800 after:absolute after:inset-0 hover:text-emerald-700">
+            <h3 class="mt-1 text-lg font-semibold leading-6">
+                <a href="{{ route('titles.show', $title) }}" class="break-words text-slate-900 after:absolute after:inset-0 hover:text-emerald-800">
                     {{ $displayTitle }}
                 </a>
             </h3>
 
             @if ($title->display_original_title)
-                <p class="mt-1 break-words text-sm font-semibold text-slate-500">{{ $title->display_original_title }}</p>
+                <p class="mt-1 break-words text-sm font-semibold text-slate-600">{{ $title->display_original_title }}</p>
             @endif
         </div>
 
@@ -69,7 +69,7 @@
     <a
         data-title-card-details
         href="{{ route('titles.show', $title) }}"
-        class="relative z-10 mt-2 inline-flex min-h-11 items-center gap-2 rounded-control px-3 py-2 text-sm font-bold text-emerald-700 transition hover:bg-emerald-50"
+        class="relative z-10 mt-2 inline-flex min-h-11 items-center gap-2 rounded-control px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-800"
     >
         <span>{{ __('catalog.title.more_details') }}</span>
         <x-ui.icon name="fa-solid fa-arrow-right text-xs" />

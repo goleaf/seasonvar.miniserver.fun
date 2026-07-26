@@ -57,7 +57,7 @@
                 <td class="min-w-56 px-4 py-4">
                     <p class="font-black text-slate-800">{{ $user->name }}</p>
                     <p class="mt-1 text-sm text-slate-500">{{ $user->maskedEmail }}</p>
-                    <code class="mt-2 block break-all text-xs text-slate-400">{{ $user->publicId }}</code>
+                                <code class="mt-2 block break-all text-xs text-slate-600">{{ $user->publicId }}</code>
                 </td>
                 <td class="min-w-48 px-4 py-4 text-sm text-slate-600">
                     <p>{{ $user->verificationLabel }}</p>

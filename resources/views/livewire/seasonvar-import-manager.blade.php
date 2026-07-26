@@ -228,7 +228,7 @@
                             ['label' => __('catalog.importer.failed'), 'value' => $run['failed_total'], 'icon' => 'fa-solid fa-triangle-exclamation', 'tone' => 'text-rose-700'],
                         ] as $count)
                             <div wire:key="seasonvar-run-{{ $run['id'] }}-{{ $count['label'] }}" class="rounded-control bg-slate-50 p-3">
-                                <div class="flex items-center gap-2 text-xs font-bold uppercase text-slate-400">
+                                <div class="flex items-center gap-2 text-xs font-semibold text-slate-600">
                                     <x-ui.icon name="{{ $count['icon'] }} {{ $count['tone'] }}" />
                                     <span>{{ $count['label'] }}</span>
                                 </div>

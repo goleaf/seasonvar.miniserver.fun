@@ -74,7 +74,7 @@
         'app-shell bg-slate-50 text-slate-700 antialiased',
         'account-reduced-motion' => $accountReducedMotion ?? false,
     ]) data-account-settings-version="{{ $accountSettingsVersion ?? 1 }}" data-account-storage-key="{{ $accountAnonymousStorageKey ?? '' }}" data-account-progress-migration-enabled="{{ ($accountPlaybackProgressMigrationEnabled ?? false) ? '1' : '0' }}" @if ($isPrivatePage) data-private-page="1" @endif @if (($accountPreferenceMigrationUrl ?? null) !== null) data-account-migration-url="{{ $accountPreferenceMigrationUrl }}" data-account-migration-scope="{{ $accountPreferenceMigrationScope }}" @endif>
-        <a href="#main-content" data-skip-link class="fixed z-[100] -translate-y-24 rounded-control bg-emerald-700 px-4 py-3 font-bold text-white shadow-lg transition focus:translate-y-0">
+        <a href="#main-content" data-skip-link class="fixed z-[100] -translate-y-24 rounded-control bg-emerald-700 px-4 py-3 font-bold text-white shadow-elevated transition hover:bg-emerald-800 focus:translate-y-0">
             {{ __('catalog.layout.skip_to_content') }}
         </a>
 
@@ -85,7 +85,7 @@
                 <x-administration.navigation :groups="$layoutAdminNavigation" />
             @endif
             @if ($showBreadcrumbs)
-                <nav aria-label="{{ __('catalog.layout.breadcrumbs') }}" class="mb-4 rounded-panel border border-slate-200 bg-white px-3 py-2 text-sm shadow-panel">
+                <nav aria-label="{{ __('catalog.layout.breadcrumbs') }}" class="mb-4 border-b border-slate-200 px-1 pb-3 text-sm">
                     <ol class="flex flex-wrap items-center gap-2 text-slate-500">
                         @foreach ($breadcrumbs as $breadcrumb)
                             <li class="inline-flex min-w-0 items-center gap-2">
@@ -95,7 +95,7 @@
                                 @if ($loop->last)
                                     <span class="break-words font-semibold text-slate-700" aria-current="page">{{ $breadcrumb['name'] }}</span>
                                 @else
-                                    <a href="{{ $breadcrumb['url'] }}" class="break-words font-semibold text-emerald-700 hover:text-emerald-600">{{ $breadcrumb['name'] }}</a>
+                                    <a href="{{ $breadcrumb['url'] }}" class="break-words font-semibold text-emerald-700 hover:text-emerald-800">{{ $breadcrumb['name'] }}</a>
                                 @endif
                             </li>
                         @endforeach
@@ -106,7 +106,7 @@
         </main>
         <x-layout.site-footer :site-name="$siteName" :footer="$layoutFooter" />
 
-        <div data-connection-status hidden role="status" aria-live="polite" aria-atomic="true" class="fixed inset-x-3 z-[90] mx-auto max-w-lg rounded-control border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-800 shadow-panel sm:inset-x-6">
+        <div data-connection-status hidden role="status" aria-live="polite" aria-atomic="true" class="fixed inset-x-3 z-[90] mx-auto max-w-lg rounded-control border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-800 shadow-elevated sm:inset-x-6">
             <span data-connection-offline hidden class="items-center gap-2">
                 <x-ui.icon name="fa-solid fa-wifi text-rose-700" />
                 <span>{{ __('mobile.network.offline') }}</span>

@@ -6,7 +6,7 @@
     <x-ui.panel :title="__('catalog.player.watch')" icon="fa-solid fa-circle-play">
         <div class="flex flex-col gap-3 rounded-lg bg-emerald-50 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div class="min-w-0">
-                <div class="text-xs font-bold uppercase tracking-wide text-emerald-700">{{ __('catalog.player.continue') }}</div>
+                <div class="text-xs font-semibold text-emerald-700">{{ __('catalog.player.continue') }}</div>
                 <div class="mt-1 text-lg font-black text-slate-800">{{ $primaryAction->label }}</div>
             </div>
             <button
@@ -14,7 +14,7 @@
                 wire:click="playPrimary"
                 data-catalog-history
                 @disabled(! $primaryActionIsPlayable)
-                class="inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:bg-slate-300 sm:w-auto"
+                class="inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-300 sm:w-auto"
             >
                 <x-ui.icon name="fa-solid fa-play" />
                 <span>{{ $primaryAction->label }}</span>
@@ -47,7 +47,7 @@
                         class="absolute inset-0 z-10 hidden items-center justify-center rounded-lg bg-white/80 p-4 text-center text-sm font-bold text-emerald-700 backdrop-blur-sm"
                         role="status"
                     >
-                        <span class="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-2 shadow-sm ring-1 ring-emerald-100">
+                        <span class="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-2">
                             <x-ui.icon name="fa-solid fa-spinner fa-spin" />
                             <span>{{ __('catalog.player.switching_variant') }}</span>
                         </span>
@@ -134,7 +134,7 @@
                                 aria-live="polite"
                                 class="bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-900"
                             ></p>
-                            <dialog data-player-shortcuts-dialog class="m-auto w-[min(34rem,calc(100%-2rem))] rounded-lg border-0 bg-white p-0 text-slate-800 shadow-xl backdrop:bg-slate-950/50">
+                            <dialog data-player-shortcuts-dialog class="m-auto w-[min(34rem,calc(100%-2rem))] rounded-panel border-0 bg-white p-0 text-slate-800 shadow-elevated backdrop:bg-slate-950/50">
                                 <div class="p-5">
                                     <div class="flex items-start justify-between gap-3">
                                         <div>
@@ -291,11 +291,11 @@
                                 data-catalog-history
                                 data-player-previous-episode
                                 data-player-transition-episode="{{ $episodeNavigation->previous->id }}"
-                                class="flex min-h-11 items-center gap-3 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700"
+                                class="flex min-h-11 items-center gap-3 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-800"
                             >
                                 <x-ui.icon name="fa-solid fa-arrow-left" />
                                 <span class="min-w-0">
-                                    <span class="block text-xs uppercase tracking-wide text-slate-400">{{ __('catalog.player.previous') }}</span>
+                                    <span class="block text-xs font-semibold text-slate-600">{{ __('catalog.player.previous') }}</span>
                                     <span class="block break-words">{{ $this->episodeDisplayLabel($episodeNavigation->previous) }}</span>
                                 </span>
                             </a>
@@ -308,10 +308,10 @@
                                 data-catalog-history
                                 data-player-next-episode
                                 data-player-transition-episode="{{ $episodeNavigation->next->id }}"
-                                class="flex min-h-11 items-center justify-end gap-3 rounded-control bg-slate-50 px-3 py-2 text-right text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 sm:col-start-2"
+                                class="flex min-h-11 items-center justify-end gap-3 rounded-control bg-slate-50 px-3 py-2 text-right text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-800 sm:col-start-2"
                             >
                                 <span class="min-w-0">
-                                    <span class="block text-xs uppercase tracking-wide text-slate-600">{{ __('catalog.player.next_short') }}</span>
+                                    <span class="block text-xs font-semibold text-slate-600">{{ __('catalog.player.next_short') }}</span>
                                     <span class="block break-words">{{ $this->episodeDisplayLabel($episodeNavigation->next) }}</span>
                                 </span>
                                 <x-ui.icon name="fa-solid fa-arrow-right" />
@@ -335,7 +335,7 @@
                             wire:click="setWatchlist({{ $inWatchlist ? 'false' : 'true' }})"
                             wire:loading.attr="disabled"
                             wire:target="setWatchlist"
-                            class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700"
+                            class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800"
                         >
                             <x-ui.icon name="{{ $inWatchlist ? 'fa-solid' : 'fa-regular' }} fa-bookmark" wire:loading.remove wire:target="setWatchlist" />
                             <x-ui.icon name="fa-solid fa-spinner fa-spin" wire:loading wire:target="setWatchlist" />
@@ -375,7 +375,7 @@
                                     wire:click="setEpisodeWatched({{ $selectedEpisode->id }}, {{ $selectedEpisodeManualWatched ? 'false' : 'true' }})"
                                     wire:loading.attr="disabled"
                                     wire:target="setEpisodeWatched"
-                                    class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-60"
+                                    class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 disabled:opacity-60"
                                 >
                                     <x-ui.icon name="{{ $selectedEpisodeManualWatched ? 'fa-solid fa-rotate-left' : 'fa-solid fa-circle-check' }}" />
                                     <span>{{ $selectedEpisodeManualWatched ? __('catalog.player.remove_watched') : __('catalog.player.mark_watched') }}</span>
@@ -393,7 +393,7 @@
                                     data-player-save-marker
                                     wire:loading.attr="disabled"
                                     wire:target="savePlaybackMarker"
-                                    class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-60"
+                                    class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 disabled:opacity-60"
                                 >
                                     <x-ui.icon name="fa-solid fa-location-dot" />
                                     <span>{{ __('catalog.player.save_moment') }}</span>
@@ -513,7 +513,7 @@
                 class="absolute inset-0 z-10 hidden items-start justify-center rounded-b-lg bg-white/80 p-4 text-center text-sm font-bold text-emerald-700 backdrop-blur-sm"
                 role="status"
             >
-                <span class="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-2 shadow-sm ring-1 ring-emerald-100">
+                <span class="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-2">
                     <x-ui.icon name="fa-solid fa-spinner fa-spin" />
                     <span>{{ __('catalog.player.updating_variant_episodes') }}</span>
                 </span>
@@ -532,7 +532,7 @@
                                 @class([
                                     'inline-flex min-h-11 max-w-full items-center rounded-control px-3 py-2 text-left text-sm font-bold leading-5',
                                     'bg-emerald-700 text-white' => $activeSeason?->id === $seasonOption->id,
-                                    'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => $activeSeason?->id !== $seasonOption->id,
+                                    'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-800' => $activeSeason?->id !== $seasonOption->id,
                                 ])
                             >
                                 {{ $this->seasonDisplayLabel($seasonOption) }} · {{ $this->episodeCountLabel((int) $seasonOption->available_episodes_count) }}
@@ -569,7 +569,7 @@
                             @class([
                                 'grid min-h-20 content-center gap-1 rounded-lg px-3 py-3 text-left text-sm leading-5 transition',
                                 'bg-emerald-50 text-emerald-800' => $selectedEpisode?->id === $episodeOption->id,
-                                'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => $selectedEpisode?->id !== $episodeOption->id,
+                                'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-800' => $selectedEpisode?->id !== $episodeOption->id,
                             ])
                         >
                             <span class="flex items-center gap-2 font-bold">

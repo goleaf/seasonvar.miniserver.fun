@@ -18,7 +18,7 @@
     <form action="{{ $searchUrl }}" method="GET" role="search" aria-label="{{ __('catalog.header_search.form_label') }}" class="flex min-w-0 items-start gap-2" data-header-search-form>
         <div class="relative min-w-0 flex-1">
             <label for="site-search" class="sr-only">{{ __('catalog.header_search.input_label') }}</label>
-            <div data-header-search-input-frame class="flex min-h-11 min-w-0 items-center rounded-control border border-slate-300 bg-white shadow-sm">
+            <div data-header-search-input-frame class="flex min-h-11 min-w-0 items-center rounded-control border border-slate-300 bg-white">
                 <span class="grid min-h-11 min-w-11 shrink-0 place-items-center text-slate-400" aria-hidden="true">
                     <x-ui.icon name="fa-solid fa-magnifying-glass" />
                 </span>
@@ -58,7 +58,7 @@
 
             <div
                 id="site-search-suggestions"
-                class="absolute left-0 top-[calc(100%+0.5rem)] z-[70] hidden w-full max-w-none rounded-control border border-slate-200 bg-white p-2 shadow-xl shadow-slate-900/15"
+                class="absolute left-0 top-[calc(100%+0.5rem)] z-[70] hidden w-full max-w-none rounded-control border border-slate-200 bg-white p-2 shadow-elevated"
                 data-header-search-dropdown
             >
                 <button type="button" aria-label="{{ __('catalog.header_search.close') }}" class="ml-auto grid min-h-11 min-w-11 place-items-center rounded-control text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300" data-header-search-close>
@@ -67,7 +67,7 @@
 
                 <div id="site-search-options" role="listbox" aria-label="{{ __('catalog.header_search.suggestions_label') }}">
                     <section class="hidden" role="group" aria-label="{{ __('catalog.header_search.groups.titles') }}" data-header-search-title-section>
-                        <span aria-hidden="true" class="block px-2 pb-1 text-[0.6875rem] font-black uppercase tracking-[0.12em] text-slate-500">{{ __('catalog.header_search.groups.titles') }}</span>
+                        <span aria-hidden="true" class="block px-2 pb-1 text-xs font-semibold text-slate-600">{{ __('catalog.header_search.groups.titles') }}</span>
                         <div class="grid gap-1 sm:grid-cols-2" data-header-search-title-results></div>
                     </section>
 
@@ -91,7 +91,7 @@
             </div>
         </div>
 
-        <button type="submit" class="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
+        <button type="submit" class="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
             <x-ui.icon name="fa-solid fa-magnifying-glass" />
             <span class="sr-only sm:not-sr-only">{{ __('catalog.header_search.submit') }}</span>
         </button>

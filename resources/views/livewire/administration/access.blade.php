@@ -54,7 +54,7 @@
                             {{ $role->active ? __('administration.access.role_active') : __('administration.access.role_inactive') }}
                         </span>
                     </summary>
-                    <code class="text-xs text-slate-400">{{ $role->code }}</code>
+                                    <code class="text-xs text-slate-600">{{ $role->code }}</code>
                     <ul class="mt-3 space-y-2">
                         @foreach ($role->permissions as $permission)
                             <li class="flex items-start justify-between gap-3 border-t border-slate-100 pt-2">
@@ -78,7 +78,7 @@
                     <div class="min-w-0">
                         <h3 class="font-black text-slate-800">{{ $membership->userName }}</h3>
                         <p class="mt-1 text-sm text-slate-500">{{ $membership->maskedEmail }}</p>
-                        <code class="mt-1 block break-all text-xs text-slate-400">{{ $membership->userPublicId }}</code>
+                                    <code class="mt-1 block break-all text-xs text-slate-600">{{ $membership->userPublicId }}</code>
                     </div>
                     <div class="text-sm text-slate-600">
                         <p class="font-bold text-slate-800">{{ $membership->roleLabel }}</p>
