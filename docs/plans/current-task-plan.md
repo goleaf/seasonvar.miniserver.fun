@@ -10602,3 +10602,58 @@ SHA-256 `412fd422115fe129a5e25dea93d452af315d618a18088f0168b6388809ba8c64`.
 17. `[completed_unresolved_authentication]` Configured non-force push reached
     the GitHub HTTPS username prompt and was cancelled before transfer; no
     force or remote/history rewrite.
+
+---
+
+## Task 85 — compact snapshot сводки и алфавита справочников
+
+Статус: `implementation_verified_ready_for_exact_commit`.
+
+Дата: 26.07.2026.
+
+Design:
+[`2026-07-26-directory-metadata-snapshot-design.md`](../superpowers/specs/2026-07-26-directory-metadata-snapshot-design.md).
+
+Implementation plan:
+[`2026-07-26-directory-metadata-snapshot.md`](../superpowers/plans/2026-07-26-directory-metadata-snapshot.md).
+
+### Результат
+
+`CatalogDirectoryQuery` сохраняет точную сводку и алфавит как два
+ограниченных ресурса существующего `CatalogFacetSnapshotCache`. Холодный
+алфавит сначала группирует видимые идентификаторы таксономии, затем вычисляет
+подпись один раз на значение; совпадающие основной и резервный языки тега
+создают одно обращение к переводу. Прежний SQL сводки и все web/API contracts
+сохранены.
+
+На production-scale SQLite медианы холодного алфавита изменились с
+`665,56` до `407,06 ms` для актёров, со `165,86` до `114,20 ms` для
+режиссёров и с `410,69` до `249,32 ms` для тегов. Повторный снимок занял
+`0,345–0,385 ms` и выполнил `0` запросов SQL.
+
+### Requirement-compliance matrix
+
+| Требование / область | Статус | Evidence |
+| --- | --- | --- |
+| Fresh requirements, owners, versions | `completed` | Root/index и применимые canonical owners перечитаны; PHP 8.5.8, Laravel 13.22, Boost 2.4.13, Livewire 4.3.3, PHPUnit 12.5.32, SQLite 3.46.1 |
+| Existing implementation/dependants | `completed` | Query/page/API/warming/cache/invalidation/index history проверены до изменения |
+| TDD и exact semantics | `completed` | RED: 3 ожидаемых падения; GREEN: 8 тестов, 39 утверждений |
+| Cache identity/invalidation/failure | `completed` | Отдельные versioned resources; существующий `CatalogFacets`, TieredCache и after-commit owners |
+| Production query effect | `completed` | Actors/directors/tags exact hashes, EXPLAIN и cold/hot профиль без нового индекса |
+| Related compatibility | `completed` | Свежие 119 тестов/1 059 утверждений и cache failure/state 15/56 |
+| Style/static/docs/build | `completed` | Pint, PHPStan, scoped Rector, Vite, docs refresh и docs CI завершились с кодом 0 |
+| Full monolithic PHPUnit | `unresolved` | Две попытки отсоединились от runner без достоверного итога; точные процессы остановлены |
+| Routes/schema/data/translations/dependencies | `not_applicable` | Не изменены; чужие shared-tree изменения исключаются exact index |
+| Security/privacy/auth/Premium/legal | `already_compliant` | Только guest-public scalar metadata через прежнюю visibility boundary |
+| Production rollback/data safety | `completed` | Code/docs revert; versioned keys истекают, restore/reindex/backfill/flush не нужны |
+| README/CHANGELOG/owners | `completed` | Visitor history, отдельная русская запись и тематические owners обновлены |
+| Commit/push main | `in_progress` | Только exact Task 85 snapshot; non-force configured push после commit |
+
+### Изменяемые и защищённые contracts
+
+Изменяются `CatalogDirectoryQuery`, два feature-test файла, task plan и
+точные секции документации. Защищены 11 web routes, directory API,
+Resources/OpenAPI, visibility, tag eligibility/locale priority, pagination,
+SEO, warming, cache TTL/stale/lock/version, imports, administration и
+параллельный shared-tree scope. Migration, route, translation, permission,
+package, configuration, queue, scheduler и production DML не добавляются.

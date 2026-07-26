@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Models\Actor;
 use App\Models\CatalogTitle;
 use App\Models\Genre;
 use App\Models\User;
+use App\Services\Catalog\CatalogDirectoryQuery;
+use App\Services\Catalog\CatalogDirectoryRegistry;
 use App\Services\Catalog\CatalogFacetQuery;
 use App\Support\Cache\CacheDomain;
 use App\Support\Cache\CacheVersionRegistry;
@@ -79,5 +82,44 @@ final class CatalogFacetCacheTest extends TestCase
         $this->assertArrayNotHasKey('source_url', $attributes);
         $this->assertArrayNotHasKey('created_at', $attributes);
         $this->assertArrayNotHasKey('updated_at', $attributes);
+    }
+
+    public function test_directory_metadata_snapshots_are_reused_until_the_facet_version_changes(): void
+    {
+        app(CacheVersionRegistry::class)->bump(CacheDomain::CatalogFacets);
+
+        $firstTitle = CatalogTitle::factory()->create();
+        $firstActor = Actor::query()->create([
+            'name' => 'Alice Actor',
+            'slug' => 'alice-directory-cache-actor',
+        ]);
+        $firstTitle->actors()->attach($firstActor);
+
+        $directory = app(CatalogDirectoryRegistry::class)->find('actors');
+        $this->assertNotNull($directory);
+        $query = app(CatalogDirectoryQuery::class);
+        $firstSummary = $query->summary($directory);
+        $firstLetters = $query->letters($directory)->all();
+
+        $this->assertSame(['values' => 1, 'titles' => 1], $firstSummary);
+        $this->assertSame(['A'], $firstLetters);
+
+        $secondTitle = CatalogTitle::factory()->create();
+        $secondActor = Actor::query()->create([
+            'name' => 'Борис Актёр',
+            'slug' => 'boris-directory-cache-akter',
+        ]);
+        $secondTitle->actors()->attach($secondActor);
+
+        $this->assertSame($firstSummary, $query->summary($directory));
+        $this->assertSame($firstLetters, $query->letters($directory)->all());
+
+        app(CacheVersionRegistry::class)->bump(CacheDomain::CatalogFacets);
+
+        $this->assertSame(['values' => 2, 'titles' => 2], $query->summary($directory));
+        $this->assertEqualsCanonicalizing(
+            ['A', 'Б'],
+            $query->letters($directory)->all(),
+        );
     }
 }

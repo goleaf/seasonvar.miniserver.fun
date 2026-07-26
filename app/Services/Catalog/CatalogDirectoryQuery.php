@@ -22,6 +22,7 @@ class CatalogDirectoryQuery
         private readonly CatalogTaxonomyRegistry $taxonomies,
         private readonly CatalogTitleQuery $titles,
         private readonly TagResolver $tagResolver,
+        private readonly CatalogFacetSnapshotCache $snapshots,
     ) {}
 
     /** @return LengthAwarePaginator<int, Model|stdClass> */
@@ -78,6 +79,41 @@ class CatalogDirectoryQuery
     /** @return array{values: int, titles: int} */
     public function summary(CatalogDirectoryDefinition $directory): array
     {
+        $summary = $this->snapshots->remember(
+            'directory-summary-v1',
+            ['directory' => $directory->key],
+            fn (): array => [$this->buildSummary($directory)],
+        )[0] ?? [];
+
+        return [
+            'values' => (int) ($summary['values'] ?? 0),
+            'titles' => (int) ($summary['titles'] ?? 0),
+        ];
+    }
+
+    /** @return Collection<int, non-empty-string> */
+    public function letters(CatalogDirectoryDefinition $directory): Collection
+    {
+        if (! $directory->supportsAlphabet || $directory->filterType === null) {
+            return collect();
+        }
+
+        return collect($this->snapshots->remember(
+            'directory-alphabet-v1',
+            $this->alphabetSnapshotDimensions($directory),
+            fn (): array => $this->buildLetters($directory)
+                ->map(fn (string $letter): array => ['letter' => $letter])
+                ->all(),
+        ))
+            ->map(fn (array $row): string => (string) ($row['letter'] ?? ''))
+            ->filter(fn (string $letter): bool => $letter !== '')
+            ->map(fn (string $letter): string => $letter)
+            ->values();
+    }
+
+    /** @return array{values: int, titles: int} */
+    private function buildSummary(CatalogDirectoryDefinition $directory): array
+    {
         if ($directory->isYear()) {
             $summary = DB::query()
                 ->fromSub(
@@ -125,7 +161,7 @@ class CatalogDirectoryQuery
     }
 
     /** @return Collection<int, string> */
-    public function letters(CatalogDirectoryDefinition $directory): Collection
+    private function buildLetters(CatalogDirectoryDefinition $directory): Collection
     {
         if (! $directory->supportsAlphabet || $directory->filterType === null) {
             return collect();
@@ -136,27 +172,21 @@ class CatalogDirectoryQuery
         $model = new $modelClass;
         $table = $model->getTable();
         $pivot = $this->taxonomies->pivot($filterType);
-        $visibleAlias = 'visible_directory_letter_titles';
         $localizedTag = $filterType === 'tag' && Tag::usesCanonicalSchema();
         $labelSql = $localizedTag ? $this->localizedTagNameSql($table) : $table.'.name';
         $labelBindings = $localizedTag ? $this->localizedTagNameBindings() : [];
 
         $query = DB::table($table)
             ->selectRaw("substr({$labelSql}, 1, 1) as initial", $labelBindings)
-            ->join($pivot['table'], $pivot['table'].'.'.$pivot['related_key'], '=', $table.'.id')
             ->joinSub(
-                $this->titles->visibleTo(null)->select('catalog_titles.id'),
-                $visibleAlias,
-                $visibleAlias.'.id',
+                $this->visibleDirectoryValueIds($filterType, $pivot),
+                'directory_visible_values',
+                'directory_visible_values.directory_value_id',
                 '=',
-                $pivot['table'].'.'.$pivot['title_key'],
+                $table.'.id',
             )
             ->whereNotNull($table.'.name')
             ->where($table.'.name', '<>', '');
-
-        if ($filterType === 'tag') {
-            $query->whereIn($table.'.id', Tag::query()->publiclyEligible()->select('tags.id'));
-        }
 
         return $query
             ->groupBy('initial')
@@ -165,6 +195,21 @@ class CatalogDirectoryQuery
             ->unique()
             ->sortBy(fn (string $letter): string => $letter === '#' ? '~~~' : Str::lower($letter))
             ->values();
+    }
+
+    /** @return array<string, string> */
+    private function alphabetSnapshotDimensions(CatalogDirectoryDefinition $directory): array
+    {
+        $dimensions = ['directory' => $directory->key];
+
+        if ($directory->filterType?->value === 'tag' && Tag::usesCanonicalSchema()) {
+            $dimensions['locale_signature'] = hash(
+                'sha256',
+                implode("\0", $this->tagLabelLocales()),
+            );
+        }
+
+        return $dimensions;
     }
 
     /** @return Collection<int, int> */
@@ -310,6 +355,34 @@ class CatalogDirectoryQuery
                 '=',
                 $table.'.id',
             );
+    }
+
+    /**
+     * @param  array{table: string, title_key: string, related_key: string}  $pivot
+     */
+    private function visibleDirectoryValueIds(string $filterType, array $pivot): QueryBuilder
+    {
+        $query = DB::table($pivot['table'])
+            ->selectRaw(
+                "{$pivot['table']}.{$pivot['related_key']} as directory_value_id",
+            )
+            ->joinSub(
+                $this->titles->visibleTo(null)->select('catalog_titles.id'),
+                'directory_visible_value_titles',
+                'directory_visible_value_titles.id',
+                '=',
+                $pivot['table'].'.'.$pivot['title_key'],
+            )
+            ->groupBy($pivot['table'].'.'.$pivot['related_key']);
+
+        if ($filterType === 'tag') {
+            $query->whereIn(
+                $pivot['table'].'.'.$pivot['related_key'],
+                Tag::query()->publiclyEligible()->select('tags.id'),
+            );
+        }
+
+        return $query;
     }
 
     private function filteredValueCount(
@@ -474,13 +547,30 @@ class CatalogDirectoryQuery
 
     private function localizedTagNameSql(string $table): string
     {
-        return "coalesce((select tag_directory_labels.label from tag_translations as tag_directory_labels where tag_directory_labels.tag_id = {$table}.id and tag_directory_labels.locale = ? limit 1), (select fallback_tag_directory_labels.label from tag_translations as fallback_tag_directory_labels where fallback_tag_directory_labels.tag_id = {$table}.id and fallback_tag_directory_labels.locale = ? limit 1), {$table}.name)";
+        $translations = collect($this->tagLabelLocales())
+            ->map(function (string $locale, int $index) use ($table): string {
+                $alias = 'tag_directory_labels_'.$index;
+
+                return "(select {$alias}.label from tag_translations as {$alias} where {$alias}.tag_id = {$table}.id and {$alias}.locale = ? limit 1)";
+            })
+            ->all();
+
+        return 'coalesce('.implode(', ', [...$translations, $table.'.name']).')';
     }
 
     /** @return list<string> */
     private function localizedTagNameBindings(): array
     {
-        return [app()->getLocale(), (string) config('app.fallback_locale', 'ru')];
+        return $this->tagLabelLocales();
+    }
+
+    /** @return list<string> */
+    private function tagLabelLocales(): array
+    {
+        return array_values(array_unique([
+            app()->getLocale(),
+            (string) config('app.fallback_locale', 'ru'),
+        ]));
     }
 
     private function normalizedInitial(string $initial): string

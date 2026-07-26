@@ -127,6 +127,37 @@ HTTP API policy: browser `max-age=60`, shared `s-maxage=300`, SWR 60 s, stale-if
 | Import progress/admin counts | operational DB snapshot and queue heartbeat | bounded polling/health | no public cache |
 | Navigation/settings | static configuration/layout data | deployment/config cache | no database query in Blade |
 
+## Compact metadata справочников
+
+`CatalogDirectoryQuery` хранит два ограниченных публичных ресурса через
+существующий `CatalogFacetSnapshotCache`:
+
+- `directory-summary-v1` с dimension `directory` содержит одну строку только
+  с целыми `values` и `titles`;
+- `directory-alphabet-v1` с dimension `directory` содержит только
+  нормализованные буквы; для canonical tags добавляется SHA-256 подпись
+  упорядоченной пары active/fallback locales.
+
+Payload не содержит моделей, HTML, пользовательского состояния, исходных
+URL, поискового текста или приватных идентификаторов. Summary и alphabet
+остаются guest-public aggregates; personal/authenticated visibility через
+эту boundary не кешируется.
+
+Оба ресурса используют прежнюю политику `catalog-facets`: 300 секунд fresh,
+1 800 секунд stale, 120 секунд hot, общий rebuild lock, telemetry и DB
+fallback. `CatalogCacheInvalidator::catalogChanged()` и
+`TagCacheInvalidator::publicChanged()` уже повышают `CatalogFacets` version
+после успешного commit, поэтому импорт, административное изменение публичной
+таксономии или перевода не требуют нового listener. Прямой DML вне этих
+канонических write boundaries обязан вызвать существующую общую
+инвалидацию; store-wide flush запрещён.
+
+При недоступном cache store `TieredCache` выполняет authoritative rebuild из
+БД, а при конкурентном rebuild может вернуть прежний bounded stale payload
+по общей политике. Cache warming продолжает вызывать те же методы query
+owner и автоматически наполняет ресурсы; отдельная job, queue или scheduler
+не добавлены.
+
 ## Eloquent AutoCache для фильтров Top 100
 
 `wddyousuf/eloquent-autocache` подключён строго в режиме `opt-in` и не заменяет `TieredCache`, version registry или полностраничный кеш. Trait проекта `CachesCatalogFilterOptions` используют только модели `Country` и `Genre`; `CatalogTitle`, `User`, импортёр, отзывы, комментарии, media/access и любые личные данные в эту границу не входят.

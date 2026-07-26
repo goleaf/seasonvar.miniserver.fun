@@ -25,6 +25,15 @@ HTTP query-параметр `q` проходит через `CatalogTitlesReques
 
 Mobile `GET /api/v1/titles` переиспользует ту же `CatalogTitlesRequest` normalization и `CatalogTitlesPageBuilder`, но не принимает web-only `view`, `type`, `taxonomy`. Его `per_page` равен 20 по умолчанию и ограничен 1–50. Indexed/unindexed PHP-массивы (`country[0]=turciia`, `country[]=turciia`) и повторяемые значения имеют одинаковый смысл. `GET /api/v1/catalog/filters` публикует отдельные `cyrillic`, `latin` и `other`, а directory API применяет тот же `CatalogDirectoryQuery` с отдельным v1 page size без изменения web defaults.
 
+Сводка и доступный алфавит web/API справочников остаются точными guest-public
+aggregates `CatalogDirectoryQuery`. Холодный alphabet сначала дедуплицирует
+видимые taxonomy IDs и только затем вычисляет имя/locale label; summary
+сохраняет прежний distinct contract. Повторные значения хранятся отдельными
+compact resources общего `CatalogFacetSnapshotCache` и инвалидируются через
+существующий `CatalogFacets` version после catalog/tag writes. Query keys,
+группы `cyrillic`/`latin`/`other`, shape summary, page size и фильтры не
+изменились.
+
 Расширенный UI «Точный подбор» не вводит новых query keys: он группирует существующие `year_from`, `year_to`, `updated`, `seasons_min`, `seasons_max`, `episodes_min`, `episodes_max`, `rating_source`, `rating_min`, `votes_min`, `video` и повторяемый `quality[]`. Групповой сброс удаляет только эти ключи, сохраняя `q`, обычные группы, `letter`, `sort`, `view` и `per_page`. Livewire action и обычный GET reset URL используют один и тот же allowlist из `CatalogSeriesFilters::ADVANCED_REQUEST_PROPERTIES`.
 
 `CatalogSearchQueryParser::parse()` принимает строку и возвращает неизменяемый объект запроса. Он содержит отображаемую строку `raw`, нормализованный ключ `normalized`, не более восьми значимых токенов в исходном порядке, один распознанный год, состояние запроса, безопасное FTS5-выражение и SHA-256-хэши вариантов точного имени.

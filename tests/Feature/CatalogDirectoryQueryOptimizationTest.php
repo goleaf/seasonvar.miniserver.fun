@@ -8,8 +8,11 @@ use App\DTOs\CatalogDirectoryDefinition;
 use App\Enums\PublicationStatus;
 use App\Models\Actor;
 use App\Models\CatalogTitle;
+use App\Models\Tag;
 use App\Services\Catalog\CatalogDirectoryQuery;
 use App\Services\Catalog\CatalogDirectoryRegistry;
+use App\Support\Cache\CacheDomain;
+use App\Support\Cache\CacheVersionRegistry;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -146,6 +149,117 @@ final class CatalogDirectoryQueryOptimizationTest extends TestCase
         );
     }
 
+    public function test_alphabet_groups_visible_value_ids_before_joining_taxonomy_labels(): void
+    {
+        $latin = Actor::query()->create([
+            'name' => 'Alice Actor',
+            'slug' => 'alice-alphabet-actor',
+        ]);
+        $cyrillic = Actor::query()->create([
+            'name' => 'Борис Актёр',
+            'slug' => 'boris-alphabet-akter',
+        ]);
+        $symbol = Actor::query()->create([
+            'name' => '123 Actor',
+            'slug' => '123-alphabet-actor',
+        ]);
+        $draftOnly = Actor::query()->create([
+            'name' => 'Draft Actor',
+            'slug' => 'draft-alphabet-actor',
+        ]);
+        $futureOnly = Actor::query()->create([
+            'name' => 'Future Actor',
+            'slug' => 'future-alphabet-actor',
+        ]);
+        $expiredOnly = Actor::query()->create([
+            'name' => 'Expired Actor',
+            'slug' => 'expired-alphabet-actor',
+        ]);
+        $deletedOnly = Actor::query()->create([
+            'name' => 'Deleted Actor',
+            'slug' => 'deleted-alphabet-actor',
+        ]);
+
+        $firstVisible = CatalogTitle::factory()->create();
+        $secondVisible = CatalogTitle::factory()->create();
+        $draft = CatalogTitle::factory()->create([
+            'is_published' => false,
+            'publication_status' => PublicationStatus::Draft,
+        ]);
+        $future = CatalogTitle::factory()->create([
+            'available_from' => now()->addHour(),
+        ]);
+        $expired = CatalogTitle::factory()->create([
+            'available_until' => now()->subHour(),
+        ]);
+        $deleted = CatalogTitle::factory()->create();
+
+        $latin->catalogTitles()->attach([$firstVisible->id, $secondVisible->id]);
+        $cyrillic->catalogTitles()->attach($firstVisible);
+        $symbol->catalogTitles()->attach($secondVisible);
+        $draftOnly->catalogTitles()->attach($draft);
+        $futureOnly->catalogTitles()->attach($future);
+        $expiredOnly->catalogTitles()->attach($expired);
+        $deletedOnly->catalogTitles()->attach($deleted);
+        $deleted->delete();
+
+        app(CacheVersionRegistry::class)->bump(CacheDomain::CatalogFacets);
+
+        $queries = $this->captureQueries(function (): void {
+            $letters = app(CatalogDirectoryQuery::class)->letters($this->actorsDirectory());
+
+            $this->assertEqualsCanonicalizing(['#', 'A', 'Б'], $letters->all());
+        });
+
+        $alphabetQuery = collect($queries)->sole(
+            fn (string $sql): bool => str_contains($sql, 'as initial')
+                && str_contains($sql, 'from actors'),
+        );
+
+        $this->assertStringContainsString(
+            'inner join (select catalog_title_actor.actor_id as directory_value_id',
+            $alphabetQuery,
+        );
+        $this->assertStringContainsString('group by catalog_title_actor.actor_id', $alphabetQuery);
+        $this->assertStringContainsString('as directory_visible_values', $alphabetQuery);
+        $this->assertStringNotContainsString(
+            'from actors inner join catalog_title_actor',
+            $alphabetQuery,
+        );
+    }
+
+    public function test_tag_alphabet_uses_one_translation_lookup_when_active_and_fallback_locales_match(): void
+    {
+        app()->setLocale('ru');
+        config(['app.fallback_locale' => 'ru']);
+
+        $title = CatalogTitle::factory()->create();
+        $tag = Tag::query()->create([
+            'name' => 'Canonical tag',
+            'slug' => 'canonical-alphabet-tag',
+        ]);
+        $tag->translations()->create([
+            'locale' => 'ru',
+            'label' => 'Жанр',
+        ]);
+        $title->tags()->attach($tag);
+
+        app(CacheVersionRegistry::class)->bump(CacheDomain::CatalogFacets);
+
+        $queries = $this->captureQueries(function (): void {
+            $letters = app(CatalogDirectoryQuery::class)->letters($this->tagsDirectory());
+
+            $this->assertSame(['Ж'], $letters->all());
+        });
+
+        $alphabetQuery = collect($queries)->sole(
+            fn (string $sql): bool => str_contains($sql, 'as initial')
+                && str_contains($sql, 'from tags'),
+        );
+
+        $this->assertSame(1, substr_count($alphabetQuery, 'from tag_translations as'));
+    }
+
     /**
      * @param  callable(): void  $callback
      * @return list<string>
@@ -170,6 +284,14 @@ final class CatalogDirectoryQueryOptimizationTest extends TestCase
     private function actorsDirectory(): CatalogDirectoryDefinition
     {
         $directory = app(CatalogDirectoryRegistry::class)->find('actors');
+        $this->assertNotNull($directory);
+
+        return $directory;
+    }
+
+    private function tagsDirectory(): CatalogDirectoryDefinition
+    {
+        $directory = app(CatalogDirectoryRegistry::class)->find('tags');
         $this->assertNotNull($directory);
 
         return $directory;

@@ -880,6 +880,49 @@ translation, cache key/TTL/invalidation, queue, dependency и environment не
 изменены; rollback — обычный code/docs revert без restore, reindex или cache
 flush.
 
+## Compact summary и alphabet справочников
+
+Следующий follow-up 26.07.2026 отдельно измерил оставшиеся cold
+`CatalogDirectoryQuery::summary()` и `letters()`. На одном read snapshot
+actors содержали 111 714 видимых значений и 28 199 связанных тайтлов.
+Прежняя форма alphabet вычисляла label для каждой видимой pivot-связи до
+`GROUP BY initial`; summary одновременно строил два temporary
+`COUNT(DISTINCT)` дерева.
+
+Split summary из grouped values count и title `EXISTS` дал около
+`310,80 ms` против прежних `233,58 ms` и отклонён. Новая форма меняет только
+alphabet: сначала группирует visible related IDs, затем один раз вычисляет
+taxonomy/locale label для каждого ID. При совпадении active/fallback locale
+tag label выполняет один translation lookup вместо двух одинаковых scalar
+subqueries.
+
+Пять чередующихся legacy/new samples в одной `DEFERRED` read transaction
+вернули одинаковые normalized hashes:
+
+| Справочник | Прежний alphabet | Новый alphabet |
+| --- | ---: | ---: |
+| actors | `665,56 ms` | `407,06 ms` |
+| directors | `165,86 ms` | `114,20 ms` |
+| tags | `410,69 ms` | `249,32 ms` |
+
+`EXPLAIN QUERY PLAN` использует существующие publication lookup, pivot
+covering, tag eligibility, taxonomy primary-key и tag translation indexes.
+Новая migration/index/materialized table не добавлена.
+
+Summary и alphabet дополнительно сохраняются как отдельные compact resources
+существующего `CatalogFacetSnapshotCache`. Повторные array-backed reads
+вернули exact values в `0,345–0,385 ms` с `0` SQL; production использует
+прежние 300 секунд fresh, 1 800 секунд stale, versioned invalidation, lock и
+DB fallback. Это read-only diagnostics под активным importer, а не p95/SLA.
+
+Свежая направленная матрица справочников, web/API, warming и invalidation
+прошла 119 тестов с 1 059 утверждениями, отдельная cache failure/state
+матрица — 15 тестов с 56 утверждениями; Pint, PHPStan, Rector, Vite и
+документные проверки завершились успешно. Routes, Resources/OpenAPI,
+summary/alphabet shape, visibility, schema/data, translations, dependencies,
+queues и environment не изменены. Rollback — code/docs revert; versioned
+keys истекают естественно без restore, reindex, backfill или cache flush.
+
 ## Производительность onboarding вкусов Task 71
 
 Autocomplete ограничен существующим suggestion query и не гидратирует полный
