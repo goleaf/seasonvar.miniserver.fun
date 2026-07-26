@@ -163,7 +163,15 @@ content/revision version contract.
 
 `2ed775b0` и `1807d92e` подтверждены на `origin/main`. Exact restoration
 `.githooks/{pre-commit,pre-push,post-commit,lib/git-guard.sh}` и
-`.github/workflows/ci.yml` совпадает SHA-256 с `6d7d30ed`; final policy
-verification, index approval, follow-up commit и обычный push выполняются
-после обновления этого evidence. Remote/auth или clean-tree отказ должен
-остаться `unresolved`, а не выдаваться за успешную доставку.
+`.github/workflows/ci.yml` совпадает SHA-256 с `6d7d30ed`; 20-path index
+прошёл updater, manifest verification, staged review и approval, после чего
+hooks создали `27d516d8` (`fix: harden admin corrections and restore
+safeguards`).
+
+Обычный `GIT_TERMINAL_PROMPT=0 git push origin main` завершился фактической
+ошибкой `fatal: could not read Username for 'https://github.com': terminal
+prompts disabled`. `gh` не установлен, credential helper отсутствует,
+`origin/main` остаётся `1807d92e`; local commit и closure evidence сохранены.
+Force push, изменение remote, создание ветки, bypass hooks или переписывание
+истории не выполнялись. Lease освобождается после повторной попытки отправки
+этого closure commit.

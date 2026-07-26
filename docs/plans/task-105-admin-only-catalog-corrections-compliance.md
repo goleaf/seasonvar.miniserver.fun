@@ -20,4 +20,5 @@
 | Focused/broad/full/browser/build/migration verification | `completed` | [Archive evidence](archive/2026-07-26-admin-only-catalog-corrections-evidence.md); task suites/build/browser/migration зелёные, foreign full baseline честно отделён. |
 | Senior code review | `completed` | Reviewer: 0 Critical, 2 Important; обе исправлены через RED/GREEN 33/33, 135 assertions. |
 | Repository delivery safeguards | `completed` | Смешанный commit удалил tracked hooks/CI; exact canonical SHA-256 восстановлены, `bash -n` и 120-test policy matrix прошли. |
-| Exact index/commit/push/release | `unresolved` | Реализация commit `2ed775b0`/`1807d92e` уже на `origin/main`; reviewer follow-up и safeguards готовятся к exact commit и ordinary push. |
+| Exact index/commit/release | `completed` | 20-path manifest/index approved; follow-up `27d516d8` создан в `main`; lease освобождается после closure commit/final push attempt. |
+| Ordinary push | `unresolved` | `GIT_TERMINAL_PROMPT=0 git push origin main` не получил HTTPS Username; local commits сохранены, history/remote не переписывались. |
