@@ -247,6 +247,10 @@ final class CiQualityGateContractTest extends TestCase
                 $repositoryPath.'/.githooks/lib/git-guard.sh',
                 File::get(base_path('.githooks/lib/git-guard.sh')),
             );
+            File::put(
+                $repositoryPath.'/scripts/task-workspace-lease.sh',
+                File::get(base_path('scripts/task-workspace-lease.sh')),
+            );
 
             foreach ([
                 'scripts/update-changelog-for-staged-code.sh',
@@ -259,6 +263,7 @@ final class CiQualityGateContractTest extends TestCase
 
             File::put($repositoryPath.'/scripts/ci-check.sh', "#!/usr/bin/env bash\nexit 0\n");
             chmod($repositoryPath.'/.githooks/pre-commit', 0755);
+            chmod($repositoryPath.'/scripts/task-workspace-lease.sh', 0755);
 
             $this->runGit($repositoryPath, 'init', '-b', 'main');
             $this->runGit($repositoryPath, 'config', 'user.name', 'Seasonvar Test');
@@ -272,10 +277,111 @@ final class CiQualityGateContractTest extends TestCase
             File::append($repositoryPath.'/tracked.txt', "не в индексе\n");
             File::put($repositoryPath.'/untracked.txt', "не отслеживается\n");
 
-            $process = new Process(['bash', '.githooks/pre-commit'], $repositoryPath);
+            $acquire = new Process(
+                ['bash', 'scripts/task-workspace-lease.sh', 'acquire', 'partial-task'],
+                $repositoryPath,
+            );
+            $acquire->run();
+
+            $this->assertTrue($acquire->isSuccessful(), $acquire->getErrorOutput());
+            preg_match(
+                '/^SEASONVAR_TASK_LEASE_TOKEN=([a-f0-9]{64})$/m',
+                $acquire->getOutput(),
+                $tokenMatches,
+            );
+            $token = $tokenMatches[1] ?? '';
+            $environment = [
+                'SEASONVAR_TASK_ID' => 'partial-task',
+                'SEASONVAR_TASK_LEASE_TOKEN' => $token,
+            ];
+
+            $declaration = new Process(
+                ['bash', 'scripts/task-workspace-lease.sh', 'declare-paths', 'partial-task'],
+                $repositoryPath,
+                $environment,
+            );
+            $declaration->setInput("staged.txt\0");
+            $declaration->run();
+
+            $this->assertTrue($declaration->isSuccessful(), $declaration->getErrorOutput());
+
+            $approval = new Process(
+                ['bash', 'scripts/task-workspace-lease.sh', 'approve-index', 'partial-task'],
+                $repositoryPath,
+                $environment,
+            );
+            $approval->run();
+
+            $this->assertTrue($approval->isSuccessful(), $approval->getErrorOutput());
+
+            $process = new Process(
+                ['bash', '.githooks/pre-commit'],
+                $repositoryPath,
+                $environment,
+            );
             $process->run();
 
             $this->assertTrue($process->isSuccessful(), $process->getErrorOutput());
+        } finally {
+            File::deleteDirectory($repositoryPath);
+        }
+    }
+
+    public function test_pre_commit_rejects_a_missing_owner_before_the_changelog_updater_can_mutate(): void
+    {
+        $repositoryPath = sys_get_temp_dir().'/seasonvar-owner-guard-'.bin2hex(random_bytes(6));
+
+        try {
+            File::ensureDirectoryExists($repositoryPath.'/.githooks/lib');
+            File::ensureDirectoryExists($repositoryPath.'/scripts');
+            File::put(
+                $repositoryPath.'/.githooks/pre-commit',
+                File::get(base_path('.githooks/pre-commit')),
+            );
+            File::put(
+                $repositoryPath.'/.githooks/lib/git-guard.sh',
+                File::get(base_path('.githooks/lib/git-guard.sh')),
+            );
+            File::put(
+                $repositoryPath.'/scripts/task-workspace-lease.sh',
+                File::get(base_path('scripts/task-workspace-lease.sh')),
+            );
+            File::put(
+                $repositoryPath.'/scripts/update-changelog-for-staged-code.sh',
+                "#!/usr/bin/env bash\nprintf 'unexpected mutation\\n' > updater-ran.txt\n",
+            );
+
+            foreach ([
+                'scripts/ci-check.sh',
+                'scripts/check-readme-policy.sh',
+                'scripts/check-changelog-policy.sh',
+            ] as $script) {
+                File::put($repositoryPath.'/'.$script, "#!/usr/bin/env bash\nexit 0\n");
+            }
+
+            chmod($repositoryPath.'/.githooks/pre-commit', 0755);
+            chmod($repositoryPath.'/scripts/task-workspace-lease.sh', 0755);
+            chmod($repositoryPath.'/scripts/update-changelog-for-staged-code.sh', 0755);
+
+            $this->runGit($repositoryPath, 'init', '-b', 'main');
+            $this->runGit($repositoryPath, 'config', 'user.name', 'Seasonvar Test');
+            $this->runGit($repositoryPath, 'config', 'user.email', 'seasonvar@example.com');
+            File::put($repositoryPath.'/tracked.txt', "исходное состояние\n");
+            $this->runGit($repositoryPath, 'add', '--', 'tracked.txt');
+            $this->runGit($repositoryPath, 'commit', '-m', 'Исходное состояние');
+            File::put($repositoryPath.'/staged.txt', "подготовлено\n");
+            $this->runGit($repositoryPath, 'add', '--', 'staged.txt');
+
+            $process = new Process(['bash', '.githooks/pre-commit'], $repositoryPath);
+            $process->run();
+
+            $this->assertFalse($process->isSuccessful());
+            $this->assertFileDoesNotExist($repositoryPath.'/updater-ran.txt');
+            $this->assertStringContainsString(
+                'SEASONVAR_TASK_ID',
+                $process->getErrorOutput(),
+            );
+            $this->assertStringNotContainsString('token_sha256', $process->getErrorOutput());
         } finally {
             File::deleteDirectory($repositoryPath);
         }
@@ -290,19 +396,32 @@ final class CiQualityGateContractTest extends TestCase
             $hook,
             '"$repo_root/scripts/update-changelog-for-staged-code.sh"',
         );
+        $ownerPosition = strpos($hook, 'seasonvar_git_guard_require_workspace_lease');
+        $pathsPosition = strpos($hook, 'seasonvar_git_guard_require_declared_paths');
+        $approvalPosition = strpos($hook, 'seasonvar_git_guard_require_approved_index');
         $documentationPosition = strpos($hook, 'bash "$repo_root/scripts/ci-check.sh" docs');
         $readmePosition = strpos($hook, 'check-readme-policy.sh');
         $changelogPosition = strpos($hook, 'check-changelog-policy.sh');
 
         $this->assertIsInt($guardPosition);
         $this->assertIsInt($updaterPosition);
+        $this->assertIsInt($ownerPosition);
+        $this->assertIsInt($pathsPosition);
+        $this->assertIsInt($approvalPosition);
         $this->assertIsInt($documentationPosition);
         $this->assertIsInt($readmePosition);
         $this->assertIsInt($changelogPosition);
-        $this->assertTrue($guardPosition < $updaterPosition);
-        $this->assertTrue($updaterPosition < $documentationPosition);
+        $this->assertTrue($guardPosition < $ownerPosition);
+        $this->assertTrue($ownerPosition < $updaterPosition);
+        $this->assertTrue($updaterPosition < $pathsPosition);
+        $this->assertTrue($pathsPosition < $approvalPosition);
+        $this->assertTrue($approvalPosition < $documentationPosition);
         $this->assertTrue($updaterPosition < $readmePosition);
         $this->assertTrue($updaterPosition < $changelogPosition);
+        $this->assertSame(
+            2,
+            substr_count($hook, 'seasonvar_git_guard_require_approved_index'),
+        );
         $this->assertStringNotContainsString(
             'seasonvar_git_guard_require_no_unstaged_changes',
             $hook,
@@ -333,6 +452,18 @@ final class CiQualityGateContractTest extends TestCase
             'export PROJECT_DOCS_PUBLIC_BASE_URL="${PROJECT_DOCS_PUBLIC_BASE_URL:-https://seasonvar.miniserver.fun}"',
             $qualityGate,
         );
+        $currentPlanPosition = strpos(
+            $qualityGate,
+            'bash scripts/check-current-plan-policy.sh docs/plans/current-task-plan.md',
+        );
+        $managedDocsPosition = strpos(
+            $qualityGate,
+            'php artisan project:docs-refresh --check --no-interaction',
+        );
+
+        $this->assertIsInt($currentPlanPosition);
+        $this->assertIsInt($managedDocsPosition);
+        $this->assertTrue($currentPlanPosition < $managedDocsPosition);
         $this->assertStringContainsString('php artisan project:docs-refresh --check --no-interaction', $qualityGate);
         $this->assertStringContainsString("    docs)\n        run_docs", $qualityGate);
         $this->assertStringContainsString("    run_docs\n    run_laravel_cache_validation", $qualityGate);
@@ -343,7 +474,22 @@ final class CiQualityGateContractTest extends TestCase
         $hook = File::get(base_path('.githooks/pre-push'));
         $guard = File::get(base_path('.githooks/lib/git-guard.sh'));
 
+        $ownerPosition = strpos($hook, 'seasonvar_git_guard_require_workspace_lease');
+        $safePathsPosition = strpos($hook, 'seasonvar_git_guard_require_safe_paths tracked');
+        $cleanTreePosition = strpos($hook, 'seasonvar_git_guard_require_clean_tree');
+        $qualityGatePosition = strpos($hook, 'bash "$repo_root/scripts/ci-check.sh" pre-push');
+
+        $this->assertIsInt($ownerPosition);
+        $this->assertIsInt($safePathsPosition);
+        $this->assertIsInt($cleanTreePosition);
+        $this->assertIsInt($qualityGatePosition);
+        $this->assertTrue($ownerPosition < $safePathsPosition);
+        $this->assertTrue($safePathsPosition < $cleanTreePosition);
+        $this->assertTrue($cleanTreePosition < $qualityGatePosition);
         $this->assertStringContainsString('seasonvar_git_guard_require_clean_tree', $hook);
+        $this->assertStringContainsString('seasonvar_git_guard_require_workspace_lease()', $guard);
+        $this->assertStringContainsString('seasonvar_git_guard_require_declared_paths()', $guard);
+        $this->assertStringContainsString('seasonvar_git_guard_require_approved_index()', $guard);
         $this->assertStringContainsString('seasonvar_git_guard_require_clean_tree()', $guard);
         $this->assertStringContainsString('bash "$repo_root/scripts/ci-check.sh" pre-push', $hook);
         $this->assertStringNotContainsString('seasonvar_git_guard_require_no_unstaged_changes()', $guard);

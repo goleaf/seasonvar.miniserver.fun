@@ -173,7 +173,18 @@
 - Не коммитить изменения в ветках, отличных от `main`. Не открывать pull request из отдельной ветки, если пользователь прямо не отменил это правило.
 - Перед любым commit/push проверять `git status --short --branch` и убеждаться, что текущая ветка — `main`.
 - Рабочее дерево нельзя оставлять грязным после завершения задачи: все разрешенные изменения должны быть закоммичены, а посторонние незакоммиченные изменения должны быть явно отмечены как блокер.
-- `pre-commit` должен допускать обычную частичную фиксацию при наличии посторонних unstaged или untracked файлов: branch/conflict/sensitive-path и documentation checks применяются к подготовленному scope, а hook не добавляет посторонние файлы автоматически. Полностью чистое рабочее дерево обязательно перед `push` и проверяется `pre-push`.
+- До первой правки один владелец обязан получить
+  `scripts/task-workspace-lease.sh acquire <task-id>` и объявить точный
+  NUL-delimited набор task paths через `declare-paths`; raw token хранится
+  только в environment живого owner process. Второй owner ждёт штатного
+  handoff, а stale recovery не выполняется для живого PID.
+- Перед commit владелец обязан проверить точное совпадение staged paths,
+  просмотреть итоговый staged diff после CHANGELOG updater, выполнить
+  `approve-index` и сохранить тот же snapshot до успешного hook. Детальный
+  канонический порядок и rollback находятся только в `docs/development.md`.
+- `docs/plans/current-task-plan.md` остаётся единым кратким registry; полные
+  исторические evidence сохраняются в `docs/plans/archive` и не удаляются.
+- `pre-commit` должен допускать обычную частичную фиксацию при наличии посторонних unstaged или untracked файлов: matching owner/manifest/index, branch/conflict/sensitive-path и documentation checks применяются к подготовленному scope, а hook не добавляет посторонние файлы автоматически. Полностью чистое рабочее дерево обязательно перед `push` и проверяется `pre-push`.
 - Версионируемые hooks устанавливаются командой `composer hooks:install`; точный контракт проверок находится в `docs/development.md`.
 
 ## Безопасность

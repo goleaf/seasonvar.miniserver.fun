@@ -58,6 +58,7 @@ run_docs() (
     trap clear_laravel_cache_artifacts EXIT
     export DB_CONNECTION=sqlite
     export DB_DATABASE=:memory:
+    bash scripts/check-current-plan-policy.sh docs/plans/current-task-plan.md
     php artisan project:docs-refresh --check --no-interaction
 )
 

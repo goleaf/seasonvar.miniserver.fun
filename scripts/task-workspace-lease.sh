@@ -16,6 +16,7 @@ usage() {
 Использование:
   task-workspace-lease.sh acquire <task-id>
   task-workspace-lease.sh status
+  task-workspace-lease.sh verify-owner <task-id>
   task-workspace-lease.sh declare-paths <task-id>
   task-workspace-lease.sh verify-paths <task-id>
   task-workspace-lease.sh approve-index <task-id>
@@ -628,6 +629,14 @@ verify_paths() {
     printf 'verified_paths_task_id=%s\n' "$task_id"
 }
 
+verify_owner() {
+    local task_id="$1"
+
+    require_matching_owner "$task_id" "verify-owner"
+
+    printf 'verified_owner_task_id=%s\n' "$task_id"
+}
+
 approve_index() {
     local task_id="$1"
     local approved_at
@@ -746,6 +755,13 @@ case "$command" in
             exit 2
         }
         show_status
+        ;;
+    verify-owner)
+        [[ $# -eq 2 ]] || {
+            usage
+            exit 2
+        }
+        verify_owner "$2"
         ;;
     declare-paths)
         [[ $# -eq 2 ]] || {

@@ -2,6 +2,24 @@
 
 ## 2026-07-26
 
+- Завершён безопасный `workflow` общей `main` без новой ветки, `worktree` или
+  дополнительного слоя координации. `scripts/task-workspace-lease.sh` получил
+  выполняемый только для чтения `verify-owner`, а `pre-commit` теперь до
+  единственной разрешённой мутации проверяет совпадающего локального владельца
+  репозитория. После обновления `CHANGELOG` требуется точное равенство заранее
+  объявленного `NUL-safe path manifest` и набора подготовленных путей,
+  сверяется SHA-256 полного `Git index` до и после документационных проверок.
+  `pre-push` сохраняет тот же `owner lease`, проверки ветки, конфликтов,
+  чувствительных путей, чистого дерева и полный `quality gate`. Накопленный
+  `docs/plans/current-task-plan.md` размером `1 195 905` `bytes` сохранён
+  без потери текста в датированном архиве. SHA-256 исходного файла —
+  `181ee22258c05ae5a99bd6e8d5117e859b1b3b475d1397c8cffdb3ff90776a49`,
+  а после механической нормализации только 176 относительных ссылок SHA-256
+  архива — `a12519c9cc789dcd0ed7e740c15fb43df8ac6f1f9cad39d82045eb40d4b2ea9e`.
+  Текущий файл заменён одним кратким реестром; его выполняемая только для
+  чтения `policy` подключена первой к профилю документации. `Routes`, `API`,
+  `Laravel runtime`, БД, `migrations`, `cache`, `queue`, `frontend assets`,
+  `dependencies` и `production data` не изменялись.
 - Выполнен полный UX-редизайн `/titles` без второго механизма фильтрации и
   изменения `API`: на компьютере появилась закреплённая боковая панель в общем
   потоке документа, а компактный экран получил полноширинное отображение через
@@ -90,65 +108,65 @@
   `CatalogTitlesViewModel::viewOptions()` и
   `SeasonvarImportDispatchBatcher`; связанные проверки этой возможности
   остаются зелёными.
-- Главная Task 94 разделена на две bounded web-проекции внутри
+- Главная `Task 94` разделена на две ограниченные `web`-проекции внутри
   `CatalogHomePageBuilder::webData()` без изменения `/api/v1/home`: гостю
   отдаются компактная статистика, `Trending`, сгруппированные обновления,
-  `RecentlyAdded`, доступные видео, редакционные подборки и facets; после
-  authenticated cache bypass пользователь получает owner-scoped
+  `RecentlyAdded`, доступные видео, редакционные подборки и `facets`; после
+  обхода общего кеша для вошедшего пользователя применяется `owner-scoped`
   `CatalogViewingActivityQuery`, `UserLibraryQuery::homeUpdates()`,
   `Personalized`, общий тренд, обновления и ссылки на свои
   подборки/календарь. `CatalogHomeContentAdditionQuery` переносит точные
-  оконные `COUNT/MIN/MAX` через bounded hydration максимум восьми rows,
+  оконные `COUNT/MIN/MAX` через ограниченную загрузку максимум восьми строк,
   поэтому массовое пополнение выводится одной карточкой с диапазоном и
-  точным count. Добавлены query-free layouts `home`, `spotlight`, `trend`,
+  точным счётчиком. Добавлены не создающие запросов макеты `home`, `spotlight`, `trend`,
   постеры `2:3`, мобильные ограничения первых четырёх элементов, RU/EN
   тексты и локализованное время через `AccountDateTimeFormatter::time()`.
-  Схема, индексы, маршруты, cache keys, зависимости и environment не
-  менялись. Initial RED подтвердил отсутствие нового порядка и aggregate
-  presentation; финальный focused-контур завершился `39` тестами / `304`
-  assertions, UI/Blade contracts — `56` / `423`. Полный набор из `2 065`
+  Схема, индексы, маршруты, `cache keys`, зависимости и `environment` не
+  менялись. Начальная красная проверка подтвердила отсутствие нового порядка
+  и сводного представления; финальный направленный контур завершился `39`
+  тестами / `304` утверждениями, контракты `UI`/`Blade` — `56` / `423`. Полный набор из `2 065`
   тестов был выполнен малыми независимыми пакетами из-за внешнего лимита
-  долгого процесса: восемь падений относятся к параллельным staged-файлам
-  playback, sitemap, importer, sessions и notification service и не
-  скрыты. `Pint`, `PHPStan` и `npm run build` завершены; Chromium
+  долгого процесса: восемь падений относятся к параллельным подготовленным файлам
+  `playback`, `sitemap`, `importer`, `sessions` и `notification service` и не
+  скрыты. `Pint`, `PHPStan` и `npm run build` завершены; `Chromium`
   `1440×1000` и `390×844` подтвердил точный порядок, реальный четырёхстрочный
-  clamp, сетку статистики `2 + 2 + 1`, отсутствие horizontal overflow и
-  ноль console errors.
+  ограничение четырьмя строками, сетку статистики `2 + 2 + 1`, отсутствие
+  горизонтального переполнения и ноль ошибок консоли.
 - Добавлены глобальные предпочтения переводов и субтитров без второго
   проигрывателя или рекомендателя. Обратимая миграция
   `2026_07_26_234000_add_playback_translation_preferences.php` расширяет
   `user_account_settings` любимой и запасной озвучкой, режимом
-  `automatic|dubbed|original_subtitles`, языком субтитров и opt-in
+  `automatic|dubbed|original_subtitles`, языком субтитров и `opt-in`
   уведомлением, создаёт нормализованную
-  `user_hidden_playback_variants` с cascade/unique и добавляет nullable
+  `user_hidden_playback_variants` с `cascade`/`unique` и добавляет `nullable`
   `licensed_media.subtitle_language`. `AccountSettingsService` валидирует
-  реальные voiceover/variant codes, язык и конфликты, атомарно заменяет
-  hidden set, сохраняет значения в экспорт и очищает их при reset/delete.
+  реальные `voiceover`/`variant` `codes`, язык и конфликты, атомарно заменяет
+  `hidden` `set`, сохраняет значения в экспорт и очищает их при `reset`/`delete`.
   `AccountSettingsPage` предоставляет русско-английские доступные элементы
-  управления; onboarding и mobile playback переиспользуют тот же профиль,
+  управления; `onboarding` и `mobile` `playback` переиспользуют тот же профиль,
   сохраняя приоритет явного API/URL выбора.
-  `CatalogPlaybackSourceResolver` применяет порядок explicit → favorite →
-  fallback → mode/language → прежние quality/provider/health и исключает
-  hidden варианты из выбора и меню. `CatalogUserCardStateLoader` и
+  `CatalogPlaybackSourceResolver` применяет порядок `explicit` → `favorite` →
+  `fallback` → `mode`/`language` → прежние `quality`/`provider`/`health` и исключает
+  `hidden` варианты из выбора и меню. `CatalogUserCardStateLoader` и
   `CatalogRecommendationAvailabilityReranker` получают доступность одним
-  grouped media query; карточки сообщают о любимом или альтернативном
+  `grouped` `media` `query`; карточки сообщают о любимом или альтернативном
   переводе. `ExternalMediaMetadata` записывает язык только по явному
-  subtitle marker. `PreferredTranslationNotificationService` после commit
-  повторно проверяет entitlement, исключает hidden вариант и создаёт одно
-  database-уведомление с детерминированным ID и безопасным payload без media
-  URL и внутренних ID. На отдельной SQLite проверены forward/down/forward
+  `subtitle` `marker`. `PreferredTranslationNotificationService` после `commit`
+  повторно проверяет `entitlement`, исключает `hidden` вариант и создаёт одно
+  `database`-уведомление с детерминированным ID и безопасным `payload` без `media`
+  URL и внутренних ID. На отдельной SQLite проверены `forward`/`down`/`forward`
   миграции; `EXPLAIN QUERY PLAN` выбрал новый
-  `user_account_preferred_translation_notify_idx`, covering hidden unique и
-  существующий `licensed_media_publication_lookup_idx`. Browser QA в
+  `user_account_preferred_translation_notify_idx`, `covering` `hidden` `unique` и
+  существующий `licensed_media_publication_lookup_idx`. `Browser` QA в
   Chromium на `1440×1200` и `390×844` дополнительно выявил и исправил
   недоступное для обновления Livewire-объявление об успешном сохранении и
   вложенную прокрутку списка скрытых переводов; после исправлений нет
-  горизонтального переполнения, ошибок console или неудачных запросов.
-  `Pint`, `PHPStan`, task-scoped Rector, Composer, маршруты и Vite прошли,
+  горизонтального переполнения, ошибок `console` или неудачных запросов.
+  `Pint`, `PHPStan`, `task-scoped` Rector, Composer, маршруты и Vite прошли,
   связанная регрессия завершилась 52 тестами и 367 утверждениями. Полный
   процесс из 2 065 тестов завершён с 2 046 успешными и 11 пропущенными;
   семь отказов и одна ошибка были изолированы до двух чужих состояний
-  shared tree — web-session logout и отсутствующего importer batcher.
+  `shared` `tree` — `web-session` `logout` и отсутствующего `importer` `batcher`.
 - `CatalogHomeSnapshotCache` больше не повторяет коррелированный
   `withCount()` публичных тайтлов для `code=subtitle-available` при каждом
   перестроении только главной. Прежний запрос тега для канонической и
@@ -167,40 +185,40 @@
   первая сборка нового поколения фасетов выполняла 10 SQL и один запрос тега
   субтитров, повторная — 8 SQL и ноль запросов тега. TDD прошёл 3 теста с 12
   утверждениями, весь класс производительности — 14/68, объединённая
-  cache/invalidation/`API`/web-матрица — 38/831. Pint, синтаксис, PHPStan,
-  Rector, Composer и Vite прошли; Chromium desktop/mobile и
-  `/api/v1/home` вернули 200 без overflow или browser errors. Полный процесс
+  `cache`/`invalidation`/`API`/`web`-матрица — 38/831. Pint, синтаксис, PHPStan,
+  Rector, Composer и Vite прошли; Chromium `desktop`/`mobile` и
+  `/api/v1/home` вернули 200 без `overflow` или `browser` `errors`. Полный процесс
   завершил 2 065 тестов: 2 046 прошли, 11 пропущены, а семь отказов и одна
-  ошибка принадлежат параллельным изменениям переводов, общих query budgets,
-  sitemap, web sessions и importer batching; тесты этой оптимизации не
+  ошибка принадлежат параллельным изменениям переводов, общих `query` `budgets`,
+  `sitemap`, `web` `sessions` и `importer` `batching`; тесты этой оптимизации не
   падали.
-- Добавлен provenance-слой метаданных каталога. Обратимые migrations
+- Добавлен `provenance`-слой метаданных каталога. Обратимые `migrations`
   `2026_07_26_064318_create_catalog_metadata_provenance_tables.php` и
   `2026_07_26_064319_add_quality_run_links_to_catalog_quality_tables.php`
   создают `catalog_metadata_observations`, `catalog_metadata_conflicts`,
-  `catalog_field_versions`, `catalog_quality_runs` и nullable связи запусков
-  с существующими quality snapshots/issues. Один
-  `CatalogMetadataProvenanceRecorder` нормализует allowlisted значения,
-  обновляет идентичные confirmations без разрастания версий, сохраняет
-  editorial actor, открывает и разрешает conflicts и отличает provider
-  evidence от фактически выбранных additive жанров/стран.
-  `SeasonvarCatalogMetadataProvenance` подключён к prepared-page apply и
-  локальному metadata backfill; последний пакетно помечает затронутые
-  quality snapshots как dirty. `CatalogTitleQualityInputLoader` использует
-  current observations с совместимым fallback, а
-  `catalog:quality-refresh` сохраняет bounded success/failed lifecycle без
+  `catalog_field_versions`, `catalog_quality_runs` и `nullable` связи запусков
+  с существующими `quality` `snapshots`/`issues`. Один
+  `CatalogMetadataProvenanceRecorder` нормализует `allowlisted` значения,
+  обновляет идентичные `confirmations` без разрастания версий, сохраняет
+  `editorial` `actor`, открывает и разрешает `conflicts` и отличает `provider`
+  `evidence` от фактически выбранных `additive` жанров/стран.
+  `SeasonvarCatalogMetadataProvenance` подключён к `prepared-page` `apply` и
+  локальному `metadata` `backfill`; последний пакетно помечает затронутые
+  `quality` `snapshots` как `dirty`. `CatalogTitleQualityInputLoader` использует
+  `current` `observations` с совместимым `fallback`, а
+  `catalog:quality-refresh` сохраняет `bounded` `success`/`failed` `lifecycle` без
   текста исключения. `/admin/catalog/quality` показывает в доступном
-  раскрываемом блоке источник, confirmation, confidence и статус полей и
-  канонического tag provenance, ограничивая описания и не передавая private
-  URL. Page presenter ограничен 50 карточками и постоянным бюджетом
-  запросов; schema capability кешируется на время одного presenter/importer
-  service instance и не выполняет три повторных schema lookup для каждого
+  раскрываемом блоке источник, `confirmation`, `confidence` и статус полей и
+  канонического `tag` `provenance`, ограничивая описания и не передавая `private`
+  URL. `Page` `presenter` ограничен 50 карточками и постоянным бюджетом
+  запросов; `schema` `capability` кешируется на время одного `presenter`/`importer`
+  `service` `instance` и не выполняет три повторных `schema` `lookup` для каждого
   тайтла. SQLite `EXPLAIN QUERY PLAN` подтвердил
   `catalog_metadata_observation_current_idx` и
-  `catalog_metadata_conflict_queue_idx`. Добавлены schema/recorder/query,
-  importer/backfill/editorial/run/recalculation/Livewire regressions;
+  `catalog_metadata_conflict_queue_idx`. Добавлены `schema`/`recorder`/`query`,
+  `importer`/`backfill`/`editorial`/`run`/`recalculation`/Livewire регрессии;
   связанная матрица прошла `81` тест с `479` утверждениями, Playwright —
-  desktop/mobile/tablet `3/3`.
+  `desktop`/`mobile`/`tablet` `3/3`.
 
 - `CatalogDirectoryQuery` теперь использует один построитель запросов
   `taxonomyCandidates()` для фильтрованных итоговых счётчиков и

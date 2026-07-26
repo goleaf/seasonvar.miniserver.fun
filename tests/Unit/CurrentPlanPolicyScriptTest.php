@@ -257,12 +257,38 @@ MARKDOWN;
         $this->assertStringNotContainsString($this->fixtureDirectory, $process->getErrorOutput());
     }
 
-    public function test_the_unmigrated_repository_current_plan_is_not_accepted_early(): void
+    public function test_the_repository_current_plan_is_accepted_after_lossless_migration(): void
     {
         $process = $this->runPolicyCheck(base_path('docs/plans/current-task-plan.md'));
 
-        $this->assertFalse($process->isSuccessful());
-        $this->assertStringContainsString('H1', $process->getErrorOutput());
+        $this->assertTrue($process->isSuccessful(), $process->getErrorOutput());
+        $this->assertSame('', $process->getOutput());
+        $this->assertSame('', $process->getErrorOutput());
+    }
+
+    public function test_the_archived_plan_is_a_lossless_relative_link_normalization(): void
+    {
+        $archivePath = base_path(
+            'docs/plans/archive/2026-07-26-shared-main-workflow-evidence.md',
+        );
+        $archive = File::get($archivePath);
+        $localLinkPattern = '/\]\(\.\.\/(task-[^)]+\.md(?:#[^)]*)?|discovery-collections-admin-unification\.md(?:#[^)]*)?)\)/';
+        $normalizedParentLinks = substr_count($archive, '](../../');
+        preg_match_all($localLinkPattern, $archive, $normalizedLocalLinks);
+
+        $source = str_replace('](../../', '](../', $archive);
+        $source = preg_replace($localLinkPattern, ']($1)', $source);
+
+        $this->assertNotNull($source);
+        $this->assertSame(176, $normalizedParentLinks + count($normalizedLocalLinks[0]));
+        $this->assertSame(
+            '181ee22258c05ae5a99bd6e8d5117e859b1b3b475d1397c8cffdb3ff90776a49',
+            hash('sha256', $source),
+        );
+        $this->assertSame(
+            'a12519c9cc789dcd0ed7e740c15fb43df8ac6f1f9cad39d82045eb40d4b2ea9e',
+            hash_file('sha256', $archivePath),
+        );
     }
 
     private function runPolicyCheck(string $path): Process

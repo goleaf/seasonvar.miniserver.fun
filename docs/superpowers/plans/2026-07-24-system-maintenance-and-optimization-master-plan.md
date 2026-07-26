@@ -2306,7 +2306,12 @@ Stage only files that actually changed. Verify the final remote ref again. If no
 
 ### Task 30: Serialize Shared-`main` Delivery Ownership
 
-**Status:** `preparation_completed_local`; Steps 1–3 were prepared, verified and committed in `main` as `ad5c13c` without touching live hooks. The configured remote rejected HTTPS authentication, so remote delivery remains `unresolved`. Player handoff is commit-backed through `f22e755`; Steps 4–7 remain blocked until current importer and collection owners finish or commit their exact work, because hook integration and shared documentation must not overwrite or interrupt their delivery.
+**Status:** `activation_in_progress_task_102`; standalone Steps 1–3 remain
+commit-backed in `ad5c13c`. Task 102 obtained the exclusive
+`task-102-shared-main-workflow` lease, declared its exact 19-path scope before
+edits and integrated owner verification into both hooks without touching
+foreign application paths. Focused tests are green; broad verification,
+approved commit and configured push remain pending.
 
 **Reason:** Multiple independent tasks currently edit one checkout while project policy forbids branches and worktrees. The existing clean-tree guard prevents accidental partial commits but has no cooperative task-owner lease, leading to repeated guard bypass pressure and overlapping owner documents.
 
@@ -2364,7 +2369,7 @@ Preparation may complete this step and its dedicated test in an isolated commit 
 
 Preparation evidence: initial RED failed because `scripts/task-workspace-lease.sh` did not exist; GREEN passed 12 tests and 56 assertions. The dedicated suite also proves unexpected directory contents block release while preserving metadata.
 
-- [ ] **Step 4: Integrate hooks without weakening current guards**
+- [x] **Step 4: Integrate hooks without weakening current guards**
 
 Add `seasonvar_git_guard_require_workspace_lease` before staged/tracked path and clean-tree checks. Preserve `seasonvar_git_guard_require_main`, conflict detection, sensitive/temporary path checks, no-unstaged/no-untracked checks, documentation policy and pre-push quality gate.
 
@@ -2382,7 +2387,7 @@ git diff --check
 
 Expected: all pass; tests prove a second owner cannot acquire/release the active lease and hooks still run every existing guard.
 
-- [ ] **Step 6: Document adoption and rollback**
+- [x] **Step 6: Document adoption and rollback**
 
 Document exact acquire/status/release commands, token handling, stale recovery and failure messages. Rollback removes only the lease requirement/script/tests/docs and leaves all previous Git guards intact. Existing active leases are released before rollback; no source change is touched.
 
@@ -2486,7 +2491,12 @@ Stage only files with factual changes. If a child owner is concurrently editing 
 
 ### Task 32: Bind a Reviewed Git Index Snapshot to the Workspace Lease
 
-**Status:** `standalone_preparation_delivered_local_pending_activation`. The observed staged-player/unstaged-importer collision proves that owner identity alone does not prove the final index was reviewed. Steps 1–3 are committed in local `main` as `2a7f636`, with delivery evidence in `cb83684`; the normal push reached `origin` but failed because HTTPS credentials are unavailable. During final verification another owner added a player-plan path to the staged set, so Task 32 stopped until that owner removed only its path and completed `f22e755`. Hook/guard integration, contributor workflow activation and the final Task 32 commit contract remain blocked behind the Task 30 handoff gate while importer and collection owners retain their unstaged scopes. The preparation RED was `13` passed / `10` expected failures; standalone GREEN is `23` tests / `122` assertions, while the unchanged hook contract remains `17` tests / `95` assertions.
+**Status:** `activation_in_progress_task_102`. Standalone preparation remains
+commit-backed in `2a7f636` with evidence in `cb83684`. Task 102 integrated
+reviewed-index verification after the only permitted updater mutation and a
+second verification after read-only documentation policies. Focused
+lease/current-plan/hook suites pass; final broad gate, approved commit and
+configured push remain pending.
 
 **Reason:** Task 30 serializes cooperative owner handoff, but an active owner can still inherit or accidentally accept previously staged paths. A commit must be bound to the exact reviewed final Git index. A SHA-256 snapshot detects every final index difference, but cannot prove the history of commands when an index is restored byte-for-byte before verification; the documented workflow therefore still requires explicit re-review and re-approval after staging operations.
 
@@ -2555,7 +2565,7 @@ git diff --cached --quiet -- && exit 1
 
 The implementation must use the existing exact lease-path validator and token comparison. Write approval through a mode-`0600` temporary file inside the exact lease directory and atomically rename it. Cleanup may use only validated exact files and `rmdir`; recursive deletion remains forbidden.
 
-- [ ] **Step 4: Integrate pre-commit after all existing safety checks are preserved**
+- [x] **Step 4: Integrate pre-commit after all existing safety checks are preserved**
 
 Add a guard function such as:
 
@@ -2579,7 +2589,7 @@ git diff --check
 
 Expected: all pass; tests prove changed index content invalidates approval while every previous Git guard remains in the hook.
 
-- [ ] **Step 6: Document the exact safe sequence**
+- [x] **Step 6: Document the exact safe sequence**
 
 Document:
 
@@ -2612,7 +2622,12 @@ Stage `README.md` only for an actual contributor-workflow change. Never include 
 
 ### Task 33: Enforce One Active Current-Plan Registry after Archival
 
-**Status:** `standalone_preparation_implemented_before_tasks_27_and_31`. Steps 1–3 are complete: fixture-driven tests, the read-only PHP parser and its shell wrapper. Task 27 still owns the one-time lossless archive, Task 31 still owns workstream reconciliation, and Steps 4–7 remain blocked until those prerequisites are complete. The standalone parser is not wired into CI/hooks and is not an acceptance gate against the unmigrated repository current plan.
+**Status:** `activation_in_progress_task_102`. Standalone parser/tests remain
+unchanged. Task 102 preserved the 1 195 905-byte working current plan
+byte-for-byte in a dated archive with its SHA-256, replaced the current file
+with one concise registry and connected the read-only policy as the first docs
+profile gate. Focused parser/hook contracts pass; broad verification, approved
+commit and configured push remain pending.
 
 **Reason:** The current plan contains several historical and parallel full task bodies and multiple headings that claim to be current. Manual discipline has not preserved a single active owner, while the unlimited rolling protocol requires history to grow through linked archives and monotonic task IDs rather than one unbounded working file.
 
@@ -2693,7 +2708,7 @@ Until Tasks 27/31 migrate the real file, scripts/ci-check.sh, hooks, docs/develo
 
 Standalone evidence: initial RED produced `15` expected failures because both scripts were absent; the first GREEN passed `15` tests / `31` assertions. Security review then reproduced two focused failures for an inline-code archive example and an encoded control character; final focused GREEN passed `17` tests / `36` assertions. The complete Unit suite passed `489` tests / `107453` assertions; targeted Pint, PHP syntax, shell syntax, PHPStan, Rector, managed-doc checks and the docs profile also passed. The repository current plan remains intentionally rejected until Steps 4–5.
 
-- [ ] **Step 4: Migrate the current file through Tasks 27 and 31**
+- [x] **Step 4: Migrate the current file through Tasks 27 and 31**
 
 Do not delete historical evidence. Verify every moved heading has an archive target and the archive index links it. The active registry must include:
 
@@ -2707,7 +2722,7 @@ production activation blockers;
 latest commit-backed compliance evidence.
 ```
 
-- [ ] **Step 5: Integrate the docs gate**
+- [x] **Step 5: Integrate the docs gate**
 
 Add:
 
@@ -2750,7 +2765,11 @@ Stage `README.md` only when the supported development workflow actually changed.
 
 ### Task 34: Bind Declared Task Paths to the Reviewed Index
 
-**Status:** `standalone_preparation_committed_local_delivery_unresolved_remote`. The exact implementation plan is committed in local `main` as `ebbbc85`; standalone Steps 1–3 implementation is present in `331b0c3`, and separate compliance evidence begins in `137cff0`. A concurrent player owner completed the shared-index snapshot before a separate Task 34 implementation commit, so `331b0c3` also contains player evidence and has a player-oriented subject. This commit-granularity deviation is preserved without history rewrite. A normal push reached the configured remote but failed because HTTPS credentials are unavailable; local `main` remains ahead of `origin/main`. Step 4 hook integration and the supported contributor workflow remain blocked until the active importer/collection owners hand off and Tasks 30/32 can be activated safely. This task is a separate hardening layer, not a replacement for the owner lease, final-index SHA-256, human review or existing Git guards.
+**Status:** `activation_in_progress_task_102`. The exact implementation plan
+remains in `ebbbc85`, standalone implementation in `331b0c3`, and historical
+evidence in `137cff0`. Task 102 connected exact declared-path equality between
+matching owner verification and reviewed-index verification. Focused tests
+pass; broad verification, approved commit and configured push remain pending.
 
 **Reason:** During Task 32 delivery, another owner added a player-plan path to an already prepared staged set. The commit stopped and the foreign owner removed only its own path, but the incident proves a remaining pre-approval gap: an owner could accidentally review and approve a new snapshot that already contains a foreign path. The lease must therefore know the exact intended task path set before staging and require exact equality before index approval.
 
@@ -2823,7 +2842,7 @@ Any successful new declaration removes only the exact existing `approved-index` 
 
 Observed standalone GREEN after Step 3 and additional fail-closed cases: `GitWorkspaceLeaseScriptTest` passes `44` tests / `256` assertions; unchanged `CiQualityGateContractTest` passes `17` / `95`; the complete Unit suite passes `472` / `107410`; `bash -n scripts/task-workspace-lease.sh`, Pint, README policy, managed docs, docs CI and full `git diff --check` pass. Manifest corruption, symlink refusal and exact stale recovery are covered without using the active shared repository. The full working-copy CHANGELOG policy stops only on the concurrent importer phrase `network-free`; the Task 34 Russian entry is reached and accepted before that foreign line.
 
-- [ ] **Step 4: Integrate the hook after Tasks 30 and 32**
+- [x] **Step 4: Integrate the hook after Tasks 30 and 32**
 
 Add a guard such as:
 
@@ -2857,7 +2876,7 @@ git diff --check
 
 Expected: all pass; the hook rejects undeclared, missing and foreign staged paths while every Task 30/32 and pre-existing Git guard remains active.
 
-- [ ] **Step 6: Document the contributor sequence and rollback**
+- [x] **Step 6: Document the contributor sequence and rollback**
 
 Document an exact path declaration before staging:
 

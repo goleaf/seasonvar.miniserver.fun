@@ -152,23 +152,89 @@ php artisan db:seed --class=Database\\Seeders\\PortalDemoSeeder
 - Если локальный checkout оказался на другой ветке, сначала безопасно перенесите незакоммиченные изменения на `main`, затем продолжайте работу только в `main`.
 - Перед commit или push выполните `git status --short --branch` и проверьте, что текущая ветка — `main`.
 - Не коммитьте и не отправляйте изменения из веток, отличных от `main`.
+- Один shared checkout одновременно принадлежит только одной задаче. До первой
+  правки владелец получает atomic repository-local lease, сохраняет raw token
+  только в environment своего живого процесса и объявляет полный точный набор
+  task paths. Второй owner не выполняет edits/staging/commit/push до штатного
+  `release` первого либо explicit safe recovery действительно stale PID.
+- `docs/plans/current-task-plan.md` является коротким единым реестром текущего
+  owner, active/blocked workstreams, compliance и последних evidence links.
+  Полные завершённые или вытесненные тела сохраняются только датированными
+  файлами в `docs/plans/archive`; их нельзя удалять или копировать обратно в
+  current registry.
 - GitHub ruleset `Protect main history` запрещает удаление `main` и переписывание её истории через non-fast-forward update, не блокируя обычный fast-forward push. Pull-request branches и required status checks не вводятся поверх канонического direct-to-`main` процесса.
 - Repository Actions policy принимает только GitHub-owned actions и точный разрешённый SHA `shivammathur/setup-php`; любой action ref без полного commit SHA отклоняется GitHub до выполнения workflow. Default `GITHUB_TOKEN` остаётся read-only и не может одобрять pull request.
 - Не оставляйте рабочее дерево грязным после задачи: разрешенные изменения должны быть закоммичены, а чужие/посторонние незакоммиченные изменения нужно явно отметить как блокер.
 - Установить версионируемые hooks: `composer hooks:install`. Команда локально задаёт `core.hooksPath=.githooks`; `composer setup` выполняет её автоматически.
 - Перед commit используйте локальную read-only диагностику `composer git:doctor`, а перед отправкой — `composer git:doctor -- --remote`. Обычный режим не обращается к сети и проверяет ветку, conflicts, versioned hooks, точный canonical HTTPS/SSH remote, transport/credential mechanism, counts рабочего дерева и локальный ahead/behind без вывода имён изменённых файлов, remote credential или пути к ключу. Для SSH требуется repository-local explicit identity с `IdentitiesOnly=yes` и `BatchMode=yes`; значение `core.sshCommand` не печатается. `--remote` дополнительно выполняет bounded `git ls-remote` и не изменяет refs.
 - Нативный Git использует отдельный repository-scoped SSH deploy key с write access только к `goleaf/seasonvar.miniserver.fun`. Закрытый ключ хранится вне Git с user-level permissions, а exact identity выбирается локальным `core.sshCommand`; PAT, private key и его путь нельзя помещать в tracked config или документацию. Успешный `git:doctor -- --remote` доказывает только чтение remote, а право записи подтверждает обычный `git push origin main` после успешного clean-tree `pre-push`.
-- `pre-commit` блокирует commit вне `main`, unresolved conflicts, staged временные/debug-файлы и staged `.env`/credential paths. Посторонние unstaged tracked changes и untracked files не блокируют обычный частичный commit и никогда не добавляются hook в индекс.
+- `pre-commit` блокирует commit вне `main`, без matching owner lease, с
+  unresolved conflicts, staged временными/debug-файлами, staged
+  `.env`/credential paths, несовпадением staged path set с объявленным
+  manifest или отличием index от явно одобренного SHA-256 snapshot.
+  Посторонние unstaged tracked changes и untracked files не блокируют обычный
+  частичный commit и никогда не добавляются hook в индекс.
 - После staged safety checks `pre-commit` запускает `scripts/update-changelog-for-staged-code.sh`: при наличии подготовленных в индексе изменений кода и отсутствии ручного подготовленного изменения журнала скрипт добавляет краткую фактическую русскую запись в раздел даты `Europe/Vilnius` и выполняет точный `git add -- CHANGELOG.md`. Классификация получает относительные пути с разделителем NUL, записывает только категории и количество кодовых файлов и не выводит пути, содержимое различий, содержимое файлов или секреты. Изменение только документации Markdown не меняет журнал; повторный запуск и ручная запись не создают дубликат. Отдельное unstaged-изменение самого `CHANGELOG.md` остаётся блокером, потому что его автоматическое объединение потеряло бы границу авторского hunk.
-- Затем `pre-commit` запускает общий read-only профиль `bash scripts/ci-check.sh docs`. Профиль фиксирует публичную базу управляемых ссылок через `PROJECT_DOCS_PUBLIC_BASE_URL`, поэтому временный `APP_URL` тестового сервера не меняет sitemap-origin в tracked Markdown. Устаревшие управляемые блоки исправляются только явным `php artisan project:docs-refresh` и повторным review; кроме описанного точечного обновления `CHANGELOG.md`, hook не меняет и не добавляет в индекс файлы.
+- Matching owner проверяется до updater, поэтому процесс без lease не может
+  вызвать даже разрешённую index mutation. После updater hook повторяет
+  conflict/path safety, а затем требует точное равенство manifest и staged
+  paths и reviewed index snapshot.
+  Если updater впервые добавил `CHANGELOG.md`, предыдущий snapshot ожидаемо
+  становится stale: нужно проверить итоговый staged diff и явно повторить
+  `approve-index`, а не обходить hook.
+- Затем `pre-commit` запускает общий read-only профиль `bash scripts/ci-check.sh docs`. Профиль сначала проверяет единый current-plan registry и архивные ссылки, затем фиксирует публичную базу управляемых ссылок через `PROJECT_DOCS_PUBLIC_BASE_URL`, поэтому временный `APP_URL` тестового сервера не меняет sitemap-origin в tracked Markdown. Устаревшие управляемые блоки исправляются только явным `php artisan project:docs-refresh` и повторным review; кроме описанного точечного обновления `CHANGELOG.md`, hook не меняет и не добавляет в индекс файлы. Непосредственно перед успешным завершением hook повторно сверяет SHA-256 index, поэтому documentation gate не может незаметно изменить одобренный commit snapshot.
 - `pre-commit` также проверяет, что обычный текст `README.md` написан по-русски, содержит дорожную карту, заканчивается пользовательской историей и включён в staged diff при изменении кода, конфигурации, маршрутов, миграций, интерфейса или зависимостей.
 - `pre-commit` проверяет staged-версию `CHANGELOG.md`: обычный текст подробного технического журнала должен быть русским, а точные технические обозначения могут сохраняться в исходном написании. Сокращать, объединять или удалять прежние записи нельзя.
 - После каждого запроса нужно проверять актуальность `README.md`; датированная запись добавляется только при реальном изменении возможностей или дорожной карты, без пустых записей ради даты.
-- `pre-push` повторно проверяет `main`, unresolved conflicts и уже tracked временные/credential paths, требует clean working tree, затем запускает общий профиль `bash scripts/ci-check.sh pre-push` для backend и frontend.
+- `pre-push` требует того же matching owner lease, повторно проверяет `main`,
+  unresolved conflicts и уже tracked временные/credential paths, требует clean
+  working tree, затем запускает общий профиль
+  `bash scripts/ci-check.sh pre-push` для backend и frontend. Непустой index
+  approval после commit не требуется. Lease освобождается только после
+  фактического результата push, чтобы другой owner не начал delivery раньше.
 - При partial commit профиль `docs` является ранней проверкой текущего рабочего снимка, а staged-политики README/CHANGELOG проверяют точный index. Окончательное доказательство целостного commit snapshot выполняет `pre-push` только после очистки дерева; unstaged исправление не считается подтверждением уже подготовленного staged Markdown.
 - Проверки читают состояние Git и печатают причину отказа. Единственная разрешённая мутация до коммита — автоматическая запись и точное добавление в индекс `CHANGELOG.md`; остальные файлы хук не добавляет, не исправляет и не удаляет. Если последующая проверка завершается ошибкой, запись остаётся видимой в рабочем файле и индексе для проверки. `.env.example` явно разрешён; реальные `.env`, закрытые ключи и файлы учётных данных JSON должны храниться вне Git.
 - Локальная проверка secret paths намеренно лёгкая и основана на очевидных именах путей; она не заменяет review staged diff. На стороне GitHub включены secret scanning и push protection, а passive Dependabot alerts сообщают об известных проблемах exact dependency graph. Эти сигналы не доказывают отсутствие неизвестных проблем и не заменяют `composer audit`/`npm audit`; автоматические Dependabot PR updates выключены, потому что отдельные PR-ветки запрещены текущим Git workflow.
 - `post-commit` запускает только управляемое обновление Markdown через `project:docs-refresh`; успешный запуск без фактических изменений завершается без вывода, а обновлённые файлы и ошибки по-прежнему перечисляются. Исходный PHP/Blade/JS код hook не редактирует, auto-push выключен без явного `SEASONVAR_DOCS_AUTO_PUSH=1`.
+
+Штатная последовательность одного владельца:
+
+```bash
+export SEASONVAR_TASK_ID=task-123-short-name
+lease_output="$(scripts/task-workspace-lease.sh acquire "$SEASONVAR_TASK_ID")"
+export SEASONVAR_TASK_LEASE_TOKEN="${lease_output##*=}"
+unset lease_output
+
+printf '%s\0' path/one path/two CHANGELOG.md README.md |
+    scripts/task-workspace-lease.sh declare-paths "$SEASONVAR_TASK_ID"
+
+# Только после declaration: edits, focused checks и точный staging.
+git add -- path/one path/two CHANGELOG.md README.md
+scripts/update-changelog-for-staged-code.sh
+scripts/task-workspace-lease.sh verify-paths "$SEASONVAR_TASK_ID"
+git diff --cached --name-status
+git diff --cached --check
+scripts/task-workspace-lease.sh approve-index "$SEASONVAR_TASK_ID"
+scripts/task-workspace-lease.sh verify-index "$SEASONVAR_TASK_ID"
+git commit -m "type: точное описание изменения"
+git push origin main
+scripts/task-workspace-lease.sh release "$SEASONVAR_TASK_ID"
+unset SEASONVAR_TASK_LEASE_TOKEN SEASONVAR_TASK_ID
+```
+
+Path declaration является boundary владения, но не авторизацией на
+посторонний код: весь staged diff всё равно проверяется человеком. Любая новая
+declaration инвалидирует прежний approval. Любой `git add`, unstage, conflict
+resolution, mode change или другая index mutation после review требует
+повторной проверки и `approve-index`. `status` безопасно показывает только
+task ID, owner PID, время, наличие manifest и актуальность approval; paths,
+tokens и digests не выводятся.
+
+`release` требует exact task ID и token и удаляет только известные validated
+lease-файлы без recursive deletion. `recover <task-id>` — ручная аварийная
+операция: она запрещена для живого PID и не заменяет normal handoff.
+`SEASONVAR_SKIP_GIT_GUARD=1` остаётся существующим emergency override и не
+является штатным способом commit/push.
 
 Проверить установку без изменения файлов:
 
@@ -176,8 +242,10 @@ php artisan db:seed --class=Database\\Seeders\\PortalDemoSeeder
 git config --local --get core.hooksPath
 composer git:doctor
 composer git:doctor -- --remote
-bash -n .githooks/pre-commit .githooks/pre-push .githooks/post-commit .githooks/lib/git-guard.sh scripts/check-readme-policy.sh scripts/check-changelog-policy.sh scripts/update-changelog-for-staged-code.sh
+bash -n .githooks/pre-commit .githooks/pre-push .githooks/post-commit .githooks/lib/git-guard.sh scripts/task-workspace-lease.sh scripts/check-current-plan-policy.sh scripts/check-readme-policy.sh scripts/check-changelog-policy.sh scripts/update-changelog-for-staged-code.sh
 php -l scripts/check-changelog-policy.php scripts/update-changelog-for-staged-code.php
+scripts/task-workspace-lease.sh status
+scripts/check-current-plan-policy.sh docs/plans/current-task-plan.md
 scripts/check-readme-policy.sh README.md
 scripts/check-changelog-policy.sh CHANGELOG.md
 ```

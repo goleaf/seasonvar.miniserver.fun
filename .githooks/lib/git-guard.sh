@@ -30,6 +30,35 @@ seasonvar_git_guard_require_no_conflicts() {
     fi
 }
 
+seasonvar_git_guard_require_task_environment() {
+    if [[ -z "${SEASONVAR_TASK_ID:-}" || -z "${SEASONVAR_TASK_LEASE_TOKEN:-}" ]]; then
+        echo "Seasonvar Git guard: задайте SEASONVAR_TASK_ID и matching SEASONVAR_TASK_LEASE_TOKEN активного owner process." >&2
+        exit 1
+    fi
+}
+
+seasonvar_git_guard_run_lease_command() {
+    local command="$1"
+    local repo_root
+
+    seasonvar_git_guard_require_task_environment
+    repo_root="$(seasonvar_git_guard_repo_root)"
+
+    "$repo_root/scripts/task-workspace-lease.sh" "$command" "$SEASONVAR_TASK_ID"
+}
+
+seasonvar_git_guard_require_workspace_lease() {
+    seasonvar_git_guard_run_lease_command verify-owner
+}
+
+seasonvar_git_guard_require_declared_paths() {
+    seasonvar_git_guard_run_lease_command verify-paths
+}
+
+seasonvar_git_guard_require_approved_index() {
+    seasonvar_git_guard_run_lease_command verify-index
+}
+
 seasonvar_git_guard_staged_paths() {
     git diff --cached --name-only --diff-filter=ACMR -z --
 }

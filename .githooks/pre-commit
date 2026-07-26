@@ -13,8 +13,17 @@ source "$repo_root/.githooks/lib/git-guard.sh"
 seasonvar_git_guard_require_main
 seasonvar_git_guard_require_no_conflicts
 seasonvar_git_guard_require_safe_paths staged
+seasonvar_git_guard_require_workspace_lease
 
 "$repo_root/scripts/update-changelog-for-staged-code.sh"
+
+seasonvar_git_guard_require_no_conflicts
+seasonvar_git_guard_require_safe_paths staged
+seasonvar_git_guard_require_declared_paths
+seasonvar_git_guard_require_approved_index
+
 bash "$repo_root/scripts/ci-check.sh" docs
 "$repo_root/scripts/check-readme-policy.sh" --staged
 "$repo_root/scripts/check-changelog-policy.sh" --staged
+
+seasonvar_git_guard_require_approved_index

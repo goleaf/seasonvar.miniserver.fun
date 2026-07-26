@@ -76,6 +76,43 @@ final class GitWorkspaceLeaseScriptTest extends TestCase
         $this->assertStringContainsString('paths_declared=no', $status->getOutput());
     }
 
+    public function test_owner_verification_requires_the_matching_task_and_token_without_mutation(): void
+    {
+        $withoutLease = $this->runLeaseWithToken(
+            str_repeat('1', 64),
+            'verify-owner',
+            'owner-task',
+        );
+
+        $this->assertFalse($withoutLease->isSuccessful());
+
+        $acquire = $this->runLease('acquire', 'owner-task');
+        $token = $this->tokenFrom($acquire);
+        $statusBefore = $this->gitOutput('status', '--porcelain=v1');
+        $stagedBefore = $this->gitOutput('diff', '--cached', '--binary');
+        $trackedBefore = $this->gitOutput('diff', '--binary');
+
+        $missingToken = $this->runLease('verify-owner', 'owner-task');
+        $wrongToken = $this->runLeaseWithToken(
+            str_repeat('2', 64),
+            'verify-owner',
+            'owner-task',
+        );
+        $wrongTask = $this->runLeaseWithToken($token, 'verify-owner', 'other-task');
+        $matchingOwner = $this->runLeaseWithToken($token, 'verify-owner', 'owner-task');
+
+        $this->assertFalse($missingToken->isSuccessful());
+        $this->assertFalse($wrongToken->isSuccessful());
+        $this->assertFalse($wrongTask->isSuccessful());
+        $this->assertTrue($matchingOwner->isSuccessful(), $matchingOwner->getErrorOutput());
+        $this->assertSame("verified_owner_task_id=owner-task\n", $matchingOwner->getOutput());
+        $this->assertStringNotContainsString($token, $matchingOwner->getOutput());
+        $this->assertStringNotContainsString(hash('sha256', $token), $matchingOwner->getOutput());
+        $this->assertSame($statusBefore, $this->gitOutput('status', '--porcelain=v1'));
+        $this->assertSame($stagedBefore, $this->gitOutput('diff', '--cached', '--binary'));
+        $this->assertSame($trackedBefore, $this->gitOutput('diff', '--binary'));
+    }
+
     public function test_path_declaration_requires_the_matching_active_lease_and_preserves_previous_state_on_failure(): void
     {
         $withoutLease = $this->declarePaths(str_repeat('1', 64), 'paths-task', ['tracked.txt']);
@@ -672,12 +709,18 @@ final class GitWorkspaceLeaseScriptTest extends TestCase
         $token = $this->tokenFrom($acquire);
         $declaration = $this->declarePaths($token, 'clean-tree-task', ['tracked.txt']);
         $this->runLease('status');
+        $ownerVerification = $this->runLeaseWithToken(
+            $token,
+            'verify-owner',
+            'clean-tree-task',
+        );
         $approval = $this->runLeaseWithToken($token, 'approve-index', 'clean-tree-task');
         $pathsVerification = $this->runLeaseWithToken($token, 'verify-paths', 'clean-tree-task');
         $verify = $this->runLeaseWithToken($token, 'verify-index', 'clean-tree-task');
         $release = $this->runLeaseWithToken($token, 'release', 'clean-tree-task');
 
         $this->assertTrue($declaration->isSuccessful(), $declaration->getErrorOutput());
+        $this->assertTrue($ownerVerification->isSuccessful(), $ownerVerification->getErrorOutput());
         $this->assertTrue($approval->isSuccessful(), $approval->getErrorOutput());
         $this->assertTrue($pathsVerification->isSuccessful(), $pathsVerification->getErrorOutput());
         $this->assertTrue($verify->isSuccessful(), $verify->getErrorOutput());
