@@ -9580,7 +9580,7 @@ API-only секции, их eager relations и card counts.
 
 ## Task 72 — консолидация запросов `/stats`
 
-Статус: `implementation_complete_commit_pending`.
+Статус: `implementation_committed_push_unresolved_auth`.
 
 Дата начала: 26.07.2026.
 
@@ -9678,7 +9678,7 @@ model отложен до отдельного consistency/invalidation/rollback
 | Full default PHPUnit process | `unresolved` | Оба широких запуска остановлены накопительным configured `256M` ceiling; отдельно пройденный `TieredCacheTest` и весь affected matrix GREEN |
 | Managed documentation check | `completed` | `php artisan project:docs-refresh --check` GREEN; managed blocks unchanged |
 | README/CHANGELOG/final requirement reread | `completed` | Performance owner, visitor history and Russian changelog updated; requirements and repository-wide legacy/cache/route scan repeated |
-| Commit/push in `main` | `pending` | Exact Task 72 scope only |
+| Commit/push in `main` | `unresolved_external_auth` | Exact seven-file commit `ab7ac83` created on `main`; remote doctor blocked by root Composer policy, configured non-force push rejected before transfer because HTTPS credentials are unavailable |
 
 ### Безлимитный execution order
 
@@ -9702,6 +9702,8 @@ model отложен до отдельного consistency/invalidation/rollback
     analysis.
 13. `[completed]` Performance/visitor/changelog documentation and final
     requirement reread.
-14. `[pending]` Exact isolated Task 72 commit on existing `main`.
-15. `[pending]` Configured non-force push; external failure remains
-    `unresolved`.
+14. `[completed]` Exact isolated seven-file commit `ab7ac83` created on
+    existing `main`; foreign onboarding/card/translation work excluded.
+15. `[completed_unresolved_authentication]` Remote doctor was blocked by
+    root Composer policy; configured non-force push was attempted and GitHub
+    rejected it before transfer because HTTPS credentials are unavailable.

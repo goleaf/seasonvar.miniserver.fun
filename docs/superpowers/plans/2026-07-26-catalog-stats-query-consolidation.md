@@ -394,7 +394,7 @@ Livewire/Blade/JS и importer references.
 Каждый пункт получает `completed`, `already_compliant`,
 `not_applicable` или `unresolved` с evidence.
 
-- [ ] **Step 4: Собрать exact alternate-index commit**
+- [x] **Step 4: Собрать exact alternate-index commit**
 
 Включить только Task 72 files и task-specific hunks shared docs. Проверить:
 
@@ -410,7 +410,7 @@ Commit message:
 perf: consolidate catalog stats queries
 ```
 
-- [ ] **Step 5: Отправить configured remote**
+- [x] **Step 5: Отправить configured remote**
 
 ```bash
 composer git:doctor -- --remote
@@ -419,3 +419,9 @@ git push
 
 External authentication/network rejection фиксируется как `unresolved`;
 успешный local commit не выдаётся за push.
+
+Execution outcome: exact seven-file commit `ab7ac83` created on `main`.
+`composer git:doctor -- --remote` was blocked by the root Composer plugin
+policy; `GIT_TERMINAL_PROMPT=0 git push origin main` was then attempted and
+rejected before transfer because configured HTTPS credentials are
+unavailable. Push status remains `unresolved_external_auth`.
