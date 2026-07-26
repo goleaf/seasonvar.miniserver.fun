@@ -8,6 +8,7 @@ use App\Enums\ContentAudience;
 use App\Enums\PublicationStatus;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRating;
+use App\Models\Country;
 use App\Models\Episode;
 use App\Models\Genre;
 use App\Models\Season;
@@ -92,6 +93,11 @@ final class CatalogTitleSuggestionQueryTest extends TestCase
             'slug' => 'poliarnaia-drama',
         ]);
         $title->genres()->attach($genre);
+        $country = Country::query()->create([
+            'name' => 'Россия',
+            'slug' => 'rossiia',
+        ]);
+        $title->countries()->attach($country);
         CatalogTitleRating::query()->create([
             'catalog_title_id' => $title->id,
             'provider' => 'kinopoisk',
@@ -109,17 +115,22 @@ final class CatalogTitleSuggestionQueryTest extends TestCase
         $this->assertSame(1, (int) $result->getAttribute('seasons_count'));
         $this->assertSame(2, (int) $result->getAttribute('episodes_count'));
         $this->assertTrue($result->relationLoaded('genres'));
+        $this->assertTrue($result->relationLoaded('countries'));
         $this->assertTrue($result->relationLoaded('ratings'));
         $this->assertSame('Полярная драма', $result->genres->sole()->name);
+        $this->assertSame('Россия', $result->countries->sole()->name);
         $this->assertEqualsWithDelta(8.4, (float) $result->ratings->sole()->rating, 0.001);
 
         $queries = collect(DB::getQueryLog())->pluck('query');
-        $this->assertCount(9, $queries);
+        $this->assertCount(10, $queries);
         $this->assertCount(1, $queries->filter(
             fn (string $sql): bool => str_contains($sql, 'from "catalog_title_ratings"'),
         ));
         $this->assertCount(1, $queries->filter(
             fn (string $sql): bool => str_contains($sql, 'inner join "catalog_title_genre"'),
+        ));
+        $this->assertCount(1, $queries->filter(
+            fn (string $sql): bool => str_contains($sql, 'inner join "catalog_title_country"'),
         ));
 
         $episodeAggregateSql = $queries

@@ -33,7 +33,7 @@
 - Повторяемая разметка живет в `resources/views/components`; если компонент вычисляет классы, ссылки или состояние, добавляйте класс в `app/View/Components`.
 - Общие UI-компоненты размещайте в пространстве `x-ui.*`, доменные элементы каталога - в `x-catalog.*`.
 - Компоненты форм размещайте в `x-form.*`; поисковые поля используют `x-form.search-field`, а ошибки - `x-form.input-error`.
-- `x-layout.site-header` выводит две независимые адаптивные полосы в одном семантическом header: бренд, глобальный поиск и auth-actions сверху, вся навигация снизу. Нижняя полоса использует перенос пунктов без внутренней прокрутки; подписи видимы с `sm`, а на телефоне доступные имена сохраняются рядом с иконками для экранных дикторов. Переключателя языка в header нет.
+- `x-layout.site-header` выводит одну sticky desktop-строку: wordmark, четыре primary links, «Ещё», один flexible search и account actions. На compact viewport сверху остаются logo/search/profile, а снизу — пять icon+label действий; отдельного mobile menu и переключателя языка в header нет.
 - `x-layout.header-search` рендерит query-free GET fallback, neutral input frame и пустые accessible result regions. Постеры, год и агрегаты тайтлов, группы портала и responsive limits добавляет `resources/js/header-search.js`; Blade не выполняет поиск и не сериализует Eloquent graph. Dropdown не имеет внутренней прокрутки и не выходит за viewport на mobile/tablet/desktop/TV.
 - `/search` получает query result DTO-like arrays/models только из `GlobalSearchPageQuery`; template не содержит `@php`, model/service/facade calls или SQL. Он выводит локализованный exact title count, server-prepared portal groups, safe error/empty/typo states и ссылки на canonical full catalogue/actor/tag pages. `CatalogTitlesViewModel` и `CatalogDirectoryPageBuilder` заранее готовят translated labels и locale-formatted counts для `/titles`, actor/tag directories и их Livewire updates.
 - Компоненты получают готовые модели, коллекции или ViewModel-объекты и не выполняют запросы к базе.
@@ -152,7 +152,7 @@ Create-form не дублирует общий layout offline alert. Тольк�
 
 ## Responsive shell и mobile presentation Task 23
 
-`layouts/app.blade.php`, `components/layout/site-header.blade.php` и `site-footer.blade.php` образуют единственную responsive shell. `AppLayoutData` готовит общие navigation items/active state и private-page marker; Blade не определяет устройство, entitlement, player capability, PWA eligibility или cache policy. Mobile native `<details>` и desktop row выводят те же DTO items, а header search остаётся одной progressive GET form.
+`layouts/app.blade.php`, `components/layout/site-header.blade.php` и `site-footer.blade.php` образуют единственную responsive shell. `AppLayoutData` готовит desktop primary/more, account, notification и mobile navigation items/active state, а также private-page marker; Blade не определяет устройство, entitlement, player capability, PWA eligibility или cache policy. Desktop dropdown, mobile fullscreen presentation и оба compact trigger используют одну progressive GET search form и один DOM input.
 
 Главный контент, route announcer и online/offline status server-rendered. Safe-area/dynamic-viewport styling находится в `resources/css/app.css`; interaction — в Vite modules. Изменённые templates не содержат `@php`, inline style, inline business script, model/service/facade/database calls или raw user output. Password visibility, public share, player bridge, filter draft и keyboard viewport не дублируются в Blade.
 

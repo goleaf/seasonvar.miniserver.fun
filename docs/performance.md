@@ -1064,6 +1064,6 @@ Browser runtime делает максимум два abortable запроса п
 `160 ms`, разделяет `header_titles` и `header_portal`, ограничивает memory
 cache 120 ответами и инициализирует DOM root через `WeakSet`. Passive
 scroll listener меняет только компактное состояние sticky header через
-`requestAnimationFrame`. Проверочный Vite build сформировал CSS `200,62 kB`
-(`43,49 kB` gzip) и JS `29,32 kB` (`9,49 kB` gzip); это локальный build
+`requestAnimationFrame`. Проверочный Vite build сформировал CSS `199,57 kB`
+(`43,32 kB` gzip) и JS `29,34 kB` (`9,50 kB` gzip); это локальный build
 snapshot, а не production SLA.

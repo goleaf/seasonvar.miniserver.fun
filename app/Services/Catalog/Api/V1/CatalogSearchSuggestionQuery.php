@@ -28,7 +28,7 @@ final readonly class CatalogSearchSuggestionQuery
         private HeaderSearchSuggestionCache $headerCache,
     ) {}
 
-    /** @return array{query: string, scope: string|null, items: Collection<int, array<string, mixed>>} */
+    /** @return array{query: string, scope: string|null, items: Collection<int, covariant array<string, mixed>>} */
     public function search(string $query, ?User $user, ?string $scope = null): array
     {
         $parsed = $this->parser->parse($query);
@@ -107,8 +107,14 @@ final readonly class CatalogSearchSuggestionQuery
     {
         $seasons = (int) $title->getAttribute('seasons_count');
         $episodes = (int) $title->getAttribute('episodes_count');
+        $country = $title->countries
+            ->take(2)
+            ->pluck('name')
+            ->filter(fn (mixed $name): bool => is_string($name) && $name !== '')
+            ->implode(', ');
         $details = collect([
             $title->year === null ? null : (string) $title->year,
+            $country !== '' ? $country : null,
             trans_choice('catalog.counts.seasons', $seasons, [
                 'count' => Number::format($seasons, locale: app()->currentLocale()),
             ]),
@@ -131,6 +137,7 @@ final readonly class CatalogSearchSuggestionQuery
             'meta' => $details->implode(' · '),
             'poster_url' => $title->poster_url,
             'year' => $title->year,
+            'country' => $country !== '' ? $country : null,
             'seasons_count' => $seasons,
             'episodes_count' => $episodes,
             'content_type' => (string) $title->type,

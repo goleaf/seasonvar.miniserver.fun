@@ -3,6 +3,8 @@
 return [
     'navigation' => [
         'menu' => 'Portal sections',
+        'primary' => 'Mobile navigation',
+        'library' => 'Library',
         'page_loaded' => 'Page opened: :title',
     ],
     'network' => [

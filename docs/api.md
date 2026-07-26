@@ -203,3 +203,14 @@ Task 07 не переименовывает route/API fields и не раскр�
 Existing `/api/v1/me` library/title-state/sync resources remain the mobile compatibility boundary; no second marker, blacklist or collection API was added. `watch_status` accepts/returns stable `planned|watching|paused|completed|dropped|null`; bookmark remains `in_watchlist`, feedback accepts/returns additive stable `more_like_this|not_interested|blacklisted|null`, and optimistic version fields keep their names. OpenAPI mirrors both enums without translated values.
 
 Manual markers and personal update acknowledgments are currently web/Livewire owner actions and are absent from public API payloads. Public title resources never expose exact progress, marker position, blacklist, acknowledgment or private collection membership; authenticated resources derive owner from Sanctum/session and remain `private, no-store`.
+
+## Header search API compatibility Task 88
+
+`GET /api/v1/search/suggestions?scope=header_titles&q=…` сохраняет прежнюю
+форму `data` и public visibility, но дополнительно может вернуть nullable
+`country`. Поле содержит не более двух публичных локализованных названий и
+также входит в готовую строку `meta` между годом и количеством сезонов.
+`header_portal` и legacy scope не меняются. `SearchSuggestionRequest`
+по-прежнему нормализует scalar query, ограничивает его 80 символами и
+allowlist-ит scope; Resource не раскрывает relationships, raw source URL,
+cache key или account state.

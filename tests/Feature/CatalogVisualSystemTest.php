@@ -196,7 +196,7 @@ class CatalogVisualSystemTest extends TestCase
             ->assertSee('<main id="main-content"', false);
     }
 
-    public function test_site_header_uses_two_responsive_rows_without_inner_scrolling(): void
+    public function test_site_header_uses_one_sticky_row_and_a_keyboard_safe_mobile_navigation(): void
     {
         $response = $this->get(route('home'));
         $html = $response->getContent();
@@ -204,37 +204,26 @@ class CatalogVisualSystemTest extends TestCase
 
         $response
             ->assertOk()
-            ->assertSee('data-site-header-primary', false)
+            ->assertSee('data-site-header-row', false)
+            ->assertSee('data-site-header-primary-navigation', false)
+            ->assertSee('data-site-header-more', false)
             ->assertSee('data-site-header-actions', false)
-            ->assertSee('data-site-header-navigation', false);
+            ->assertSee('data-mobile-bottom-navigation', false)
+            ->assertSee('data-mobile-search-action', false);
 
-        $this->assertLessThan(
-            strpos($html, 'data-site-header-navigation'),
-            strpos($html, 'data-site-header-primary'),
-        );
-        $this->assertLessThan(
-            strpos($html, 'data-site-header-navigation'),
-            strpos($html, 'data-site-header-actions'),
-        );
-        $this->assertLessThan(
-            strpos($html, 'data-site-header-actions'),
-            strpos($html, 'data-header-search-autocomplete'),
-        );
-        $this->assertMatchesRegularExpression('/data-site-header-primary[^>]*class="[^"]*\bflex\b[^"]*\bflex-wrap\b/', $component);
-        $this->assertStringContainsString('<span class="sr-only sm:not-sr-only">{{ $item->label }}</span>', $component);
-        $this->assertStringContainsString(
-            '<span class="sr-only sm:not-sr-only">{{ __(\'auth.actions.logout\') }}</span>',
-            File::get(resource_path('views/livewire/auth/logout-button.blade.php')),
-        );
-        $this->assertDoesNotMatchRegularExpression('/overflow-(?:x|y|auto|scroll)/', $component);
-        $this->assertStringNotContainsString('lg:grid-cols-[auto_minmax(280px,1fr)_auto]', $component);
+        $this->assertSame(1, substr_count($html, 'data-site-header-row'));
+        $this->assertSame(4, substr_count($html, 'data-desktop-primary-item'));
+        $this->assertSame(5, substr_count($html, 'data-mobile-navigation-item'));
+        $this->assertStringContainsString('aria-current="{{ $item->ariaCurrent }}"', $component);
+        $this->assertStringContainsString('border-b-2', $component);
+        $this->assertStringContainsString('data-header-account-menu', $component);
     }
 
     public function test_site_header_navigation_enforces_large_targets_for_nested_buttons(): void
     {
         $stylesheet = File::get(resource_path('css/app.css'));
 
-        $this->assertStringContainsString('[data-site-header-navigation] button', $stylesheet);
+        $this->assertStringContainsString('[data-mobile-bottom-navigation] button', $stylesheet);
         $this->assertStringContainsString('min-height: 2.75rem;', $stylesheet);
         $this->assertStringContainsString('min-width: 2.75rem;', $stylesheet);
         $this->assertStringContainsString('justify-content: center;', $stylesheet);
@@ -250,7 +239,7 @@ class CatalogVisualSystemTest extends TestCase
             ->assertOk()
             ->assertSee('href="'.route('login').'"', false)
             ->assertSee('href="'.route('register').'"', false)
-            ->assertDontSee('href="'.route('library.index').'"', false)
+            ->assertSee('href="'.route('library.index').'"', false)
             ->assertDontSee('href="'.route('admin.index').'"', false);
 
         $this->actingAs($viewer)->get(route('home'))

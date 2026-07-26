@@ -221,23 +221,24 @@ test('private and administration routes keep the guest boundary', async ({ page,
     expect(browserErrors).toEqual([]);
 });
 
-test('tablet-width shell keeps compact navigation until the desktop content breakpoint', async ({ page }, testInfo) => {
+test('tablet-width shell keeps five compact actions until the desktop content breakpoint', async ({ page }, testInfo) => {
     const viewport = page.viewportSize();
     const expectsCompactNavigation = viewport.width < 1024;
 
     await page.goto('/');
 
-    const compactNavigation = page.locator('[data-mobile-navigation]');
-    const desktopNavigation = page.locator('details[data-mobile-navigation] + nav[data-site-header-navigation]');
+    const compactNavigation = page.locator('[data-mobile-bottom-navigation]');
+    const desktopNavigation = page.locator('[data-site-header-primary-navigation]');
 
     if (expectsCompactNavigation) {
-        await expect(compactNavigation.locator('summary')).toBeVisible();
+        await expect(compactNavigation).toBeVisible();
+        await expect(compactNavigation.locator('[data-mobile-navigation-item]')).toHaveCount(5);
         await expect(desktopNavigation).toBeHidden();
 
         return;
     }
 
-    await expect(compactNavigation.locator('summary')).toBeHidden();
+    await expect(compactNavigation).toBeHidden();
     await expect(desktopNavigation).toBeVisible();
 
     await testInfo.attach('navigation-breakpoint', {
@@ -247,6 +248,41 @@ test('tablet-width shell keeps compact navigation until the desktop content brea
         }, null, 2),
         contentType: 'application/json',
     });
+});
+
+test('sticky header compacts without disappearing and mobile navigation yields to the keyboard', async ({ page }, testInfo) => {
+    await page.goto('/titles');
+
+    const header = page.locator('[data-site-header]');
+    const headerRow = page.locator('[data-site-header-row]');
+    const mobileNavigation = page.locator('[data-mobile-bottom-navigation]');
+    const initialHeight = await headerRow.evaluate((element) => element.getBoundingClientRect().height);
+
+    await page.evaluate(() => window.scrollTo(0, 700));
+    await expect(header).toHaveAttribute('data-compact', 'true');
+    await expect(header).toBeVisible();
+
+    const compactHeight = await headerRow.evaluate((element) => element.getBoundingClientRect().height);
+    const position = await header.evaluate((element) => window.getComputedStyle(element).position);
+
+    expect(position).toBe('sticky');
+    if (page.viewportSize().width >= 1024) {
+        expect(compactHeight).toBeLessThan(initialHeight);
+        const catalogLink = page.locator('[data-site-header-primary-navigation] a').first();
+
+        await expect(catalogLink).toHaveAttribute('aria-current', 'page');
+        expect(await catalogLink.evaluate((element) => Number.parseInt(window.getComputedStyle(element).fontWeight, 10))).toBeGreaterThanOrEqual(600);
+        expect(await catalogLink.evaluate((element) => window.getComputedStyle(element).borderBottomWidth)).toBe('2px');
+    } else {
+        await expect(mobileNavigation).toBeVisible();
+        await expect(mobileNavigation.locator('[aria-current="page"]')).toHaveCount(1);
+        await page.evaluate(() => document.documentElement.classList.add('app-keyboard-visible'));
+        await expect(mobileNavigation).toBeHidden();
+        await page.evaluate(() => document.documentElement.classList.remove('app-keyboard-visible'));
+        await expect(mobileNavigation).toBeVisible();
+    }
+
+    await page.screenshot({ path: testInfo.outputPath('sticky-header.png') });
 });
 
 test('title FAQ disclosures expose full touch targets', async ({ page }) => {

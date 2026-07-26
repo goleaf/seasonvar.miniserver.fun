@@ -25,6 +25,7 @@ final class SearchSuggestionResource extends JsonResource
             'meta' => data_get($this->resource, 'meta'),
             'poster_url' => data_get($this->resource, 'poster_url'),
             'year' => data_get($this->resource, 'year'),
+            'country' => data_get($this->resource, 'country'),
             'seasons_count' => data_get($this->resource, 'seasons_count'),
             'episodes_count' => data_get($this->resource, 'episodes_count'),
             'content_type' => data_get($this->resource, 'content_type'),

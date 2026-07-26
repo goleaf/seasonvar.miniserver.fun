@@ -124,9 +124,31 @@ Importer индексирует только изменившийся тайтл
 
 ## Автодополнение в шапке
 
-`x-layout.header-search` — progressive Blade/Vite-компонент в первой полосе шапки. Обычная форма отправляет shareable `GET /search?q=...` либо `GET /{locale}/search?q=...` и остаётся полным fallback без JavaScript. После одного нормализованного символа модуль ждёт 160 мс и запрашивает только exact-short title scope; со второго символа независимо запрашиваются `scope=header_titles` и `scope=header_portal`. У каждого контура свой `AbortController`, а sequence guard не позволяет запоздавшему ответу заменить новый запрос. Внутри вкладки хранится bounded cache последних 120 scope-ответов, разделённых также по `<html lang>`; смена языка не может повторно использовать ответ другой локали. Быстрый title-response рендерится сразу, не ожидая более широкого поиска по порталу.
+`x-layout.header-search` — единственный progressive Blade/Vite-компонент
+header: inline в одной desktop-строке и fullscreen в compact presentation.
+Обычная форма отправляет shareable `GET /search?q=...` либо
+`GET /{locale}/search?q=...` и остаётся полным fallback без JavaScript.
+После одного нормализованного символа модуль ждёт 160 мс и запрашивает только
+exact-short title scope; со второго символа независимо запрашиваются
+`scope=header_titles` и `scope=header_portal`. У каждого контура свой
+`AbortController`, а sequence guard не позволяет запоздавшему ответу
+заменить новый запрос. Внутри вкладки хранится bounded cache последних 120
+scope-ответов, разделённых также по `<html lang>`; смена языка не может
+повторно использовать ответ другой локали. Быстрый title-response рендерится
+сразу, не ожидая более широкого поиска по порталу.
 
-Тайтлы получает общий `CatalogTitleSuggestionQuery`, который также обслуживает мобильные API-подсказки. Готовый FTS сохраняет точный порядок, а при неготовом индексе используется ограниченный title/original/alias LIKE-fallback с ранжированием «точное совпадение → начало названия → начало слова → вхождение». Оба пути применяют публичную visibility boundary. Каждый результат содержит готовый URL, постер, год, тип и два grouped public-availability count — сезонов и серий; скрытые релизы не считаются, N+1 отсутствует. Готовая строка `meta` строится сервером через `Number::format()`/`trans_choice()`, а header fetch передаёт `Accept-Language` из `<html lang>`, чтобы подписи совпадали с текущим SSR-интерфейсом, а не с произвольной locale браузера. Поля `description` и участники в поиск тайтла не входят.
+Тайтлы получает общий `CatalogTitleSuggestionQuery`, который также
+обслуживает мобильные API-подсказки. Готовый FTS сохраняет точный порядок, а
+при неготовом индексе используется ограниченный title/original/alias
+LIKE-fallback с ранжированием «точное совпадение → начало названия → начало
+слова → вхождение». Оба пути применяют публичную visibility boundary.
+Каждый результат содержит готовый URL, постер, год, до двух стран и два
+grouped public-availability count — сезонов и серий; скрытые релизы не
+считаются, N+1 отсутствует. Готовая строка `meta` строится сервером через
+`Number::format()`/`trans_choice()`, а header fetch передаёт
+`Accept-Language` из `<html lang>`, чтобы подписи совпадали с текущим
+SSR-интерфейсом, а не с произвольной locale браузера. Поля `description` и
+участники в поиск тайтла не входят.
 
 Второй контур `PortalSearchSuggestionQuery` ищет только по кратким именам и названиям: во всех десяти публичных справочниках, годах, опубликованных подборках, общедоступных заявках, открытых профилях и закрытом реестре существующих разделов. Каждый источник ограничен четырьмя строками, общий ответ — 30 строками. Private, unlisted, pending, hidden, deleted и не связанные с видимыми тайтлами записи отсекаются каноническими public scopes. Ранжирование одинаково: точное совпадение → начало названия → начало слова → вхождение. Итог содержит готовые URL и короткие метки, но не описания, private fields, внутренние FTS-данные или raw remote URL.
 
@@ -148,7 +170,19 @@ Tag search использует только public/approved identity, base name
 
 Интерфейсная локаль не смешивается с языком названия, оригинального аудио, дубляжа, субтитров, студии или типа перевода. Title FTS одновременно индексирует `title`, `original_title`, aliases и детерминированную кириллическую транслитерацию; tag display локализуется отдельно. `ru` и `en` имеют одинаковые semantic keys/placeholders/plural forms; API получает locale из проверенного `Accept-Language`, web и Livewire — через существующие route/account/session middleware.
 
-Search history, popular raw queries и analytics не добавлены: у проекта нет privacy/retention owner, а функция не нужна для корректности поиска. Не добавлены Scout или внешний engine, queue dependency, cron, миграция или новый package. Изменение title/alias/import/admin path уже синхронизирует FTS; public title/tag/collection/content-request/profile изменения после commit повышают version `SearchSuggestions`. Общий cache содержит только public compact payload, dimensions `format|locale|audience|scope|query-hash`; authenticated result cards и пользовательское состояние глобально не кешируются.
+Server/account search history, popular raw queries и analytics не добавлены.
+Только явно отправленный непустой запрос может храниться в максимум пяти
+записях locale/version-scoped `sessionStorage` текущей вкладки с явной
+очисткой и in-memory fallback. Он не отправляется отдельным запросом, не
+синхронизируется с аккаунтом и не попадает в database, Laravel session,
+shared cache, logs или analytics. Не добавлены Scout или внешний engine,
+queue dependency, cron, миграция или новый package. Изменение
+title/alias/import/admin path уже синхронизирует FTS; public
+title/tag/collection/content-request/profile изменения после commit повышают
+version `SearchSuggestions`. Общий cache содержит только public compact
+payload, dimensions `format|locale|audience|scope|query-hash`;
+authenticated result cards и пользовательское состояние глобально не
+кешируются.
 
 ### Ручная проверка Task 02
 

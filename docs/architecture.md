@@ -585,3 +585,19 @@ builds и notification contracts не меняются.
 [`taste onboarding design`](superpowers/specs/2026-07-26-taste-onboarding-design.md),
 а проверяемый checklist — в
 [`taste onboarding plan`](superpowers/plans/2026-07-26-taste-onboarding.md).
+
+## Архитектурная граница шапки и глобального поиска Task 88
+
+`AppLayoutData` остаётся единственным server-side владельцем состава и
+активности ссылок общего shell. Он подготавливает четыре desktop-раздела,
+меню «Ещё», account/notification actions и четыре ссылочных слота мобильной
+навигации; пятый слот поиска является действием одного существующего
+`x-layout.header-search`. Blade не выполняет route discovery, authorization
+или запросы к базе.
+
+Desktop dropdown и mobile fullscreen presentation используют один input,
+один combobox/listbox и один Vite runtime. `GET /search`, `/titles?q=…` и
+`GET /api/v1/search/suggestions` сохраняют прежние публичные contracts.
+Country добавляется только в header title projection через bounded eager-load;
+route middleware и policies профиля, уведомлений, библиотеки и заявок не
+заменяются сокрытием элементов интерфейса.

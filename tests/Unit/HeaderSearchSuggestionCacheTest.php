@@ -61,4 +61,13 @@ final class HeaderSearchSuggestionCacheTest extends TestCase
         $this->assertSame(['group' => 'titles'], $titles);
         $this->assertSame(['group' => 'portal'], $portal);
     }
+
+    public function test_header_payload_uses_format_version_two(): void
+    {
+        $format = (new \ReflectionClass(HeaderSearchSuggestionCache::class))
+            ->getReflectionConstant('FORMAT_VERSION');
+
+        $this->assertNotFalse($format);
+        $this->assertSame(2, $format->getValue());
+    }
 }

@@ -2,6 +2,7 @@
 
 return [
     'title' => 'Release calendar',
+    'short_title' => 'Calendar',
     'eyebrow' => 'Portal schedule',
     'description' => 'Premieres, new seasons, episodes, translations, subtitles, and actual portal publications with explicit date precision.',
     'schedule' => 'Release list',

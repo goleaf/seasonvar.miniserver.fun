@@ -29,6 +29,7 @@ final readonly class CatalogTitleSuggestionQuery
         }
 
         $limit = max(1, min(25, $limit));
+        $countryLoad = $this->taxonomies->relationSummaryLoads()['countries'];
         $matches = $this->titles->matchingTitles($query, $user)
             ->select([
                 'catalog_titles.id',
@@ -43,6 +44,7 @@ final readonly class CatalogTitleSuggestionQuery
             ->with([
                 'aliases:id,catalog_title_id,name',
                 ...$this->taxonomies->cardSummaryLoads(),
+                'countries' => $countryLoad,
             ])
             ->limit(max(40, $limit * 8));
 

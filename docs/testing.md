@@ -106,3 +106,14 @@ truthful features, reset/merge/export и verification redirect compatibility.
 `tests/browser/taste-onboarding.spec.js` выполняет idempotent owner journey в
 desktop/mobile/tablet, проверяет a11y labels, загрузку/сохранение, console,
 network и overflow.
+
+Task 88 шапки и глобального поиска покрывают
+`HeaderSearchSuggestionApiTest`, `HeaderSearchAutocompleteTest`,
+`AppLayoutOptionalNavigationTest`, `CatalogTitleSuggestionQueryTest`,
+`HeaderSearchSuggestionCacheTest`, точечные shell/asset Blade tests и
+Playwright-сценарии `catalog.spec.js`, `cross-device-quality.spec.js`,
+`auth-portal.spec.js`. Матрица проверяет exact desktop/mobile IA, nullable
+country, bounded query count, cache format `2`, neutral focus, `Ctrl+K` и
+`/`, keyboard navigation, session-only recent queries, true-zero request
+CTA, fullscreen focus/scroll cleanup, sticky compaction, safe area,
+authentication и отсутствие console/network/overflow/axe regressions.

@@ -11,7 +11,7 @@ use Closure;
 
 final readonly class HeaderSearchSuggestionCache
 {
-    private const FORMAT_VERSION = 1;
+    private const FORMAT_VERSION = 2;
 
     public function __construct(
         private TieredCache $cache,

@@ -95,6 +95,26 @@ const assertAccessibility = async (page) => {
     expect(blockingViolations).toEqual([]);
 };
 
+const openHeaderSearchForViewport = async (page) => {
+    const root = page.locator('[data-header-search-autocomplete]');
+    const input = page.locator('#site-search');
+
+    if (page.viewportSize().width < 1024) {
+        if (await root.getAttribute('data-mobile-open') !== 'true') {
+            await page.locator('[data-site-header-row] [data-header-search-open]').click();
+        }
+
+        await expect(root).toHaveAttribute('data-mobile-open', 'true');
+    } else {
+        await input.evaluate((field) => field.blur());
+        await input.focus();
+    }
+
+    await expect(input).toBeVisible();
+
+    return { input, root };
+};
+
 const auditRenderedPage = async (page, testInfo, label, path, { listPoster = false } = {}) => {
     const response = await page.goto(path);
 
@@ -249,6 +269,7 @@ test('header search input keeps its neutral frame while focused and edited', asy
     for (const width of [375, 768, 1280, 1920]) {
         await page.setViewportSize({ width, height: width < 800 ? 1024 : 1200 });
         await assertPageGeometry(page);
+        await openHeaderSearchForViewport(page);
         await search.evaluate((input) => input.blur());
         const idleSearchFrameStyle = await searchFrameStyle();
         await search.focus();
@@ -271,7 +292,7 @@ test('header search input keeps its neutral frame while focused and edited', asy
     expect(browserErrors.pageErrors).toEqual([]);
 });
 
-test('header autocomplete works by keyboard and keeps two responsive rows', async ({ page, baseURL }) => {
+test('header autocomplete works by keyboard in one desktop row and compact fullscreen search', async ({ page, baseURL }) => {
     test.setTimeout(90_000);
 
     const browserErrors = await installNetworkGuard(page, baseURL);
@@ -294,13 +315,16 @@ test('header autocomplete works by keyboard and keeps two responsive rows', asyn
 
     const search = page.locator('#site-search');
     const listbox = page.getByRole('listbox', { name: 'Подсказки поиска' });
+    const dropdown = page.locator('[data-header-search-dropdown]');
     const titleOption = page.locator('[data-header-search-title-results] [role="option"]').first();
 
+    await openHeaderSearchForViewport(page);
     await search.fill('Browser Smoke');
     await expect(listbox).toBeVisible();
     await expect(titleOption).toBeVisible();
     await expect(titleOption).toContainText('Browser Smoke');
     await expect(titleOption).toContainText('2025');
+    await expect(titleOption).toContainText('Россия');
     await expect(titleOption).toContainText('1 сезон');
     await expect(titleOption).toContainText('3 серии');
     await expect(titleOption.locator('img')).toBeVisible();
@@ -314,18 +338,21 @@ test('header autocomplete works by keyboard and keeps two responsive rows', asyn
     for (const width of [375, 768, 1280, 1920]) {
         await page.setViewportSize({ width, height: width < 800 ? 1024 : 1200 });
         await assertPageGeometry(page);
+        const { root } = await openHeaderSearchForViewport(page);
+        await search.focus();
+        await expect(listbox).toBeVisible();
 
-        const dropdownGeometry = await listbox.evaluate((dropdown) => {
-            const box = dropdown.getBoundingClientRect();
-            const style = window.getComputedStyle(dropdown);
-            const primary = document.querySelector('[data-site-header-primary]')?.getBoundingClientRect();
-            const navigation = [...document.querySelectorAll('[data-site-header-navigation]')]
-                .find((element) => element.getClientRects().length > 0)
-                ?.getBoundingClientRect();
+        const dropdownGeometry = await dropdown.evaluate((panel) => {
+            const box = panel.getBoundingClientRect();
+            const style = window.getComputedStyle(panel);
+            const headerRow = document.querySelector('[data-site-header-row]')?.getBoundingClientRect();
+            const navigation = document.querySelector('[data-site-header-primary-navigation]')?.getBoundingClientRect();
             const inputFrame = document.querySelector('[data-header-search-input-frame]')?.getBoundingClientRect();
             const submit = document.querySelector('[data-header-search-autocomplete] button[type="submit"]')?.getBoundingClientRect();
+            const rootBox = document.querySelector('[data-header-search-autocomplete]')?.getBoundingClientRect();
 
             return {
+                compact: window.innerWidth < 1024,
                 left: box.left,
                 right: box.right,
                 viewportWidth: window.innerWidth,
@@ -333,21 +360,36 @@ test('header autocomplete works by keyboard and keeps two responsive rows', asyn
                 inputLeft: inputFrame?.left ?? 0,
                 inputWidth: inputFrame?.width ?? 0,
                 inputHeight: inputFrame?.height ?? 0,
+                navigationBottom: navigation?.bottom ?? 0,
+                navigationTop: navigation?.top ?? 0,
+                headerBottom: headerRow?.bottom ?? 0,
+                headerTop: headerRow?.top ?? 0,
+                rootBottom: rootBox?.bottom ?? 0,
+                rootLeft: rootBox?.left ?? 0,
+                rootWidth: rootBox?.width ?? 0,
+                rootTop: rootBox?.top ?? 0,
                 submitHeight: submit?.height ?? 0,
                 submitWidth: submit?.width ?? 0,
-                primaryBottom: primary?.bottom ?? 0,
-                navigationTop: navigation?.top ?? 0,
             };
         });
 
-        expect(Math.abs(dropdownGeometry.left - dropdownGeometry.inputLeft)).toBeLessThanOrEqual(12);
-        expect(Math.abs((dropdownGeometry.right - dropdownGeometry.left) - dropdownGeometry.inputWidth)).toBeLessThanOrEqual(24);
         expect(dropdownGeometry.right).toBeLessThanOrEqual(dropdownGeometry.viewportWidth + 1);
-        expect(['auto', 'scroll']).not.toContain(dropdownGeometry.overflowY);
         expect(dropdownGeometry.inputHeight).toBeGreaterThanOrEqual(44);
         expect(dropdownGeometry.submitHeight).toBeGreaterThanOrEqual(44);
         expect(dropdownGeometry.submitWidth).toBeGreaterThanOrEqual(44);
-        expect(dropdownGeometry.navigationTop).toBeGreaterThanOrEqual(dropdownGeometry.primaryBottom - 1);
+
+        if (dropdownGeometry.compact) {
+            await expect(root).toHaveAttribute('role', 'dialog');
+            await expect(page.locator('[data-mobile-bottom-navigation]')).toBeHidden();
+            expect(dropdownGeometry.rootTop).toBeLessThanOrEqual(1);
+            expect(dropdownGeometry.rootBottom).toBeGreaterThanOrEqual((width < 800 ? 1024 : 1200) - 1);
+        } else {
+            expect(Math.abs(dropdownGeometry.left - dropdownGeometry.rootLeft)).toBeLessThanOrEqual(12);
+            expect(Math.abs((dropdownGeometry.right - dropdownGeometry.left) - dropdownGeometry.rootWidth)).toBeLessThanOrEqual(24);
+            expect(['auto', 'scroll']).not.toContain(dropdownGeometry.overflowY);
+            expect(dropdownGeometry.navigationTop).toBeGreaterThanOrEqual(dropdownGeometry.headerTop - 1);
+            expect(dropdownGeometry.navigationBottom).toBeLessThanOrEqual(dropdownGeometry.headerBottom + 1);
+        }
     }
 
     await search.press('End');
@@ -366,6 +408,62 @@ test('header autocomplete works by keyboard and keeps two responsive rows', asyn
     await expect.poll(async () => page.locator('#site-search').evaluate(
         (input) => input.getBoundingClientRect().height,
     )).toBeGreaterThanOrEqual(44);
+
+    expect(browserErrors.localAssetFailures).toEqual([]);
+    expect(browserErrors.consoleErrors).toEqual([]);
+    expect(browserErrors.pageErrors).toEqual([]);
+});
+
+test('header search supports shortcuts, true-empty request CTA and session-only recent queries', async ({ page, baseURL }, testInfo) => {
+    const browserErrors = await installNetworkGuard(page, baseURL);
+
+    await page.route('**/api/v1/search/suggestions?*', async (route) => {
+        const url = new URL(route.request().url());
+
+        await route.fulfill({
+            contentType: 'application/json',
+            body: JSON.stringify({
+                data: [],
+                meta: {
+                    query: url.searchParams.get('q'),
+                    scope: url.searchParams.get('scope'),
+                },
+            }),
+        });
+    });
+    await page.goto('/');
+    await page.keyboard.press('Control+k');
+
+    const { input, root } = await openHeaderSearchForViewport(page);
+    const requestAction = page.locator('[data-header-search-request]');
+    const catalogAction = page.locator('[data-header-search-all-results]');
+
+    await expect(input).toBeFocused();
+    await input.fill('Несуществующий сериал для заявки');
+    await expect(requestAction).toBeVisible();
+    await expect(catalogAction).toBeVisible();
+    await expect(catalogAction).toHaveAttribute('href', /\/titles\?q=/);
+    await page.screenshot({ path: testInfo.outputPath('header-search-empty.png') });
+    await input.press('Enter');
+    await expect(page).toHaveURL(/\/search\?q=/);
+
+    await page.goto('/');
+    await page.keyboard.press('Control+k');
+    await openHeaderSearchForViewport(page);
+    await expect(page.locator('[data-header-search-recent]')).toBeVisible();
+    await expect(page.locator('[data-header-search-recent-results]')).toContainText('Несуществующий сериал для заявки');
+    await page.locator('[data-header-search-recent-clear]').click();
+    await expect(page.locator('[data-header-search-recent]')).toBeHidden();
+
+    if (await root.getAttribute('data-mobile-open') === 'true') {
+        await page.locator('[data-header-search-mobile-close]').click();
+    } else {
+        await input.press('Escape');
+        await input.evaluate((field) => field.blur());
+    }
+
+    await page.keyboard.press('/');
+    await expect(input).toBeFocused();
 
     expect(browserErrors.localAssetFailures).toEqual([]);
     expect(browserErrors.consoleErrors).toEqual([]);

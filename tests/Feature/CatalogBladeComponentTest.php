@@ -36,25 +36,27 @@ class CatalogBladeComponentTest extends TestCase
         }
     }
 
-    public function test_header_keeps_logo_search_and_auth_actions_above_the_wrapping_navigation(): void
+    public function test_header_uses_one_desktop_row_one_search_root_and_five_mobile_actions(): void
     {
         $html = $this->get(route('home'))->assertOk()->getContent();
-        $primaryPosition = strpos($html, 'data-site-header-primary');
+        $brandPosition = strpos($html, 'data-site-header-brand');
+        $navigationPosition = strpos($html, 'data-site-header-primary-navigation');
         $searchPosition = strpos($html, 'data-header-search-autocomplete');
         $actionsPosition = strpos($html, 'data-site-header-actions');
-        $navigationPosition = strpos($html, 'data-site-header-navigation');
 
-        $this->assertIsInt($primaryPosition);
+        $this->assertIsInt($brandPosition);
+        $this->assertIsInt($navigationPosition);
         $this->assertIsInt($searchPosition);
         $this->assertIsInt($actionsPosition);
-        $this->assertIsInt($navigationPosition);
-        $this->assertLessThan($searchPosition, $primaryPosition);
+        $this->assertLessThan($navigationPosition, $brandPosition);
+        $this->assertLessThan($searchPosition, $navigationPosition);
         $this->assertLessThan($actionsPosition, $searchPosition);
-        $this->assertLessThan($navigationPosition, $searchPosition);
-        $this->assertLessThan($navigationPosition, $actionsPosition);
         $this->assertSame(1, substr_count($html, 'data-header-search-autocomplete'));
         $this->assertSame(1, substr_count($html, 'data-site-header-actions'));
-        $this->assertStringContainsString('flex-wrap', $html);
+        $this->assertSame(2, substr_count($html, 'data-mobile-search-action'));
+        $this->assertSame(1, substr_count($html, 'data-mobile-bottom-navigation'));
+        $this->assertSame(5, substr_count($html, 'data-mobile-navigation-item'));
+        $this->assertStringContainsString('>Seasonvar<', $html);
     }
 
     public function test_title_card_and_list_row_render_only_genre_chips_as_links(): void

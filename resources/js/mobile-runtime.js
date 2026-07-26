@@ -8,6 +8,7 @@ let runtimeReady = false;
 let connectionWasOffline = false;
 let connectionStatusTimer = null;
 let viewportFrame = null;
+let headerScrollFrame = null;
 let filterAwaitingApply = null;
 
 const compactLayout = window.matchMedia('(max-width: 63.999rem)');
@@ -217,6 +218,23 @@ const scheduleViewportUpdate = () => {
     viewportFrame = window.requestAnimationFrame(updateViewport);
 };
 
+const updateHeaderCompactState = () => {
+    headerScrollFrame = null;
+    const header = document.querySelector('[data-site-header]');
+
+    if (header instanceof HTMLElement) {
+        header.dataset.compact = window.scrollY > 32 ? 'true' : 'false';
+    }
+};
+
+const scheduleHeaderCompactUpdate = () => {
+    if (headerScrollFrame !== null) {
+        return;
+    }
+
+    headerScrollFrame = window.requestAnimationFrame(updateHeaderCompactState);
+};
+
 const showConnectionState = (state) => {
     const container = document.querySelector('[data-connection-status]');
 
@@ -278,10 +296,11 @@ const initializeRuntime = () => {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     window.addEventListener('resize', scheduleViewportUpdate, { passive: true });
+    window.addEventListener('scroll', scheduleHeaderCompactUpdate, { passive: true });
     window.visualViewport?.addEventListener('resize', scheduleViewportUpdate, { passive: true });
     window.visualViewport?.addEventListener('scroll', scheduleViewportUpdate, { passive: true });
     document.addEventListener('livewire:navigating', () => {
-        document.querySelectorAll('[data-mobile-navigation][open]').forEach((navigation) => {
+        document.querySelectorAll('[data-header-menu][open]').forEach((navigation) => {
             navigation.open = false;
         });
     });
@@ -297,13 +316,14 @@ const initializeRuntime = () => {
     });
 
     scheduleViewportUpdate();
+    scheduleHeaderCompactUpdate();
     showConnectionState(navigator.onLine === false ? 'offline' : 'online');
     connectionWasOffline = navigator.onLine === false;
 };
 
 export const initializeMobileRuntime = (root = document) => {
     initializeRuntime();
-    root.querySelectorAll?.('[data-mobile-navigation]').forEach(initializeNavigation);
+    root.querySelectorAll?.('[data-header-menu]').forEach(initializeNavigation);
     root.querySelectorAll?.('[data-public-share]').forEach(initializeShareButton);
     root.querySelectorAll?.('[data-password-toggle]').forEach(initializePasswordToggle);
     root.querySelectorAll?.('[data-catalog-unified-filters]').forEach(initializeResponsiveFilter);

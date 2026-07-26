@@ -72,7 +72,7 @@ const assertReadableHeaderBrand = async (page) => {
     const box = await brand.boundingBox();
 
     expect(box).not.toBeNull();
-    expect(box.width).toBeGreaterThanOrEqual(page.viewportSize().width >= 640 ? 170 : 44);
+    expect(box.width).toBeGreaterThanOrEqual(page.viewportSize().width >= 640 ? 120 : 44);
 };
 
 const assertNoBrowserErrors = (browserErrors) => {
@@ -99,11 +99,8 @@ test('guest authentication and private library navigation are responsive', async
     await assertResponsivePage(page);
     await assertReadableHeaderBrand(page);
 
-    if (page.viewportSize().width < 640) {
-        await page.locator('[data-mobile-navigation] > summary').click();
-    }
-
-    await page.getByRole('link', { name: 'Профиль' }).click();
+    await page.locator('[data-header-account-menu] > summary').click();
+    await page.locator('[data-header-account-menu]').getByRole('link', { name: 'Профиль' }).click();
     await expect(page).toHaveURL(/\/profile$/);
     await expect(page.getByRole('heading', { level: 1, name: 'Профиль' })).toBeVisible();
     await expect(page.getByText('Почта подтверждена', { exact: true })).toBeVisible();
@@ -122,7 +119,8 @@ test('guest authentication and private library navigation are responsive', async
         fullPage: true,
     });
 
-    await page.getByRole('button', { name: 'Выйти', exact: true }).click();
+    await page.locator('[data-header-account-menu] > summary').click();
+    await page.locator('[data-header-account-menu]').getByRole('button', { name: 'Выйти', exact: true }).click();
     await expect(page).toHaveURL(/\/$/);
     await page.goto('/library');
     await expect(page).toHaveURL(/\/login$/);

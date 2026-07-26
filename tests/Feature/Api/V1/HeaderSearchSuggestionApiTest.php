@@ -6,6 +6,7 @@ namespace Tests\Feature\Api\V1;
 
 use App\Enums\PublicationStatus;
 use App\Models\CatalogTitle;
+use App\Models\Country;
 use App\Models\Episode;
 use App\Models\Genre;
 use App\Models\Season;
@@ -34,6 +35,11 @@ final class HeaderSearchSuggestionApiTest extends TestCase
                 ['number' => 3],
             )
             ->create();
+        $country = Country::query()->create([
+            'name' => 'Россия',
+            'slug' => 'rossiia',
+        ]);
+        $title->countries()->attach($country);
         CatalogTitle::factory()->create([
             'title' => 'Полярный детектив закрытый',
             'publication_status' => PublicationStatus::Hidden,
@@ -49,9 +55,10 @@ final class HeaderSearchSuggestionApiTest extends TestCase
             ->assertJsonPath('data.0.label', 'Полярный детектив')
             ->assertJsonPath('data.0.poster_url', 'https://images.example.com/polar-detective.jpg')
             ->assertJsonPath('data.0.year', 2025)
+            ->assertJsonPath('data.0.country', 'Россия')
             ->assertJsonPath('data.0.seasons_count', 1)
             ->assertJsonPath('data.0.episodes_count', 3)
-            ->assertJsonPath('data.0.meta', '2025 · 1 сезон · 3 серии')
+            ->assertJsonPath('data.0.meta', '2025 · Россия · 1 сезон · 3 серии')
             ->assertJsonPath('data.0.url', route('titles.show', $title));
     }
 

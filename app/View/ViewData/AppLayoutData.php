@@ -66,144 +66,189 @@ final class AppLayoutData
             : [];
         $canCreateTechnicalIssue = (bool) config('technical-issues.enabled', true)
             && $authenticatedUser !== null;
-        $layoutHeaderNavigation = [
-            $this->headerLinkUrl($layoutHomeUrl, 'fa-solid fa-house', __('catalog.navigation.home'), $this->request->routeIs('home', 'localized.home')),
-            $this->headerLink('titles.index', 'fa-solid fa-list-ul', __('catalog.navigation.all_titles'), $this->request->routeIs('titles.*')),
-        ];
+        $homeHeaderLink = $this->headerLinkUrl(
+            $layoutHomeUrl,
+            'fa-solid fa-house',
+            __('catalog.navigation.home'),
+            $this->request->routeIs('home', 'localized.home'),
+        );
+        $catalogHeaderLink = $this->headerLink(
+            'titles.index',
+            'fa-solid fa-list-ul',
+            __('catalog.navigation.catalog'),
+            $this->request->routeIs('titles.*'),
+        );
+        $calendarHeaderLink = null;
+        $layoutHeaderPrimaryNavigation = [$catalogHeaderLink];
+        $layoutHeaderMoreNavigation = [];
+        $layoutHeaderAccountNavigation = [];
+        $layoutHeaderNavigation = [$homeHeaderLink, $catalogHeaderLink];
         $layoutHeaderActions = [];
 
         if ($this->router->has('discover.index')) {
-            $layoutHeaderNavigation[] = $this->headerLinkUrl(
+            $discoveryHeaderLink = $this->headerLinkUrl(
                 $this->collectionDirectoryUrl(),
                 'fa-solid fa-compass',
                 __('recommendations.navigation.discover'),
                 $this->request->routeIs('discover.*', 'localized.discover.*', 'collections.show', 'localized.collections.show', 'profiles.collections', 'localized.profiles.collections'),
             );
+            $layoutHeaderPrimaryNavigation[] = $discoveryHeaderLink;
+            $layoutHeaderNavigation[] = $discoveryHeaderLink;
         }
 
         if ($this->router->has('calendar.index')) {
-            $layoutHeaderNavigation[] = $this->headerLink(
+            $calendarHeaderLink = $this->headerLink(
                 'calendar.index',
                 'fa-regular fa-calendar-days',
-                __('calendar.title'),
+                __('calendar.short_title'),
                 $this->request->routeIs('calendar.*', 'localized.calendar.*'),
             );
+            $layoutHeaderPrimaryNavigation[] = $calendarHeaderLink;
+            $layoutHeaderNavigation[] = $calendarHeaderLink;
         }
 
         if ($this->router->has('top.show')) {
-            $layoutHeaderNavigation[] = $this->headerLink(
+            $topHeaderLink = $this->headerLink(
                 'top.show',
                 'fa-solid fa-trophy',
                 __('top_lists.navigation'),
                 $this->request->routeIs('top.*', 'localized.top.*'),
                 ['category' => 'movies'],
             );
+            $layoutHeaderPrimaryNavigation[] = $topHeaderLink;
+            $layoutHeaderNavigation[] = $topHeaderLink;
         }
 
         if ($this->router->has('requests.index')) {
-            $layoutHeaderNavigation[] = $this->headerLink(
+            $requestsHeaderLink = $this->headerLink(
                 'requests.index',
                 'fa-solid fa-list-check',
                 __('requests.directory.title'),
                 $this->request->routeIs('requests.*', 'localized.requests.*'),
             );
+            $layoutHeaderMoreNavigation[] = $requestsHeaderLink;
+            $layoutHeaderNavigation[] = $requestsHeaderLink;
         }
 
         if ($this->router->has('help.index')) {
-            $layoutHeaderNavigation[] = $this->headerLink(
+            $helpHeaderLink = $this->headerLink(
                 'help.index',
                 'fa-regular fa-circle-question',
                 __('help.navigation'),
                 $this->request->routeIs('help.*', 'localized.help.*'),
             );
+            $layoutHeaderMoreNavigation[] = $helpHeaderLink;
+            $layoutHeaderNavigation[] = $helpHeaderLink;
         }
 
         if ($isAuthenticated) {
-            $layoutHeaderNavigation[] = $this->headerLink(
+            $libraryHeaderLink = $this->headerLink(
                 'library.index',
                 'fa-solid fa-bookmark',
                 __('catalog.layout.my_library'),
                 $this->request->routeIs('library.*', 'viewing-activity'),
             );
+            $layoutHeaderAccountNavigation[] = $libraryHeaderLink;
+            $layoutHeaderNavigation[] = $libraryHeaderLink;
             if ($this->router->has('personal-tags.index')) {
-                $layoutHeaderNavigation[] = $this->headerLink(
+                $personalTagsHeaderLink = $this->headerLink(
                     'personal-tags.index',
                     'fa-solid fa-tags',
                     __('tags.personal_page.title'),
                     $this->request->routeIs('personal-tags.*'),
                 );
+                $layoutHeaderAccountNavigation[] = $personalTagsHeaderLink;
+                $layoutHeaderNavigation[] = $personalTagsHeaderLink;
             }
             if ($this->router->has('collections.mine')) {
-                $layoutHeaderNavigation[] = $this->headerLink(
+                $collectionsHeaderLink = $this->headerLink(
                     'collections.mine',
                     'fa-solid fa-folder-open',
                     __('collections.navigation.my_collections'),
                     $this->request->routeIs('collections.mine', 'collections.edit'),
                 );
+                $layoutHeaderAccountNavigation[] = $collectionsHeaderLink;
+                $layoutHeaderNavigation[] = $collectionsHeaderLink;
             }
             if ($this->router->has('profile.show')) {
-                $layoutHeaderNavigation[] = $this->headerLink(
+                $profileHeaderLink = $this->headerLink(
                     'profile.show',
                     'fa-solid fa-user',
                     __('catalog.navigation.profile'),
                     $this->request->routeIs('profile.show'),
                 );
+                $layoutHeaderAccountNavigation[] = $profileHeaderLink;
+                $layoutHeaderNavigation[] = $profileHeaderLink;
             }
             if ($this->router->has('settings.index')) {
-                $layoutHeaderNavigation[] = $this->headerLink(
+                $settingsHeaderLink = $this->headerLink(
                     'settings.index',
                     'fa-solid fa-gear',
                     __('settings.navigation.settings'),
                     $this->request->routeIs('settings.*', 'localized.settings.*', 'profile.show', 'profile.security'),
                 );
+                $layoutHeaderAccountNavigation[] = $settingsHeaderLink;
+                $layoutHeaderNavigation[] = $settingsHeaderLink;
             }
             if ($this->router->has('profile.discussions')) {
-                $layoutHeaderNavigation[] = $this->headerLink(
+                $discussionsHeaderLink = $this->headerLink(
                     'profile.discussions',
                     'fa-solid fa-comments',
                     __('comments.navigation.discussions'),
                     $this->request->routeIs('profile.discussions', 'notifications.index'),
                 );
+                $layoutHeaderAccountNavigation[] = $discussionsHeaderLink;
+                $layoutHeaderNavigation[] = $discussionsHeaderLink;
             }
             if ($this->router->has('profile.reviews')) {
-                $layoutHeaderNavigation[] = $this->headerLink(
+                $reviewsHeaderLink = $this->headerLink(
                     'profile.reviews',
                     'fa-solid fa-star-half-stroke',
                     __('reviews.navigation.my_reviews'),
                     $this->request->routeIs('profile.reviews'),
                 );
+                $layoutHeaderAccountNavigation[] = $reviewsHeaderLink;
+                $layoutHeaderNavigation[] = $reviewsHeaderLink;
             }
             if ($this->router->has('issues.mine')) {
-                $layoutHeaderNavigation[] = $this->headerLink(
+                $issuesHeaderLink = $this->headerLink(
                     'issues.mine',
                     'fa-solid fa-screwdriver-wrench',
                     __('issues.my_tickets'),
                     $this->request->routeIs('issues.*', 'localized.issues.*'),
                 );
+                $layoutHeaderAccountNavigation[] = $issuesHeaderLink;
+                $layoutHeaderNavigation[] = $issuesHeaderLink;
             }
             if ($canAccessAdministration && $this->router->has('admin.index')) {
-                $layoutHeaderNavigation[] = $this->headerLink(
+                $adminHeaderLink = $this->headerLink(
                     'admin.index',
                     'fa-solid fa-user-shield',
                     __('administration.navigation.entry'),
                     $this->request->routeIs('admin.*'),
                 );
+                $layoutHeaderAccountNavigation[] = $adminHeaderLink;
+                $layoutHeaderNavigation[] = $adminHeaderLink;
             }
         } else {
-            $layoutHeaderActions[] = $this->headerLinkUrl(
+            $loginHeaderLink = $this->headerLinkUrl(
                 $this->authenticationRoutes->guestUrl('login'),
                 'fa-solid fa-right-to-bracket',
                 __('auth.actions.login'),
                 $this->request->routeIs('login', 'localized.login'),
             );
+            $layoutHeaderActions[] = $loginHeaderLink;
+            $layoutHeaderAccountNavigation[] = $loginHeaderLink;
 
             if (config('authentication.registration.enabled', true) && $this->router->has('register')) {
-                $layoutHeaderActions[] = $this->headerLinkUrl(
+                $registerHeaderLink = $this->headerLinkUrl(
                     $this->authenticationRoutes->guestUrl('register'),
                     'fa-solid fa-user-plus',
                     __('auth.pages.register.title'),
                     $this->request->routeIs('register', 'localized.register'),
                 );
+                $layoutHeaderActions[] = $registerHeaderLink;
+                $layoutHeaderAccountNavigation[] = $registerHeaderLink;
             }
         }
 
@@ -286,9 +331,49 @@ final class AppLayoutData
                 $this->request->routeIs('issues.create', 'localized.issues.create'),
             );
         }
+        $mobileLibraryLink = $this->headerLink(
+            'library.index',
+            'fa-solid fa-bookmark',
+            __('mobile.navigation.library'),
+            $this->request->routeIs('library.*', 'viewing-activity'),
+        );
+        $layoutHeaderMobileNavigation = array_filter([
+            'home' => $homeHeaderLink,
+            'catalog' => $catalogHeaderLink,
+            'calendar' => $calendarHeaderLink,
+            'library' => $mobileLibraryLink,
+        ]);
+        $layoutHeaderNotificationAction = $isAuthenticated && $this->router->has('notifications.index')
+            ? $this->headerLink(
+                'notifications.index',
+                'fa-regular fa-bell',
+                __('catalog.layout.notifications'),
+                $this->request->routeIs('notifications.index'),
+            )
+            : null;
         $layoutHeader = [
+            'brand_name' => 'Seasonvar',
             'home_url' => $layoutHomeUrl,
             'search_url' => $this->navigationRoute('search.index'),
+            'catalog_search_url' => $this->navigationRoute('titles.index'),
+            'request_create_url' => $this->router->has('requests.create')
+                ? $this->navigationRoute('requests.create')
+                : null,
+            'search_active' => $this->request->routeIs('search.*', 'localized.search.*'),
+            'primary_navigation' => $layoutHeaderPrimaryNavigation,
+            'more_navigation' => $layoutHeaderMoreNavigation,
+            'more_active' => collect($layoutHeaderMoreNavigation)
+                ->contains(fn (LayoutNavigationItem $item): bool => $item->ariaCurrent !== null),
+            'account_navigation' => $layoutHeaderAccountNavigation,
+            'mobile_navigation' => $layoutHeaderMobileNavigation,
+            'notification_action' => $layoutHeaderNotificationAction,
+            'account_initial' => $authenticatedUser === null
+                ? null
+                : Str::upper(Str::substr((string) $authenticatedUser->name, 0, 1)),
+            'account_label' => $authenticatedUser === null
+                ? __('auth.actions.login')
+                : (string) $authenticatedUser->name,
+            'is_authenticated' => $isAuthenticated,
             'navigation' => $layoutHeaderNavigation,
             'actions' => $layoutHeaderActions,
             'show_logout' => $isAuthenticated,

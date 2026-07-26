@@ -11110,3 +11110,96 @@ derived backfill выполняется bounded command/schedule, не migration
 17. `[pending]` Configured non-force push; external failure stays `unresolved`.
 
 ---
+## Task 88 — новая шапка портала и усиленный глобальный поиск
+
+Дата начала: 26.07.2026.
+
+Статус: `delivery_in_progress`.
+
+Design:
+[`2026-07-26-portal-header-global-search-design.md`](../superpowers/specs/2026-07-26-portal-header-global-search-design.md).
+
+Detailed plan:
+[`2026-07-26-portal-header-global-search.md`](../superpowers/plans/2026-07-26-portal-header-global-search.md).
+
+### Цель
+
+Собрать desktop header в одну строку
+`Seasonvar → Каталог/Подборки/Календарь/Топ 100 → Ещё → flexible search →
+notifications/account`, сделать header sticky/compact-on-scroll, а compact
+shell — из top logo/search/profile и fixed пяти пунктов
+`Главная/Каталог/Поиск/Календарь/Библиотека`. Усилить один существующий
+progressive global search страной, session-only recent queries, `Ctrl+K`/`/`,
+fullscreen mobile presentation, отдельным `/titles?q=` переходом и честным
+request CTA при нулевом результате.
+
+### Подтверждённые решения
+
+- один существующий `x-layout.header-search`, без duplicate input/state;
+- существующие split API scopes, Form Request, visibility and cache owners;
+- country — один bounded eager-load по уже индексированному pivot;
+- recent queries — максимум пять строк только в locale-versioned
+  `sessionStorage`, без server/account/shared cache/log/analytics;
+- no migration/index/package/route/queue/scheduler/environment change;
+- old two-row/no-bottom-navigation permanent rules replaced only where
+  directly changed by user; one-tree/routes/policies/safe-area remain.
+
+### Cross-feature matrix
+
+| Domain | Status | Decision / gate |
+| --- | --- | --- |
+| Desktop/mobile layout | `critical_affected` | Exact IA, breakpoints, focus, safe-area and screenshots |
+| Global search/API | `critical_affected` | Existing parser/query/scopes plus nullable country |
+| Browser privacy | `critical_affected` | Session-only 5-entry history with explicit clear/fallback |
+| Authentication/authorization | `protected_critical` | Prepared links and existing route/policy middleware |
+| Notifications/profile/library | `affected_presentation_only` | No private payload/count query in shared header |
+| Cache | `affected_low` | Header payload format v2; no global flush |
+| Database | `affected_read_only` | Existing `(catalog_title_id,country_id)` PK; no DDL/DML |
+| Performance | `affected_bounded` | One country eager-load, max five title rows |
+| SEO/routes/locale | `protected_critical` | Names/URLs/GET contracts/localized aliases unchanged |
+| Player/pagination | `protected_high` | Shortcut/keyboard and sticky-header geometry regressions |
+| Service worker/providers | `not_applicable` | No worker/external/media change |
+| Production assets | `affected` | Atomic Vite manifest/assets and code/opcache refresh |
+| Shared Git state | `critical_risk_recorded` | Captured baseline and exact alternate-index delivery only |
+
+### Compliance matrix
+
+| Requirement | Status | Evidence / next gate |
+| --- | --- | --- |
+| Fresh skills/root/index/canonical requirements | `completed` | 26.07.2026 before Task 88 application edit |
+| Related Markdown and prior header/search design | `completed` | UI/frontend/search/cache/security/auth/ops/CI owners traced |
+| Versions/database/frontend stack | `completed` | PHP 8.5.8, Laravel 13.22, Livewire 4.3.3, Tailwind 4.3.2, Vite 8.1.4, PHPUnit 12.5.32, SQLite |
+| Official version-specific docs | `completed` | Laravel Boost and Context7 checked |
+| Existing implementation/routes/tests/indexes | `completed` | Blade/Vite/API/query/cache/browser trace and SQLite schema |
+| Alternatives/design/self-review | `completed` | Linked design; single-root approach chosen |
+| Expected/protected files/risks | `completed` | Linked detailed plan |
+| Canonical permanent rule update | `completed` | `UI_STANDARDS/frontend/catalog-search/security` updated before application code |
+| Detailed plan reread | `completed` | Full Task 88 detailed plan reread after canonical gate |
+| TDD RED/GREEN | `completed` | Focused GREEN: 22 tests, 167 assertions after exact RED |
+| Implementation | `completed` | Prepared shell, country projection, cache v2, single-root responsive runtime |
+| Security/privacy/authorization | `completed` | Existing middleware/Form Request retained; same-origin/textContent/session-only review |
+| SQL/cache/performance evidence | `completed` | Fixed query count and covering pivot PK verified by SQLite EXPLAIN |
+| Static/build/browser QA | `completed` | Exact Pint/PHPStan/Rector/build plus 18/18 Playwright; split broad suites classified |
+| Docs/README/CHANGELOG | `completed` | Canonical/themed/visitor/changelog owners updated |
+| Final reread/legacy/debug/secret audit | `completed` | Canonical reread and stale two-row/debug/selector scan completed |
+| Exact commit/push in `main` | `pending` | External failure honest |
+
+### Living execution order
+
+1. `[completed]` Fresh requirements, versions, Git and existing-system audit.
+2. `[completed]` Cross-feature/data/cache/security/browser-storage review.
+3. `[completed]` Alternatives, approved design, expected/protected manifests.
+4. `[completed]` Detailed priority/status/risk/verification plan.
+5. `[completed]` Update canonical permanent owners before code.
+6. `[completed]` Reread plan, write layout/API/interaction RED tests and
+   observe exact failures.
+7. `[completed]` Minimal backend prepared-state/country/cache implementation.
+8. `[completed]` Desktop/mobile Blade/CSS/JS implementation.
+9. `[completed]` Focused GREEN, query/EXPLAIN and security validation.
+10. `[completed]` Related/full tests, Pint/static/docs/Vite gates; two
+    foreign shared-tree failures and monolithic-process limits documented.
+11. `[completed]` Managed Playwright matrix and manual screenshot inspection.
+12. `[completed]` Final docs/README/CHANGELOG/compliance/legacy audit.
+13. `[pending]` Exact hook-enabled Task 88 commit in `main`.
+14. `[pending]` Normal non-force configured push; external failure remains
+    `unresolved`.

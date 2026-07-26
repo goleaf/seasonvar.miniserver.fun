@@ -12,6 +12,39 @@ use Tests\TestCase;
 
 final class AppLayoutOptionalNavigationTest extends TestCase
 {
+    public function test_layout_prepares_the_new_desktop_and_mobile_navigation_groups(): void
+    {
+        $homeRoute = $this->app->make(Router::class)->getRoutes()->getByName('home');
+        $this->app->make(Request::class)->setRouteResolver(static fn () => $homeRoute);
+
+        $header = $this->app->make(AppLayoutData::class)->from([])['layoutHeader'];
+        $primaryLabels = collect($header['primary_navigation'])
+            ->map(fn (LayoutNavigationItem $item): string => $item->label)
+            ->all();
+        $moreLabels = collect($header['more_navigation'])
+            ->map(fn (LayoutNavigationItem $item): string => $item->label)
+            ->all();
+
+        $this->assertSame([
+            __('catalog.navigation.catalog'),
+            __('recommendations.navigation.discover'),
+            __('calendar.short_title'),
+            __('top_lists.navigation'),
+        ], $primaryLabels);
+        $this->assertSame([
+            __('requests.directory.title'),
+            __('help.navigation'),
+        ], $moreLabels);
+        $this->assertSame(
+            ['home', 'catalog', 'calendar', 'library'],
+            array_keys($header['mobile_navigation']),
+        );
+        $this->assertSame(route('titles.index'), $header['catalog_search_url']);
+        $this->assertSame(route('requests.create'), $header['request_create_url']);
+        $this->assertNull($header['notification_action']);
+        $this->assertCount(2, $header['account_navigation']);
+    }
+
     public function test_default_locale_collection_navigation_opens_the_embedded_directory(): void
     {
         $this->assertCollectionNavigationUrl(

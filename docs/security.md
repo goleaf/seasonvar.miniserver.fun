@@ -244,7 +244,14 @@ Explicit network test не является SSRF или speed test: маршру
 - Title FTS использует bound `MATCH`; legacy partial patterns экранируют `%`, `_` и escape marker с `ESCAPE '!'`. Portal/person/tag paths нейтрализуют wildcard characters до bound `LIKE`. Query выводится только Blade `{{ }}`/DOM `textContent`, same-origin URL guard исключает внедрение внешней ссылки.
 - `CatalogEntitlementService`/`CatalogTitleQuery` единообразно исключают unpublished, deleted, future, expired и недоступную audience. Public tag/collection/request/profile scopes применяются до hydration. В текущей схеме нет отдельной region/premium/age title boundary; search не имитирует отсутствующие поля и автоматически унаследует их при расширении canonical entitlement service.
 - `api-search-suggestions` ограничивает 120 запросов в минуту на opaque authenticated user key либо HMAC network fingerprint. Ответ `429` проходит существующий locale-aware `ApiErrorResponse`; cache и logs не содержат raw query, stack trace, SQL, token, email или IP.
-- Shared autocomplete cache имеет только public audience. Персональное watch/bookmark/history состояние и private/user tags не сериализуются и не получают global key; core search не хранит query history или popular raw searches.
+- Shared autocomplete cache имеет только public audience. Персональное
+  watch/bookmark/history состояние и private/user tags не сериализуются и не
+  получают global key; server/account search history и popular raw searches
+  отсутствуют. Максимум пять только явно отправленных строк могут храниться
+  в locale/version-scoped `sessionStorage` текущей вкладки с explicit clear
+  и memory fallback. Эти строки не отправляются отдельным запросом, не
+  связываются с user ID и не попадают в Laravel session, database, shared
+  cache, logs или analytics.
 
 ## Security boundary календаря релизов
 
@@ -258,7 +265,21 @@ Google action передаёт токен только same-origin clipboard и 
 
 - Responsive/capability state не является доверием: viewport, orientation, `navigator.onLine`, Network Information, fullscreen/PiP/Media Session availability, local preference и user agent не разрешают source, premium, region, download, mutation или private route. Все решения остаются в existing policies/services/middleware.
 - Layout отмечает только routes с `PrivateAccountResponse`; persisted bfcache restoration такой страницы выполняет server revalidation. Settings, history/library, tickets, premium/admin, invoices/checkout и attachment/download routes остаются `private, no-store`/noindex. Добавленные admin routes получают `auth`, `auth.session`, `account.private` до gate, поэтому initial HTML и Livewire lifecycle имеют одну private boundary.
-- Browser-storage audit не нашёл auth/password/provider/payment/media tokens, protected source URLs или ticket diagnostics в local/session storage/IndexedDB. Сохраняются только существующие versioned device player preferences, максимум 50 anonymous episode positions за 30 дней и opaque settings-migration state. После verified login отправляются только bounded stable IDs/position/duration/time; сервер повторно валидирует формат, visibility и target relation, не принимает completion как доказательство просмотра, не перезаписывает canonical account row и не включает payload в shared cache/log. Private response перечисляет только accepted episode IDs; local snapshot удаляется лишь для них и лишь если за время запроса не стал новее, поэтому временно недоступная цель не теряется.
+- Browser-storage audit не нашёл auth/password/provider/payment/media
+  tokens, protected source URLs или ticket diagnostics в
+  local/session storage/IndexedDB. Сохраняются существующие versioned device
+  player preferences, максимум 50 anonymous episode positions за 30 дней,
+  opaque settings-migration state и максимум пять явно отправленных recent
+  search strings только в locale/version-scoped `sessionStorage` одной
+  вкладки. Search recents имеют явную очистку, не содержат user/target ID,
+  исчезают с вкладкой и не синхронизируются с server/account. После verified
+  login отправляются только bounded stable IDs/position/duration/time;
+  сервер повторно валидирует формат, visibility и target relation, не
+  принимает completion как доказательство просмотра, не перезаписывает
+  canonical account row и не включает payload в shared cache/log. Private
+  response перечисляет только accepted episode IDs; local snapshot
+  удаляется лишь для них и лишь если за время запроса не стал новее, поэтому
+  временно недоступная цель не теряется.
 - Share принимает prepared canonical public URL, разрешает только HTTP(S), передаёт public title и имеет explicit write-only clipboard fallback. Clipboard никогда не читается; private ticket/settings/progress/source URL не поддерживает share action.
 - Media Session получает только public title/episode/season/poster и authorized previous/next page URL; source URL, signed grant, user progress и entitlement не попадают в metadata. Action handlers очищаются при destroy/navigation.
 - Manifest/service worker/push subscription/backend отсутствуют. Поэтому браузер не регистрирует worker, не запрашивает install/notification permission и не держит browser cache portal responses. Будущий worker обязан использовать versioned static-asset allowlist, method/response checks и абсолютный denylist authenticated HTML/API, settings, premium/payment/invoice, ticket/attachment, history/progress, personal recommendations/calendar, protected video, signed grants/downloads; logout/account switch требует server reauthorization и удаления user-scoped client data.

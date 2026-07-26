@@ -7,6 +7,30 @@ use Tests\TestCase;
 
 class FrontendAssetContractTest extends TestCase
 {
+    public function test_header_assets_define_shortcuts_session_recents_and_keyboard_safe_mobile_navigation(): void
+    {
+        $search = File::get(resource_path('js/header-search.js'));
+        $runtime = File::get(resource_path('js/mobile-runtime.js'));
+        $styles = File::get(resource_path('css/app.css'));
+
+        foreach ([
+            'sessionStorage',
+            'MAX_RECENT_QUERIES = 5',
+            "event.key === '/'",
+            "event.key.toLocaleLowerCase() === 'k'",
+            'data-header-search-open',
+            'app-search-open',
+        ] as $marker) {
+            $this->assertStringContainsString($marker, $search);
+        }
+
+        $this->assertStringContainsString('data-site-header', $runtime);
+        $this->assertStringContainsString('dataset.compact', $runtime);
+        $this->assertStringContainsString('[data-mobile-bottom-navigation]', $styles);
+        $this->assertStringContainsString('.app-keyboard-visible [data-mobile-bottom-navigation]', $styles);
+        $this->assertStringContainsString('env(safe-area-inset-bottom, 0px)', $styles);
+    }
+
     public function test_light_visual_system_exposes_canonical_tailwind_tokens(): void
     {
         $styles = File::get(resource_path('css/app.css'));

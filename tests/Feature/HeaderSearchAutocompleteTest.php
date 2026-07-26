@@ -20,6 +20,8 @@ final class HeaderSearchAutocompleteTest extends TestCase
 
         $this->assertStringContainsString('data-header-search-autocomplete', $html);
         $this->assertStringContainsString('data-suggestions-endpoint="'.route('api.v1.search.suggestions').'"', $html);
+        $this->assertStringContainsString('data-catalog-search-url="'.route('titles.index').'"', $html);
+        $this->assertStringContainsString('data-request-create-url="'.route('requests.create').'"', $html);
         $this->assertStringContainsString('method="GET"', $html);
         $this->assertStringContainsString('name="q"', $html);
         $this->assertStringContainsString('value="Север"', $html);
@@ -36,12 +38,17 @@ final class HeaderSearchAutocompleteTest extends TestCase
         $this->assertStringContainsString('data-header-search-title-results', $html);
         $this->assertStringContainsString('data-header-search-portal-results', $html);
         $this->assertStringContainsString('data-header-search-status', $html);
-        $this->assertStringContainsString('class="absolute left-0 top-[calc(100%+0.5rem)] z-[70] hidden w-full max-w-none rounded-control border border-slate-200 bg-white p-2 shadow-elevated"', $html);
+        $this->assertStringContainsString('data-header-search-dialog', $html);
+        $this->assertStringContainsString('data-header-search-recent', $html);
+        $this->assertStringContainsString('data-header-search-recent-clear', $html);
+        $this->assertStringContainsString('data-header-search-all-results', $html);
+        $this->assertStringContainsString('data-header-search-request', $html);
+        $this->assertStringContainsString('data-header-search-mobile-close', $html);
         $this->assertLessThan(
             strpos($html, 'data-header-search-dropdown'),
             strpos($html, 'data-header-search-input-frame'),
         );
-        $this->assertStringNotContainsString('overflow-y-', $html);
+        $this->assertSame(1, substr_count($html, 'id="site-search"'));
     }
 
     public function test_header_search_input_never_uses_a_colored_focus_frame(): void
@@ -84,10 +91,12 @@ final class HeaderSearchAutocompleteTest extends TestCase
     private function renderSearch(string $query = ''): string
     {
         return Blade::render(
-            '<x-layout.header-search :initial-query="$query" :search-url="$searchUrl" />',
+            '<x-layout.header-search :initial-query="$query" :search-url="$searchUrl" :catalog-search-url="$catalogSearchUrl" :request-create-url="$requestCreateUrl" />',
             [
+                'catalogSearchUrl' => route('titles.index'),
                 'query' => $query,
-                'searchUrl' => route('titles.index'),
+                'requestCreateUrl' => route('requests.create'),
+                'searchUrl' => route('search.index'),
             ],
         );
     }

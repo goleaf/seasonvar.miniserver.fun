@@ -182,9 +182,51 @@ Legacy utility `shadow-panel` сохраняется как no-shadow compatibil
 
 Рамка именно глобального поискового поля `#site-search` в `x-layout.site-header` всегда остаётся нейтральной `border-slate-300`. При наведении, фокусе, вводе, загрузке подсказок и открытом autocomplete ей запрещены цветная рамка, `ring` и `outline`: нельзя возвращать `focus-within:border-*`, `focus-within:ring-*`, зелёную обводку или аналогичный эффект в CSS/JavaScript. Сам `[data-header-search-input]` является единственным исключением из общего зелёного `:focus-visible`: его `outline` и `box-shadow` всегда `none`, тогда как кнопка и ссылки подсказок сохраняют обычный видимый focus. Контракт защищён data-атрибутами, feature- и browser-тестами.
 
-Autocomplete-панель не получает `overflow-y-*` и внутреннюю прокрутку. Она ограничивается viewport по ширине и сокращает число title/portal rows по высоте и breakpoint: `2/3` при низком экране, `3/4` на телефоне, `4/6` на планшете, `5/8` на desktop/TV. Каждая строка сохраняет минимум 44 px по высоте; title result показывает полностью читаемый постер, год и числа сезонов/серий, а broken poster заменяется локальной заглушкой. Внутри `role="listbox"` разрешены только семантические `group`/`option`: визуальные подписи групп скрываются от accessibility tree через `aria-hidden`, доступное имя задаётся самому `group`, а live-status располагается за пределами listbox. Этот контракт проверяется axe при открытой панели.
+Autocomplete-панель desktop не получает `overflow-y-*` и внутреннюю
+прокрутку. Она ограничивается viewport по ширине и сокращает число
+title/portal rows по высоте и breakpoint: `2/3` при низком экране, `3/4`
+на телефоне, `4/6` на планшете, `5/8` на desktop/TV. Полноэкранное mobile
+представление этого же компонента является dialog-boundary: при недостатке
+высоты прокручивается единая область результатов, но второй input, form,
+query state или autocomplete instance не создаётся. Каждая строка сохраняет
+минимум 44 px по высоте; title result показывает полностью читаемый постер,
+год, страну и числа сезонов/серий, а broken poster заменяется локальной
+заглушкой. Внутри `role="listbox"` разрешены только семантические
+`group`/`option`: визуальные подписи групп скрываются от accessibility tree
+через `aria-hidden`, доступное имя задаётся самому `group`, а live-status
+располагается за пределами listbox. Этот контракт проверяется axe при
+открытой панели.
 
 Это точечное исключение относится только к рамке поля поиска в шапке и не распространяется на другие поля. Кнопка отправки, ссылки подсказок и остальные интерактивные элементы сохраняют обычный видимый `focus-visible`.
+
+## Каноническая шапка портала
+
+Desktop header использует одну sticky строку:
+`Seasonvar → Каталог/Подборки/Календарь/Топ 100 → Ещё → flexible search →
+уведомления/профиль`. Бренд является самым левым элементом, поиск занимает
+оставшееся свободное место, а «Заявки» и «Помощь» принадлежат раскрывающемуся
+меню «Ещё». Активный основной раздел обозначается одновременно
+`aria-current`, полужирным начертанием и нижней полосой, то есть состояние
+не передаётся только цветом. При прокрутке тот же header уменьшает
+вертикальные отступы и вторичные подписи, но не исчезает.
+
+На compact viewport верхняя строка содержит только бренд, кнопку открытия
+поиска и профиль. Внизу находится fixed navigation ровно из пяти действий:
+`Главная`, `Каталог`, `Поиск`, `Календарь`, `Библиотека`. Каждое действие
+имеет локальную иконку, короткую видимую подпись, минимум 44 px и
+текстово-графический active state. Нижняя navigation учитывает
+`safe-area-inset-bottom`, не дублирует routes/state и скрывается при
+фактически открытой экранной клавиатуре через существующий
+`visualViewport`-сигнал. Контент получает соответствующий нижний reserve,
+поэтому navigation не перекрывает player, toast, pagination или focused
+control.
+
+Compact-кнопка поиска открывает полноэкранное представление единственного
+`x-layout.header-search`; закрытие возвращает focus инициатору. `Ctrl+K`,
+`Meta+K` и `/` открывают или фокусируют тот же search, кроме случая, когда
+пользователь уже вводит текст в editable control. Desktop и compact
+presentation не создают вторую форму, второй input ID или независимый
+client state.
 
 ## Тема
 
@@ -300,7 +342,12 @@ Blade и Livewire Blade являются только presentation layer: зап
 - На scoped routes каталога route-страна, route-жанр, другой route-справочник или route-год должны быть не только подсвечены, но и действительно отмечены checkbox. Дополнительные значения той же группы остаются отмеченными вместе с route-значением; значения разных групп одновременно отражают составной фильтр.
 - Устаревшие или несуществующие slug-значения справочников в query string `/titles` игнорируются без публичных счетчиков ошибок, warning-чипов и текста вроде «Ошибочных фильтров».
 - Актёры и режиссёры в фильтрах `/titles` используют доступное Livewire-поле с debounce 300 мс и bounded contextual options из `CatalogSeries::$optionSearch`; полный справочник и внутренние ID не попадают в browser state. Spinner находится в отдельном targeted loading wrapper и показывается только при запросе соответствующего поля. Варианты остаются touch-sized checkbox-строками без внутреннего scroll; остальные длинные группы используют локальный progressive-enhancement поиск по уже загруженному ограниченному списку.
-- Header search должен оставаться видимым на всех публичных страницах, включая catalog listing routes, и делить верхнюю полосу только с брендом. На `/titles` локальная поисковая форма каталога может сосуществовать с header search, но обе формы должны иметь разные доступные имена и разные `id` полей. Активная сортировка объявляется через `aria-current="true"`.
+- Header search должен оставаться доступным на всех публичных страницах,
+  включая catalog listing routes: inline в единственной desktop-строке и
+  через полноэкранный trigger в compact shell. На `/titles` локальная
+  поисковая форма каталога может сосуществовать с header search, но обе
+  формы должны иметь разные доступные имена и разные `id` полей. Активная
+  сортировка объявляется через `aria-current="true"`.
 - Directory hubs используют один responsive Livewire список с разделителями на телефоне, планшете и desktop; годовой справочник создаёт отдельный такой список внутри каждого десятилетия. Search control, alphabet/decade buttons и pagination имеют touch target не меньше 44 px; loading status объявляется через `role=status`, пустое состояние остаётся в SSR. Алфавит разделяет доступные буквы на подписанные строки «Кириллица» и «Латиница», символы держит отдельно, естественно переносит controls и не создаёт внутренний horizontal scroll. Plain navigation links не получают decorative border, а keyboard focus остаётся видимым через согласованный focus ring.
 - Карточка directory value выводит только подготовленные `name`, canonical detail URL и `published_titles_count`; Blade не выполняет query и использует стабильный `wire:key`. Длинные имена переносятся, counts не исчезают, внутренний scroll-container не создаётся.
 - «Точный подбор» раскрывается сразу, если URL содержит любое активное условие: год, справочник, тип публикации, субтитры, расширенный параметр, качество или букву.
@@ -411,7 +458,13 @@ Portal использует один mobile-first HTML/Livewire tree и те ж�
 - Базовый текст и form controls остаются читаемыми, input text на телефоне не меньше 16 px, заголовки/metadata/translated labels переносятся. User zoom и text scaling не ограничиваются.
 - Primary links/buttons имеют не менее 44×44 CSS px hit area. Hover может быть дополнительным состоянием, но bookmark, collection, comment/review/report/edit/filter/player actions всегда доступны tap, focus и keyboard. Gesture-only essential action запрещён; Task 23 намеренно не добавляет конфликтующие swipe/double-tap gestures.
 
-На телефоне header показывает одну SSR search form и native `<details>` menu из того же `AppLayoutData`, что desktop navigation. Menu имеет текстовые labels, active state, Escape/route-close и safe-area padding; отдельный bottom navigation не используется, поэтому ничего не перекрывает player или keyboard. На `sm` и выше сохраняется desktop link row. Browser back остаётся обычным route history.
+На телефоне header использует тот же подготовленный `AppLayoutData` и один
+SSR search component, что desktop: compact top row показывает
+`Seasonvar/поиск/профиль`, а fixed bottom navigation — ровно пять
+канонических действий из раздела «Каноническая шапка портала». Полноэкранный
+search имеет Escape/close/focus-return, bottom navigation скрывается при
+экранной клавиатуре, safe-area и content reserve исключают перекрытие.
+Browser back остаётся обычным route history.
 
 Каталожные фильтры остаются одной Livewire state boundary: один полноширинный native `<details>` и одна форма работают на compact и wide viewport без dialog или второго draft. Checkbox/select меняют applied state через grouped islands, строка названия и числовые диапазоны отправляются явно, а сброс возвращает канонический query. Внутренний people lookup использует targeted Livewire loading; header/help/request autocomplete остаются viewport-bounded, отменяют stale client requests и доступны без hover.
 

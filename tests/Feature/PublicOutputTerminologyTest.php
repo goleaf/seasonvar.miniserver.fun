@@ -12,7 +12,7 @@ class PublicOutputTerminologyTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_public_catalog_responses_do_not_show_source_brand_or_card_term(): void
+    public function test_public_catalog_responses_only_show_seasonvar_as_the_portal_wordmark(): void
     {
         $sourceUrl = 'https://seasonvar.ru/serial-777-Public_hidden_source-1-season.html';
         $title = CatalogTitle::factory()->create([
@@ -114,7 +114,7 @@ class PublicOutputTerminologyTest extends TestCase
 
     private function assertPublicOutputIsNeutral(string $content, string $name): void
     {
-        $content = $this->removeAllowedHosts($content);
+        $content = $this->removePortalBrandWordmark($this->removeAllowedHosts($content));
 
         $this->assertDoesNotMatchRegularExpression('/Карточк|карточк/u', $content, $name);
         $this->assertDoesNotMatchRegularExpression('/тайтл/iu', $content, $name);
@@ -130,6 +130,15 @@ class PublicOutputTerminologyTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/веб[- ]плеер\s+веб[- ]плеер/iu', $content, $name);
         $this->assertStringNotContainsString('js-seasonvar-player', $content, $name);
         $this->assertStringNotContainsString('source_url', $content, $name);
+    }
+
+    private function removePortalBrandWordmark(string $content): string
+    {
+        return (string) preg_replace(
+            '/<span\b(?=[^>]*\bdata-site-header-wordmark\b)[^>]*>\s*Seasonvar\s*<\/span>/iu',
+            '',
+            $content,
+        );
     }
 
     private function removeAllowedHosts(string $content): string

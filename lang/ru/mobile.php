@@ -3,6 +3,8 @@
 return [
     'navigation' => [
         'menu' => 'Разделы портала',
+        'primary' => 'Мобильная навигация',
+        'library' => 'Библиотека',
         'page_loaded' => 'Открыта страница: :title',
     ],
     'network' => [

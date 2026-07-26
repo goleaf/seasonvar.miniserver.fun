@@ -92,9 +92,37 @@ large-display получают увеличенные цели. Это Chromium 
 
 ## Глобальный поиск в шапке
 
-`x-layout.header-search` остаётся обычной GET-формой `/search`, а `resources/js/header-search.js` прогрессивно добавляет два независимых API-контура. Debounce — 160 мс; предыдущие запросы отменяются раздельно, stale sequence игнорируется, title cards рендерятся до завершения portal scope. DOM строится только через `createElement`/`textContent`; provider HTML не вставляется. Вкладка хранит не более 120 scope/query responses. Оба fetch передают allowlisted `Accept-Language` из текущего `<html lang>`; API формирует year/season/episode metadata через `trans_choice()`, поэтому карточка не смешивает locale браузера и SSR-интерфейса.
+`x-layout.header-search` остаётся единственной обычной GET-формой `/search`,
+а `resources/js/header-search.js` прогрессивно добавляет desktop inline и
+compact fullscreen presentation поверх одного input/state. Debounce —
+160 мс; предыдущие запросы отменяются раздельно, stale sequence
+игнорируется, title cards рендерятся до завершения portal scope. DOM строится
+только через `createElement`/`textContent`; provider HTML не вставляется.
+Вкладка хранит не более 120 scope/query responses. Оба fetch передают
+allowlisted `Accept-Language` из текущего `<html lang>`; API формирует
+year/country/season/episode metadata через `trans_choice()`, поэтому карточка
+не смешивает locale браузера и SSR-интерфейса.
 
-Dropdown ограничивает количество строк по доступной высоте и ширине: `2/3` title/portal при высоте меньше 720 px, `3/4` на телефоне, `4/6` на планшете и `5/8` на desktop/TV. Он не получает собственного scroll-container, остаётся внутри viewport, сохраняет touch targets не меньше 44 px и доступен через combobox/listbox, стрелки, Enter и Escape. Listbox содержит только доступные groups/options: визуальные заголовки групп имеют `aria-hidden`, `role="group"` получает собственный label, а live-status находится рядом с listbox, а не внутри него. Рамка `#site-search` остаётся нейтральной при hover/focus/input/loading/open согласно [`UI_STANDARDS.md`](UI_STANDARDS.md).
+Dropdown desktop ограничивает количество строк по доступной высоте и
+ширине: `2/3` title/portal при высоте меньше 720 px, `3/4` на телефоне,
+`4/6` на планшете и `5/8` на desktop/TV. Compact fullscreen dialog может
+прокручивать единую область результатов по высоте viewport, сохраняя touch
+targets не меньше 44 px и управление combobox/listbox, стрелками, Enter,
+Escape и focus trap/return. Listbox содержит только доступные
+groups/options: визуальные заголовки групп имеют `aria-hidden`,
+`role="group"` получает собственный label, а live-status находится рядом с
+listbox, а не внутри него. Рамка `#site-search` остаётся нейтральной при
+hover/focus/input/loading/open согласно [`UI_STANDARDS.md`](UI_STANDARDS.md).
+
+Только явно отправленные непустые запросы сохраняются максимум в пяти
+записях locale/version-scoped `sessionStorage`. История не уходит на сервер,
+не привязывается к аккаунту, не попадает в cache/log/analytics и исчезает
+при закрытии вкладки; при запрете storage поиск продолжает работать с
+in-memory fallback. Пользователь может очистить список. При непустом запросе
+всегда доступна отдельная строка перехода на `/titles?q=...`, а при честном
+нулевом результате — подготовленная server-side ссылка создания заявки.
+`Ctrl+K`, `Meta+K` и `/` фокусируют desktop input или открывают compact
+fullscreen search, но не перехватывают ввод в editable control.
 
 ## Video delivery contract
 
@@ -185,7 +213,36 @@ composer dev
 - Четыре template pattern `wire:replace.self` принадлежат только leaf-checkbox contextual filters каталога с `wire:model.live`: после grouped island response заменяется input с checked state, но не его label, group или filter form. Bare `wire:replace`, custom elements и shadow DOM отсутствуют. Player не переводится с keyed `wire:ignore` на replacement, а native dialogs, editors и text/search inputs продолжают обычный morphing, чтобы не терять focus и browser-owned draft state. Новый scope требует воспроизводимого дефекта и проверки более узкого key/component/lifecycle решения.
 - Одна запись `WeakMap` на точный media shell владеет Plyr, HLS, listeners и timers. Source replacement, `livewire:navigating`, `pagehide` и удаление island вызывают единый cleanup; resize и повторный `livewire:navigated` не создают второй session. Fatal HLS network retry создаёт новый HLS instance, terminal/manual retry отменяют устаревший timer, а native HLS остаётся fallback только для браузера без HLS.js/MSE support. Ошибка существующего `<track>` показывает отдельное локализованное polite-предупреждение и не делает video fatal; production subtitle-track relation/editor по-прежнему отсутствуют.
 - Поиск вариантов актёров и режиссёров внутри `/titles` принадлежит `CatalogSeries::$optionSearch`: `wire:model.live.debounce.300ms` запускает bounded contextual facet query внутри deferred `catalog-live`, а одноимённые islands фильтров и выдачи обновляются группой. Отдельный wrapper `wire:loading.delay` с точным property `wire:target` показывает spinner только для активного поля; FontAwesome-иконка не скрывает себя Tailwind-классом. Выбор результата остаётся touch-sized `wire:model.live` checkbox и обычным повторяемым URL-фильтром. Duplicate people `fetch` в `app.js` отсутствует; read-only `/api/catalog/people` сохраняется для внешних API-клиентов. Локальный поиск остальных длинных групп остаётся progressive enhancement по уже загруженному ограниченному списку.
-- Header search остаётся видимым на всех публичных routes, включая `/titles`, `/titles/year/{year}` и taxonomy listing pages. Первая полоса header содержит только бренд и гибкий progressive API-поиск, вторая — всю навигацию с `flex-wrap`; подписи ссылок визуально скрыты до `sm`, но доступные имена сохраняются. После двух символов и debounce 160 мс поиск параллельно запрашивает до пяти богатых карточек тайтлов и bounded public-only структуру портала без внутреннего scroll; `combobox`/`listbox`, Arrow Up/Down, Enter, Escape, click-outside и 44px targets работают на touch и клавиатуре. Обычная `GET /search`-форма сохраняется без JavaScript, а временная ошибка подсказок не блокирует submit. Модуль повторно инициализируется после `livewire:navigated` через `WeakSet` без дублирования listeners. Playwright проверяет выбор клавиатурой и геометрию двух полос на ширинах 375, 768, 1280 и 1920 px. Локальная поисковая форма каталога находится над результатами и имеет отдельное доступное имя `Поиск по каталогу` или `Искать в выбранной подборке`, поэтому на listing routes допустимы два разных search landmarks без дублирования input IDs. Один полноширинный `<details id="catalog-filters">` расположен между панелью управления и результатами; sidebar/dialog отсутствуют. Первый HTML содержит карточки и компактный нейтральный placeholder, после чего отдельный sibling lazy island при попадании в viewport подгружает годы и справочники без отправки сотен options в initial payload. Livewire сам добавляет к busy placeholder один `wire:intersect.once="__lazyLoadIsland"`; loading text объявляется через `role="status"` и `aria-live="polite"`. Директива создаётся заново после Livewire navigation, поэтому фильтры не остаются placeholder после снятия route-bound страны, жанра или года. Application action, manual `IntersectionObserver`, Alpine duplicate и infinite scroll для этой границы запрещены.
+- Header search остаётся доступным на всех публичных routes, включая
+  `/titles`, `/titles/year/{year}` и taxonomy listing pages. Desktop header
+  — одна sticky строка с брендом, четырьмя основными разделами, `Ещё`,
+  flexible search и account actions; compact shell — top
+  brand/search/profile и fixed пять пунктов bottom navigation. При scroll
+  та же desktop-строка компактнее, но не скрывается. После двух символов и
+  debounce 160 мс поиск параллельно запрашивает до пяти богатых карточек
+  тайтлов и bounded public-only структуру портала; `combobox`/`listbox`,
+  Arrow Up/Down, Enter, Escape, click-outside, shortcuts и 44px targets
+  работают на touch и клавиатуре. Обычная `GET /search`-форма сохраняется
+  без JavaScript, а временная ошибка подсказок не блокирует submit. Модуль
+  повторно инициализируется после `livewire:navigated` через `WeakSet` без
+  дублирования listeners. Playwright проверяет inline/fullscreen режим,
+  active marker, keyboard focus, safe-area и keyboard-hidden bottom nav на
+  ширинах 375, 768, 1280 и 1920 px. Локальная поисковая форма каталога
+  находится над результатами и имеет отдельное доступное имя `Поиск по
+  каталогу` или `Искать в выбранной подборке`, поэтому на listing routes
+  допустимы два разных search landmarks без дублирования input IDs. Один
+  полноширинный `<details id="catalog-filters">` расположен между панелью
+  управления и результатами; sidebar/dialog отсутствуют. Первый HTML
+  содержит карточки и компактный нейтральный placeholder, после чего
+  отдельный sibling lazy island при попадании в viewport подгружает годы и
+  справочники без отправки сотен options в initial payload. Livewire сам
+  добавляет к busy placeholder один `wire:intersect.once="__lazyLoadIsland"`;
+  loading text объявляется через `role="status"` и
+  `aria-live="polite"`. Директива создаётся заново после Livewire
+  navigation, поэтому фильтры не остаются placeholder после снятия
+  route-bound страны, жанра или года. Application action, manual
+  `IntersectionObserver`, Alpine duplicate и infinite scroll для этой
+  границы запрещены.
 - Серверное состояние `/titles` ведёт `CatalogSeries`: вычисляемые `catalogPage` и `catalogFacets` разделяют быстрые результаты и contextual facets. Eager island результатов и viewport-lazy island фильтров имеют общее имя `catalog-live`, поэтому checkbox/select с `wire:model.live` атомарно обновляют выбранные состояния, счётчики и строки. Строка поиска и числовые диапазоны применяются по submit, сортировка, размер страницы, алфавит и пагинация — отдельными Livewire actions. Параметр и action `view` отсутствуют; legacy `view` не попадает в нормализованное состояние. Для форм сохранён обычный GET/`noscript` fallback; malformed и out-of-range `page` канонизируется redirect-ом, чтобы адресная строка не сохраняла stale границу.
 - `CatalogDirectoryBrowser` хранит locked string directory и нормализованные URL scalars: `q` (NFKC/squish, максимум 80), `letter`, allowlisted `sort=name_asc|count_desc`, optional decade и Livewire paginator. Search использует `wire:model.live.debounce.400ms`, каждое изменение фильтра сбрасывает page, а `#[Url(history: true)]` восстанавливает refresh/back/forward. Render-local paginator и навигационные collections не входят в snapshot.
 - «Точный подбор» объединяет `year`, публикацию, субтитры, справочники, `year_*`/`updated`, `seasons_*`/`episodes_*`, `rating_*`/`votes_min` и `video`/`quality` без изменения query keys. Общая форма исключает дублирование видимых query-параметров, summary считает все условия и раскрывается при любом активном фильтре; «Сбросить фильтры» использует существующий `resetAll`. Мобильная панель выдачи переиспользует `setPerPage` и те же query builders, что desktop, без отдельного client state представления.
@@ -308,7 +365,16 @@ Mobile-first layout остаётся одной колонкой на телеф
 Technical issue UI использует те же light Tailwind/Blade/Livewire conventions. Player передаёт report form только encrypted expiring context и numeric approximate position; `resources/js/issues.js` собирает optional allowlisted diagnostics и не читает source URL, cookies/storage или progress. Create/detail/list/admin layouts mobile-first, long-text safe, keyboard/touch accessible и имеют scoped loading/live-region states. Final submit длинной create-формы объединяет `wire:offline.attr="disabled"` с targeted loading guard: offline-поля остаются редактируемыми, но заведомо неуспешная отправка недоступна до browser `online`. Полный frontend/privacy contract: [`technical-issues.md`](technical-issues.md).
 ## Task 02: глобальный поиск
 
-Header использует один progressive `x-layout.header-search`: SSR-форма остаётся рабочим `GET` без JavaScript, а `resources/js/header-search.js` добавляет только presentation/autocomplete behavior. Один символ запрашивает bounded exact-title scope, со второго после debounce 160 мс параллельно запускаются title и portal scopes. Locale входит в in-tab cache identity и передаётся как проверяемый `Accept-Language`; `AbortController` плюс sequence number защищают от stale response после нового ввода, очистки или перехода.
+Header использует один progressive `x-layout.header-search`: SSR-форма
+остаётся рабочим `GET` без JavaScript, а `resources/js/header-search.js`
+добавляет только presentation/autocomplete/fullscreen behavior. Один символ
+запрашивает bounded exact-title scope, со второго после debounce 160 мс
+параллельно запускаются title и portal scopes. Locale входит в in-tab cache
+identity и передаётся как проверяемый `Accept-Language`; `AbortController`
+плюс sequence number защищают от stale response после нового ввода, очистки
+или перехода. Bounded recent queries остаются только в versioned
+`sessionStorage` текущей вкладки; desktop/compact presentation использует тот
+же root/input и cleanup lifecycle.
 
 Dropdown реализует `combobox`/`listbox`, `aria-expanded`, `aria-activedescendant`, translated live status, Arrow Up/Down, Home/End, Enter, Escape, отдельные clear/close controls, outside-click и возврат фокуса. DOM создаётся через `textContent`, URL допускаются только same-origin, поэтому query и внешние metadata не интерпретируются как HTML. Responsive limits зависят от viewport height/width, панель ограничена viewport и не требует hover. Search page, catalog controls и actor/tag directory UI используют существующие Tailwind tokens, min-height 44 px, локализованные loading/empty/error/count states и не содержат inline CSS/Blade JavaScript.
 

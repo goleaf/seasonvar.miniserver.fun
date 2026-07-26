@@ -471,3 +471,18 @@ Source publication/health/profile/import/admin mutation сохраняет targe
 Library HTML, bookmarks, statuses, feedback, markers, progress, acknowledgments, private collection membership и filters всегда остаются owner-scoped и `private, no-store`. Bounded ID pages/totals/aggregates используют общий `CacheDomain::UserPortal` с owner version namespace; модели и entitlement-aware availability-счётчики повторно гидратируются из authoritative DB, а owner overlay никогда не записывается в public payload. Отдельного full-response cache, глобального user-state cache, Eloquent graph cache или store-wide flush нет.
 
 Bookmark/status/feedback/marker/acknowledgment/progress mutations используют существующие targeted title/user/recommendation/sync invalidators либо читаются непосредственно на следующем private request. Collection mutations остаются в collection cache lifecycle; смена public → private немедленно инвалидирует public collection scopes. Global flush, wildcard scan, email в key, shared signed URL и смешивание private/public collection payload запрещены.
+
+## Cache lifecycle шапки и глобального поиска Task 88
+
+Server autocomplete продолжает использовать только public
+`HeaderSearchSuggestionCache`; формат payload повышен до `2`, поэтому старые
+ответы без `country` не смешиваются с новой проекцией. Locale, scope и
+нормализованный hash запроса остаются частью opaque key, а raw query,
+идентификатор пользователя и account state в shared cache не попадают.
+Инвалидация остаётся в существующем домене search suggestions; global flush
+не требуется.
+
+Последние пять поисковых фраз существуют только в locale/version-scoped
+`sessionStorage` текущей вкладки с in-memory fallback. Они не отправляются в
+профиль, session Laravel, shared cache, логи или аналитику и удаляются
+явной кнопкой либо завершением browser session.
