@@ -10662,7 +10662,7 @@ package, configuration, queue, scheduler и production DML не добавляю
 
 ## Task 86 — facet snapshot годовых подборок главной
 
-Статус: `verification_complete_delivery_in_progress`.
+Статус: `completed_with_unresolved_push`.
 
 Дата начала: 26.07.2026.
 
@@ -10751,7 +10751,7 @@ rebuild/failure fallback; migration/index/table/queue не добавляютс�
 | Full suite/shared repository | `completed_with_foreign_failures` | Temporary 1G config: 2 009 tests, 1 990 passed, 200 820 assertions, 11 skipped, 7 failures + 1 error in concurrent Task 87/catalog-quality/UI/account/importer scope; no Task 86/Homepage/CatalogFacets failure; temporary file removed |
 | Docs/README/CHANGELOG | `completed` | Cache/performance owners, visitor history and Russian technical history updated; managed docs check and 34 documentation tests GREEN |
 | Final requirements/legacy/debug/secret audit | `completed` | Applicable requirements reread; resource/aggregate/dependant search reviewed; no Task 86 duplicate, debug call, secret, temporary config/script/screenshot or whitespace defect |
-| Commit/push main | `pending` | Hook-enabled exact commits; external failure honest |
+| Commit/push main | `completed_with_unresolved_push` | Exact implementation/docs commit `d513d02` in `main`; hooks passed; `git:doctor` found no HTTPS credential helper and non-interactive push exited 128 before data transfer |
 
 ### Безлимитный execution order
 
@@ -10777,7 +10777,7 @@ rebuild/failure fallback; migration/index/table/queue не добавляютс�
 14. `[completed]` Caching/performance owners, README and Russian CHANGELOG.
 15. `[completed]` Final requirements/legacy/debug/secret/exact diff audit and
     fresh focused/static/Vite/Chromium gates.
-16. `[in_progress]` Exact Task 86 implementation/docs commit on existing
-    `main`.
-17. `[pending]` Configured non-force push; external failure stays
-    `unresolved`.
+16. `[completed]` Exact Task 86 implementation/docs commit `d513d02` on
+    existing `main`; hooks passed.
+17. `[completed]` Configured non-force push attempted; HTTPS credentials are
+    unavailable, so exit 128 before data transfer remains `unresolved`.

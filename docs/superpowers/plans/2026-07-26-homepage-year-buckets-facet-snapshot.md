@@ -413,7 +413,7 @@ git diff --check -- app/Services/Catalog/CatalogHomeSnapshotCache.php tests/Feat
 PHPStan/Rector, Vite, browser/API smoke и managed docs check. Обновить
 compliance matrix только по свежему output.
 
-- [ ] **Step 6: Создать exact implementation/docs commit**
+- [x] **Step 6: Создать exact implementation/docs commit**
 
 Проверить `git status --short --branch`, подтвердить `main`, собрать
 alternate index из текущего `HEAD` и только Task 86 hunks. Commit message:
@@ -424,7 +424,7 @@ perf: reuse homepage year bucket snapshot
 
 Hook должен пройти; чужие staged/unstaged/untracked files не включать.
 
-- [ ] **Step 7: Выполнить configured push**
+- [x] **Step 7: Выполнить configured push**
 
 Run:
 
