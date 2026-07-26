@@ -10662,7 +10662,7 @@ package, configuration, queue, scheduler и production DML не добавляю
 
 ## Task 87 — диагностика качества просмотра
 
-Статус: `delivery_ready`.
+Статус: `completed_with_unresolved_push`.
 
 Дата начала: 26.07.2026.
 
@@ -10735,7 +10735,7 @@ scope.
 | Static/build/browser | `completed_with_foreign_findings` | Exact Pint, JS syntax, scoped PHPStan and Vite GREEN; browser 3 passed/3 expected skips; full Rector found only 2 foreign collection files; existing non-task CatalogTitlePlayer nullsafe notice retained |
 | Docs/README/CHANGELOG | `completed` | Frontend/admin/performance/security/data/deployment/issues/playback owners, visitor README and Russian technical history updated; docs-refresh check GREEN |
 | Final requirements/legacy/security audit | `completed` | Requirements/owners/plan reread; repository-wide duplicate route/service/copy search and exact debug/TODO/DOM-sink/identity/URL/secret scans reviewed; only intentional negative test fixtures matched forbidden identity/source fields |
-| Exact commit/push main | `pending` | Alternate-index task scope; external failure will remain honest |
+| Exact commit/push main | `completed_with_unresolved_push` | Exact Task 87 commit `924e39e` создан в существующей `main`; `GIT_TERMINAL_PROMPT=0 git push origin main` завершился кодом 128 до передачи данных: GitHub HTTPS не получил имя пользователя |
 
 ### Безлимитный execution order
 
@@ -10753,8 +10753,8 @@ scope.
 12. `[completed_with_foreign_failures]` Related/full suite, Vite and browser QA; four full-suite failures classified outside Task 87.
 13. `[completed]` Canonical docs, README and Russian CHANGELOG.
 14. `[completed]` Final requirement/legacy/debug/secret/exact diff audit.
-15. `[in_progress]` Exact Task 87 commit on existing `main`.
-16. `[pending]` Configured non-force push; external failure stays `unresolved`.
+15. `[completed]` Exact Task 87 commit `924e39e` on existing `main`.
+16. `[completed_unresolved_authentication]` Configured non-force push выполнен и завершился кодом 128 до передачи данных; force/remote/history не менялись.
 
 ---
 

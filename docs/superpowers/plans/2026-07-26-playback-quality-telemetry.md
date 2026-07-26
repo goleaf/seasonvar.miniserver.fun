@@ -256,12 +256,14 @@ Design:
     remote, diff/stat and exact task-only diff.
 82. `[completed]` Scan exact diff for secrets, raw provider URLs, logs,
     formatting noise, binaries, `.env`, vendor/node_modules/storage/cache.
-83. `[pending]` Stage only task hunks/files through an isolated alternate Git
+83. `[completed]` Stage only task hunks/files through an isolated alternate Git
     index because shared working tree contains foreign changes.
-84. `[pending]` Inspect `git diff --cached` from the isolated index.
-85. `[pending]` Commit on existing `main` with exact factual message.
-86. `[pending]` Confirm resulting branch/hash and that foreign shared changes
+84. `[completed]` Inspect `git diff --cached` from the isolated index.
+85. `[completed]` Commit on existing `main` with exact factual message.
+86. `[completed]` Confirm resulting branch/hash and that foreign shared changes
     remain untouched.
-87. `[pending]` Run non-force `git push` to configured current remote branch.
-88. `[pending]` If authentication/network/protection rejects push, preserve
+87. `[completed_with_unresolved_authentication]` Run non-force `git push` to
+    configured current remote branch; GitHub HTTPS rejected it before data
+    transfer because no username credential was available.
+88. `[completed]` If authentication/network/protection rejects push, preserve
     local commit and report exact command/error/hash without claiming success.
