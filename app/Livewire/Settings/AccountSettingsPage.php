@@ -13,6 +13,7 @@ use App\DTOs\PlaybackSettingsData;
 use App\Enums\AccountSettingsSection;
 use App\Enums\CatalogCollectionVisibility;
 use App\Enums\HelpFeature;
+use App\Enums\PlaybackPreferenceMode;
 use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Models\CatalogTitleReviewNotificationPreference;
 use App\Models\CommentNotificationPreference;
@@ -71,6 +72,17 @@ final class AccountSettingsPage extends Component
     public string $preferredQuality = '';
 
     public string $preferredVariant = '';
+
+    public string $fallbackVariant = '';
+
+    public string $preferredPlaybackMode = 'automatic';
+
+    public string $preferredSubtitleLanguage = '';
+
+    /** @var list<string> */
+    public array $hiddenVariantKeys = [];
+
+    public bool $notifyPreferredTranslation = false;
 
     public bool $subtitlesEnabled = false;
 
@@ -193,16 +205,36 @@ final class AccountSettingsPage extends Component
     ): void {
         $user = $this->user();
         $current = $settings->resolve($user);
-        $variantKeys = collect($options->variants(
+        $selectedVoiceovers = array_values(array_filter([
             $current->preferredVariant,
+            $current->fallbackVariant,
+            $this->preferredVariant,
+            $this->fallbackVariant,
+        ], is_string(...)));
+        $voiceoverKeys = collect($options->voiceovers(
+            $selectedVoiceovers,
             $user,
         ))
             ->pluck('value')
             ->all();
+        $variantKeys = collect($options->variants(
+            [...$current->hiddenVariantKeys, ...$this->hiddenVariantKeys],
+            $user,
+        ))->pluck('value')->all();
+        $subtitleLanguageKeys = collect($options->subtitleLanguages())->pluck('value')->all();
         $qualityKeys = collect($options->qualities(
             $current->preferredQuality,
             $user,
         ))->pluck('value')->all();
+        $this->withValidator(function ($validator): void {
+            $protectedVariants = array_filter([$this->preferredVariant, $this->fallbackVariant]);
+
+            $validator->after(function ($validator) use ($protectedVariants): void {
+                if (array_intersect($protectedVariants, $this->hiddenVariantKeys) !== []) {
+                    $validator->errors()->add('hiddenVariantKeys', __('settings.validation.hidden_variant_conflict'));
+                }
+            });
+        });
         $validated = $this->validate([
             'autoplay' => ['required', 'boolean'],
             'rememberVolume' => ['required', 'boolean'],
@@ -210,10 +242,32 @@ final class AccountSettingsPage extends Component
             'muted' => ['required', 'boolean'],
             'playbackSpeed' => ['required', Rule::in((array) config('account-settings.playback_speeds', []))],
             'preferredQuality' => ['nullable', Rule::in(['', ...$qualityKeys])],
-            'preferredVariant' => ['nullable', Rule::in(['', ...$variantKeys])],
+            'preferredVariant' => ['nullable', Rule::in(['', ...$voiceoverKeys])],
+            'fallbackVariant' => ['nullable', 'different:preferredVariant', Rule::in(['', ...$voiceoverKeys])],
+            'preferredPlaybackMode' => ['required', Rule::enum(PlaybackPreferenceMode::class)],
+            'preferredSubtitleLanguage' => ['nullable', Rule::in(['', ...$subtitleLanguageKeys])],
+            'hiddenVariantKeys' => ['array', 'max:50'],
+            'hiddenVariantKeys.*' => [
+                'required',
+                'string',
+                'distinct',
+                Rule::in($variantKeys),
+                Rule::notIn(array_filter([$this->preferredVariant, $this->fallbackVariant])),
+            ],
+            'notifyPreferredTranslation' => ['required', 'boolean'],
             'subtitlesEnabled' => ['required', 'boolean'],
             'keyboardShortcutsEnabled' => ['required', 'boolean'],
         ], $this->validationMessages());
+
+        $protectedVariants = array_filter([
+            $validated['preferredVariant'],
+            $validated['fallbackVariant'],
+        ]);
+        if (array_intersect($protectedVariants, $validated['hiddenVariantKeys']) !== []) {
+            $this->addError('hiddenVariantKeys', __('settings.validation.hidden_variant_conflict'));
+
+            return;
+        }
 
         try {
             $saved = $settings->updatePlayback($user, new PlaybackSettingsData(
@@ -226,6 +280,11 @@ final class AccountSettingsPage extends Component
                 preferredVariant: $validated['preferredVariant'] !== '' ? $validated['preferredVariant'] : null,
                 subtitlesEnabled: $validated['subtitlesEnabled'],
                 keyboardShortcutsEnabled: $validated['keyboardShortcutsEnabled'],
+                fallbackVariant: $validated['fallbackVariant'] !== '' ? $validated['fallbackVariant'] : null,
+                playbackMode: PlaybackPreferenceMode::from($validated['preferredPlaybackMode']),
+                preferredSubtitleLanguage: $validated['preferredSubtitleLanguage'] !== '' ? $validated['preferredSubtitleLanguage'] : null,
+                hiddenVariantKeys: array_values($validated['hiddenVariantKeys']),
+                notifyPreferredTranslation: $validated['notifyPreferredTranslation'],
             ));
         } catch (ValidationException $exception) {
             throw $exception;
@@ -468,8 +527,15 @@ final class AccountSettingsPage extends Component
             'url' => $this->settingsRoute($section),
             'active' => $section === $active,
         ])->all();
+        $selectedVoiceovers = array_values(array_filter([
+            $this->preferredVariant,
+            $this->fallbackVariant,
+        ], static fn (mixed $value): bool => is_string($value) && $value !== ''));
+        $voiceoverOptions = $active === AccountSettingsSection::Playback
+            ? $playbackOptions->voiceovers($selectedVoiceovers, $this->user())
+            : [];
         $variantOptions = $active === AccountSettingsSection::Playback
-            ? $playbackOptions->variants($this->preferredVariant !== '' ? $this->preferredVariant : null, $this->user())
+            ? $playbackOptions->variants($this->hiddenVariantKeys, $this->user())
             : [];
         $premiumSnapshot = $active === AccountSettingsSection::Premium
             ? $premium->snapshot($this->user(), $this->locale, $this->timezone)
@@ -500,6 +566,15 @@ final class AccountSettingsPage extends Component
                 ? $playbackOptions->qualities($this->preferredQuality !== '' ? $this->preferredQuality : null, $this->user())
                 : [],
             'variantOptions' => $variantOptions,
+            'voiceoverOptions' => $voiceoverOptions,
+            'subtitleLanguageOptions' => $active === AccountSettingsSection::Playback
+                ? $playbackOptions->subtitleLanguages()
+                : [],
+            'playbackModeOptions' => array_map(static fn (PlaybackPreferenceMode $mode): array => [
+                'value' => $mode->value,
+                'label' => __('settings.playback.modes.'.$mode->value),
+                'hint' => __('settings.playback.mode_hints.'.$mode->value),
+            ], PlaybackPreferenceMode::cases()),
             'visibilityOptions' => array_map(static fn (CatalogCollectionVisibility $visibility): array => [
                 'value' => $visibility->value,
                 'label' => $visibility->label(),
@@ -557,6 +632,11 @@ final class AccountSettingsPage extends Component
         $this->playbackSpeed = $resolved->playbackSpeed;
         $this->preferredQuality = $resolved->preferredQuality ?? '';
         $this->preferredVariant = $resolved->preferredVariant ?? '';
+        $this->fallbackVariant = $resolved->fallbackVariant ?? '';
+        $this->preferredPlaybackMode = $resolved->playbackMode->value;
+        $this->preferredSubtitleLanguage = $resolved->preferredSubtitleLanguage ?? '';
+        $this->hiddenVariantKeys = $resolved->hiddenVariantKeys;
+        $this->notifyPreferredTranslation = $resolved->notifyPreferredTranslation;
         $this->subtitlesEnabled = $resolved->subtitlesEnabled;
         $this->keyboardShortcutsEnabled = $resolved->keyboardShortcutsEnabled;
         $this->collectionDefaultVisibility = $resolved->collectionDefaultVisibility;
@@ -655,6 +735,12 @@ final class AccountSettingsPage extends Component
             'playbackSpeed.*' => __('settings.validation.playback_speed'),
             'preferredQuality.*' => __('settings.validation.quality'),
             'preferredVariant.*' => __('settings.validation.variant'),
+            'fallbackVariant.*' => __('settings.validation.fallback_variant'),
+            'preferredPlaybackMode.*' => __('settings.validation.playback_mode'),
+            'preferredSubtitleLanguage.*' => __('settings.validation.subtitle_language'),
+            'hiddenVariantKeys.*' => __('settings.validation.hidden_variants'),
+            'hiddenVariantKeys.*.*' => __('settings.validation.hidden_variants'),
+            'notifyPreferredTranslation.*' => __('settings.validation.notify_preferred_translation'),
             'collectionDefaultVisibility.*' => __('settings.validation.collection_visibility'),
         ];
     }

@@ -146,7 +146,15 @@ Target boundaries:
 - Offline-sync использует append-only invalidation journal, а не копию catalog graph. `CatalogSyncChangePublisher` сворачивает import/backfill/admin/merge изменения до `title.upsert|delete` после успешной транзакции; `UserSyncChangePublisher` публикует owner-scoped state/progress/history entries. Оба publisher fail-safe проверяют наличие additive schema и не превращают завершённую доменную запись в ошибку transport-подсистемы.
 - `ApiSyncCursorCodec` шифрует scope, nullable owner, monotonic journal ID и время выдачи; `ApiSyncPullQuery` выполняет bounded keyset pull без offset и продвигает checkpoint до последнего возвращённого journal ID. Повторные invalidations остаются append-only transport events и могут сворачиваться клиентом только после сохранения нового checkpoint. `ApiSyncMutationService` сначала атомарно резервирует owner/UUID receipt по canonical SHA-256 payload, затем переиспользует `CatalogUserStateService` и `CatalogViewingActivityService`; request payload и playback grant в journal/receipt не сохраняются.
 - Версии watchlist/rating проверяются под row lock и инкрементируются только при фактической смене соответствующего desired state. `ApiSyncRetentionPruner` удаляет changes старше 30 дней и receipts старше 90 дней ordered ID-пачками до 500; console command остаётся тонким transport-слоем, а scheduler запрещает overlap и дубли на нескольких процессах.
-- `CatalogPlaybackSourceResolver` является единственной границей выдачи playback source: проверяет title/season/episode/media в момент разрешения и повторно на signed web `/playback/{licensedMedia}` или mobile `/api/v1/playback/{licensedMedia}`, ранжирует источники по явно заданным предпочтениям, provider priority, успешной проверке и качеству, затем возвращает небольшой `PlaybackSourceData`. Raw provider URL не передается в Livewire snapshot, Blade или JSON.
+- `CatalogPlaybackSourceResolver` является единственной границей выдачи
+  playback source: проверяет title/season/episode/media в момент разрешения и
+  повторно на signed web `/playback/{licensedMedia}` или mobile
+  `/api/v1/playback/{licensedMedia}`. Порядок выбора:
+  явный разрешённый media/variant, любимая озвучка, запасной перевод, режим
+  озвучки или оригинала с субтитрами, явно распознанный язык субтитров,
+  прежние format/quality/provider/health сигналы. Hidden variants
+  исключаются до ранжирования и из меню, включая mobile API; raw provider
+  URL и private preference set не передаются в Blade/JSON/shared cache.
 - `PlaybackSourceUrlGuard` разделяется resolver и `SeasonvarMediaAvailabilityChecker`: допускаются только HTTPS-hosts из allowlist с публичными DNS-адресами. Availability checker не следует редиректам, использует Range/streaming, timeouts и лимит `Content-Length`, а progress context получает только `[redacted-url]`.
 
 ## Запросы и валидация
@@ -416,6 +424,13 @@ Schema/index/rollback и aggregate definitions принадлежат [`DATA_REL
 
 - Единственная settings shell — `AccountSettingsPage` на owner-only `/settings/{section?}` и `/{locale}/settings/{section?}`. Стабильные section codes перечислены `AccountSettingsSection`; ссылки `/profile`, `/profile/security`, `/profile/discussions`, `/profile/reviews`, `/notifications`, `/library`, `/my/collections` сохраняются как канонические специализированные страницы и не дублируются внутри настроек.
 - `AccountSettingsService` является typed write/read boundary для appearance, playback, collection default, reset и idempotent anonymous merge. Он принимает только allowlisted DTO/value-object значения, повторно применяет Gate и transaction lock, увеличивает `settings_version` и никогда не mass-assign-ит произвольный ключ, JSON path или поле пользователя. `AccountSettingsSchema` даёт read-default/write-503 поведение во время rolling migration.
+- Translation preferences расширяют тот же playback boundary: scalar
+  favorite/fallback/mode/subtitle-language/notification и нормализованный
+  hidden set записываются одной retryable transaction под user lock.
+  Favorite/fallback — разные реальные voiceover keys; hidden set ограничен,
+  уникален и не может включать их. Режим original+subtitles или явный язык
+  субтитров также включает `subtitles_enabled`. Reset удаляет только эти
+  preferences, а export/delete сохраняют portability/cascade semantics.
 - Профиль продолжает использовать существующий `ProfilePage`/`AccountService`, расширенный каноническими Task 14 `UserProfileService` и `UserProfileMediaService`; settings shell лишь ссылается на него и не дублирует username/avatar/cover/biography writes. Comments/reviews notification actions и delivery services остаются источником истины; player продолжает использовать один `CatalogTitlePlayer` и один `player.js`; session/export/delete используют существующие auth services. OAuth providers, premium, email/push notification channels, media-language tracks, дополнительные player styles и continue-watching modes отсутствуют и не представлены фиктивными controls.
 - `AccountSettingsData` разрешает nullable explicit database fields поверх defaults. URL locale имеет request-level приоритет, authenticated database preference синхронизируется между устройствами, versioned local storage применяется только к безопасному immediate/device state, затем используется config default. Anonymous values после входа валидируются и заполняют только ещё не выбранные account fields; завершённый merge помечается opaque HMAC account scope.
 - Interface locale (`ru|en`) отделён от media identity. Timezone хранится как IANA identifier и применяется одним `AccountDateTimeFormatter`; browser timezone — только явное предложение. Preferred quality/variant являются stable codes реальных доступных media rows, сохраняются при временной недоступности и не содержат URL.

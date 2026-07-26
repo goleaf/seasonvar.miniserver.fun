@@ -39,9 +39,31 @@ final readonly class ReleaseCalendarNotificationQuery
                     CatalogRecommendationFeedback::negativeValues(),
                 ));
         $this->visibility->constrain($visibleEntries, $user);
+        $visibleFavoriteTitles = CatalogTitle::query()
+            ->availableTo($user)
+            ->selectRaw('1')
+            ->whereColumn('catalog_titles.slug', 'notifications.data->catalog_title_slug')
+            ->whereDoesntHave('userStates', fn ($state) => $state
+                ->where('user_id', $user->id)
+                ->whereIn(
+                    'recommendation_feedback',
+                    CatalogRecommendationFeedback::negativeValues(),
+                ));
 
-        $paginator = $user->notifications()->where('type', 'release-calendar.activity')
-            ->whereExists($visibleEntries->toBase())
+        $paginator = $user->notifications()
+            ->where(function ($query) use ($visibleEntries, $visibleFavoriteTitles): void {
+                $query
+                    ->where(function ($query) use ($visibleEntries): void {
+                        $query
+                            ->where('type', 'release-calendar.activity')
+                            ->whereExists($visibleEntries->toBase());
+                    })
+                    ->orWhere(function ($query) use ($visibleFavoriteTitles): void {
+                        $query
+                            ->where('type', 'playback-preference.translation-available')
+                            ->whereExists($visibleFavoriteTitles->toBase());
+                    });
+            })
             ->latest('created_at')->latest('id')->paginate(10, pageName: 'releaseNotificationPage')->withQueryString();
         $entryIds = $paginator->getCollection()->pluck('data.entry_public_id')
             ->filter(fn (mixed $publicId): bool => is_string($publicId))
@@ -59,10 +81,52 @@ final readonly class ReleaseCalendarNotificationQuery
             ->with('catalogTitle:id,slug,title,original_title')
             ->get(['id', 'public_id', 'catalog_title_id', 'entry_type', 'status'])
             ->keyBy('public_id');
+        $favoriteTitleSlugs = $paginator->getCollection()->pluck('data.catalog_title_slug')
+            ->filter(fn (mixed $slug): bool => is_string($slug))
+            ->unique()
+            ->values();
+        $favoriteTitles = CatalogTitle::query()
+            ->availableTo($user)
+            ->whereIn('slug', $favoriteTitleSlugs)
+            ->whereDoesntHave('userStates', fn ($state) => $state
+                ->where('user_id', $user->id)
+                ->whereIn(
+                    'recommendation_feedback',
+                    CatalogRecommendationFeedback::negativeValues(),
+                ))
+            ->get(['id', 'slug', 'title', 'original_title'])
+            ->keyBy('slug');
         $settings = $this->settings->resolve($user);
 
-        return $paginator->through(function (DatabaseNotification $notification) use ($entries, $settings): ReleaseCalendarNotificationData {
+        return $paginator->through(function (DatabaseNotification $notification) use ($entries, $favoriteTitles, $settings): ReleaseCalendarNotificationData {
             $data = $notification->data;
+
+            if ($notification->type === 'playback-preference.translation-available') {
+                $title = is_string($data['catalog_title_slug'] ?? null)
+                    ? $favoriteTitles->get($data['catalog_title_slug'])
+                    : null;
+                $variantLabel = is_string($data['variant_label'] ?? null)
+                    ? $data['variant_label']
+                    : __('catalog.player.voiceover');
+
+                return new ReleaseCalendarNotificationData(
+                    id: (string) $notification->id,
+                    isRead: $notification->read_at !== null,
+                    label: __('playback.notifications.favorite_translation_available'),
+                    detail: $title instanceof CatalogTitle
+                        ? __('playback.notifications.favorite_translation_detail', [
+                            'title' => $title->display_title,
+                            'variant' => $variantLabel,
+                        ])
+                        : null,
+                    url: $title instanceof CatalogTitle ? route('titles.show', $title) : route('calendar.index'),
+                    createdAtIso: $notification->created_at?->toAtomString() ?? '',
+                    createdAtLabel: $notification->created_at !== null
+                        ? $this->dateTimes->value($notification->created_at, $settings->locale, $settings->timezone)
+                        : '',
+                );
+            }
+
             $kind = is_string($data['kind'] ?? null) ? ReleaseCalendarNotificationType::tryFrom($data['kind']) : null;
             $entryType = is_string($data['entry_type'] ?? null) ? ReleaseScheduleEntryType::tryFrom($data['entry_type']) : null;
             $status = is_string($data['status'] ?? null) ? ReleaseScheduleStatus::tryFrom($data['status']) : null;

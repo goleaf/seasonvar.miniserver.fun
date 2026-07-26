@@ -22,19 +22,6 @@
         </div>
     </header>
 
-    <div aria-live="polite" aria-atomic="true">
-        @if ($statusMessage !== null)
-            <div class="rounded-control border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800" role="status">
-                <x-ui.icon name="fa-solid fa-circle-check" /> {{ $statusMessage }}
-            </div>
-        @endif
-        @if ($actionError !== null)
-            <div class="rounded-control border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-800" role="alert">
-                <x-ui.icon name="fa-solid fa-circle-exclamation" /> {{ $actionError }}
-            </div>
-        @endif
-    </div>
-
     <div class="grid min-w-0 gap-5 lg:grid-cols-[17rem_minmax(0,1fr)] lg:items-start">
         <nav aria-label="{{ __('settings.navigation.label') }}" class="rounded-panel border border-slate-200 bg-white p-2 shadow-panel lg:sticky lg:top-24">
             <ul class="grid gap-1 sm:grid-cols-2 lg:grid-cols-1">
@@ -60,6 +47,20 @@
 
         <div class="min-w-0">
             @island(name: 'account-settings-pagination', always: true, with: $this->paginationIslandPage)
+            @if ($statusMessage !== null || $actionError !== null)
+            <div class="mb-5" aria-live="polite" aria-atomic="true">
+                @if ($statusMessage !== null)
+                    <div class="rounded-control border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800" role="status">
+                        <x-ui.icon name="fa-solid fa-circle-check" /> {{ $statusMessage }}
+                    </div>
+                @endif
+                @if ($actionError !== null)
+                    <div class="rounded-control border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-800" role="alert">
+                        <x-ui.icon name="fa-solid fa-circle-exclamation" /> {{ $actionError }}
+                    </div>
+                @endif
+            </div>
+            @endif
             @switch($activeSection->value)
                 @case('profile')
                     <section aria-labelledby="settings-profile-title" class="rounded-panel border border-slate-200 bg-white p-4 shadow-panel sm:p-6">
@@ -186,14 +187,71 @@
                                 </select>
                             </label>
 
-                            @if ($variantOptions !== [])
-                                <label for="settings-variant" class="block text-sm font-bold text-slate-700 sm:col-span-2">
+                            @if ($voiceoverOptions !== [])
+                                <label for="settings-preferred-variant" class="block text-sm font-bold text-slate-700">
                                     {{ __('settings.playback.translation') }}
-                                    <select id="settings-variant" wire:model="preferredVariant" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2.5 text-sm">
+                                    <select id="settings-preferred-variant" wire:model="preferredVariant" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2.5 text-sm">
                                         <option value="">{{ __('settings.playback.translation_auto') }}</option>
-                                        @foreach ($variantOptions as $variantOption)<option value="{{ $variantOption['value'] }}">{{ $variantOption['label'] }}</option>@endforeach
+                                        @foreach ($voiceoverOptions as $voiceoverOption)<option value="{{ $voiceoverOption['value'] }}">{{ $voiceoverOption['label'] }}</option>@endforeach
                                     </select>
+                                    <span class="mt-1 block text-xs font-normal leading-5 text-slate-500">{{ __('settings.playback.translation_hint') }}</span>
                                 </label>
+
+                                <label for="settings-fallback-variant" class="block text-sm font-bold text-slate-700">
+                                    {{ __('settings.playback.fallback_translation') }}
+                                    <select id="settings-fallback-variant" wire:model="fallbackVariant" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2.5 text-sm">
+                                        <option value="">{{ __('settings.playback.fallback_translation_auto') }}</option>
+                                        @foreach ($voiceoverOptions as $voiceoverOption)<option value="{{ $voiceoverOption['value'] }}">{{ $voiceoverOption['label'] }}</option>@endforeach
+                                    </select>
+                                    <span class="mt-1 block text-xs font-normal leading-5 text-slate-500">{{ __('settings.playback.fallback_translation_hint') }}</span>
+                                </label>
+                                @error('preferredVariant') <p class="text-sm font-semibold text-rose-700" role="alert">{{ $message }}</p> @enderror
+                                @error('fallbackVariant') <p class="text-sm font-semibold text-rose-700" role="alert">{{ $message }}</p> @enderror
+                            @endif
+
+                            <fieldset class="sm:col-span-2">
+                                <legend class="text-sm font-bold text-slate-700">{{ __('settings.playback.playback_mode') }}</legend>
+                                <div class="mt-2 grid gap-3 md:grid-cols-3">
+                                    @foreach ($playbackModeOptions as $modeOption)
+                                        <label wire:key="playback-mode-{{ $modeOption['value'] }}" class="flex min-h-12 items-start gap-3 rounded-control border border-slate-200 bg-slate-50 p-3 text-sm font-bold text-slate-700">
+                                            <input type="radio" wire:model="preferredPlaybackMode" value="{{ $modeOption['value'] }}" class="mt-0.5 h-5 w-5 border-slate-300 text-emerald-700 focus:ring-emerald-600" />
+                                            <span><span class="block">{{ $modeOption['label'] }}</span><span class="mt-1 block font-normal leading-5 text-slate-500">{{ $modeOption['hint'] }}</span></span>
+                                        </label>
+                                    @endforeach
+                                </div>
+                                @error('preferredPlaybackMode') <p class="mt-2 text-sm font-semibold text-rose-700" role="alert">{{ $message }}</p> @enderror
+                            </fieldset>
+
+                            <label for="settings-subtitle-language" class="block text-sm font-bold text-slate-700">
+                                {{ __('settings.playback.subtitle_language') }}
+                                <select id="settings-subtitle-language" wire:model="preferredSubtitleLanguage" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2.5 text-sm">
+                                    <option value="">{{ __('settings.playback.subtitle_language_auto') }}</option>
+                                    @foreach ($subtitleLanguageOptions as $languageOption)<option value="{{ $languageOption['value'] }}">{{ $languageOption['label'] }}</option>@endforeach
+                                </select>
+                                <span class="mt-1 block text-xs font-normal leading-5 text-slate-500">{{ __('settings.playback.subtitle_language_hint') }}</span>
+                                @error('preferredSubtitleLanguage') <span class="mt-2 block text-sm font-semibold text-rose-700" role="alert">{{ $message }}</span> @enderror
+                            </label>
+
+                            <label class="flex min-h-12 items-start gap-3 rounded-control bg-emerald-50 p-4 text-sm font-bold text-emerald-950">
+                                <input type="checkbox" wire:model="notifyPreferredTranslation" class="mt-0.5 h-5 w-5 rounded border-emerald-300 text-emerald-700 focus:ring-emerald-600" />
+                                <span><span class="block">{{ __('settings.playback.notify_preferred_translation') }}</span><span class="mt-1 block font-normal leading-5 text-emerald-800">{{ __('settings.playback.notify_preferred_translation_hint') }}</span></span>
+                            </label>
+
+                            @if ($variantOptions !== [])
+                                <fieldset class="sm:col-span-2">
+                                    <legend class="text-sm font-bold text-slate-700">{{ __('settings.playback.hidden_translations') }}</legend>
+                                    <p class="mt-1 text-xs leading-5 text-slate-500">{{ __('settings.playback.hidden_translations_hint') }}</p>
+                                    <div class="mt-3 grid gap-2 rounded-control border border-slate-200 p-3 sm:grid-cols-2">
+                                        @foreach ($variantOptions as $variantOption)
+                                            <label wire:key="hidden-variant-{{ $variantOption['value'] }}" class="flex min-h-11 items-center gap-3 rounded-control bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
+                                                <input type="checkbox" wire:model="hiddenVariantKeys" value="{{ $variantOption['value'] }}" class="h-5 w-5 rounded border-slate-300 text-rose-700 focus:ring-rose-600" />
+                                                <span class="min-w-0 break-words">{{ $variantOption['label'] }}</span>
+                                            </label>
+                                        @endforeach
+                                    </div>
+                                    @error('hiddenVariantKeys') <p class="mt-2 text-sm font-semibold text-rose-700" role="alert">{{ $message }}</p> @enderror
+                                    @error('hiddenVariantKeys.*') <p class="mt-2 text-sm font-semibold text-rose-700" role="alert">{{ $message }}</p> @enderror
+                                </fieldset>
                             @endif
                         </div>
 

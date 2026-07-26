@@ -85,8 +85,47 @@ class ExternalMediaMetadata
             || preg_match('/\b(?:subtitles?|subs?)\b/u', $value) === 1;
     }
 
+    public function subtitleLanguage(?string $title, ?string $sourceUrl = null, ?string $url = null): ?string
+    {
+        if (! $this->hasSubtitles($title, $sourceUrl, $url)) {
+            return null;
+        }
+
+        $value = $this->normalizedValue(implode(' ', array_filter([
+            $title,
+            $sourceUrl ? urldecode($sourceUrl) : null,
+            $url ? urldecode($url) : null,
+        ])));
+        $markers = [
+            'ru' => '(?:ru|rus|russian|русск(?:ий|ие|ом))',
+            'en' => '(?:en|eng|english|английск(?:ий|ие|ом))',
+            'ko' => '(?:ko|kor|korean|корейск(?:ий|ие|ом))',
+            'ja' => '(?:ja|jpn|japanese|японск(?:ий|ие|ом))',
+            'zh' => '(?:zh|chi|zho|chinese|китайск(?:ий|ие|ом))',
+            'es' => '(?:es|spa|spanish|испанск(?:ий|ие|ом))',
+            'de' => '(?:de|deu|ger|german|немецк(?:ий|ие|ом))',
+            'fr' => '(?:fr|fra|fre|french|французск(?:ий|ие|ом))',
+            'it' => '(?:it|ita|italian|итальянск(?:ий|ие|ом))',
+            'pt' => '(?:pt|por|portuguese|португальск(?:ий|ие|ом))',
+        ];
+        $subtitleMarker = '(?:субтитр\pL*|subtitles?|subs?)';
+        $supported = (array) config('playback.supported_subtitle_languages', []);
+
+        foreach ($markers as $language => $marker) {
+            if (! in_array($language, $supported, true)) {
+                continue;
+            }
+
+            if (preg_match('/(?:'.$subtitleMarker.'.{0,24}\b'.$marker.'\b|\b'.$marker.'\b.{0,24}'.$subtitleMarker.')/u', $value) === 1) {
+                return $language;
+            }
+        }
+
+        return null;
+    }
+
     /**
-     * @return array{variant_type: string, variant_name: string|null, variant_key: string, has_subtitles: bool}
+     * @return array{variant_type: string, variant_name: string|null, variant_key: string, has_subtitles: bool, subtitle_language: string|null}
      */
     public function playbackVariant(?string $title, ?string $sourceUrl, string $url): array
     {
@@ -104,6 +143,7 @@ class ExternalMediaMetadata
             'variant_name' => $variantName,
             'variant_key' => $this->playbackVariantKey($variantType, $variantName),
             'has_subtitles' => $hasSubtitles,
+            'subtitle_language' => $this->subtitleLanguage($title, $sourceUrl, $url),
         ];
     }
 

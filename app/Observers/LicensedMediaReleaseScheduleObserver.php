@@ -11,6 +11,7 @@ use App\Enums\ReleaseScheduleStatus;
 use App\Models\LicensedMedia;
 use App\Models\ReleaseScheduleCorrection;
 use App\Models\ReleaseScheduleEntry;
+use App\Services\Catalog\PreferredTranslationNotificationService;
 use App\Services\ReleaseCalendar\ReleaseCalendarCacheInvalidator;
 use App\Services\ReleaseCalendar\ReleaseCalendarNotificationService;
 use App\Services\ReleaseCalendar\ReleaseCalendarSchema;
@@ -24,10 +25,25 @@ final readonly class LicensedMediaReleaseScheduleObserver
         private ReleaseCalendarCacheInvalidator $cache,
         private ReleaseCalendarNotificationService $notifications,
         private ReleaseScheduleIdentity $identity,
+        private PreferredTranslationNotificationService $preferredTranslations,
     ) {}
 
     public function saved(LicensedMedia $media): void
     {
+        if (($media->wasRecentlyCreated || $media->wasChanged([
+            'published_at',
+            'status',
+            'variant_key',
+            'variant_name',
+            'translation_name',
+        ]))
+            && $media->status === 'published'
+            && $media->published_at !== null
+            && ! $media->published_at->isFuture()
+            && filled($media->variant_key)) {
+            DB::afterCommit(fn () => $this->preferredTranslations->available($media->id));
+        }
+
         if (! $this->schema->ready()
             || (! $media->wasRecentlyCreated && ! $media->wasChanged(['published_at', 'status', 'translation_name', 'has_subtitles']))
             || $media->status !== 'published'
@@ -132,6 +148,7 @@ final readonly class LicensedMediaReleaseScheduleObserver
             'season_number' => $media->season->number,
             'episode_number' => $media->episode->number,
             'translation_name' => $type === ReleaseScheduleEntryType::TranslationRelease ? $media->translation_name : null,
+            'language_code' => $type === ReleaseScheduleEntryType::SubtitleRelease ? $media->subtitle_language : null,
             'starts_at' => $publishedAt,
             'date_value' => null,
             'date_end' => null,

@@ -1,10 +1,10 @@
 # Notifications и emails
 
-Обновлено: 18.07.2026
+Обновлено: 26.07.2026
 
 ## Текущее состояние
 
-- В проекте нет настраиваемых пользовательских email/push notification categories и нет Blade email templates. Canonical password reset, email verification и другие critical account mail не выдаются за отключаемые настройки.
+- В проекте нет настраиваемых пользовательских push categories и нет Blade email templates. Поддерживаемые пользовательские события доставляются в private database inbox; уведомление о любимом переводе включается отдельно в `/settings/playback`. Canonical password reset, email verification и другие critical account mail не выдаются за отключаемые настройки.
 - Mailer по умолчанию остается `MAIL_MAILER=log`, чтобы локальная разработка не отправляла реальные письма.
 - Operational notification используется только для queued импортера Seasonvar.
 
@@ -55,13 +55,13 @@ Task 14 does not invent follower/profile-activity notifications because no follo
 
 ## Каноническая matrix настроек
 
-`/settings/notifications` показывает только реально поддержанные in-portal database categories: comment reply/reaction/moderation/report и review helpful/moderation/report. Stable DB booleans остаются в существующих dedicated tables; `UpdateCommentNotificationPreferences` и `UpdateReviewNotificationPreferences` являются единственными write actions, а delivery services продолжают применять их до создания уведомления.
+`/settings/notifications` показывает только реально поддержанные category matrix для discussion/review/request/technical issue/release calendar. Stable DB booleans остаются в существующих dedicated tables, а delivery services применяют их до создания уведомления. Отдельный opt-in `notify_preferred_translation` находится в `/settings/playback` рядом с любимой озвучкой: это playback preference, а не календарная или социальная категория.
 
-Отсутствующая preference row означает неперсистентный opt-in default и создаётся только после explicit Apply/Reset. Email, push, episode/season/translation/subtitle/quality, collection follow/like, mention, follower и premium reminder controls не показываются, потому что соответствующие event/channel domains отсутствуют. Critical account security mail остаётся mandatory в своих auth workflows и не представляется configurable category.
+Отсутствующая preference row означает неперсистентный opt-in default и создаётся только после explicit Apply/Reset. Email, push, quality, collection follow/like, mention, follower и premium reminder controls не показываются, потому что соответствующие event/channel domains отсутствуют. Critical account security mail остаётся mandatory в своих auth workflows и не представляется configurable category.
 
 ## Export и deletion boundary
 
-Account export включает stored comment/review/content-request/technical-issue preferences и database notifications только шести реально зарегистрированных stable types: `comment.activity`, `review.activity`, `content-request.activity`, `technical-issue.activity`, `release-calendar.activity`, `premium.activity`. Для каждого типа применяется отдельный field allowlist; произвольный future payload, body, private note, actor identity, raw URL и provider data автоматически не экспортируются. `read_at`/`created_at` сохраняются как UTC timestamps.
+Account export включает stored preferences и database notifications только семи реально зарегистрированных stable types: `comment.activity`, `review.activity`, `content-request.activity`, `technical-issue.activity`, `release-calendar.activity`, `premium.activity`, `playback-preference.translation-available`. Для каждого типа применяется отдельный field allowlist; произвольный future payload, body, private note, actor identity, raw URL и provider data автоматически не экспортируются. `read_at`/`created_at` сохраняются как UTC timestamps.
 
 Canonical account deletion удаляет все morph notifications текущего owner до удаления `users`, потому что generic `notifications` table намеренно не имеет user FK. Domain preference tables удаляются собственными service cleanup или FK cascade. Это не удаляет уведомления другого recipient и не меняет append-only administrative audit.
 
@@ -88,6 +88,12 @@ php artisan test --filter=ConfigurationEnvironmentTest
 ## Уведомления календаря релизов
 
 `ReleaseCalendarActivityNotification` использует существующий database channel. Доставка требует и category flag подписки на тайтл, и общую настройку аккаунта. Deterministic UUID включает recipient, schedule UUID, revision и category, поэтому observer/import retry не создаёт дубль. Payload не содержит media/provider URL, private correction note, email, progress или список подписчиков; inbox заново проверяет видимость. Отдельный гарантированный pre-release scheduler не заявлен и не добавлен. Полный matrix — в [`release-calendar.md`](release-calendar.md).
+
+## Уведомление о любимом переводе
+
+`PreferredTranslationAvailableNotification` использует stable type `playback-preference.translation-available` и существующий database channel без обязательной queue. Получатель должен явно включить `notify_preferred_translation`, сохранить совпадающий `preferred_variant` и не скрывать этот же variant. Перед записью `PreferredTranslationNotificationService` повторно проверяет публикацию, playable health, URL boundary и entitlement всей иерархии title/season/episode/media.
+
+Deterministic UUID строится по получателю, тайтлу и стабильному variant key, поэтому повтор observer/import не создаёт дубль. Payload содержит только public slug тайтла, variant key и очищенную короткую подпись; raw media/provider URL, numeric user/media ID, source diagnostics и внутреннее состояние импорта отсутствуют. Delivery выполняется best-effort after commit, блокирует текущего получателя для идемпотентной вставки и не откатывает уже сохранённый media import. Presentation использует существующий private inbox и заново разрешает видимость тайтла. Отдельный email/push/scheduler не заявлен.
 
 ## Уведомления Premium
 

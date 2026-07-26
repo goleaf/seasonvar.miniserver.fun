@@ -302,6 +302,12 @@ class User extends Authenticatable implements HasLocalePreference, MustVerifyEma
         return $this->hasOne(UserAccountSetting::class);
     }
 
+    /** @return HasMany<UserHiddenPlaybackVariant, $this> */
+    public function hiddenPlaybackVariants(): HasMany
+    {
+        return $this->hasMany(UserHiddenPlaybackVariant::class);
+    }
+
     /** @return HasMany<PremiumEntitlement, $this> */
     public function premiumEntitlements(): HasMany
     {

@@ -63,4 +63,15 @@ class ExternalMediaMetadataTest extends TestCase
         $this->assertSame('original', $original['variant_type']);
         $this->assertSame('Оригинал', $original['variant_name']);
     }
+
+    public function test_it_detects_only_explicit_subtitle_languages(): void
+    {
+        $metadata = app(ExternalMediaMetadata::class);
+
+        $this->assertSame('ru', $metadata->subtitleLanguage('Субтитры: русский', null, 'https://media.example.com/show.mp4'));
+        $this->assertSame('en', $metadata->subtitleLanguage('English subtitles', null, 'https://media.example.com/show.mp4'));
+        $this->assertSame('ko', $metadata->subtitleLanguage('[KO SUBS]', null, 'https://media.example.com/show.mp4'));
+        $this->assertNull($metadata->subtitleLanguage('Корейский сериал', null, 'https://media.example.com/show.mp4'));
+        $this->assertNull($metadata->subtitleLanguage('Субтитры', null, 'https://media.example.com/show.mp4'));
+    }
 }

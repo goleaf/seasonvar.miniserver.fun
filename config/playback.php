@@ -17,6 +17,7 @@ return [
     'allowed_storage_disks' => ['local', 's3'],
     'allowed_formats' => ['m3u8', 'mp4', 'm4v', 'webm', 'mov'],
     'supported_qualities' => ['4320p', '2160p', '1440p', '1080p', '720p', '576p', '540p', '480p', '360p', '240p'],
+    'supported_subtitle_languages' => ['ru', 'en', 'ko', 'ja', 'zh', 'es', 'de', 'fr', 'it', 'pt'],
     'provider_priority' => [
         'seasonvar_parsed' => 100,
         'local' => 90,

@@ -641,6 +641,10 @@ return [
         'description_missing' => 'Описание пока отсутствует.',
         'more_details' => 'Подробнее',
         'card_rating' => ':provider :rating',
+        'translation_preference' => [
+            'preferred' => 'Есть ваш предпочитаемый перевод',
+            'alternative' => 'Пока доступна только другая озвучка',
+        ],
         'rating_providers' => [
             'kinopoisk' => 'КиноПоиск',
             'imdb' => 'IMDb',

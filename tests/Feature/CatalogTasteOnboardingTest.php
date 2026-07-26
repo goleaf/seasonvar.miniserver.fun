@@ -108,6 +108,7 @@ final class CatalogTasteOnboardingTest extends TestCase
             'volume' => 37,
             'preferred_quality' => '1080',
             'preferred_variant' => 'voice-one',
+            'preferred_playback_mode' => 'original_subtitles',
             'subtitles_enabled' => true,
         ]);
     }

@@ -747,6 +747,7 @@ class CatalogTitlePlayer extends Component
         $mediaItems = $selectedEpisode !== null && $activeSeason !== null
             ? $this->playback->mediaForEpisode($title, $activeSeason, $selectedEpisode, $user)
             : collect();
+        $mediaItems = $this->visibleMediaItems($mediaItems);
 
         if ($selectedEpisode !== null) {
             $selectedEpisode->setRelation('licensedMedia', $mediaItems);
@@ -1156,10 +1157,16 @@ class CatalogTitlePlayer extends Component
 
     private function playbackPreferences(): PlaybackPreferencesData
     {
+        $account = $this->accountPreferences();
+
         return new PlaybackPreferencesData(
             variant: $this->effectiveVariant(),
             quality: $this->effectiveQuality(),
             format: $this->normalizedFormat(),
+            fallbackVariant: $account->fallbackVariant,
+            playbackMode: $account->playbackMode,
+            subtitleLanguage: $account->preferredSubtitleLanguage,
+            hiddenVariantKeys: $account->hiddenVariantKeys,
         );
     }
 
@@ -1181,7 +1188,31 @@ class CatalogTitlePlayer extends Component
             preferredVariant: $current->preferredVariant,
             subtitlesEnabled: $current->subtitlesEnabled,
             keyboardShortcutsEnabled: $current->keyboardShortcutsEnabled,
+            fallbackVariant: $current->fallbackVariant,
+            playbackMode: $current->playbackMode,
+            preferredSubtitleLanguage: $current->preferredSubtitleLanguage,
+            hiddenVariantKeys: $current->hiddenVariantKeys,
+            notifyPreferredTranslation: $current->notifyPreferredTranslation,
         );
+    }
+
+    /**
+     * @param  Collection<int, LicensedMedia>  $mediaItems
+     * @return Collection<int, LicensedMedia>
+     */
+    private function visibleMediaItems(Collection $mediaItems): Collection
+    {
+        $hiddenVariantKeys = $this->accountPreferences()->hiddenVariantKeys;
+
+        return $hiddenVariantKeys === []
+            ? $mediaItems
+            : $mediaItems
+                ->reject(fn (LicensedMedia $media): bool => in_array(
+                    (string) $media->variant_key,
+                    $hiddenVariantKeys,
+                    true,
+                ))
+                ->values();
     }
 
     private function attemptPlaybackAction(string $action, int $maxAttempts): bool

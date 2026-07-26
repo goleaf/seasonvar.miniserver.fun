@@ -73,6 +73,17 @@
 - Вложенный `CatalogTitlePlayer` загружает только серии активного сезона и их playable media; выбор first/next episode остаётся SQL query с детерминированным tuple-order, а не полной PHP-коллекцией выпусков.
 - Кнопки предыдущей/следующей серии переиспользуют уже авторизованную и упорядоченную коллекцию серий активного сезона. Внутри сезона навигация не выполняет SQL; только реальный переход через границу сезона делает один прежний watchable keyset query для соответствующей стороны. На локальной production-scale SQLite странице `/titles/veshhdok` одинаковый профиль из 5 запусков сократил медиану с 60 до 58 запросов, общий SQL с 535,77 до 177,72 мс, playback SQL с 493,68 до 132,05 мс (−73,3%) и server render с 1381,70 до 1019,26 мс (−26,2%). Отдельные выборки по 20 HTTP-запросов дали p50 1139,0 → 735,5 мс и p95 1638,8 → 1037,9 мс при 20/20 HTTP 200 и неизменных 884195 байтах ответа. Коллекции остаются render-local; authorization result и signed media URL не кэшируются.
 - `CatalogPlaybackSourceResolver` переиспользует уже проверенные title/episode/season instances и выбирает только поля, нужные entitlement, ranking и player DTO. Контрольный episode resolve выполняет 2 запроса вместо 6; direct signed route по-прежнему самостоятельно загружает компактную publication hierarchy и повторно проверяет доступ.
+- Translation preference ranking выполняется в том же bounded media query:
+  hidden keys применяются в SQL, а favorite/fallback/mode/language меняют
+  только in-memory sort tuple. Карточки и personalized recommendation
+  candidates получают preference availability одним grouped media query на
+  уже ограниченный набор title IDs, без per-card reads. Recipient lookup
+  уведомления использует
+  `user_account_preferred_translation_notify_idx
+  (notify_preferred_translation,preferred_variant,user_id)`, а hidden
+  exclusion — covering unique `(user_id,variant_key)`; отдельный новый media
+  index не добавлен, потому что representative SQLite plan использует
+  существующий `licensed_media_publication_lookup_idx`.
 - Публичный Livewire snapshot карточки содержит только locked `catalogTitleId` и URL-скаляры `season`, `episode`, `media`, `variant`, `quality`, `format`; Eloquent models, список просмотра, rating и progress остаются server/render-local. Watchlist count, user rating count и average собираются одним conditional aggregate по уникальным user/title строкам без join, поэтому provider ratings и pivot-умножение не искажают результат.
 - Блок рекомендаций на странице тайтла ограниченно загружает active precomputed rows и только при их отсутствии выполняет два лёгких genre/year fallback-запроса. `CatalogTitlePageBuilder` объединяет fallback по ID в одну коллекцию DTO, а Blade показывает только уже eager-loaded card summaries без запросов и тяжёлых связей.
 - Cold-path тайтла не материализует глобальные списки доступных выпусков. Для одного тайтла episode/media aggregates используют прямой `catalog_title_id` и bounded season-ID subquery; recommendation cards присоединяют derived projection только доступных сезонов выбранных ID. Публичные подборки используют существующий `(catalog_title_id,catalog_collection_id)` lookup как membership subquery. На рабочей SQLite одиночный внутренний `GET /titles/ierrohierro` с отключённым full-response cache и изолированным array cache сохранил HTTP 200 и 284 332 байта, но сократился с 4 380,2 до 1 970,2 мс, а учтённое DB time — с 3 932,5 до 1 556,7 мс при тех же 77 запросах. Это две последовательные cold observations, не p95/SLA.

@@ -8,8 +8,10 @@ use App\DTOs\AccountSettingsData;
 use App\DTOs\AnonymousAccountSettingsData;
 use App\DTOs\PlaybackSettingsData;
 use App\Enums\CatalogCollectionVisibility;
+use App\Enums\PlaybackPreferenceMode;
 use App\Models\User;
 use App\Models\UserAccountSetting;
+use App\Models\UserHiddenPlaybackVariant;
 use App\Services\Catalog\PlaybackPreferenceOptions;
 use App\ValueObjects\AccountTimezone;
 use Illuminate\Support\Facades\DB;
@@ -33,7 +35,10 @@ final class AccountSettingsService
             $user->setRelation('accountSetting', $setting);
         }
 
-        return $this->resolved($setting);
+        return $this->resolved(
+            $setting,
+            $setting instanceof UserAccountSetting ? $this->hiddenVariantKeys($user) : [],
+        );
     }
 
     public function updateAppearance(
@@ -92,7 +97,7 @@ final class AccountSettingsService
     {
         $this->ensurePlayback($user, $data);
 
-        return $this->mutate($user, [
+        return $this->mutatePlayback($user, [
             'autoplay' => $data->autoplay,
             'remember_volume' => $data->rememberVolume,
             'volume' => $data->volume,
@@ -100,15 +105,22 @@ final class AccountSettingsService
             'playback_speed' => $data->playbackSpeed,
             'preferred_quality' => $data->preferredQuality,
             'preferred_variant' => $data->preferredVariant,
-            'subtitles_enabled' => $data->subtitlesEnabled,
+            'fallback_variant' => $data->fallbackVariant,
+            'preferred_playback_mode' => $data->playbackMode->value,
+            'preferred_subtitle_language' => $data->preferredSubtitleLanguage,
+            'notify_preferred_translation' => $data->notifyPreferredTranslation,
+            'subtitles_enabled' => $data->subtitlesEnabled
+                || $data->playbackMode === PlaybackPreferenceMode::OriginalSubtitles
+                || $data->preferredSubtitleLanguage !== null,
             'keyboard_shortcuts_enabled' => $data->keyboardShortcutsEnabled,
-        ]);
+        ], $data->hiddenVariantKeys);
     }
 
     public function updateOnboardingPreferences(
         User $user,
         string $locale,
         ?bool $subtitlesEnabled,
+        PlaybackPreferenceMode $playbackMode = PlaybackPreferenceMode::Automatic,
     ): AccountSettingsData {
         $this->ensureLocale($locale);
 
@@ -116,6 +128,9 @@ final class AccountSettingsService
 
         if ($subtitlesEnabled !== null) {
             $attributes['subtitles_enabled'] = $subtitlesEnabled;
+        }
+        if ($this->schema->translationPreferencesAvailable()) {
+            $attributes['preferred_playback_mode'] = $playbackMode->value;
         }
 
         return $this->mutate($user, $attributes);
@@ -132,7 +147,7 @@ final class AccountSettingsService
     {
         $defaults = (array) config('account-settings.defaults', []);
 
-        return $this->mutate($user, [
+        return $this->mutatePlayback($user, [
             'autoplay' => (bool) ($defaults['autoplay'] ?? false),
             'remember_volume' => (bool) ($defaults['remember_volume'] ?? true),
             'volume' => min(100, max(0, (int) ($defaults['volume'] ?? 70))),
@@ -140,9 +155,13 @@ final class AccountSettingsService
             'playback_speed' => (string) ($defaults['playback_speed'] ?? '1.00'),
             'preferred_quality' => null,
             'preferred_variant' => null,
+            'fallback_variant' => null,
+            'preferred_playback_mode' => PlaybackPreferenceMode::Automatic->value,
+            'preferred_subtitle_language' => null,
+            'notify_preferred_translation' => false,
             'subtitles_enabled' => (bool) ($defaults['subtitles_enabled'] ?? false),
             'keyboard_shortcuts_enabled' => (bool) ($defaults['keyboard_shortcuts_enabled'] ?? true),
-        ]);
+        ], []);
     }
 
     public function migrateAnonymous(User $user, AnonymousAccountSettingsData $data): AccountSettingsData
@@ -186,7 +205,69 @@ final class AccountSettingsService
             $setting = $setting->exists ? $setting->refresh() : null;
             $user->setRelation('accountSetting', $setting);
 
-            return $this->resolved($setting);
+            return $this->resolved($setting, $this->hiddenVariantKeys($user, false));
+        }, attempts: 3);
+    }
+
+    /**
+     * @param  array<string, bool|int|string|null>  $attributes
+     * @param  list<string>  $hiddenVariantKeys
+     */
+    private function mutatePlayback(User $user, array $attributes, array $hiddenVariantKeys): AccountSettingsData
+    {
+        Gate::forUser($user)->authorize('update-account-settings');
+        abort_unless($this->schema->translationPreferencesAvailable(), 503, __('settings.errors.unavailable'));
+        $hiddenVariantKeys = collect($hiddenVariantKeys)
+            ->filter(fn (mixed $key): bool => is_string($key) && $key !== '')
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+
+        return DB::transaction(function () use ($user, $attributes, $hiddenVariantKeys): AccountSettingsData {
+            User::query()->lockForUpdate()->findOrFail($user->id);
+            $setting = UserAccountSetting::query()->lockForUpdate()->find($user->id)
+                ?? new UserAccountSetting(['user_id' => $user->id]);
+            $currentHidden = UserHiddenPlaybackVariant::query()
+                ->whereBelongsTo($user)
+                ->lockForUpdate()
+                ->orderBy('variant_key')
+                ->pluck('variant_key')
+                ->all();
+
+            foreach ($attributes as $attribute => $value) {
+                $setting->setAttribute($attribute, $value);
+            }
+
+            $hiddenChanged = $currentHidden !== $hiddenVariantKeys;
+
+            if (! $setting->exists || $setting->isDirty(array_keys($attributes)) || $hiddenChanged) {
+                $setting->settings_version = max(1, (int) $setting->settings_version) + 1;
+                $setting->save();
+            }
+
+            if ($hiddenChanged) {
+                UserHiddenPlaybackVariant::query()->whereBelongsTo($user)->delete();
+
+                if ($hiddenVariantKeys !== []) {
+                    $timestamp = now();
+                    UserHiddenPlaybackVariant::query()->insert(array_map(
+                        static fn (string $variantKey): array => [
+                            'user_id' => $user->id,
+                            'variant_key' => $variantKey,
+                            'created_at' => $timestamp,
+                            'updated_at' => $timestamp,
+                        ],
+                        $hiddenVariantKeys,
+                    ));
+                }
+            }
+
+            $setting = $setting->refresh();
+            $user->setRelation('accountSetting', $setting);
+            $user->unsetRelation('hiddenPlaybackVariants');
+
+            return $this->resolved($setting, $hiddenVariantKeys);
         }, attempts: 3);
     }
 
@@ -213,11 +294,14 @@ final class AccountSettingsService
             $setting = $setting->refresh();
             $user->setRelation('accountSetting', $setting);
 
-            return $this->resolved($setting);
+            return $this->resolved($setting, $this->hiddenVariantKeys($user, false));
         }, attempts: 3);
     }
 
-    private function resolved(?UserAccountSetting $setting): AccountSettingsData
+    /**
+     * @param  list<string>  $hiddenVariantKeys
+     */
+    private function resolved(?UserAccountSetting $setting, array $hiddenVariantKeys = []): AccountSettingsData
     {
         $defaults = (array) config('account-settings.defaults', []);
         $defaultLocale = (string) config('account-settings.default_locale', 'ru');
@@ -247,6 +331,27 @@ final class AccountSettingsService
             && CatalogCollectionVisibility::tryFrom($setting->collection_default_visibility) !== null
                 ? $setting->collection_default_visibility
                 : (string) ($defaults['collection_default_visibility'] ?? 'private');
+        $preferredVariant = $this->variantKey($setting?->preferred_variant);
+        $translationPreferencesAvailable = $setting instanceof UserAccountSetting
+            && $this->schema->translationPreferencesAvailable();
+        $fallbackVariant = $translationPreferencesAvailable
+            ? $this->variantKey($setting?->fallback_variant)
+            : null;
+        $playbackMode = $translationPreferencesAvailable
+            && is_string($setting?->preferred_playback_mode)
+            ? (PlaybackPreferenceMode::tryFrom($setting->preferred_playback_mode) ?? PlaybackPreferenceMode::Automatic)
+            : PlaybackPreferenceMode::Automatic;
+        $subtitleLanguage = $translationPreferencesAvailable
+            && is_string($setting?->preferred_subtitle_language)
+            && in_array($setting->preferred_subtitle_language, (array) config('playback.supported_subtitle_languages', []), true)
+                ? $setting->preferred_subtitle_language
+                : null;
+        $hiddenVariantKeys = collect($hiddenVariantKeys)
+            ->filter(fn (mixed $key): bool => $this->variantKey($key) !== null)
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
 
         return new AccountSettingsData(
             locale: $locale,
@@ -257,10 +362,14 @@ final class AccountSettingsService
             muted: $setting->muted ?? (bool) ($defaults['muted'] ?? false),
             playbackSpeed: $speed,
             preferredQuality: $quality,
-            preferredVariant: is_string($setting?->preferred_variant)
-                && preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $setting->preferred_variant) === 1
-                ? $setting->preferred_variant
-                : null,
+            preferredVariant: $preferredVariant,
+            fallbackVariant: $fallbackVariant,
+            playbackMode: $playbackMode,
+            preferredSubtitleLanguage: $subtitleLanguage,
+            hiddenVariantKeys: $hiddenVariantKeys,
+            notifyPreferredTranslation: $translationPreferencesAvailable
+                ? ($setting->notify_preferred_translation ?? false)
+                : false,
             subtitlesEnabled: $setting->subtitles_enabled ?? (bool) ($defaults['subtitles_enabled'] ?? false),
             keyboardShortcutsEnabled: $setting->keyboard_shortcuts_enabled ?? (bool) ($defaults['keyboard_shortcuts_enabled'] ?? true),
             reducedMotion: $setting->reduced_motion ?? (bool) ($defaults['reduced_motion'] ?? false),
@@ -286,17 +395,88 @@ final class AccountSettingsService
             throw ValidationException::withMessages(['playbackSpeed' => [__('settings.validation.playback_speed')]]);
         }
 
+        abort_unless($this->schema->translationPreferencesAvailable(), 503, __('settings.errors.unavailable'));
         $current = $this->resolve($user);
         $qualityKeys = collect($this->playbackOptions->qualities($current->preferredQuality, $user))->pluck('value')->all();
-        $variantKeys = collect($this->playbackOptions->variants($current->preferredVariant, $user))->pluck('value')->all();
+        $voiceoverKeys = collect($this->playbackOptions->voiceovers([
+            $current->preferredVariant,
+            $current->fallbackVariant,
+        ], $user))->pluck('value')->all();
+        $variantKeys = collect($this->playbackOptions->variants([
+            ...$current->hiddenVariantKeys,
+            $current->preferredVariant,
+            $current->fallbackVariant,
+        ], $user))->pluck('value')->all();
+        $errors = [];
 
         if ($data->preferredQuality !== null && ! in_array($data->preferredQuality, $qualityKeys, true)) {
-            throw ValidationException::withMessages(['preferredQuality' => [__('settings.validation.quality')]]);
+            $errors['preferredQuality'] = [__('settings.validation.quality')];
         }
 
-        if ($data->preferredVariant !== null && ! in_array($data->preferredVariant, $variantKeys, true)) {
-            throw ValidationException::withMessages(['preferredVariant' => [__('settings.validation.variant')]]);
+        if ($data->preferredVariant !== null && ! in_array($data->preferredVariant, $voiceoverKeys, true)) {
+            $errors['preferredVariant'] = [__('settings.validation.variant')];
         }
+
+        if ($data->fallbackVariant !== null && ! in_array($data->fallbackVariant, $voiceoverKeys, true)) {
+            $errors['fallbackVariant'] = [__('settings.validation.variant')];
+        }
+
+        if ($data->preferredVariant !== null && $data->preferredVariant === $data->fallbackVariant) {
+            $errors['fallbackVariant'] = [__('settings.validation.fallback_variant')];
+        }
+
+        if ($data->preferredSubtitleLanguage !== null
+            && ! in_array($data->preferredSubtitleLanguage, (array) config('playback.supported_subtitle_languages', []), true)) {
+            $errors['preferredSubtitleLanguage'] = [__('settings.validation.subtitle_language')];
+        }
+
+        if (count($data->hiddenVariantKeys) > 50
+            || count(array_unique($data->hiddenVariantKeys)) !== count($data->hiddenVariantKeys)
+            || collect($data->hiddenVariantKeys)->contains(fn (mixed $key): bool => ! is_string($key) || ! in_array($key, $variantKeys, true))) {
+            $errors['hiddenVariantKeys'] = [__('settings.validation.hidden_variants')];
+        }
+
+        if (in_array($data->preferredVariant, $data->hiddenVariantKeys, true)
+            || in_array($data->fallbackVariant, $data->hiddenVariantKeys, true)) {
+            $errors['hiddenVariantKeys'] = [__('settings.validation.hidden_variant_conflict')];
+        }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+    }
+
+    private function variantKey(mixed $value): ?string
+    {
+        return is_string($value)
+            && preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $value) === 1
+                ? $value
+                : null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function hiddenVariantKeys(?User $user, bool $useLoaded = true): array
+    {
+        if ($user === null || ! $this->schema->translationPreferencesAvailable()) {
+            return [];
+        }
+
+        if ($useLoaded && $user->relationLoaded('hiddenPlaybackVariants')) {
+            return $user->hiddenPlaybackVariants
+                ->pluck('variant_key')
+                ->filter(fn (mixed $key): bool => is_string($key))
+                ->sort()
+                ->values()
+                ->all();
+        }
+
+        return UserHiddenPlaybackVariant::query()
+            ->whereBelongsTo($user)
+            ->orderBy('variant_key')
+            ->pluck('variant_key')
+            ->all();
     }
 
     private function ensureAnonymous(User $user, AnonymousAccountSettingsData $data): void

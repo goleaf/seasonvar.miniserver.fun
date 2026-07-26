@@ -11610,6 +11610,137 @@ Detailed implementation plan:
 
 ---
 
+## Task 93 — глобальные предпочтения переводов и субтитров
+
+Статус: `verification_completed_delivery_in_progress`.
+
+Дата начала: 26.07.2026.
+
+Approved design:
+[`2026-07-26-playback-translation-preferences-design.md`](../superpowers/specs/2026-07-26-playback-translation-preferences-design.md).
+
+Detailed implementation plan:
+[`2026-07-26-playback-translation-preferences.md`](../superpowers/plans/2026-07-26-playback-translation-preferences.md).
+
+### Фактический baseline
+
+- PHP `8.5`, Laravel `13.22.0`, Boost `2.4.13`, Livewire `4.3.3`,
+  PHPUnit `12.5.32`, Pint `1.29.3`, Tailwind `4.3.2`, SQLite.
+- Existing `preferred_variant`, account settings policy/service/transaction,
+  canonical source resolver, media variant metadata, grouped card state loader,
+  taste onboarding, recommendation availability reranker и database
+  notification observers переиспользуются.
+- `licensed_media` не хранит подтверждённый subtitle language; interface
+  locale запрещено использовать как media-language guess.
+- Ветка `main`, remote `origin`; ветка ahead remote и shared tree содержит
+  большой foreign staged/unstaged/untracked scope Tasks 89–92. Task 93 не
+  имеет права reset/stash/unstage/delete или blind-stage этих изменений.
+
+### Expected changed files
+
+- additive migration, new preference enum/model and User relationships;
+- account setting schema/model/DTO/service/config/options/export/delete;
+- media metadata, importer/backfill fields, LicensedMedia;
+- source resolver/player preference projection;
+- grouped card state/component/presentation and recommendation reranker;
+- favorite-translation database notification/service/observer/presentation;
+- taste onboarding compatibility;
+- full-page account settings Livewire/Blade and RU/EN translations;
+- focused schema/service/player/import/card/recommendation/notification/UI
+  tests;
+- canonical playback/data/import/notification/frontend/security/performance
+  docs, README, CHANGELOG, Task 93 spec/plan/compliance evidence.
+
+Новый HTML/API route, controller, package, queue, scheduler, cache store,
+environment variable, remote provider или production backfill не планируется.
+Discovery, меняющее этот вывод, немедленно обновит scope.
+
+### Protected contracts
+
+- existing web/API routes, route names, slug binding, JSON Resources and SEO;
+- one `user_account_settings`/device preference contract and one player
+  lifecycle/resolver;
+- explicit media/URL selection, signed playback, source health/fallback,
+  progress/session/telemetry and access authorization;
+- `seasonvar:import`, no video download/storage and retryable apply;
+- existing release-calendar types/subscriptions and database notification
+  privacy/idempotency;
+- public/shared caches contain no owner preference state;
+- recommendation score/public modes, onboarding completion and account export/
+  deletion semantics;
+- Premium/payments/ads/region/legal restrictions;
+- RU/EN key parity and mobile/accessibility standards;
+- all foreign shared-tree hunks and `main` history.
+
+### Cross-feature, schema и rollout matrix
+
+| Domain | Статус | Решение / gate |
+| --- | --- | --- |
+| Account settings | `critical_affected` | Existing policy/service; atomic scalar + hidden-set write |
+| Database | `critical_affected` | Additive nullable/default fields, normalized unique set, reversible down |
+| Player/source | `critical_affected` | Explicit > favorite > fallback > mode/language > existing rank |
+| Importer | `high_affected` | Explicit-only nullable subtitle language; no source body/video download |
+| Cards | `high_affected` | One grouped owner query; no Blade query/shared cache |
+| Recommendations | `high_affected` | One grouped availability pass; public modes unchanged |
+| Notifications | `critical_affected` | Database-only, deterministic UUID, after commit, safe payload |
+| Onboarding | `high_affected` | Existing playback choice maps to mode without overwriting variants |
+| Export/delete | `critical_affected` | New values exported; hidden rows cascade |
+| Authorization/privacy | `critical_affected` | Owner gate, validation, escaped labels, no source URL/history |
+| SEO/API/cache | `protected_high` | No public contract/private cache projection change |
+| Mobile | `verified_compatible` | Existing request shape retained; explicit request overrides account defaults; hidden set remains server-enforced |
+| Premium/region/legal | `protected_critical` | Existing media scopes stay mandatory |
+| Dependencies/env/routes | `not_applicable` | No new package, env or route |
+| Production data | `not_applicable` | No synchronous backfill; old rows map to safe defaults |
+| Rollback | `completed_design` | Revert code then reversible migration; no destructive rewrite |
+| Shared Git state | `critical_risk_recorded` | Exact Task 93 paths/hunks only; no blind add |
+
+### Task-specific requirement-compliance matrix
+
+| Requirement/domain | Статус | Evidence / следующий gate |
+| --- | --- | --- |
+| Root/index/canonical fresh read | `completed` | 26.07.2026 before Task 93 PHP edits |
+| Applicable skills/rules | `completed` | Laravel, recommendations, UI, TDD, planning skills/rules read |
+| Existing implementation first | `completed` | Account/player/import/card/recommendation/notification/onboarding paths traced |
+| Runtime/packages/DB/frontend/Git | `completed` | Actual versions and dirty `main` baseline recorded |
+| Official version-dependent docs | `completed` | Laravel 13 Livewire validation, migrations, transactions, notifications checked |
+| New permanent rule in owner | `completed` | Canonical playback report updated before code |
+| Alternatives/design/files/contracts/risks/rollback | `completed` | Linked design and detailed 40-step plan |
+| Prepared plan reread | `completed` | Design and 40-step plan reread before first RED |
+| TDD schema/account | `completed` | RED/GREEN covers additive schema, unique/cascade, atomic success/conflict/reset and safe export |
+| TDD importer/player | `completed` | Explicit-only language, persisted playlist metadata and favorite/fallback/mode/language/hidden precedence |
+| TDD cards/recommendations | `completed` | One grouped media read per bounded title set and exact preference labels/scores |
+| TDD notification | `completed` | Opt-in, hidden exclusion, entitlement, deterministic idempotency, safe payload and inbox presentation |
+| TDD Livewire/UI | `completed` | Auth, RU controls, successful save and conflict errors; reset is covered by canonical service |
+| Validation/authorization/security | `completed` | Owner gate, allowlists, bounded normalized keys/set, escaped output, safe notification payload |
+| SQL/performance/EXPLAIN | `completed` | Query budgets green; EXPLAIN uses the notification, hidden unique and existing licensed-media publication indexes |
+| Cross-feature compatibility | `completed` | Export/delete/onboarding/web player/mobile API/cache isolation/entitlement scopes verified |
+| Docs/README/CHANGELOG | `completed` | Canonical owners, docs map, visitor sections and dated Russian entry updated |
+| Focused/full/static/build checks | `completed_with_unrelated_failures` | Related suite 52/367 green; Pint/PHPStan/scoped Rector/Composer/routes/build/browser green; full suite retains foreign session/importer failures |
+| Final requirement/legacy/secret audit | `completed` | Fresh canonical reread; isolated index has no foreign path, secret, debug, TODO or duplicate implementation |
+| Commit/push main | `pending` | Exact isolated commit and ordinary push |
+
+### Execution order
+
+1. `[completed]` Requirements/skills/versions/Git and existing owners audit.
+2. `[completed]` Alternatives, canonical contract, design, risks and rollback.
+3. `[completed]` Detailed TDD plan and cross-feature matrix.
+4. `[completed]` Prepared plan reread and isolated RED/GREEN TDD cycles.
+5. `[completed]` Additive schema/model/DTO/defaults/schema guard.
+6. `[completed]` Atomic service validation/write/reset/export/delete.
+7. `[completed]` Explicit-only subtitle language metadata/import/refresh path.
+8. `[completed]` Player preference projection, ranking and hidden filtering.
+9. `[completed]` Grouped card presentation and recommendation boost.
+10. `[completed]` Favorite-translation database notification.
+11. `[completed]` Taste onboarding compatibility.
+12. `[completed]` Livewire settings UI and RU/EN parity.
+13. `[completed]` Security/query/index/cache/cross-feature review.
+14. `[completed_with_unrelated_failures]` Full/static/docs/build/browser verification; all Task 93 checks green, foreign global failures recorded.
+15. `[completed]` Canonical docs, README, Russian CHANGELOG and final matrix.
+16. `[completed]` Exact diff/secret/debug/shared-tree audit.
+17. `[pending]` Exact Task 93 commit on `main`.
+18. `[pending]` Ordinary configured push; external failure recorded honestly.
+
+---
 ## Task 94 — новая персонализированная главная
 
 Статус: `implementation_verified_commit_complete_push_unresolved_authentication`.

@@ -641,6 +641,10 @@ return [
         'description_missing' => 'No description is available yet.',
         'more_details' => 'Details',
         'card_rating' => ':provider :rating',
+        'translation_preference' => [
+            'preferred' => 'Your preferred translation is available',
+            'alternative' => 'Only another dub is available for now',
+        ],
         'rating_providers' => [
             'kinopoisk' => 'Kinopoisk',
             'imdb' => 'IMDb',

@@ -39,6 +39,9 @@ return [
     'availability_boosts' => [
         'quality' => 12,
         'variant' => 12,
+        'fallback_variant' => 8,
+        'playback_mode' => 6,
+        'subtitle_language' => 4,
         'subtitles' => 6,
     ],
     'top_rated' => [

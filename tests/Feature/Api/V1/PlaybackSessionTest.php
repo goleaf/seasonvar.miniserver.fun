@@ -12,6 +12,7 @@ use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Models\User;
+use App\Models\UserAccountSetting;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -88,6 +89,34 @@ final class PlaybackSessionTest extends TestCase
                 'episode_id' => $episodes[0]->id,
             ])->assertCreated()
             ->assertJsonMissingPath('data.progress_session_token');
+    }
+
+    public function test_authenticated_mobile_session_uses_global_translation_preferences_with_explicit_request_precedence(): void
+    {
+        [$title, $season, $episodes] = $this->createGraph('preferred-mobile-playback');
+        $standard = $this->createMedia($title, $season, $episodes[0], '720p', 'mp4', 'standard');
+        $favorite = $this->createMedia($title, $season, $episodes[0], '1080p', 'mp4', 'favorite');
+        $user = User::factory()->create();
+        UserAccountSetting::query()->create([
+            'user_id' => $user->id,
+            'preferred_variant' => 'favorite',
+        ]);
+        $token = $user->createToken('Preferred phone', ['mobile:read', 'mobile:write'], now()->addDay());
+
+        $this->withToken($token->plainTextToken)
+            ->postJson("/api/v1/titles/{$title->slug}/playback-sessions", [
+                'episode_id' => $episodes[0]->id,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.media.id', $favorite->id);
+
+        $this->withToken($token->plainTextToken)
+            ->postJson("/api/v1/titles/{$title->slug}/playback-sessions", [
+                'episode_id' => $episodes[0]->id,
+                'variant' => 'standard',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.media.id', $standard->id);
     }
 
     public function test_foreign_hidden_future_and_failed_releases_fail_closed(): void

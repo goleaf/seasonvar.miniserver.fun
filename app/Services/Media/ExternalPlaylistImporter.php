@@ -213,6 +213,7 @@ final class ExternalPlaylistImporter
                 'variant_name' => $variant['variant_name'],
                 'variant_key' => $variant['variant_key'],
                 'has_subtitles' => $variant['has_subtitles'],
+                'subtitle_language' => $variant['subtitle_language'],
                 'format' => $this->mediaMetadata->format($entry['url']),
                 'check_status' => 'not_checked',
                 'status' => 'published',

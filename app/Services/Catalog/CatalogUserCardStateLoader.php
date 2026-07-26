@@ -8,12 +8,16 @@ use App\Models\CatalogTitle;
 use App\Models\CatalogTitleUserState;
 use App\Models\Episode;
 use App\Models\EpisodeViewProgress;
+use App\Models\LicensedMedia;
 use App\Models\User;
+use App\Services\Auth\AccountSettingsService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 final class CatalogUserCardStateLoader
 {
+    public function __construct(private readonly AccountSettingsService $settings) {}
+
     /**
      * @param  Collection<int, CatalogTitle>  $titles
      * @return Collection<int, CatalogTitle>
@@ -58,8 +62,9 @@ final class CatalogUserCardStateLoader
         $episodeSeasonIds = Episode::query()
             ->whereKey($progress->pluck('episode_id')->filter()->unique())
             ->pluck('season_id', 'id');
+        $translationStates = $this->translationStates($titleIds, $user);
 
-        return $titles->each(function (CatalogTitle $title) use ($states, $progress, $episodeSeasonIds): void {
+        return $titles->each(function (CatalogTitle $title) use ($states, $progress, $episodeSeasonIds, $translationStates): void {
             $state = $states->get($title->id);
             $latestProgress = $progress->get($title->id);
             $progressPercent = $latestProgress?->progress_percent;
@@ -79,6 +84,59 @@ final class CatalogUserCardStateLoader
                 'user_primary_action',
                 $this->primaryAction($title, $latestProgress, $episodeSeasonIds),
             );
+            $title->setAttribute(
+                'user_translation_preference_state',
+                $translationStates->get($title->id),
+            );
+        });
+    }
+
+    /**
+     * @param  Collection<int, int>  $titleIds
+     * @return Collection<int, string>
+     */
+    private function translationStates(Collection $titleIds, User $user): Collection
+    {
+        $preferences = $this->settings->resolve($user);
+
+        if ($preferences->preferredVariant === null) {
+            return collect();
+        }
+
+        $media = LicensedMedia::query()
+            ->availableTo($user)
+            ->forAvailableReleases($user)
+            ->withoutKnownFailures()
+            ->withPlaybackLocation()
+            ->whereIn('catalog_title_id', $titleIds)
+            ->where(function ($query) use ($preferences): void {
+                $query
+                    ->where('variant_key', $preferences->preferredVariant)
+                    ->orWhere('variant_type', 'voiceover');
+            })
+            ->when(
+                $preferences->hiddenVariantKeys !== [],
+                fn ($query) => $query->where(function ($query) use ($preferences): void {
+                    $query
+                        ->whereNull('variant_key')
+                        ->orWhereNotIn('variant_key', $preferences->hiddenVariantKeys);
+                }),
+            )
+            ->get(['catalog_title_id', 'variant_key', 'variant_type'])
+            ->groupBy('catalog_title_id');
+
+        return $titleIds->mapWithKeys(function (int $titleId) use ($media, $preferences): array {
+            $titleMedia = $media->get($titleId, collect());
+            $preferredAvailable = $titleMedia->contains(
+                fn (LicensedMedia $item): bool => $item->variant_key === $preferences->preferredVariant,
+            );
+            $alternativeAvailable = $titleMedia->contains(
+                fn (LicensedMedia $item): bool => $item->variant_type === 'voiceover',
+            );
+
+            return $preferredAvailable
+                ? [$titleId => 'preferred']
+                : ($alternativeAvailable ? [$titleId => 'alternative'] : []);
         });
     }
 

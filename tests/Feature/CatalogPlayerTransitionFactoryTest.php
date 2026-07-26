@@ -6,6 +6,7 @@ namespace Tests\Feature;
 
 use App\DTOs\PlaybackPreferencesData;
 use App\Enums\ContentAudience;
+use App\Enums\PlaybackPreferenceMode;
 use App\Enums\ReleaseKind;
 use App\Models\CatalogTitle;
 use App\Models\Episode;
@@ -192,6 +193,81 @@ final class CatalogPlayerTransitionFactoryTest extends TestCase
         self::assertSame('voiceover-studio-a', $preferences->variant);
         self::assertSame($studioB->id, $explicitTransition['selection']['mediaId']);
         self::assertNull($explicitTransition['noticeCode']);
+    }
+
+    public function test_translation_preferences_rank_favorite_fallback_mode_language_and_hide_variants(): void
+    {
+        $title = CatalogTitle::factory()->create();
+        $season = Season::factory()->create(['catalog_title_id' => $title->id]);
+        $episode = Episode::factory()->create(['season_id' => $season->id, 'number' => 1]);
+        $favorite = $this->publishedMedia($title, $season, $episode, [
+            'variant_name' => 'Студия А',
+            'variant_key' => 'voiceover-studio-a',
+        ]);
+        $fallback = $this->publishedMedia($title, $season, $episode, [
+            'variant_name' => 'Студия Б',
+            'variant_key' => 'voiceover-studio-b',
+        ]);
+        $englishSubtitles = $this->publishedMedia($title, $season, $episode, [
+            'translation_name' => null,
+            'variant_type' => 'subtitles',
+            'variant_name' => 'Субтитры',
+            'variant_key' => 'subtitles-en',
+            'has_subtitles' => true,
+            'subtitle_language' => 'en',
+        ]);
+        $factory = app(CatalogPlayerTransitionFactory::class);
+
+        $favoriteTransition = $factory->prepare(
+            $title,
+            null,
+            $episode,
+            null,
+            new PlaybackPreferencesData(
+                variant: 'voiceover-studio-a',
+                fallbackVariant: 'voiceover-studio-b',
+            ),
+        )->toArray();
+        $fallbackTransition = $factory->prepare(
+            $title,
+            null,
+            $episode,
+            null,
+            new PlaybackPreferencesData(
+                variant: 'voiceover-studio-a',
+                fallbackVariant: 'voiceover-studio-b',
+                hiddenVariantKeys: ['voiceover-studio-a'],
+            ),
+        )->toArray();
+        $subtitleTransition = $factory->prepare(
+            $title,
+            null,
+            $episode,
+            null,
+            new PlaybackPreferencesData(
+                playbackMode: PlaybackPreferenceMode::OriginalSubtitles,
+                subtitleLanguage: 'en',
+            ),
+        )->toArray();
+        $hiddenExplicitTransition = $factory->prepare(
+            $title,
+            null,
+            $episode,
+            $favorite->id,
+            new PlaybackPreferencesData(
+                fallbackVariant: 'voiceover-studio-b',
+                hiddenVariantKeys: ['voiceover-studio-a'],
+            ),
+        )->toArray();
+
+        self::assertSame($favorite->id, $favoriteTransition['selection']['mediaId']);
+        self::assertSame($fallback->id, $fallbackTransition['selection']['mediaId']);
+        self::assertSame($englishSubtitles->id, $subtitleTransition['selection']['mediaId']);
+        self::assertSame($fallback->id, $hiddenExplicitTransition['selection']['mediaId']);
+        self::assertNotContains(
+            $favorite->id,
+            array_column($fallbackTransition['translations'], 'mediaId'),
+        );
     }
 
     public function test_transition_navigation_crosses_regular_seasons_and_guest_progress_stays_disabled(): void

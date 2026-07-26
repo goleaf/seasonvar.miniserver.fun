@@ -19,6 +19,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $playback_speed
  * @property string|null $preferred_quality
  * @property string|null $preferred_variant
+ * @property string|null $fallback_variant
+ * @property string|null $preferred_playback_mode
+ * @property string|null $preferred_subtitle_language
+ * @property bool|null $notify_preferred_translation
  * @property bool|null $subtitles_enabled
  * @property bool|null $keyboard_shortcuts_enabled
  * @property bool|null $reduced_motion
@@ -36,6 +40,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'playback_speed',
     'preferred_quality',
     'preferred_variant',
+    'fallback_variant',
+    'preferred_playback_mode',
+    'preferred_subtitle_language',
+    'notify_preferred_translation',
     'subtitles_enabled',
     'keyboard_shortcuts_enabled',
     'reduced_motion',
@@ -62,6 +70,7 @@ final class UserAccountSetting extends Model
             'remember_volume' => 'boolean',
             'volume' => 'integer',
             'muted' => 'boolean',
+            'notify_preferred_translation' => 'boolean',
             'subtitles_enabled' => 'boolean',
             'keyboard_shortcuts_enabled' => 'boolean',
             'reduced_motion' => 'boolean',

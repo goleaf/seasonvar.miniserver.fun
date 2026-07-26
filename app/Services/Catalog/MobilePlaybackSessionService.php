@@ -11,6 +11,7 @@ use App\Models\CatalogTitle;
 use App\Models\Episode;
 use App\Models\Season;
 use App\Models\User;
+use App\Services\Auth\AccountSettingsService;
 use Illuminate\Support\Facades\URL;
 
 final readonly class MobilePlaybackSessionService
@@ -21,6 +22,7 @@ final readonly class MobilePlaybackSessionService
         private CatalogEntitlementService $entitlements,
         private MobilePlaybackGrant $grants,
         private CatalogPlaybackProgressSession $progressSessions,
+        private AccountSettingsService $accountSettings,
     ) {}
 
     public function create(
@@ -43,7 +45,13 @@ final readonly class MobilePlaybackSessionService
             return MobilePlaybackSessionData::blocked(PlaybackAvailability::NotFound);
         }
 
-        $source = $this->sources->resolve($title, $user, $episode, $mediaId, $preferences);
+        $source = $this->sources->resolve(
+            $title,
+            $user,
+            $episode,
+            $mediaId,
+            $this->effectivePreferences($user, $preferences),
+        );
 
         if (! $source->isPlayable() || $source->mediaId === null) {
             return MobilePlaybackSessionData::blocked($source->status);
@@ -113,6 +121,26 @@ final readonly class MobilePlaybackSessionService
             expiresAt: $expiresAt,
             navigation: $navigation,
             progressSessionToken: $progressToken,
+        );
+    }
+
+    private function effectivePreferences(?User $user, PlaybackPreferencesData $requested): PlaybackPreferencesData
+    {
+        if ($user === null) {
+            return $requested;
+        }
+
+        $account = $this->accountSettings->resolve($user);
+
+        return new PlaybackPreferencesData(
+            variant: $requested->variant ?? $account->preferredVariant,
+            audioLanguage: $requested->audioLanguage,
+            quality: $requested->quality ?? $account->preferredQuality,
+            format: $requested->format,
+            fallbackVariant: $account->fallbackVariant,
+            playbackMode: $account->playbackMode,
+            subtitleLanguage: $account->preferredSubtitleLanguage,
+            hiddenVariantKeys: $account->hiddenVariantKeys,
         );
     }
 }

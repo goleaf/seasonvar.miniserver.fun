@@ -173,7 +173,19 @@ Task 27 verified account lifecycle against every SQLite FK to `users`. Един�
 ## Security boundary настроек аккаунта
 
 - Все settings/profile/security/export routes требуют `auth` и `auth.session`, проходят `PrivateAccountResponse` и возвращают `private, no-store`, `Pragma: no-cache`, `X-Robots-Tag: noindex,nofollow`. URL не содержит user ID, email, private values, session identifiers или OAuth state; sitemap/structured data/social metadata settings не включают.
-- `AccountSettingsService`, dedicated Livewire methods и `MigrateAnonymousPreferencesRequest` принимают фиксированный набор scalar fields. Locale, IANA timezone, booleans, volume range, speed, real quality/variant codes и collection enum валидируются server-side; arbitrary key/column/nested array/user field/provider/category/session ID не достигает mass assignment или query ordering.
+- `AccountSettingsService`, dedicated Livewire methods и
+  `MigrateAnonymousPreferencesRequest` принимают фиксированный набор
+  scalar fields и bounded hidden-variant list. Locale, IANA timezone,
+  booleans, volume range, speed, real quality/voiceover/variant codes,
+  playback mode, subtitle-language allowlist и collection enum валидируются
+  server-side; favorite/fallback/hidden conflicts отклоняются до
+  transaction. Arbitrary key/column/user field/provider URL/session ID не
+  достигает mass assignment или query ordering.
+- Favorite-translation notification является opt-in database message:
+  получатель повторно проходит entitlement всех media parents, hidden
+  variant исключается, ID детерминирован по user/title/variant, а payload
+  содержит только title slug и очищенные variant key/label. Raw media URL,
+  media/user ID, история, токены и exception text не сохраняются.
 - CSRF защищает Livewire и anonymous merge POST. Merge throttled, idempotent, заполняет только nullable account choices и не блокирует login при nonessential failure. Browser storage не содержит password/email/token/history/progress; account scope — HMAC, local values нормализуются, foreign-account values ограничиваются device-safe volume state.
 - Session UI выбирает только bounded safe summaries, не payload/raw user-agent/IP/cookie/session ID. Revoke получает HMAC action token, повторно проверяет password, ownership и current-session exclusion, rate limits attempts; logout-other сохраняет текущую session и использует canonical remember-token behavior.
 - Profile update использует explicit `name|email` allowlist и plain-text normalization. Password/delete/export inputs не входят в generic settings payload, очищаются component-ом и не логируются. Account export исключает password/tokens/session IDs; deletion вызывает единственный transactional lifecycle service.

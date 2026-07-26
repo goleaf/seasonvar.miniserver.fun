@@ -58,6 +58,10 @@ class TitleCard extends Component
     /** @var array{type: string, label: string, url: string}|null */
     public ?array $userPrimaryAction;
 
+    public ?string $translationPreferenceState;
+
+    public ?string $translationPreferenceLabel;
+
     /**
      * @var Collection<int, Model>
      */
@@ -105,10 +109,20 @@ class TitleCard extends Component
         $this->userRating = $userRating ?? $this->integerAttribute($title, 'user_rating');
         $this->userProgressPercent = $userProgressPercent ?? $this->integerAttribute($title, 'user_progress_percent');
         $this->userPrimaryAction = $userPrimaryAction ?? $this->primaryActionAttribute($title);
+        $translationPreferenceState = $title->hasAttribute('user_translation_preference_state')
+            ? $title->getAttribute('user_translation_preference_state')
+            : null;
+        $this->translationPreferenceState = in_array($translationPreferenceState, ['preferred', 'alternative'], true)
+            ? $translationPreferenceState
+            : null;
+        $this->translationPreferenceLabel = $this->translationPreferenceState !== null
+            ? __('catalog.title.translation_preference.'.$this->translationPreferenceState)
+            : null;
         $this->hasPersonalState = $this->userInWatchlist
             || $this->userRating !== null
             || $this->userProgressPercent !== null
-            || $this->userPrimaryAction !== null;
+            || $this->userPrimaryAction !== null
+            || $this->translationPreferenceState !== null;
         $genreLimit = in_array($this->layout, ['home', 'spotlight'], true) ? 2 : 3;
         $this->cardGenres = ($title->relationLoaded('genres') ? $title->genres : collect())->take($genreLimit);
         $this->cardRelations = $this->cardGenres;

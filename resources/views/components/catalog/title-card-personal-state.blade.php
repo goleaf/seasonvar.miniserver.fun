@@ -25,6 +25,15 @@
                     <span>{{ __('catalog.viewing.watched_percent_label', ['percent' => $userProgressPercent]) }}</span>
                 </span>
             @endif
+            @if ($translationPreferenceLabel !== null)
+                <span
+                    data-translation-preference="{{ $translationPreferenceState }}"
+                    class="inline-flex items-center gap-1 rounded-full px-2 py-1 {{ $translationPreferenceState === 'preferred' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600' }}"
+                >
+                    <x-ui.icon :name="$translationPreferenceState === 'preferred' ? 'fa-solid fa-language' : 'fa-solid fa-circle-info'" />
+                    <span>{{ $translationPreferenceLabel }}</span>
+                </span>
+            @endif
         </div>
 
         @if ($userPrimaryAction)

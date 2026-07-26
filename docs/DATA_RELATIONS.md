@@ -120,7 +120,12 @@
 - Каждый пункт фильтра показывает только контекстное число публично доступных тайтлов при всех активных условиях, кроме собственной группы; отдельный глобальный счётчик для каждого значения не вычисляется.
 - Синтаксически корректные, но уже отсутствующие slug справочников тихо отбрасываются; неподдерживаемые enum-значения показывают ошибку валидации и не должны откатываться к полной выдаче каталога.
 - Фильтры года должны принимать четырехзначный год от 1900 до следующего года.
-- Языки и отдельные аудиодорожки не фильтруются как самостоятельные сущности, потому что нормализованных таблиц для них нет. Текущая `Translation` представляет озвучку/перевод, а `licensed_media.has_subtitles` — только наличие субтитров.
+- Языки и отдельные аудиодорожки не являются самостоятельными taxonomy
+  entities. `Translation` представляет озвучку/перевод,
+  `licensed_media.has_subtitles` — наличие субтитров, а nullable
+  `licensed_media.subtitle_language` содержит только явно распознанный
+  allowlisted language code. Locale интерфейса, страна тайтла и название
+  студии не используются как догадка о языке.
 - Locale интерфейса не используется как скрытая media preference: язык произведения, отдельные audio/subtitle language entities и profile preference в текущей схеме отсутствуют.
 
 ## Индексы запросов
@@ -417,9 +422,25 @@ ratings и licensed media остаются authoritative. Снимок их не
 ## Настройки аккаунта
 
 - `users` имеет optional `hasOne(UserAccountSetting::class)`. Таблица `user_account_settings` использует `user_id` одновременно как primary/foreign key, поэтому физически допускает ровно одну строку на account без duplicate reconciliation; account deletion удаляет её FK cascade.
-- Nullable columns фиксируют только явный выбор: `locale`, `timezone`, `autoplay`, `remember_volume`, `volume`, `muted`, `playback_speed`, `preferred_quality`, `preferred_variant`, `subtitles_enabled`, `keyboard_shortcuts_enabled`, `reduced_motion`, `collection_default_visibility`. Переведённые labels, media URLs, session/provider secrets, email/password, progress/history и notification matrix сюда не записываются.
+- Nullable columns фиксируют только явный выбор: `locale`, `timezone`,
+  `autoplay`, `remember_volume`, `volume`, `muted`, `playback_speed`,
+  `preferred_quality`, любимый `preferred_variant`, запасной
+  `fallback_variant`, `preferred_playback_mode`,
+  `preferred_subtitle_language`, `notify_preferred_translation`,
+  `subtitles_enabled`, `keyboard_shortcuts_enabled`, `reduced_motion`,
+  `collection_default_visibility`. Непоказываемые варианты находятся в
+  нормализованной `user_hidden_playback_variants` с unique
+  `(user_id,variant_key)` и cascade delete. Переведённые labels, media URLs,
+  session/provider secrets, email/password, progress/history и произвольная
+  notification matrix сюда не записываются.
 - `settings_version` монотонно увеличивается при material update и участвует в account/device precedence. Invalid legacy locale/timezone/boolean/range/speed/quality/variant/visibility читается как safe default, но не переписывается скрытно; следующий explicit save нормализует только выбранную категорию.
-- Interface locale использует существующий registry `ru|en`; timezone — allowlisted IANA ID, не raw offset. Playback speed берётся из config allowlist, volume — integer `0..100`, quality/variant — bounded stable codes реально доступных `licensed_media`/variant rows. Preferred временно недоступное значение сохраняется, resolver выбирает safe playable fallback.
+- Interface locale использует существующий registry `ru|en`; timezone —
+  allowlisted IANA ID, не raw offset. Playback speed берётся из config
+  allowlist, volume — integer `0..100`, quality/variant — bounded stable
+  codes реально доступных `licensed_media`/variant rows. Favorite и fallback
+  обязаны быть разными voiceover codes и не могут входить в hidden set;
+  hidden set ограничен 50 уникальными кодами. Временно недоступное
+  предпочтение сохраняется, resolver выбирает safe playable fallback.
 - Comment/review preferences остаются в `comment_notification_preferences` и `catalog_title_review_notification_preferences`, потому что delivery services уже читают эти таблицы. Collection default не изменяет `catalog_collections.visibility` существующих rows. Exact viewing history/progress/library остаются в private tables и не превращаются в settings fields.
 - `seasonvar.account-preferences.v1` в local storage — не database relation: anonymous/device state имеет schema version, optional account version и opaque owner scope. После login server принимает только typed allowlist и заполняет nullable account fields; volume/mute могут остаться device-only. Legacy `plyr` key читается совместимо и не удаляется до подтверждённой миграции. Существующий `seasonvar.playback-progress.v1` отдельно держит максимум 50 episode positions за 30 дней; verified account migration переиспользует `episode_view_progress`, не создаёт browser-history table, не переносит source URL и не перезаписывает ни одну non-anonymous account row.
 

@@ -10,12 +10,17 @@ use Illuminate\Validation\ValidationException;
 
 final readonly class MarkReleaseCalendarNotificationRead
 {
+    private const TYPES = [
+        'release-calendar.activity',
+        'playback-preference.translation-available',
+    ];
+
     public function __construct(private ReleaseCalendarSchema $schema) {}
 
     public function one(User $user, string $notificationId): void
     {
         $this->assertReady();
-        $notification = $user->notifications()->where('type', 'release-calendar.activity')->find($notificationId);
+        $notification = $user->notifications()->whereIn('type', self::TYPES)->find($notificationId);
 
         if ($notification === null) {
             throw ValidationException::withMessages(['notification' => [__('calendar.errors.notification_not_found')]]);
@@ -27,7 +32,7 @@ final readonly class MarkReleaseCalendarNotificationRead
     public function all(User $user): void
     {
         $this->assertReady();
-        $user->unreadNotifications()->where('type', 'release-calendar.activity')->update(['read_at' => now()]);
+        $user->unreadNotifications()->whereIn('type', self::TYPES)->update(['read_at' => now()]);
     }
 
     private function assertReady(): void

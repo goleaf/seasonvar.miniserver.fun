@@ -37,18 +37,58 @@ final class PlaybackPreferenceOptions
         return $options->all();
     }
 
-    /** @return list<array{value: string, label: string, available: bool}> */
-    public function variants(?string $selected = null, ?User $user = null): array
+    /**
+     * @param  string|list<string>|null  $selected
+     * @return list<array{value: string, label: string, available: bool}>
+     */
+    public function variants(string|array|null $selected = null, ?User $user = null): array
     {
-        $options = LicensedMedia::query()
+        return $this->variantOptions($selected, $user);
+    }
+
+    /**
+     * @param  string|list<string>|null  $selected
+     * @return list<array{value: string, label: string, available: bool}>
+     */
+    public function voiceovers(string|array|null $selected = null, ?User $user = null): array
+    {
+        return $this->variantOptions($selected, $user, 'voiceover');
+    }
+
+    /** @return list<array{value: string, label: string}> */
+    public function subtitleLanguages(): array
+    {
+        return collect((array) config('playback.supported_subtitle_languages', []))
+            ->filter(fn (mixed $language): bool => is_string($language) && preg_match('/^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/', $language) === 1)
+            ->unique()
+            ->map(fn (string $language): array => [
+                'value' => $language,
+                'label' => (string) __('settings.playback.subtitle_languages.'.$language),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  string|list<string>|null  $selected
+     * @return list<array{value: string, label: string, available: bool}>
+     */
+    private function variantOptions(string|array|null $selected, ?User $user, ?string $type = null): array
+    {
+        $query = LicensedMedia::query()
             ->availableTo($user)
             ->withPlaybackLocation()
             ->withoutKnownFailures()
             ->whereNotNull('variant_key')
             ->where('variant_key', '!=', '')
             ->orderBy('variant_key')
-            ->limit(250)
-            ->get(['variant_key', 'variant_name', 'translation_name'])
+            ->limit(250);
+
+        if ($type !== null) {
+            $query->where('variant_type', $type);
+        }
+
+        $options = $query->get(['variant_key', 'variant_name', 'translation_name'])
             ->unique('variant_key')
             ->filter(fn (LicensedMedia $media): bool => preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', (string) $media->variant_key) === 1)
             ->map(fn (LicensedMedia $media): array => $this->option(
@@ -58,15 +98,32 @@ final class PlaybackPreferenceOptions
             ))
             ->values();
 
-        if ($selected !== null && $selected !== '' && ! $options->contains('value', $selected)) {
-            $options->push($this->option(
-                $selected,
-                $this->unavailableLabel('settings.playback.variant_unavailable', 'variant', $selected),
-                false,
-            ));
+        foreach ($this->selectedValues($selected) as $selectedValue) {
+            if (! $options->contains('value', $selectedValue)) {
+                $options->push($this->option(
+                    $selectedValue,
+                    $this->unavailableLabel('settings.playback.variant_unavailable', 'variant', $selectedValue),
+                    false,
+                ));
+            }
         }
 
         return $options->all();
+    }
+
+    /**
+     * @param  string|list<string>|null  $selected
+     * @return list<string>
+     */
+    private function selectedValues(string|array|null $selected): array
+    {
+        return collect(is_array($selected) ? $selected : [$selected])
+            ->filter(fn (mixed $value): bool => is_string($value)
+                && $value !== ''
+                && preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $value) === 1)
+            ->unique()
+            ->values()
+            ->all();
     }
 
     /** @return array{value: string, label: string, available: bool} */

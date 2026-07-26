@@ -26,6 +26,41 @@
   `1440×1000` и `390×844` подтвердил точный порядок, реальный четырёхстрочный
   clamp, сетку статистики `2 + 2 + 1`, отсутствие horizontal overflow и
   ноль console errors.
+- Добавлены глобальные предпочтения переводов и субтитров без второго
+  проигрывателя или рекомендателя. Обратимая миграция
+  `2026_07_26_234000_add_playback_translation_preferences.php` расширяет
+  `user_account_settings` любимой и запасной озвучкой, режимом
+  `automatic|dubbed|original_subtitles`, языком субтитров и opt-in
+  уведомлением, создаёт нормализованную
+  `user_hidden_playback_variants` с cascade/unique и добавляет nullable
+  `licensed_media.subtitle_language`. `AccountSettingsService` валидирует
+  реальные voiceover/variant codes, язык и конфликты, атомарно заменяет
+  hidden set, сохраняет значения в экспорт и очищает их при reset/delete.
+  `AccountSettingsPage` предоставляет русско-английские доступные элементы
+  управления; onboarding и mobile playback переиспользуют тот же профиль,
+  сохраняя приоритет явного API/URL выбора.
+  `CatalogPlaybackSourceResolver` применяет порядок explicit → favorite →
+  fallback → mode/language → прежние quality/provider/health и исключает
+  hidden варианты из выбора и меню. `CatalogUserCardStateLoader` и
+  `CatalogRecommendationAvailabilityReranker` получают доступность одним
+  grouped media query; карточки сообщают о любимом или альтернативном
+  переводе. `ExternalMediaMetadata` записывает язык только по явному
+  subtitle marker. `PreferredTranslationNotificationService` после commit
+  повторно проверяет entitlement, исключает hidden вариант и создаёт одно
+  database-уведомление с детерминированным ID и безопасным payload без media
+  URL и внутренних ID. На отдельной SQLite проверены forward/down/forward
+  миграции; `EXPLAIN QUERY PLAN` выбрал новый
+  `user_account_preferred_translation_notify_idx`, covering hidden unique и
+  существующий `licensed_media_publication_lookup_idx`. Browser QA в
+  Chromium на `1440×1200` и `390×844` дополнительно выявил и исправил
+  недоступное для обновления Livewire-объявление об успешном сохранении и
+  вложенную прокрутку списка скрытых переводов; после исправлений нет
+  горизонтального переполнения, ошибок console или неудачных запросов.
+  `Pint`, `PHPStan`, task-scoped Rector, Composer, маршруты и Vite прошли,
+  связанная регрессия завершилась 52 тестами и 367 утверждениями. Полный
+  процесс из 2 065 тестов завершён с 2 046 успешными и 11 пропущенными;
+  семь отказов и одна ошибка были изолированы до двух чужих состояний
+  shared tree — web-session logout и отсутствующего importer batcher.
 - `CatalogHomeSnapshotCache` больше не повторяет коррелированный
   `withCount()` публичных тайтлов для `code=subtitle-available` при каждом
   перестроении только главной. Прежний запрос тега для канонической и

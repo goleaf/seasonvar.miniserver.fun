@@ -1256,7 +1256,7 @@ class SeasonvarImportPipeline
                     $updates['translation_name'] = $translationName;
                 }
 
-                foreach (['variant_type', 'variant_name', 'variant_key', 'has_subtitles'] as $attribute) {
+                foreach (['variant_type', 'variant_name', 'variant_key', 'has_subtitles', 'subtitle_language'] as $attribute) {
                     if ($variant[$attribute] !== $media->{$attribute}) {
                         $updates[$attribute] = $variant[$attribute];
                     }
@@ -1281,6 +1281,7 @@ class SeasonvarImportPipeline
                     'variant_name' => $media->variant_name,
                     'variant_key' => $media->variant_key,
                     'has_subtitles' => $media->has_subtitles,
+                    'subtitle_language' => $media->subtitle_language,
                     'url' => $url,
                 ]);
             }

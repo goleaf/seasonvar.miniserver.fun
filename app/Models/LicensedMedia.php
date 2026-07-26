@@ -30,8 +30,11 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property string $status
  * @property string|null $quality
  * @property string|null $translation_name
+ * @property string|null $variant_type
  * @property string|null $variant_name
  * @property string|null $variant_key
+ * @property bool $has_subtitles
+ * @property string|null $subtitle_language
  * @property string|null $format
  * @property int|null $file_size_bytes
  * @property CarbonInterface|null $file_size_checked_at
@@ -73,6 +76,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'variant_name',
     'variant_key',
     'has_subtitles',
+    'subtitle_language',
     'format',
     'file_size_bytes',
     'file_size_checked_at',

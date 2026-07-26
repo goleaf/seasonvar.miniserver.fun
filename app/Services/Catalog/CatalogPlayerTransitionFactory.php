@@ -82,6 +82,11 @@ final readonly class CatalogPlayerTransitionFactory
                 || (int) $requestedMedia->episode_id !== $episode->id) {
                 return $this->unavailable();
             }
+
+            if (in_array((string) $requestedMedia->variant_key, $preferences->hiddenVariantKeys, true)) {
+                $requestedMedia = null;
+                $requestedMediaId = null;
+            }
         }
 
         $source = $this->sources->resolve(
@@ -110,7 +115,13 @@ final readonly class CatalogPlayerTransitionFactory
         $season->setAttribute('kind', $episode->getAttribute('season_order_kind'));
         $season->setAttribute('sort_order', $episode->getAttribute('season_order_sort'));
         $season->setAttribute('number', $episode->getAttribute('season_order_number'));
-        $mediaItems = $this->playback->mediaForEpisode($title, $season, $episode, $user)->take(100);
+        $mediaItems = $this->playback->mediaForEpisode($title, $season, $episode, $user)
+            ->reject(fn (LicensedMedia $media): bool => in_array(
+                (string) $media->variant_key,
+                $preferences->hiddenVariantKeys,
+                true,
+            ))
+            ->take(100);
         $selectedMedia = $mediaItems->firstWhere('id', $selectedMedia->id);
 
         if (! $selectedMedia instanceof LicensedMedia) {

@@ -1,6 +1,6 @@
 # API
 
-Обновлено: 18.07.2026
+Обновлено: 26.07.2026
 
 ## Версии и discovery
 
@@ -196,7 +196,9 @@ Manifest в sync API — API change manifest, не Web App Manifest. `offline mu
 
 `POST /api/v1/titles/{titleSlug}/playback-sessions` остаётся единственным mobile context resolver: validated stable episode/media selection, canonical navigation, safe media metadata, progress token only for verified owner и short-lived signed API grant. `GET /api/v1/playback/{licensedMedia}` повторно проверяет signed opaque grant и entitlement. `PUT .../episodes/{episode}/progress` использует authenticated user, session/sequence и stable episode identity; user ID/source URL из request не доверяются.
 
-Task 07 не переименовывает route/API fields и не раскрывает raw provider URL, full model, preferences, private entitlement или issue diagnostics. Web autoplay/fallback bridge не становится high-frequency API. Full contract: [`audits/video-playback-report.md`](audits/video-playback-report.md).
+Для authenticated playback session отсутствующие `variant`, `audio_language`, `quality`, `format` и subtitle-настройки серверно дополняются owner preferences из `/settings/playback`. Явные валидированные параметры запроса имеют приоритет, но скрытые владельцем варианты всё равно fail closed и не возвращаются автоматически. Это не меняет JSON shape, не сериализует сами настройки и не доверяет client-side account state.
+
+Task 07 не переименовывает route/API fields и не раскрывает raw provider URL, full model, preferences, private entitlement или issue diagnostics. Web autoplay/fallback bridge не становится high-frequency API. Full contract: [`audits/video-playback-report.md`](audits/video-playback-report.md), глобальные translation preferences: [`Task 93 design`](superpowers/specs/2026-07-26-playback-translation-preferences-design.md).
 
 ## Personal-library API compatibility Task 09
 

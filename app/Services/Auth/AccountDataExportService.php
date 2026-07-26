@@ -40,6 +40,7 @@ final class AccountDataExportService
         'content-request.activity' => ['kind', 'request_public_id', 'status', 'canonical_public_id'],
         'technical-issue.activity' => ['kind', 'issue_public_id', 'public_number', 'issue_type', 'status', 'revision', 'canonical_public_id'],
         'release-calendar.activity' => ['kind', 'entry_public_id', 'entry_type', 'status', 'revision', 'previous_date', 'new_date'],
+        'playback-preference.translation-available' => ['catalog_title_slug', 'variant_key', 'variant_label'],
         'premium.activity' => ['kind', 'resource_public_id', 'expires_at', 'lifetime'],
     ];
 

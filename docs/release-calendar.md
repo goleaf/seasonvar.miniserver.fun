@@ -176,6 +176,8 @@ Apple Calendar получает прямую `webcal://` ссылку. Офиц�
 
 UUID уведомления детерминирован по получателю, событию, revision, delivery kind и стабильному `entry_type`, поэтому повтор observer/import не создаёт дубликат. Delivery kinds: announcement, date change, released, postponed и cancelled; содержательная категория премьеры/сезона/серии/перевода/субтитров/портальной публикации остаётся типом события и выбирает отдельный preference flag. Payload содержит только public UUID, type/status/kind/revision и безопасные старую/новую даты; provider reference, URL медиа, private note, email, точный progress и список получателей отсутствуют. Inbox заново разрешает видимость цели. Изменение времени меньше настроенного порога не создаёт date-change spam.
 
+Отдельное opt-in уведомление `playback-preference.translation-available` о появлении любимой озвучки использует тот же private inbox только как presentation surface, но не является календарной подпиской и не зависит от категорий `release_calendar_subscriptions`. Его eligibility, deterministic identity и безопасный payload принадлежат глобальным playback preferences; inbox повторно разрешает видимость тайтла перед ссылкой.
+
 Точный background reminder за 24 часа или час не заявлен: новая обязательная очередь или cron не добавлены. Страница показывает актуальное состояние при обычном чтении, а уведомления создаются после нормальной mutation/import boundary. Это честное graceful degradation при отсутствии отдельного надёжного планировщика напоминаний.
 
 ## Countdown

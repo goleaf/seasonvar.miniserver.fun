@@ -349,6 +349,15 @@ Review business state remains in Livewire/actions/DTO: viewer vote, permission, 
 
 `AccountSettingsPage` загружает только выбранный URL section, хранит scalar typed draft, применяет один Apply/Cancel pattern per staged group и dispatch-ит device sync после подтверждённого server save. Navigation использует обычные localized links с `wire:navigate`, поэтому back/forward и no-JavaScript route fallback сохраняются. Local volume/mute применяются немедленно и записываются debounced/pause/destroy, не отправляя server request на каждое движение slider.
 
+Playback section дополнительно редактирует любимую озвучку, запасной
+перевод, режим automatic/dubbed/original+subtitles, язык субтитров,
+ограниченный список скрытых вариантов и opt-in уведомление. Options
+приходят из server-scoped playable media; labels локализуются только при
+render. Карточки получают transient owner-only state одним grouped query и
+показывают «Есть ваш предпочитаемый перевод» либо «Пока доступна только
+другая озвучка»; Blade не выполняет запросов, а shared card cache не хранит
+этот state.
+
 `CatalogTitlePlayer` сохраняет URL selection как highest explicit precedence, затем использует сохранённый stable quality/variant и safe fallback. `player.js` применяет autoplay, remember-volume, mute, allowed speed, captions и focused keyboard shortcut к существующему Plyr/HLS instance; второй player/style/source resolver не создан. Reduced-motion account override добавляет body class и переиспользует те же motion-safe rules, что media query.
 
 ## Frontend lifecycle заявок на материалы

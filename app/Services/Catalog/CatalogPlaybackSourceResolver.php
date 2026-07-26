@@ -8,6 +8,7 @@ use App\DTOs\PlaybackPreferencesData;
 use App\DTOs\PlaybackSourceData;
 use App\Enums\MediaHealthStatus;
 use App\Enums\PlaybackAvailability;
+use App\Enums\PlaybackPreferenceMode;
 use App\Models\CatalogTitle;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
@@ -89,6 +90,22 @@ class CatalogPlaybackSourceResolver
 
         if ($excludedMediaIds !== []) {
             $query->whereNotIn((new LicensedMedia)->qualifyColumn('id'), $excludedMediaIds);
+        }
+
+        $hiddenVariantKeys = collect($preferences->hiddenVariantKeys)
+            ->filter(fn (mixed $key): bool => is_string($key)
+                && preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $key) === 1)
+            ->unique()
+            ->take(50)
+            ->values()
+            ->all();
+
+        if ($hiddenVariantKeys !== []) {
+            $query->where(function ($query) use ($hiddenVariantKeys): void {
+                $query
+                    ->whereNull('variant_key')
+                    ->orWhereNotIn('variant_key', $hiddenVariantKeys);
+            });
         }
 
         $mediaItems = $query->limit(100)->get();
@@ -289,6 +306,14 @@ class CatalogPlaybackSourceResolver
     {
         $providerPriority = (int) data_get(config('playback.provider_priority', []), (string) $media->storage_disk, 0);
         $variantMatch = $this->matches($media->variant_key, $preferences->variant) ? 1 : 0;
+        $fallbackMatch = $this->matches($media->variant_key, $preferences->fallbackVariant) ? 1 : 0;
+        $modeMatch = match ($preferences->playbackMode) {
+            PlaybackPreferenceMode::Dubbed => $media->variant_type === 'voiceover' ? 1 : 0,
+            PlaybackPreferenceMode::OriginalSubtitles => $media->has_subtitles
+                && in_array($media->variant_type, ['original', 'subtitles'], true) ? 1 : 0,
+            PlaybackPreferenceMode::Automatic => 0,
+        };
+        $subtitleLanguageMatch = $this->matches($media->subtitle_language, $preferences->subtitleLanguage) ? 1 : 0;
         $audioMatch = $this->matches($media->translation_name, $preferences->audioLanguage) ? 1 : 0;
         $qualityMatch = $this->matches($media->quality, $preferences->quality) ? 1 : 0;
         $formatMatch = $this->matches($media->format, $preferences->format) ? 1 : 0;
@@ -296,8 +321,11 @@ class CatalogPlaybackSourceResolver
         $qualityRank = $this->qualityRank($media->quality);
 
         return sprintf(
-            '%01d%01d%01d%01d%03d%01d%03d%012d',
+            '%01d%01d%01d%01d%01d%01d%01d%03d%01d%03d%012d',
             $variantMatch,
+            $fallbackMatch,
+            $modeMatch,
+            $subtitleLanguageMatch,
             $audioMatch,
             $qualityMatch,
             $formatMatch,
@@ -397,8 +425,11 @@ class CatalogPlaybackSourceResolver
             'available_until',
             'quality',
             'translation_name',
+            'variant_type',
             'variant_name',
             'variant_key',
+            'has_subtitles',
+            'subtitle_language',
             'format',
             'health_status',
             'deleted_at',

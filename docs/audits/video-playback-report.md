@@ -142,6 +142,36 @@ Resume выполняется после `loadedmetadata`, clamp-ится и н�
 - keyboard shortcuts enabled;
 - reduced motion из account presentation settings.
 
+Глобальные предпочтения переводов расширяют этот же contract и не создают
+параллельный профиль плеера. `preferred_variant` остаётся stable key любимой
+озвучки для обратной совместимости; рядом хранятся optional запасной
+`variant_key`, режим `automatic|dubbed|original_subtitles`, allowlisted
+BCP-47-like код языка субтитров и явное согласие на database-уведомление.
+Скрытые варианты принадлежат пользователю в отдельном normalized set с
+уникальностью `(user_id, variant_key)` и каскадным удалением.
+
+Порядок выбора сохраняет явный пользовательский action сильнее глобального
+профиля: принятый server-authorized media/URL choice, любимый вариант,
+запасной вариант, предпочитаемый режим и язык субтитров, затем существующие
+quality/provider/health rules. Скрытые варианты исключаются из автоматического
+выбора и server-prepared меню, но не удаляются из каталога. Favorite и fallback
+не могут совпадать или одновременно быть скрытыми. Недоступность настройки не
+стирает её: player временно использует безопасный доступный source.
+
+`subtitle_language` у source является nullable нормализованным metadata.
+Importer записывает его только при явном распознавании языка в provider
+metadata; interface locale, страна сериала и язык озвучки не используются как
+догадка. Отсутствующий code означает «язык не подтверждён», а не русский.
+
+Карточка получает только owner-specific presentation state через bounded
+grouped loader: «Есть ваш предпочитаемый перевод» при доступном любимом
+варианте либо «Пока доступна только другая озвучка», когда любимого варианта
+нет, но существует не скрытая озвучка. Private state не входит в shared cache,
+SEO, API или публичный HTML. Появление любимого варианта создаёт одно
+idempotent database-уведомление после committed publication; payload содержит
+только stable title/variant identity и никогда не содержит provider/source URL,
+token, raw metadata или историю просмотра.
+
 Authenticated changes проходят existing `AccountSettingsService`, CSRF/Livewire session и bounded player action; anonymous changes остаются local. Slider/rate changes debounce-ятся, fingerprint-deduplicate-ятся и не создают write на каждый movement. При выключенном remember-volume server/device volume/mute не обновляются, speed сохраняется независимо.
 
 После `ended` autoplay использует только заранее подготовленный server-authorized next transition и немедленно применяет его без countdown, кнопок Play now/Cancel и искусственного timeout. Preference `off` предотвращает переход. Последняя серия показывает final state без loop и без unrelated recommendation autoplay. Browser policy всё равно может заблокировать `play()`; тогда тот же выбранный источник остаётся открытым и проигрыватель показывает локализованное требование ручного запуска.

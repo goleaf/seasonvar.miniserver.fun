@@ -6,6 +6,7 @@ namespace App\Services\Catalog;
 
 use App\DTOs\CatalogRecommendationContext;
 use App\Enums\CatalogRecommendationType;
+use App\Enums\PlaybackPreferenceMode;
 use App\Models\LicensedMedia;
 use App\Services\Auth\AccountSettingsService;
 use Illuminate\Support\Collection;
@@ -27,29 +28,56 @@ final class CatalogRecommendationAvailabilityReranker
         $preferences = $this->settings->resolve($context->user);
         $candidateIds = array_column($candidates, 'id');
         $boosts = [];
+        $mediaByTitle = LicensedMedia::query()
+            ->availableTo($context->user)
+            ->forAvailableReleases($context->user)
+            ->withoutKnownFailures()
+            ->withPlaybackLocation()
+            ->whereIn('catalog_title_id', $candidateIds)
+            ->when(
+                $preferences->hiddenVariantKeys !== [],
+                fn ($query) => $query->where(function ($query) use ($preferences): void {
+                    $query
+                        ->whereNull('variant_key')
+                        ->orWhereNotIn('variant_key', $preferences->hiddenVariantKeys);
+                }),
+            )
+            ->get([
+                'catalog_title_id',
+                'quality',
+                'variant_key',
+                'variant_type',
+                'has_subtitles',
+                'subtitle_language',
+            ])
+            ->groupBy('catalog_title_id');
 
-        if ($preferences->preferredQuality !== null) {
-            $this->matchingTitleIds($context, $candidateIds, 'quality', $preferences->preferredQuality)
-                ->each(function (mixed $id) use (&$boosts): void {
-                    $id = (int) $id;
-                    $boosts[$id] = ($boosts[$id] ?? 0) + (int) config('recommendations.availability_boosts.quality', 12);
-                });
-        }
-
-        if ($preferences->preferredVariant !== null) {
-            $this->matchingTitleIds($context, $candidateIds, 'variant_key', $preferences->preferredVariant)
-                ->each(function (mixed $id) use (&$boosts): void {
-                    $id = (int) $id;
-                    $boosts[$id] = ($boosts[$id] ?? 0) + (int) config('recommendations.availability_boosts.variant', 12);
-                });
-        }
-
-        if ($preferences->subtitlesEnabled) {
-            $this->matchingTitleIds($context, $candidateIds, 'has_subtitles', true)
-                ->each(function (mixed $id) use (&$boosts): void {
-                    $id = (int) $id;
-                    $boosts[$id] = ($boosts[$id] ?? 0) + (int) config('recommendations.availability_boosts.subtitles', 6);
-                });
+        foreach ($mediaByTitle as $titleId => $mediaItems) {
+            $titleId = (int) $titleId;
+            $boost = 0;
+            $boost += $preferences->preferredQuality !== null
+                && $mediaItems->contains('quality', $preferences->preferredQuality)
+                    ? (int) config('recommendations.availability_boosts.quality', 12)
+                    : 0;
+            $boost += $preferences->preferredVariant !== null
+                && $mediaItems->contains('variant_key', $preferences->preferredVariant)
+                    ? (int) config('recommendations.availability_boosts.variant', 12)
+                    : 0;
+            $boost += $preferences->fallbackVariant !== null
+                && $mediaItems->contains('variant_key', $preferences->fallbackVariant)
+                    ? (int) config('recommendations.availability_boosts.fallback_variant', 8)
+                    : 0;
+            $boost += $this->modeAvailable($mediaItems, $preferences->playbackMode)
+                ? (int) config('recommendations.availability_boosts.playback_mode', 6)
+                : 0;
+            $boost += $preferences->preferredSubtitleLanguage !== null
+                && $mediaItems->contains('subtitle_language', $preferences->preferredSubtitleLanguage)
+                    ? (int) config('recommendations.availability_boosts.subtitle_language', 4)
+                    : 0;
+            $boost += $preferences->subtitlesEnabled && $mediaItems->contains('has_subtitles', true)
+                ? (int) config('recommendations.availability_boosts.subtitles', 6)
+                : 0;
+            $boosts[$titleId] = $boost;
         }
 
         foreach ($candidates as &$candidate) {
@@ -63,25 +91,19 @@ final class CatalogRecommendationAvailabilityReranker
     }
 
     /**
-     * @param  list<int>  $candidateIds
-     * @return Collection<int, int>
+     * @param  Collection<int, LicensedMedia>  $mediaItems
      */
-    private function matchingTitleIds(
-        CatalogRecommendationContext $context,
-        array $candidateIds,
-        string $column,
-        string|bool $value,
-    ): Collection {
-        return LicensedMedia::query()
-            ->availableTo($context->user)
-            ->forAvailableReleases($context->user)
-            ->withoutKnownFailures()
-            ->withPlaybackLocation()
-            ->whereIn('catalog_title_id', $candidateIds)
-            ->where($column, $value)
-            ->distinct()
-            ->pluck('catalog_title_id')
-            ->map(fn (mixed $id): int => (int) $id)
-            ->values();
+    private function modeAvailable(
+        Collection $mediaItems,
+        PlaybackPreferenceMode $mode,
+    ): bool {
+        return match ($mode) {
+            PlaybackPreferenceMode::Automatic => false,
+            PlaybackPreferenceMode::Dubbed => $mediaItems->contains('variant_type', 'voiceover'),
+            PlaybackPreferenceMode::OriginalSubtitles => $mediaItems->contains(
+                fn (LicensedMedia $media): bool => $media->has_subtitles
+                    && in_array($media->variant_type, ['original', 'subtitles'], true),
+            ),
+        };
     }
 }

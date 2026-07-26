@@ -9,6 +9,7 @@ use App\DTOs\CatalogTasteOnboardingState;
 use App\Enums\CatalogRecommendationDiversityPreference;
 use App\Enums\CatalogRecommendationFreshnessPreference;
 use App\Enums\CatalogRecommendationOnboardingTitleKind;
+use App\Enums\PlaybackPreferenceMode;
 use App\Models\CatalogRecommendationPreference;
 use App\Models\Country;
 use App\Models\Genre;
@@ -113,6 +114,11 @@ final readonly class CatalogTasteOnboardingService
                     'subtitles' => true,
                     'dubbed' => false,
                     default => null,
+                },
+                match ($data->playbackPreference->value) {
+                    'subtitles' => PlaybackPreferenceMode::OriginalSubtitles,
+                    'dubbed' => PlaybackPreferenceMode::Dubbed,
+                    default => PlaybackPreferenceMode::Automatic,
                 },
             );
         }, attempts: 3);
