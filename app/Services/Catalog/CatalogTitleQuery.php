@@ -235,7 +235,10 @@ class CatalogTitleQuery
             ),
             CatalogSort::VideoDesc => $this->joinCardCountSortAggregate(
                 $query,
-                $this->mediaCountSortAggregate($user),
+                $this->mediaCountSortAggregate(
+                    $user,
+                    $this->cardCountSortCandidateTitleIds($query),
+                ),
                 'catalog_media_sort_counts',
                 'published_media_count',
             ),
@@ -244,8 +247,10 @@ class CatalogTitleQuery
     }
 
     /**
+     * @template TAggregate of Model
+     *
      * @param  Builder<CatalogTitle>  $query
-     * @param  Builder<Model>  $aggregate
+     * @param  Builder<TAggregate>  $aggregate
      * @return Builder<CatalogTitle>
      */
     private function joinCardCountSortAggregate(
@@ -315,8 +320,23 @@ class CatalogTitleQuery
             ->groupBy($table.'.season_id');
     }
 
-    /** @return Builder<LicensedMedia> */
-    private function mediaCountSortAggregate(?User $user): Builder
+    /**
+     * @param  Builder<CatalogTitle>  $query
+     * @return Builder<CatalogTitle>
+     */
+    private function cardCountSortCandidateTitleIds(Builder $query): Builder
+    {
+        return (clone $query)
+            ->withoutEagerLoads()
+            ->reorder()
+            ->select('catalog_titles.id');
+    }
+
+    /**
+     * @param  Builder<CatalogTitle>  $candidateTitleIds
+     * @return Builder<LicensedMedia>
+     */
+    private function mediaCountSortAggregate(?User $user, Builder $candidateTitleIds): Builder
     {
         $table = (new LicensedMedia)->getTable();
 
@@ -325,7 +345,7 @@ class CatalogTitleQuery
             ->forAvailableReleases($user)
             ->select($table.'.catalog_title_id')
             ->selectRaw('COUNT(*) AS aggregate_count')
-            ->whereNotNull($table.'.catalog_title_id')
+            ->whereIn($table.'.catalog_title_id', $candidateTitleIds)
             ->groupBy($table.'.catalog_title_id');
     }
 

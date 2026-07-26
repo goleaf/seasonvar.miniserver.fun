@@ -9293,3 +9293,106 @@ height `30 354 px`. Из них 48 карточек «Последних обн�
   12 Task 68 файлов; final commit `c59fac2` не изменяет foreign Task 63/67
   hunks. Push завершился кодом 128 до передачи данных из-за отсутствующей
   HTTPS-аутентификации.
+
+## Task 69 — candidate-scoped сортировка каталога «С видео»
+
+Статус: `ready_for_exact_commit`.
+
+Дата начала: 26.07.2026.
+
+Approved design:
+[`2026-07-26-catalog-video-sort-candidate-scope-design.md`](../superpowers/specs/2026-07-26-catalog-video-sort-candidate-scope-design.md).
+
+Detailed unlimited plan:
+[`2026-07-26-catalog-video-sort-candidate-scope.md`](../superpowers/plans/2026-07-26-catalog-video-sort-candidate-scope.md).
+
+### Цель и evidence
+
+На рабочем snapshot из `32 980` тайтлов и `880 589` media сортировка
+`with_video` занимает `2 685,46 ms`, а один grouped result aggregate —
+`2 308,61 ms`. `EXPLAIN` материализует media всех тайтлов до внешнего
+фильтра. При `year=2024` текущий aggregate занимает `2 194,56 ms`, хотя
+scope содержит только `2 122` тайтла и `39 184` media.
+
+Выбран ID-only subquery из уже отфильтрованного result builder. Read-only
+prototype сохранил полный catalog path около `2 296,09 ms`, но сократил
+точный aggregate до `155,27 ms` для 2024, `32,24 ms` для 2000 и `9,83 ms`
+для 1980. Wide covering index дал лишь около 16% медианного выигрыша ценой
+`49,7 MiB` и write amplification; persisted counters/cache отклонены из-за
+новой consistency boundary.
+
+### Expected changed files
+
+- `app/Services/Catalog/CatalogTitleQuery.php`;
+- `tests/Feature/CatalogTitlesCardCountQueryTest.php`;
+- linked design/detailed/current plans;
+- `docs/performance.md`;
+- `docs/maintenance/technical-debt.md`;
+- `README.md`;
+- `CHANGELOG.md`.
+
+### Protected public contracts
+
+- `/titles`, `sort=with_video`, all filters/search and Livewire URL state;
+- `published_media_count DESC, indexed_at DESC, id DESC`;
+- numbered pagination, exact total, zero-count titles and card attributes;
+- guest/auth publication, audience/time-window and release hierarchy;
+- FTS candidate/ranking boundary;
+- public API, SEO/sitemap, importer, recommendations, collections,
+  administration, translations, cache keys/TTL/payloads and routes;
+- schema/data/indexes, dependencies, config/env and production processes;
+- all foreign shared-tree changes.
+
+### Cross-feature and risk matrix
+
+| Domain | Статус | Решение / gate |
+| --- | --- | --- |
+| Catalog filters/search | `critical_affected` | Candidate clone preserves exact built predicates; ordinary and real FTS tests |
+| Visibility/legal/access | `protected_critical` | Existing `availableTo()` and `forAvailableReleases()` remain canonical |
+| Pagination/order | `protected_critical` | Same total, `LEFT JOIN`, zero count and stable tie-breakers |
+| API/SEO/routes | `already_compliant` | No public contract change |
+| Cache | `already_compliant` | No key, TTL, payload, version or invalidation change |
+| Import/queue/admin | `not_applicable` | Read query only; no command/job/write |
+| Database/schema | `not_applicable` | No migration/index/DML; read-only profile only |
+| Frontend/mobile/a11y | `not_applicable` | No markup, assets or interaction change |
+| Production/rollback | `affected_low` | Code-only deploy/revert; no cache clear/data restore |
+| Shared Git state | `critical_risk_recorded` | Exact alternate-index commit in existing `main` |
+
+### Task-specific requirement-compliance matrix
+
+| Requirement/domain | Статус | Evidence / следующий gate |
+| --- | --- | --- |
+| Root/index/canonical requirements fresh read | `completed` | 26.07.2026 before edits |
+| Applicable performance/cache/search/ops/maintenance docs | `completed` | Canonical owners and previous `TD-011` design traced |
+| Installed versions/database | `completed` | PHP 8.5.8, Laravel 13.22.0, Boost 2.4.13, SQLite |
+| Official version-dependent docs | `completed` | Laravel 13 `leftJoinSub`, subqueries, eager-load and query listener docs via Boost |
+| Existing implementation first | `completed` | Builder/query/scopes/loader/tests/index inventory traced |
+| Read-only root-cause profile | `completed` | Full/control sorts, row counts, exact query timing and EXPLAIN captured |
+| Alternatives/user authorization | `completed` | Three approaches measured/compared; repeated explicit user preapproval applies |
+| Design/plan/files/contracts/risks | `completed` | Linked design and unlimited plan |
+| Migration/dependency/config/cache/DML | `not_applicable` | Explicitly excluded |
+| TDD RED | `completed` | Exact test: 1 failed after 5 semantic assertions only on missing candidate subquery |
+| Implementation | `completed` | Candidate clone/qualified `whereIn`; season/episode/builder/loader unchanged |
+| Focused/static/profile verification | `completed` | 10/44 focused, 138/1 234 adjacent, exact FTS/EXPLAIN/hash parity, Pint/PHPStan/Rector green |
+| Full default PHPUnit process | `unresolved` | Known cumulative `256M` exhaustion before TieredCacheTest; exact test 1/5 and file 10/35 green |
+| Frontend build | `not_applicable` | Task 69 changes only PHP query/tests/docs; no asset assumption changed |
+| Managed documentation check | `unresolved` | Shared worktree reports foreign stale blocks in README/CODE_STANDARDS/DATA_RELATIONS/SOURCE_PARITY/MAINTENANCE_LOG; exact staged policies green |
+| README/CHANGELOG/final requirement reread | `completed` | Owners updated; canonical requirements, Task 69 and visitor history re-read |
+| Commit/push in `main` | `pending` | Exact Task 69 patch only |
+
+### Безлимитный execution order
+
+1. `[completed]` Fresh requirements, versions, Git/shared-tree and existing implementation audit.
+2. `[completed]` Read-only production-scale profile for three count sorts.
+3. `[completed]` Root-cause EXPLAIN and relation/index cardinality audit.
+4. `[completed]` Disposable SQLite comparison of candidate scope, covering index and current plan.
+5. `[completed]` Approved design, exact file/contract/risk maps and detailed unlimited plan.
+6. `[completed]` TDD RED: 1 test/5 assertions; exact missing candidate boundary.
+7. `[completed]` Minimal candidate-clone/qualified `whereIn` implementation.
+8. `[completed]` Ordinary, filtered and real FTS GREEN.
+9. `[completed]` Full/specific after-profile, EXPLAIN and ID/order parity.
+10. `[completed_with_known_full_memory_ceiling]` Focused/adjacent/static/profile gates green; full process memory outcome isolated.
+11. `[completed]` Performance/technical-debt/visitor/changelog documentation.
+12. `[completed]` Final requirements reread, repository legacy scan and exact staged manifest.
+13. `[in_progress]` Commit only Task 69 on existing `main`.
+14. `[pending]` Configured non-force push; external rejection remains honest `unresolved`.

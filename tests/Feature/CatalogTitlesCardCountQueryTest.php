@@ -176,6 +176,59 @@ final class CatalogTitlesCardCountQueryTest extends TestCase
         ];
     }
 
+    public function test_video_sort_limits_its_media_aggregate_to_filtered_title_candidates(): void
+    {
+        $indexedAt = now();
+        $lowerCountTitle = CatalogTitle::factory()->create([
+            'year' => 2024,
+            'indexed_at' => $indexedAt,
+        ]);
+        $higherCountTitle = CatalogTitle::factory()->create([
+            'year' => 2024,
+            'indexed_at' => $indexedAt,
+        ]);
+        $outsideTitle = CatalogTitle::factory()->create([
+            'year' => 2023,
+            'indexed_at' => $indexedAt,
+        ]);
+        $this->createCountSortRelations($lowerCountTitle, 'with_video', 1);
+        $this->createCountSortRelations($higherCountTitle, 'with_video', 2);
+        $this->createCountSortRelations($outsideTitle, 'with_video', 3);
+        $queries = [];
+        DB::listen(function (QueryExecuted $query) use (&$queries): void {
+            $queries[] = str($query->sql)
+                ->replace(['`', '"'], '')
+                ->lower()
+                ->squish()
+                ->toString();
+        });
+
+        $data = app(CatalogTitlesPageBuilder::class)->data(
+            $this->catalogRequest([
+                'sort' => 'with_video',
+                'year' => [2024],
+            ]),
+            includeFacets: false,
+        );
+        $resultQuery = collect($queries)->first(
+            fn (string $sql): bool => str_contains($sql, 'catalog_media_sort_counts')
+                && str_contains($sql, 'order by published_media_count desc'),
+        );
+
+        $this->assertSame(2, $data['titles']->total());
+        $this->assertSame(
+            [$higherCountTitle->id, $lowerCountTitle->id],
+            $data['titles']->getCollection()->pluck('id')->all(),
+        );
+        $this->assertSame(2, $data['titles']->getCollection()->first()->published_media_count);
+        $this->assertIsString($resultQuery);
+        $this->assertStringContainsString(
+            'licensed_media.catalog_title_id in (select catalog_titles.id from catalog_titles',
+            $resultQuery,
+        );
+        $this->assertSame(2, substr_count($resultQuery, 'year in (?)'));
+    }
+
     public function test_ranked_search_keeps_count_sort_order_with_the_grouped_aggregate(): void
     {
         $indexedAt = now();
@@ -215,6 +268,70 @@ final class CatalogTitlesCardCountQueryTest extends TestCase
             $data['titles']->getCollection()->pluck('id')->all(),
         );
         $this->assertSame(2, $data['titles']->getCollection()->first()->episodes_count);
+    }
+
+    public function test_ranked_search_video_sort_reuses_fts_candidates_for_its_media_aggregate(): void
+    {
+        $indexedAt = now();
+        $lowerCountTitle = CatalogTitle::factory()->create([
+            'title' => 'Поиск видео один',
+            'indexed_at' => $indexedAt,
+        ]);
+        $higherCountTitle = CatalogTitle::factory()->create([
+            'title' => 'Поиск видео два',
+            'indexed_at' => $indexedAt,
+        ]);
+        $outsideTitle = CatalogTitle::factory()->create([
+            'title' => 'Посторонний результат',
+            'indexed_at' => $indexedAt,
+        ]);
+        $this->createCountSortRelations($lowerCountTitle, 'with_video', 1);
+        $this->createCountSortRelations($higherCountTitle, 'with_video', 2);
+        $this->createCountSortRelations($outsideTitle, 'with_video', 3);
+        app(CatalogSearchIndexer::class)->indexTitleIds([
+            $lowerCountTitle->id,
+            $higherCountTitle->id,
+            $outsideTitle->id,
+        ]);
+        CatalogSearchIndexState::query()->findOrFail(CatalogSearchIndexState::SINGLETON_ID)->update([
+            'version' => CatalogSearchIndexer::INDEX_VERSION,
+            'status' => CatalogSearchIndexStatus::Ready,
+            'source_count' => 3,
+            'document_count' => 3,
+            'completed_at' => now(),
+        ]);
+        $queries = [];
+        DB::listen(function (QueryExecuted $query) use (&$queries): void {
+            $queries[] = str($query->sql)
+                ->replace(['`', '"'], '')
+                ->lower()
+                ->squish()
+                ->toString();
+        });
+
+        $data = app(CatalogTitlesPageBuilder::class)->data(
+            $this->catalogRequest([
+                'q' => 'поиск видео',
+                'sort' => 'with_video',
+            ]),
+            includeFacets: false,
+        );
+        $resultQuery = collect($queries)->first(
+            fn (string $sql): bool => str_contains($sql, 'catalog_media_sort_counts')
+                && str_contains($sql, 'order by published_media_count desc'),
+        );
+
+        $this->assertSame(2, $data['titles']->total());
+        $this->assertSame(
+            [$higherCountTitle->id, $lowerCountTitle->id],
+            $data['titles']->getCollection()->pluck('id')->all(),
+        );
+        $this->assertIsString($resultQuery);
+        $this->assertStringContainsString(
+            'licensed_media.catalog_title_id in (select catalog_titles.id from (select',
+            $resultQuery,
+        );
+        $this->assertGreaterThanOrEqual(2, substr_count($resultQuery, 'catalog_search_candidates'));
     }
 
     /** @param array<string, mixed> $query */

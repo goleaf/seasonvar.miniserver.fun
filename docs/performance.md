@@ -509,6 +509,25 @@ read model, schema или cache key не добавлены.
 
 Same-snapshot direct comparison вернул те же 96 ID и изменил result query: `episodes_desc` — с `1 166,33` до `697,86 ms`, `seasons_desc` — с `200,54` до `175,30 ms`, `with_video` — с `4 348,99` до `2 826,29 ms`; `EXPLAIN` вместо outer `CORRELATED SCALAR SUBQUERY` показывает materialized grouped `LEFT JOIN`. Передача общего числа из исходной `filteredTitles()` query не меняет количество SQL round-trips или total `32 940`, но не выполняет сортировочный aggregate второй раз: полный builder `episodes_desc` изменился с `1 807,01` до `1 230,60 ms`, `with_video` — с `5 906,74` до `3 586,10 ms`; `seasons_desc` `735,87→780,03 ms` находится в шуме этого измерения. Все значения — одиночные read-only diagnostic observations в доказанном idle-окне до известного retry, не p95/SLA. Остаточная стоимость `with_video` и общий SQLite/queue contention остаются открытыми в `TD-011`; cache, schema, queue и URL contracts не менялись.
 
+Candidate-scope follow-up 26.07.2026 подтвердил, что остаточная стоимость
+`with_video` находилась внутри media aggregate: он материализовал доступные
+media всех `32 980` тайтлов до внешнего year/search/taxonomy filter. Теперь
+ID-only клон уже построенного result builder ограничивает
+`licensed_media.catalog_title_id` тем же canonical набором кандидатов.
+`availableTo()`/`forAvailableReleases()`, grouped `LEFT JOIN`, нулевые
+counts, paginator total и tie-breakers не менялись. На одном snapshot
+candidate и прежний aggregate вернули одинаковые SHA-256 последовательности
+96 ID для full/2024/2000/1980. Paired full-catalog samples остались в одном
+шумовом диапазоне (`2,23–2,49 s` legacy и `2,27–2,34 s` candidate), а
+filtered direct result query изменился `2 198,19→129,05 ms` для 2024,
+`2 405,53→44,93 ms` для 2000 и `2 432,46→6,87 ms` для 1980. `EXPLAIN` для
+2024 выбирает `catalog_titles_published_year_idx`, `LIST SUBQUERY` и
+`licensed_media_publication_lookup_idx` с равенством по
+`catalog_title_id/status/audience/deleted_at`. Это одиночные read-only
+observations, не p95/SLA; общий SQLite contention и full-catalog media scan
+остаются открытыми в `TD-011`. Schema/index/cache/route/API/import contracts
+не менялись.
+
 Managed Chromium fallback после недоступности системного Chrome проверил desktop/mobile `/titles?per_page=96&page=2` и `/titles?q=Практика`: четыре ответа `200`, корректные H1, нулевой horizontal overflow и отсутствие console/page/request/first-party response failures. Natural page-2 `MISS` получил DOMContentLoaded за `3,59 s`, следующий mobile `HIT` — за `1,67 s`; search `BYPASS` — за `1,83–2,24 s`. Длительность network-idle включает viewport-lazy facets/background warm requests и не объявляется page-load SLA.
 
 После graceful PHP-FPM reload isolated managed-Chromium smoke показал существенную зависимость от load/cache state: первый desktop `/` при одновременно running critical warm (`28` pending/`43` delayed/`1` reserved) и scheduled media-size importer превысил 30-second navigation timeout, `/en` завершился за `28,1 s`, а последующие mobile `/`, `/titles` и title detail — за `2,6–3,1 s`; отдельные desktop catalogue/title responses заняли `9,7/4,2 s`. Успешные ответы имели `200`, корректный `h1`, нулевой overflow/raw translation keys/console/page/first-party failures и нулевую service-worker registration. Это подтверждает application improvement и сохраняет остаточный contention/catalogue risk открытым; timeout не повышался, cache/queue не очищались.
