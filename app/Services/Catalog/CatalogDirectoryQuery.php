@@ -36,7 +36,7 @@ class CatalogDirectoryQuery
     ): LengthAwarePaginator {
         $query = $directory->isYear()
             ? $this->yearQuery($search, $decade)
-            : $this->taxonomyQuery($directory, $search, $letter);
+            : $this->taxonomyQuery($directory, $search, $letter, $sort);
 
         if ($directory->isYear()) {
             $sort === 'count_desc'
@@ -222,6 +222,7 @@ class CatalogDirectoryQuery
         CatalogDirectoryDefinition $directory,
         string $search,
         string $letter,
+        string $sort,
     ): Builder {
         $filterType = $directory->filterType?->value;
         abort_if($filterType === null, 404);
@@ -229,29 +230,45 @@ class CatalogDirectoryQuery
         $model = new $modelClass;
         $table = $model->getTable();
         $pivot = $this->taxonomies->pivot($filterType);
-        $counts = DB::table($pivot['table'])
-            ->selectRaw("{$pivot['related_key']} as directory_value_id")
-            ->selectRaw("count(distinct {$pivot['title_key']}) as published_titles_count")
-            ->whereIn(
-                $pivot['title_key'],
-                $this->titles->visibleTo(null)->select('catalog_titles.id'),
-            )
-            ->groupBy($pivot['related_key']);
+        $query = $modelClass::query()->select([
+            $table.'.id',
+            $table.'.name',
+            $table.'.slug',
+        ]);
 
-        $query = $modelClass::query()
-            ->select([
-                $table.'.id',
-                $table.'.name',
-                $table.'.slug',
-                'directory_value_counts.published_titles_count',
-            ])
-            ->joinSub(
-                $counts,
-                'directory_value_counts',
-                'directory_value_counts.directory_value_id',
-                '=',
-                $table.'.id',
-            )
+        if ($sort === 'count_desc') {
+            $counts = DB::table($pivot['table'])
+                ->selectRaw("{$pivot['related_key']} as directory_value_id")
+                ->selectRaw("count(distinct {$pivot['title_key']}) as published_titles_count")
+                ->whereIn(
+                    $pivot['title_key'],
+                    $this->titles->visibleTo(null)->select('catalog_titles.id'),
+                )
+                ->groupBy($pivot['related_key']);
+
+            $query
+                ->addSelect('directory_value_counts.published_titles_count')
+                ->joinSub(
+                    $counts,
+                    'directory_value_counts',
+                    'directory_value_counts.directory_value_id',
+                    '=',
+                    $table.'.id',
+                );
+        } else {
+            $visibleLinks = $this->correlatedVisiblePivotQuery($pivot, $table);
+
+            $query
+                ->selectSub(
+                    (clone $visibleLinks)->selectRaw(
+                        "count(distinct directory_visible_links.{$pivot['title_key']})",
+                    ),
+                    'published_titles_count',
+                )
+                ->whereExists((clone $visibleLinks)->selectRaw('1'));
+        }
+
+        $query
             ->whereNotNull($table.'.name')
             ->where($table.'.name', '<>', '')
             ->whereNotNull($table.'.slug')
@@ -273,6 +290,26 @@ class CatalogDirectoryQuery
         }
 
         return $query;
+    }
+
+    /**
+     * @param  array{table: string, title_key: string, related_key: string}  $pivot
+     */
+    private function correlatedVisiblePivotQuery(array $pivot, string $table): QueryBuilder
+    {
+        return DB::table($pivot['table'].' as directory_visible_links')
+            ->joinSub(
+                $this->titles->visibleTo(null)->select('catalog_titles.id'),
+                'directory_visible_titles',
+                'directory_visible_titles.id',
+                '=',
+                'directory_visible_links.'.$pivot['title_key'],
+            )
+            ->whereColumn(
+                'directory_visible_links.'.$pivot['related_key'],
+                '=',
+                $table.'.id',
+            );
     }
 
     private function filteredValueCount(

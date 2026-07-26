@@ -10218,3 +10218,90 @@ foreign shared-worktree scope.
 14. `[completed_unresolved_authentication]` Configured non-force
     `git push origin main` exited 128 before transfer:
     `fatal: could not read Username for 'https://github.com': No such device or address`.
+
+---
+
+
+## Task 82 — коррелированные счётчики name-order справочников
+
+Статус: `final_audit_complete_commit_pending`.
+
+Дата начала: 26.07.2026.
+
+Approved design:
+[`2026-07-26-directory-name-order-correlated-counts-design.md`](../superpowers/specs/2026-07-26-directory-name-order-correlated-counts-design.md).
+
+Detailed implementation plan:
+[`2026-07-26-directory-name-order-correlated-counts.md`](../superpowers/plans/2026-07-26-directory-name-order-correlated-counts.md).
+
+### Цель и measured root cause
+
+Обычный `name_asc` taxonomy directory materialize-ит grouped counts всех
+видимых связей до bounded 36–48 rows. На текущем `/actors` это 111 669
+values. Двенадцать alternating same-transaction samples сохранили exact
+ordered row hash
+`e4eb4f9a6a9e250c76cdba0a873901440c4c0601dd522f924787c023f20cfc72`;
+медиана result query составила `349,28 ms` для current aggregate и
+`0,78 ms` для correlated prototype. Это local read-only diagnostic под
+активной SQLite/import нагрузкой, не p95/SLA.
+
+Выбран existing-index `name/id scan → visible EXISTS → bounded scalar count`.
+Persisted summary и новый data cache отклонены из-за write/invalidation
+стоимости. `count_desc` остаётся глобальным grouped aggregate.
+
+### Expected files и protected contracts
+
+Ожидаются `CatalogDirectoryQuery`, новый isolated query optimization test,
+linked design/plan и exact performance/catalog-search/current-plan/README/
+CHANGELOG sections.
+
+Защищены web/API routes, Resources/OpenAPI, summary/alphabet/decades,
+filters/sort/page validation, exact counts/order, canonical visibility,
+tag locale/readiness, cache/SEO/sitemap/warming, schema/index/data,
+import/admin writes, dependencies/environment и весь foreign shared scope.
+
+Migration, routes, translations, permissions, cache keys/TTL/invalidation,
+config, assets, queue и dependencies не меняются. Rollback — code/docs
+revert без restore, reindex или cache flush.
+
+### Task-specific requirement-compliance matrix
+
+| Requirement/domain | Статус | Evidence / следующий gate |
+| --- | --- | --- |
+| Skills/root/index/canonical fresh read | `completed` | 26.07.2026 before Task 82 application edit |
+| Architecture/development/multilingual/security/performance/cache/ops/maintenance/integration | `completed` | Mandatory data/query owners traced |
+| Feature owners `catalog-search.md`/`api.md` | `completed` | Shared web/API directory contract traced |
+| Installed runtime/packages/database | `completed` | PHP 8.5.8, Laravel 13.22.0, Boost 2.4.13, Livewire 4.3.3, PHPUnit 12.5.32, SQLite 3.46.1 |
+| Official version-dependent docs | `completed` | Laravel 13 `whereExists`, subqueries, `joinSub`, query listener via Boost |
+| Existing implementation/dependants first | `completed` | Registry/query/page/API/resources/tests/cache warming/index history inspected |
+| Read-only root-cause profile | `completed` | Six directory profiles; actors alternating exact parity and EXPLAIN |
+| Alternatives/user authorization | `completed` | Correlation selected under repeated explicit approval |
+| Design/plan/files/contracts/risks | `completed` | Linked Task 82 documents |
+| TDD RED/GREEN | `completed` | RED: name-order failed only on global aggregate SQL; GREEN: 2 tests, 13 assertions |
+| Schema/index/DML | `not_applicable` | Existing reverse pivot/name indexes; read-only code only |
+| Routes/API/cache/SEO/auth/security/privacy | `already_compliant` | No contract change; 135 related tests, 1 139 assertions |
+| Localization/UI/mobile/a11y | `not_applicable` | No text, state, markup or asset change |
+| Production/rollback | `completed` | Exact actors/directors/tags frozen-time parity; actor EXPLAIN uses name, reverse-pivot and title-PK indexes; code-only rollback |
+| Focused/static verification | `completed` | 137 tests, 1 152 assertions; Pint, PHP syntax, scoped PHPStan and Rector green |
+| Docs/README/CHANGELOG | `completed` | Owners and visitor/technical histories updated; final `project:docs-refresh --check` and docs CI green |
+| HTTPS smoke | `completed` | `/actors?sort=name_asc` and API returned 200; API returned 20 requested values |
+| Final requirements/diff/legacy/debug/secret audit | `completed` | Canonical owners reread; task-scoped diff check green; no duplicate or debug path found |
+| Final audit/commit/push | `pending` | Exact Task 82 scope only; shared/external failure honest |
+
+### Безлимитный execution order
+
+1. `[completed]` Fresh requirements, versions, Git/shared-process audit.
+2. `[completed]` Existing directory/web/API/cache/index/test trace.
+3. `[completed]` Six-directory cold profile and actor query split.
+4. `[completed]` Alternatives, same-transaction prototype parity and EXPLAIN.
+5. `[completed]` Approved design, files/contracts/risks and detailed plan.
+6. `[completed]` Reread plan and add isolated RED regression.
+7. `[completed]` Minimal name-order correlation with count-desc compatibility.
+8. `[completed]` Focused GREEN, Pint and scoped static checks.
+9. `[completed]` Actors/directors/tags exact parity and query-plan profile.
+10. `[completed]` Related web/API/cache/SEO/warming regression.
+11. `[completed]` Performance/catalog-search owners, README and Russian
+    CHANGELOG; final managed-doc and docs CI gates green.
+12. `[completed]` Final requirements/legacy/debug/secret/diff audit.
+13. `[pending]` Exact Task 82 commit on existing `main`.
+14. `[pending]` Configured non-force push or honest unresolved blocker.

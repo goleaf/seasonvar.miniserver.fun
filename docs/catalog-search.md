@@ -6,6 +6,15 @@ Directory search полностью локален и не обращается 
 
 Search suggestions общего `/titles` могут предложить подходящий локальный directory route по названию справочника. Это metadata-only registry lookup без внешнего HTTP и без загрузки taxonomy rows.
 
+Обычный `name_asc` taxonomy directory начинает bounded result query с
+индексированного порядка `name,id`. Коррелированный `EXISTS` проверяет хотя бы
+одну связь с `CatalogTitleQuery::visibleTo(null)`, а
+`published_titles_count` считается только для значений текущей страницы.
+Глобальный grouped aggregate сохраняется исключительно для `count_desc`,
+потому что эта сортировка обязана сравнить counts всех кандидатов. Summary,
+alphabet, locale-aware tag labels, search/letter filters и web/API pagination
+остаются отдельными прежними contracts.
+
 ## Контракт запроса
 
 HTTP query-параметр `q` проходит через `CatalogTitlesRequest`: строка приводится к Unicode NFKC, пробелы по краям удаляются, а последовательности Unicode-пробелов схлопываются. Непустая строка может содержать от 1 до 80 Unicode-символов (`min:1|max:80`), но односимвольный запрос выполняет только точное сопоставление основного, оригинального или альтернативного названия и никогда не запускает FTS/prefix/full-table partial scan. Строка длиннее 80 символов отклоняется без молчаливого обрезания. Array/object-shaped `q` считается пустым безопасным состоянием и не попадает в SQL. Сообщения валидации и имена полей принадлежат `lang/{ru,en}/catalog.php`.

@@ -799,6 +799,44 @@ cache key/version/TTL/invalidation, dependency, queue или environment не
 изменены. Rollback — обычный revert PHP/tests/docs без database restore,
 cache flush или migration rollback.
 
+## Bounded name-order справочников каталога
+
+Follow-up 26.07.2026 локализовал глобальный grouped aggregate внутри
+`CatalogDirectoryQuery::paginate()`: обычный `name_asc` сначала считал
+видимые связи всех taxonomy values и только затем выбирал 36–48 строк. На
+текущем actor directory это означало materialization counts для 111 669
+значений ради первых 48.
+
+`name_asc` теперь начинает query с taxonomy table в порядке `name,id`,
+проверяет видимую связь коррелированным `EXISTS` и считает
+`published_titles_count` scalar subquery только у строк bounded страницы.
+Оба подзапроса переиспользуют прежний
+`CatalogTitleQuery::visibleTo(null)` через Laravel `joinSub`; publication
+window, audience, soft delete, canonical tag eligibility, locale labels,
+search/letter filters и tie-breaker не изменились. `count_desc` намеренно
+сохраняет прежний глобальный grouped aggregate.
+
+В одной frozen-time read transaction восемь чередующихся samples для каждого
+справочника сохранили exact ordered ID/name/count payload и SHA-256. Медиана
+actor result query изменилась с `230,32` до `2,08 ms`, director — с `95,17`
+до `2,13 ms`, tag — с `123,14` до `77,81 ms`. Для actors SQLite выбрал
+`actors_directory_name_idx`, reverse covering
+`catalog_title_actor_actor_id_catalog_title_id_index` и два primary-key probe
+видимого тайтла; `directory_value_counts` и глобальный `GROUP BY` в
+name-order result query отсутствуют. Summary и alphabet queries по-прежнему
+доминируют в cold full-page profile и остаются отдельным measured follow-up.
+Это локальные read-only diagnostics при активном importer/SQLite workload, не
+p95/SLA.
+
+TDD сначала дал один ожидаемый structural failure при уже корректных
+значениях, затем новый contract прошёл 2 теста с 13 утверждениями. Связанная
+web/API/cache/SEO/warming matrix прошла 135 дополнительных тестов с 1 139
+утверждениями; `Pint`, PHP syntax, task-scoped `PHPStan` и `Rector`
+завершились успешно. Migration, schema/index/DML, route, Resource/OpenAPI,
+translation, cache key/TTL/invalidation, queue, dependency и environment не
+изменены; rollback — обычный code/docs revert без restore, reindex или cache
+flush.
+
 ## Производительность onboarding вкусов Task 71
 
 Autocomplete ограничен существующим suggestion query и не гидратирует полный
