@@ -56,6 +56,8 @@ final readonly class CreateContentRequest
         $existingSubmission = ContentRequest::query()->where('submission_key', $submissionKey)->first();
 
         if ($existingSubmission !== null) {
+            Gate::forUser($user)->authorize('view', $existingSubmission);
+
             return $existingSubmission;
         }
 
@@ -187,6 +189,10 @@ final readonly class CreateContentRequest
 
         if (! $created && ! $request->is_public && $request->requester_id !== $user->id) {
             throw new ContentRequestActionException('requests.errors.exact_duplicate');
+        }
+
+        if (! $created) {
+            Gate::forUser($user)->authorize('view', $request);
         }
 
         if (! $created && ! $request->type->isAdministrativeOnly()) {

@@ -88,7 +88,7 @@ return new class extends Migration
                     DB::table('help_article_aliases')
                         ->where('help_article_id', $article->id)
                         ->where('locale', $locale)
-                        ->whereIn('alias', $aliases)
+                        ->whereIn('alias', array_keys($aliases))
                         ->delete();
                 }
             }
@@ -157,13 +157,13 @@ return new class extends Migration
                     ]);
 
                 foreach ($contract['aliases_remove'] as $locale => $aliases) {
-                    foreach ($aliases as $position => $alias) {
+                    foreach ($aliases as $alias => $priority) {
                         DB::table('help_article_aliases')->insertOrIgnore([
                             'help_article_id' => $article->id,
                             'locale' => $locale,
                             'alias' => $alias,
                             'normalized_alias' => $this->searchText($alias),
-                            'priority' => max(0, 100 - $position),
+                            'priority' => $priority,
                             'created_at' => $now,
                             'updated_at' => $now,
                         ]);
@@ -199,7 +199,7 @@ return new class extends Migration
      * @return array<string, array{
      *     article_up: array<string, mixed>,
      *     article_down: array<string, mixed>,
-     *     aliases_remove: array<string, list<string>>,
+     *     aliases_remove: array<string, array<string, int>>,
      *     replacements: array<string, array{old: string, new: string, note: string}>
      * }>
      */
@@ -233,8 +233,8 @@ return new class extends Migration
                 'article_up' => [],
                 'article_down' => [],
                 'aliases_remove' => [
-                    'ru' => ['исправить описание'],
-                    'en' => ['correct metadata'],
+                    'ru' => ['исправить описание' => 97],
+                    'en' => ['correct metadata' => 97],
                 ],
                 'replacements' => [
                     'ru' => [

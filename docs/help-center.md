@@ -129,7 +129,7 @@ Enum escalation допускает только `none`, `technical_ticket`, `con
 - `premium_support` создаёт private Task 20 context только для реально показанного entitlement, а не обещает refund/billing workflow.
 - `rights_holder_contact` показывается только если реальный canonical channel существует; fake email/office hours/response time нет.
 
-Public article body не хранит current ticket/request/user identity. Support contact list содержит только работающие route helpers. Technical issues, screenshots, private correspondence и resolution по-прежнему принадлежат Task 20; missing title/season/episode/translation/subtitle/quality/metadata — Task 19.
+Public article body не хранит current ticket/request/user identity. Support contact list содержит только работающие route helpers. Technical issues, screenshots, private correspondence и resolution по-прежнему принадлежат Task 20; missing title/season/episode/translation/subtitle/quality — Task 19, а исправления существующих данных — закрытой administration boundary.
 
 `metadata_correction` и `episode_list_correction` больше не входят в публичный allowlist эскалации. Если прежняя опубликованная статья всё ещё хранит такой subtype, `HelpEscalationService` fail closed и не подменяет его общей заявкой. Migration `2026_07_26_235600_restrict_catalog_corrections_to_administrators.php` guarded-переиздаёт две исходные статьи как revision `2`: календарная статья теряет correction escalation, а статья о выборе request/ticket направляет исправления полей редакции. Новых публичных маршрутов, автоматического создания заявки или исправления пользовательских редакций migration не добавляет.
 

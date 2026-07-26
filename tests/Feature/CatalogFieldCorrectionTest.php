@@ -30,6 +30,7 @@ use App\Models\Tag;
 use App\Models\Translation;
 use App\Models\User;
 use App\Notifications\ContentRequestActivityNotification;
+use App\Services\Admin\AdminAccessResolver;
 use App\Services\ContentRequests\CatalogCorrectionTargetResolver;
 use App\Services\ContentRequests\ContentRequestInputFactory;
 use App\Services\ContentRequests\ContentRequestNotificationQuery;
@@ -170,6 +171,26 @@ final class CatalogFieldCorrectionTest extends TestCase
         $this->get(route('admin.requests'))
             ->assertOk()
             ->assertSeeText($request->title);
+    }
+
+    public function test_revoked_administrator_cannot_recover_a_correction_with_an_old_submission_token(): void
+    {
+        $administrator = $this->administrator();
+        [$title, $tag] = $this->catalogFixture();
+        $correctionInput = $this->correctionInput($title, $tag);
+
+        app(CreateContentRequest::class)->handle($administrator, $correctionInput);
+        config(['seasonvar.admin_emails' => []]);
+        app(AdminAccessResolver::class)->forget($administrator);
+        $publicInput = app(ContentRequestInputFactory::class)->from([
+            'type' => ContentRequestType::Serial->value,
+            'title' => 'Новый публичный запрос',
+            'submission_token' => $correctionInput->submissionToken,
+        ]);
+
+        $this->expectException(AuthorizationException::class);
+
+        app(CreateContentRequest::class)->handle($administrator, $publicInput);
     }
 
     public function test_historical_public_flag_cannot_expose_a_correction_to_its_requester_or_public_surfaces(): void

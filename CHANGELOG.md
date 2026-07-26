@@ -4,16 +4,18 @@
 
 - Публичная функция «Исправить данные» полностью удалена из карточки тайтла
   и проигрывателя: `CatalogTitlePageBuilder` и `CatalogTitlePlayer` больше не
-  строят correction URL, Blade-компонент ссылки удалён, а старые response
-  envelopes изолированы версиями `response_contract`. Типы
+  строят URL исправлений, компонент ссылки удалён, а старые кешированные
+  ответы изолированы версиями `response_contract`. Типы
   `metadata_correction` и `episode_list_correction` сохранены только для
-  администраторов с `manage-content-requests`: type-aware policy защищает
-  форму, Livewire state и action, записи всегда private и не получают
-  vote/follow, public binding/query/SEO/presenter/help/notifications/demo
-  fail closed даже при прежнем `is_public = 1`. Guarded data migration
+  администраторов с `manage-content-requests`: проверка прав защищает форму,
+  состояние `Livewire` и серверное действие, записи всегда закрыты и не
+  получают голоса или подписки, а публичные маршруты, запросы, поисковая
+  индексация, представление, справка, уведомления и демонстрационные данные
+  закрываются при любой ошибке даже при прежнем `is_public = 1`. Защищённая
+  миграция данных
   переиздаёт две исходные статьи справки без публичной эскалации исправлений
-  и не перезаписывает редакторские версии. Добавлены feature, unit,
-  migration-roundtrip и Playwright-проверки admin-only boundary.
+  и не перезаписывает редакторские версии. Добавлены функциональные,
+  модульные, миграционные и `Playwright`-проверки административной границы.
 - Добавлен закрытый при любой ошибке выпуск проигрывателя одной версией:
   `resources/player-release.json` перечисляет 29 исходных файлов,
   `player-release-vite-plugin.js` после финальной записи фрагментов Vite

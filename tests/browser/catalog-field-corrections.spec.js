@@ -43,7 +43,7 @@ test('catalog corrections are absent from the public frontend and direct access 
     const response = await page.goto('/requests/create?type=metadata_correction');
 
     expect(response?.status()).toBe(403);
-    await expect(page.getByText('403')).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Доступ запрещён' })).toBeVisible();
     expect(consoleErrors).toEqual([]);
     expect(pageErrors).toEqual([]);
     expect(failedRequests).toEqual([]);
