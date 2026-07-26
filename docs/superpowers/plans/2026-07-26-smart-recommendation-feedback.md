@@ -315,12 +315,14 @@ Design:
 71. `[completed]` Review full/staged/unstaged/untracked diff/stat, branch,
     upstream, remotes, secrets, debug and mass formatting.
 72. `[completed]` Stage only exact task files/hunks in alternate index.
-73. `[in_progress]` Inspect `git diff --cached` and commit coherent feature in
+73. `[completed]` Inspect `git diff --cached` and commit coherent feature in
     existing `main`.
-74. `[pending]` Reconcile original foreign index without reset/stash/unstage.
-75. `[pending]` Push current `main` without force; record exact external
-    authentication/protection failure if any.
-76. `[pending]` Report files, migrations/indexes, query/security fixes,
+74. `[completed]` Reconcile original foreign index without reset/stash/unstage.
+75. `[skipped]` Configured non-force `git push origin main` was attempted
+    after commit `9270b4f` and rejected before data transfer because GitHub
+    HTTPS credentials are unavailable:
+    `fatal: could not read Username for 'https://github.com': No such device or address`.
+76. `[completed]` Report files, migrations/indexes, query/security fixes,
     tests/commands, skipped/unresolved, branch/hash/message/push/risks.
 
 ## Expected changed files
