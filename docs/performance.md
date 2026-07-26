@@ -1167,3 +1167,62 @@ scroll listener меняет только компактное состояни�
 `requestAnimationFrame`. Проверочный Vite build сформировал CSS `199,57 kB`
 (`43,32 kB` gzip) и JS `29,34 kB` (`9,50 kB` gzip); это локальный build
 snapshot, а не production SLA.
+
+## Compact subtitle facet главной страницы
+
+Следующий профиль 26.07.2026 выполнялся после прогрева годового facet
+resource. Private build главной содержал девять SQL statements за
+`38,03 ms` учтённого SQL и `193,287 ms` wall; самым дорогим оставался
+correlated count публичных тайтлов для canonical
+`code=subtitle-available` — `21,14 ms`. Этот результат меняется вместе с
+публичным каталогом/тегом, но прежний код повторял его при каждом
+Homepage-only rebuild.
+
+`EXPLAIN QUERY PLAN` уже выбирает `tags_code_unique`, covering
+`catalog_title_tag_tag_id_catalog_title_id_index(tag_id, catalog_title_id)` и
+integer primary key `catalog_titles`. Поэтому новый индекс или SQLite hint не
+добавлены: они увеличили бы стоимость importer writes, не устранив повторный
+count. Denormalized counter/materialized table также отклонены из-за нового
+backfill, transactional write и repair contract.
+
+Прежний constrained `Tag::query()->withCount()` теперь является rebuild
+callback отдельного `homepage-subtitle-tag-v1` resource в существующем
+`CatalogFacetSnapshotCache`. Он сохраняет только `id`, `name`, `slug` и
+`catalog_titles_count`; canonical/legacy lookup, все publication, audience,
+availability-window и soft-delete predicates не изменены.
+
+Пять read-only samples с изолированными array stores дали по 10 SQL и одному
+subtitle query для первого build новой `CatalogFacets` generation, затем по
+8 SQL и нулю subtitle query для принудительного Homepage rebuild в той же
+generation. До изменения сопоставимый прогретый year-facet build выполнял
+девять statements, включая один subtitle query. Во всех десяти измерениях
+сохранились count `2 917` и SHA-256 payload
+`d24cc32e754de3ce546300ed028ef442f77c8f00e1d040b5e94b6dd20a367932`.
+
+Медиана первого build составила `249,04 ms` SQL / `534,698 ms` wall,
+повторного — `39,02 ms` SQL / `302,887 ms` wall. Один повторный wall sample
+был зашумлён параллельной нагрузкой до `2 205,938 ms`, поэтому timings
+являются только локальной диагностикой, не p95/SLA; детерминированный
+результат задачи — отсутствие одного запроса при неизменном payload.
+
+TDD сначала упал после трёх утверждений на двух subtitle queries вместо
+одного, затем три новых lifecycle/null/legacy теста прошли с 12
+утверждениями. Весь `CatalogHomePerformanceTest` прошёл 14/68, объединённая
+cache/facet/invalidation/API/web matrix — 38/831. Полный процесс с временным
+лимитом `1G` завершил 2 065 тестов: 2 046 прошли, 11 пропущены, семь отказов
+и одна ошибка относятся к параллельным изменениям translation preferences,
+общих query budgets, sitemap, web sessions и importer batching; тесты Task 95
+не падали. Стандартный закреплённый `256M` остаётся недостаточным для
+накопительного полного процесса, но не для направленных классов.
+
+Локальный managed Chromium вернул HTTP 200 для `1440×1200` за `2 685 ms`,
+для `390×844` за `1 646 ms` и для `/api/v1/home`. H1, ссылка и API-фасет
+субтитров сохранены; horizontal overflow, console/page/request/local-asset
+errors отсутствовали. Эти времена являются диагностикой локального
+request/render, не production SLA.
+
+Routes, Resources, UI, translations, schema/index/DML, dependencies, queues,
+config и environment не менялись. Existing after-commit catalog/tag
+invalidation обновляет `CatalogFacets`; cache miss/outage выполняет
+authoritative query. Rollback — обычный code/docs revert без restore,
+reindex, backfill или cache flush.

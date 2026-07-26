@@ -2,6 +2,31 @@
 
 ## 2026-07-26
 
+- `CatalogHomeSnapshotCache` больше не повторяет коррелированный
+  `withCount()` публичных тайтлов для `code=subtitle-available` при каждом
+  перестроении только главной. Прежний запрос тега для канонической и
+  устаревшей схем сохранён как
+  канонический `callback` компактного ресурса
+  `homepage-subtitle-tag-v1` существующего `CatalogFacetSnapshotCache`;
+  содержимое содержит только `id`, `name`, `slug` и
+  `catalog_titles_count`. `CatalogCacheInvalidator` и
+  `TagCacheInvalidator` уже повышают `Homepage` и `CatalogFacets` после
+  `commit`, а промах или ошибка кеша выполняет исходный запрос. На SQLite
+  рабочего масштаба
+  `EXPLAIN QUERY PLAN` использует `tags_code_unique`, обратный покрывающий
+  индекс связующей таблицы и первичный ключ тайтлов, поэтому миграция и
+  новый индекс не добавлены. Пять
+  изолированных замеров сохранили счётчик `2 917` и одинаковый SHA-256:
+  первая сборка нового поколения фасетов выполняла 10 SQL и один запрос тега
+  субтитров, повторная — 8 SQL и ноль запросов тега. TDD прошёл 3 теста с 12
+  утверждениями, весь класс производительности — 14/68, объединённая
+  cache/invalidation/`API`/web-матрица — 38/831. Pint, синтаксис, PHPStan,
+  Rector, Composer и Vite прошли; Chromium desktop/mobile и
+  `/api/v1/home` вернули 200 без overflow или browser errors. Полный процесс
+  завершил 2 065 тестов: 2 046 прошли, 11 пропущены, а семь отказов и одна
+  ошибка принадлежат параллельным изменениям переводов, общих query budgets,
+  sitemap, web sessions и importer batching; тесты этой оптимизации не
+  падали.
 - Добавлен provenance-слой метаданных каталога. Обратимые migrations
   `2026_07_26_064318_create_catalog_metadata_provenance_tables.php` и
   `2026_07_26_064319_add_quality_run_links_to_catalog_quality_tables.php`

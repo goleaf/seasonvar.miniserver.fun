@@ -6,10 +6,14 @@ namespace Tests\Feature;
 
 use App\DTOs\CatalogRecommendationContext;
 use App\Enums\CatalogRecommendationType;
+use App\Enums\TagModerationStatus;
+use App\Enums\TagType;
+use App\Enums\TagVisibility;
 use App\Models\CatalogTitle;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\Season;
+use App\Models\Tag;
 use App\Services\Catalog\CatalogCacheInvalidator;
 use App\Services\Catalog\CatalogHomeContentAdditionQuery;
 use App\Services\Catalog\CatalogHomeMetricsCache;
@@ -464,6 +468,113 @@ final class CatalogHomePerformanceTest extends TestCase
             ['year' => 2025, 'titles_count' => 1],
         ], $rebuilt['year_buckets']);
         $this->assertCount(2, $yearQueries);
+    }
+
+    public function test_home_snapshot_reuses_subtitle_tag_until_the_facet_version_changes(): void
+    {
+        $visibleTitle = CatalogTitle::factory()->create();
+        $hiddenTitle = CatalogTitle::factory()->create(['is_published' => false]);
+        $tag = Tag::query()->create([
+            'name' => 'Субтитры',
+            'slug' => 'subtitry',
+            'code' => 'subtitle-available',
+            'type' => TagType::System->value,
+            'visibility' => TagVisibility::Public->value,
+            'moderation_status' => TagModerationStatus::Approved->value,
+        ]);
+        $visibleTitle->tags()->attach($tag);
+        $hiddenTitle->tags()->attach($tag);
+        $versions = app(CacheVersionRegistry::class);
+        $versions->bump(CacheDomain::CatalogFacets);
+        $subtitleQueries = [];
+        DB::listen(function (QueryExecuted $query) use (&$subtitleQueries): void {
+            $sql = str($query->sql)
+                ->replace(['`', '"'], '')
+                ->lower()
+                ->squish()
+                ->toString();
+
+            if (str_contains($sql, 'from tags')
+                && str_contains($sql, 'catalog_titles_count')
+                && in_array('subtitle-available', $query->bindings, true)) {
+                $subtitleQueries[] = $sql;
+            }
+        });
+        $snapshot = app(CatalogHomeSnapshotCache::class);
+
+        $first = $snapshot->refresh();
+        $second = $snapshot->refresh();
+
+        $this->assertSame([
+            'id' => $tag->id,
+            'name' => 'Субтитры',
+            'slug' => 'subtitry',
+            'catalog_titles_count' => 1,
+        ], $first['subtitle_tag']);
+        $this->assertSame($first['subtitle_tag'], $second['subtitle_tag']);
+        $this->assertCount(1, $subtitleQueries);
+
+        $newVisibleTitle = CatalogTitle::factory()->create();
+        $newVisibleTitle->tags()->attach($tag);
+        $stillCached = $snapshot->refresh();
+
+        $this->assertSame($first['subtitle_tag'], $stillCached['subtitle_tag']);
+        $this->assertCount(1, $subtitleQueries);
+
+        $versions->bump(CacheDomain::CatalogFacets);
+        $rebuilt = $snapshot->refresh();
+
+        $this->assertSame(2, $rebuilt['subtitle_tag']['catalog_titles_count']);
+        $this->assertCount(2, $subtitleQueries);
+    }
+
+    public function test_home_snapshot_caches_a_missing_subtitle_tag_until_the_facet_version_changes(): void
+    {
+        $versions = app(CacheVersionRegistry::class);
+        $versions->bump(CacheDomain::CatalogFacets);
+        $snapshot = app(CatalogHomeSnapshotCache::class);
+        $initial = $snapshot->refresh();
+
+        $this->assertNull($initial['subtitle_tag']);
+
+        Tag::query()->create([
+            'name' => 'Субтитры',
+            'slug' => 'subtitry',
+            'code' => 'subtitle-available',
+            'type' => TagType::System->value,
+            'visibility' => TagVisibility::Public->value,
+            'moderation_status' => TagModerationStatus::Approved->value,
+        ]);
+
+        $stillCached = $snapshot->refresh();
+
+        $this->assertNull($stillCached['subtitle_tag']);
+
+        $versions->bump(CacheDomain::CatalogFacets);
+        $rebuilt = $snapshot->refresh();
+        $rebuiltTag = $rebuilt['subtitle_tag'];
+
+        $this->assertIsArray($rebuiltTag);
+        $this->assertSame('subtitry', $rebuiltTag['slug']);
+    }
+
+    public function test_home_snapshot_preserves_the_legacy_subtitle_tag_lookup(): void
+    {
+        config(['tags.canonical_schema' => false]);
+        $title = CatalogTitle::factory()->create();
+        $tag = Tag::query()->create([
+            'name' => 'Субтитры',
+            'slug' => 'subtitry',
+        ]);
+        $title->tags()->attach($tag);
+        app(CacheVersionRegistry::class)->bump(CacheDomain::CatalogFacets);
+
+        $this->assertSame([
+            'id' => $tag->id,
+            'name' => 'Субтитры',
+            'slug' => 'subtitry',
+            'catalog_titles_count' => 1,
+        ], app(CatalogHomeSnapshotCache::class)->refresh()['subtitle_tag']);
     }
 
     public function test_catalog_page_invalidation_keeps_metrics_until_the_warmer_refreshes_them(): void

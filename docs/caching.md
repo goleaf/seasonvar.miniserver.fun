@@ -188,6 +188,30 @@ snapshot, его ключи, сроки и response shape не меняются.
 БД через штатный fallback `TieredCache`. Новая таблица, индекс, миграция,
 очередь, scheduler или зависимость для этой границы не добавлены.
 
+## Тег субтитров главной страницы
+
+`CatalogHomeSnapshotCache` хранит публичные scalar-атрибуты тега субтитров
+отдельным ресурсом `homepage-subtitle-tag-v1` в существующем
+`CatalogFacetSnapshotCache`. Payload — пустой список либо одна строка с
+`id`, `name`, `slug` и `catalog_titles_count`; Eloquent object, source URL и
+пользовательское состояние в общий cache не попадают. Dimensions различают
+публичную аудиторию и canonical/legacy schema mode.
+
+На первом read новой `CatalogFacets` generation прежний
+`Tag::query()` разрешает canonical `code=subtitle-available` либо legacy
+`slug=subtitry` и считает только тайтлы, прошедшие
+`CatalogTitleQuery::constrainVisible()`. Повторный Homepage-only rebuild
+берёт готовую строку и не повторяет correlated count. Внешний nullable
+`subtitle_tag`, Homepage resource/version/dimensions/TTL/stale/lock и
+web/API projection не менялись.
+
+`CatalogCacheInvalidator::catalogChanged()` повышает `Homepage` и
+`CatalogFacets` после commit. `TagCacheInvalidator::publicChanged()` проходит
+через ту же boundary, поэтому изменение публичного тега или его назначений
+делает compact resource недоступным. При miss, отказе store или смене
+generation `TieredCache` выполняет тот же authoritative DB query; отдельные
+flush, listener, warming job, migration, index или dependency не добавлены.
+
 ## Eloquent AutoCache для фильтров Top 100
 
 `wddyousuf/eloquent-autocache` подключён строго в режиме `opt-in` и не заменяет `TieredCache`, version registry или полностраничный кеш. Trait проекта `CachesCatalogFilterOptions` используют только модели `Country` и `Genre`; `CatalogTitle`, `User`, импортёр, отзывы, комментарии, media/access и любые личные данные в эту границу не входят.

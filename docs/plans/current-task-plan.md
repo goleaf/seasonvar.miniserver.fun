@@ -11609,3 +11609,167 @@ Detailed implementation plan:
     GitHub HTTPS username could not be read with terminal prompts disabled.
 
 ---
+
+## Task 95 — повторное использование subtitle facet главной
+
+Статус: `verification_completed_commit_in_progress`.
+
+Дата начала: 26.07.2026.
+
+Approved design:
+[`2026-07-26-homepage-subtitle-facet-snapshot-design.md`](../superpowers/specs/2026-07-26-homepage-subtitle-facet-snapshot-design.md).
+
+Detailed implementation plan:
+[`2026-07-26-homepage-subtitle-facet-snapshot.md`](../superpowers/plans/2026-07-26-homepage-subtitle-facet-snapshot.md).
+
+### Фактический baseline и выбранное решение
+
+- PHP `8.5`, Laravel `13.22.0`, Boost `2.4.13`, Livewire `4.3.3`,
+  PHPUnit `12.5.32`, Pint `1.29.3`, Tailwind `4.3.2`, SQLite.
+- Production-like база: 33 002 `catalog_titles`, 133 896
+  `catalog_title_tag`, 729 494 `episodes`, 880 984 `licensed_media`.
+- После прогрева year facet private Homepage build выполнил 9 SQL statements:
+  `38,03 ms` учтённого SQL и `193,287 ms` wall; повторный
+  `subtitle-available` count был самым дорогим statement — `21,14 ms`.
+- `EXPLAIN QUERY PLAN` использует `tags_code_unique`, covering
+  `catalog_title_tag_tag_id_catalog_title_id_index` и PK `catalog_titles`;
+  новый index не обоснован.
+- Выбран отдельный scalar resource существующего
+  `CatalogFacetSnapshotCache`. Первый miss/error выполняет прежний
+  authoritative query, Homepage-only rebuild переиспользует результат.
+- `CatalogCacheInvalidator::catalogChanged()` и
+  `TagCacheInvalidator::publicChanged()` уже обеспечивают after-commit bump
+  `Homepage` и `CatalogFacets`.
+- Ветка `main`, remote `origin`; shared tree содержит большой foreign
+  staged/unstaged/untracked scope Tasks 92–94. Task 95 не имеет права
+  reset/stash/unstage/delete или blind-stage этих изменений.
+
+### Expected changed files
+
+- `app/Services/Catalog/CatalogHomeSnapshotCache.php`;
+- `tests/Feature/CatalogHomePerformanceTest.php`;
+- `docs/superpowers/specs/2026-07-26-homepage-subtitle-facet-snapshot-design.md`;
+- `docs/superpowers/plans/2026-07-26-homepage-subtitle-facet-snapshot.md`;
+- task-specific append-only hunk в `docs/plans/current-task-plan.md`;
+- task-specific append-only hunks в `docs/caching.md`,
+  `docs/performance.md`, `README.md`, `CHANGELOG.md`.
+
+Migration, index, DML, route, API Resource, UI/translation/asset, dependency,
+queue, scheduler, config или environment change не планируется. Discovery,
+меняющее этот вывод, немедленно обновит scope.
+
+### Protected files и public contracts
+
+- parallel Task 94 builder/content/library/UI/lang/test files и все остальные
+  foreign shared-tree hunks;
+- `/`, `/ru`, `/en`, route names, full-page Livewire, SEO/JSON-LD и
+  `/api/v1/home`;
+- `CatalogHomeSnapshotCache` outer resource/dimensions/version/TTL/stale/
+  lock/payload;
+- nullable `subtitle_tag` shape: `id`, `name`, `slug`,
+  `catalog_titles_count`;
+- canonical `code=subtitle-available` и legacy `slug=subtitry`;
+- publication/audience/window/soft-delete/Premium/region/legal visibility;
+- importer/admin/tag after-commit invalidation, warming и cache outage
+  fallback;
+- no private/user state, raw source URL, secret или Eloquent object graph в
+  shared cache;
+- current `main` history и configured non-force push.
+
+### Cross-feature, database, security и production matrix
+
+| Domain | Статус | Решение / gate |
+| --- | --- | --- |
+| Homepage shared snapshot | `critical_affected` | Outer contract unchanged; nested compact facet read |
+| Catalog/tag invalidation | `critical_affected` | Existing after-commit Homepage + CatalogFacets bump |
+| Database/schema/index | `not_applicable` | Existing optimal indexes; no DDL/DML/backfill |
+| Query performance | `critical_affected` | One fewer SQL on same-generation Homepage rebuild |
+| Cache outage/concurrency | `high_affected` | Existing authoritative callback, stale and lock behavior |
+| API/SEO/routes/locales | `protected_critical` | Exact existing contracts and regression checks |
+| Authorization/privacy | `already_compliant` | Guest public query; no owner/private attributes |
+| SQL injection/XSS/CSRF/IDOR | `already_compliant` | Bound Eloquent read, scalar escaped projection, no write/input |
+| Import/admin/tag writes | `protected_high` | Existing invalidators remain sole owners |
+| Search/recommendations/player | `not_applicable` | No query or contract change |
+| Premium/region/legal | `protected_critical` | Existing constrained visibility retained |
+| Mobile/assets/service worker | `not_applicable` | No markup/asset/cache-manifest change |
+| Dependencies/environment | `not_applicable` | No package/service/config/env addition |
+| Production rollout | `high_affected` | Code-only deploy; no migration/restore/reindex/flush |
+| Rollback | `completed_design` | Revert code; unreachable cache entry expires normally |
+| Shared Git state | `critical_risk_recorded` | Exact Task 95 paths/hunks via isolated index |
+
+### Task-specific requirement-compliance matrix
+
+| Requirement/domain | Статус | Evidence / следующий gate |
+| --- | --- | --- |
+| Root/index/canonical fresh read | `completed` | 26.07.2026 before Task 95 app edits |
+| Runtime/packages/database/frontend/Git | `completed` | Boost/CLI/package locks and dirty main recorded |
+| Relevant Markdown/README/CHANGELOG | `completed` | Architecture/cache/performance/security/ops owners read |
+| Applicable skills/rules | `completed` | Laravel, brainstorming, planning, debugging, TDD, verification |
+| Official version-dependent docs | `completed` | Laravel 13 cache/withCount guidance via Boost |
+| Existing implementation first | `completed` | Snapshot/facet/invalidation/query/model/tests traced |
+| Reproduction/measurement/EXPLAIN | `completed` | 9 statements, 21,14 ms target and indexed plan |
+| Alternatives/design/risks/rollback | `completed` | Four approaches in linked approved design |
+| Design commit | `completed` | Isolated `2d3402f` on `main` |
+| Prepared-plan reread | `completed` | Full linked plan reread before test edit |
+| TDD RED | `completed` | 1 test/3 assertions; second query caused expected failure at line 473 |
+| Minimal implementation/GREEN | `completed` | 3 tests/12 assertions; full performance class 14/68 |
+| Validation/input | `not_applicable` | No request or user input |
+| Authorization/security/privacy | `completed` | Public scalar keys only; constrained Eloquent/bindings; no owner/raw URL |
+| SQL/query-count/EXPLAIN | `completed` | 10/1 subtitle first → 8/0 repeat; exact hash/count; indexed cold plan |
+| Migration/index/data safety | `not_applicable` | No schema or data mutation |
+| API/cache/SEO/routes compatibility | `completed` | Cache/API/web matrix 38/831; managed browser 200s and unchanged subtitle facet |
+| Docs/README/CHANGELOG | `completed` | Canonical cache/performance owners and visitor/technical histories updated |
+| Static/style/full/build/browser checks | `completed` | Exact gates passed; full suite has only eight foreign unresolved outcomes listed below |
+| Final requirement/legacy/debug/secret audit | `completed` | Final reread and repository-wide identity/debug/secret searches completed |
+| Commit/push main | `in_progress` | Exact isolated Task 95 commit and ordinary push |
+
+### Verification evidence
+
+- RED: targeted regression failed after three assertions because the second
+  Homepage refresh performed a second subtitle query.
+- GREEN: task-specific lifecycle/null/legacy coverage passed 3 tests / 12
+  assertions; full `CatalogHomePerformanceTest` passed 14 / 68.
+- Cache/invalidation/API/web matrix passed 38 tests / 831 assertions.
+- Exact-file Pint, PHP syntax, PHPStan and Rector passed; Composer manifest
+  validated. `npm run build` compiled 26 modules.
+- Standard `php artisan test` was terminated by the repository-enforced
+  `256M` cumulative process limit. The same configuration with a temporary
+  `1G` limit completed 2 065 tests: 2 046 passed, 11 skipped, 7 failed and
+  1 errored. No Task 95 test failed. Unresolved foreign outcomes:
+  `EagerLoadProjectionContractTest` for
+  `PreferredTranslationNotificationService`; two
+  `CatalogLivewireBudgetTest` budgets (`12 > 10`, `34 > 29`);
+  `CatalogPageTest::test_continue_watching_uses_one_accessible_recent_action_per_series`
+  (`19 > 13`); `CatalogTitleHttpQueryBudgetTest` (`31 > 30`);
+  `SitemapAndRobotsTest` (`15 > 14`);
+  `WebAccountManagementTest` missing logout notice; and
+  `SeasonvarImportDispatchBatcherTest` missing the foreign importer class.
+- Managed Chromium with isolated array cache/session returned HTTP 200 at
+  `1440×1200` in `2 685 ms`, `390×844` in `1 646 ms`, and HTTP 200 from
+  `/api/v1/home`. Both renders retained the H1 and subtitle link, had no
+  horizontal overflow, console/page/request/local-asset errors. These are
+  local diagnostics, not a production SLA.
+- `project:docs-refresh --check` and documentation policy gates are recorded
+  separately at final diff review because the shared tree contains
+  unrelated Tasks 92–98 documentation.
+
+### Execution order
+
+1. `[completed]` Fresh requirements, skills, versions, Git/shared-tree audit.
+2. `[completed]` Homepage/cache/query/write path and cross-feature trace.
+3. `[completed]` Read-only profile, table scale, indexes and EXPLAIN.
+4. `[completed]` Alternatives, approved design, risks and rollback.
+5. `[completed]` Detailed plan/compliance creation and prepared-plan reread.
+6. `[completed]` Isolated RED: actual 2 subtitle queries, expected 1.
+7. `[completed]` Minimal compact CatalogFacets resource.
+8. `[completed]` Targeted GREEN, null/legacy/invalidation regressions.
+9. `[completed]` Five-sample SQL count/timing/EXPLAIN comparison.
+10. `[completed]` Architecture/security/privacy/cross-feature review.
+11. `[completed]` Canonical cache/performance docs, README и CHANGELOG.
+12. `[completed]` Pint/syntax/focused/related/full/static/build/browser checks;
+    eight foreign full-suite outcomes recorded without masking.
+13. `[completed]` Requirement reread and legacy/duplicate/debug/secret audit.
+14. `[in_progress]` Exact Task 95 diff/index/commit on existing `main`.
+15. `[pending]` Configured non-force push; external failure recorded honestly.
+
+---

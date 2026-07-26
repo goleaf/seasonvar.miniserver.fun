@@ -110,19 +110,7 @@ final class CatalogHomeSnapshotCache
             ->map(fn (mixed $id): int => (int) $id)
             ->all();
         $yearBuckets = $this->yearBuckets();
-        $subtitleTagQuery = Tag::query()->select(['id', 'name', 'slug']);
-
-        if (Tag::usesCanonicalSchema()) {
-            $subtitleTagQuery
-                ->where('code', 'subtitle-available')
-                ->publiclyEligible();
-        } else {
-            $subtitleTagQuery->where('slug', 'subtitry');
-        }
-
-        $subtitleTag = $subtitleTagQuery
-            ->withCount(['catalogTitles' => fn (Builder $query): Builder => $this->titles->constrainVisible($query, null)])
-            ->first();
+        $subtitleTag = $this->subtitleTag();
 
         return [
             'latest_title_ids' => $latestTitleIds,
@@ -131,7 +119,7 @@ final class CatalogHomeSnapshotCache
             'video_title_ids' => $videoTitleIds,
             'latest_media_ids' => $latestMediaIds,
             'year_buckets' => $yearBuckets,
-            'subtitle_tag' => $subtitleTag?->getAttributes(),
+            'subtitle_tag' => $subtitleTag,
         ];
     }
 
@@ -165,6 +153,41 @@ final class CatalogHomeSnapshotCache
                 ])
                 ->all(),
         );
+    }
+
+    /** @return array<string, mixed>|null */
+    private function subtitleTag(): ?array
+    {
+        $canonicalSchema = Tag::usesCanonicalSchema();
+        $rows = $this->facetSnapshots->remember(
+            'homepage-subtitle-tag-v1',
+            [
+                'audience' => 'public',
+                'schema' => $canonicalSchema ? 'canonical' : 'legacy',
+            ],
+            function () use ($canonicalSchema): array {
+                $query = Tag::query()->select(['id', 'name', 'slug']);
+
+                if ($canonicalSchema) {
+                    $query
+                        ->where('code', 'subtitle-available')
+                        ->publiclyEligible();
+                } else {
+                    $query->where('slug', 'subtitry');
+                }
+
+                $tag = $query
+                    ->withCount([
+                        'catalogTitles' => fn (Builder $query): Builder => $this->titles->constrainVisible($query, null),
+                    ])
+                    ->first();
+
+                return $tag instanceof Tag ? [$tag->getAttributes()] : [];
+            },
+        );
+        $row = $rows[0] ?? null;
+
+        return is_array($row) ? $row : null;
     }
 
     /** @return array<string, mixed> */
