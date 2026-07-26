@@ -677,8 +677,8 @@ isolated index. `project:docs-refresh --check` сейчас сообщает т�
 only Task 99; branch remains `main`; normal working index untouched.
 
 **Evidence:** design commit
-`c52d1a05e2386376b5f05ce847d2352fd788a38c`; implementation/docs commit
-`62c2e5316673a1ce76cdb6f1697a57103cb5cf48` содержит ровно семь Task 99
+`c52d1a0f7a5dd888e25ed63b177828ca81a6a239`; implementation/docs commit
+`62c2e53580bc87a983f5dc116fcec7bb28bcdece` содержит ровно семь Task 99
 файлов. Shared index восстановлен с сохранением foreign staged hunks.
 
 ### Task 11.4 — Выполнить ordinary push
