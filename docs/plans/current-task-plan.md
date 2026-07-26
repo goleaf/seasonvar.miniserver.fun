@@ -9165,7 +9165,7 @@ temporary B-tree.
 
 ## Task 67 — качество публичных подборок
 
-Статус: `implementation_complete_commit_pending`.
+Статус: `implementation_committed_push_unresolved_authentication`.
 
 Дата начала: 26.07.2026.
 
@@ -9211,8 +9211,8 @@ SQLite и все foreign changes shared worktree.
 | Focused verification | `completed` | 78 tests / 6 183 assertions; Pint, exact PHPStan, Rector dry-run, Composer validation, Vite build, routes/config/migrations и dry-run green |
 | Browser verification | `completed` | Managed Chromium: desktop/mobile/tablet, 3/3 scenarios, no console/page/HTTP errors |
 | Full default PHPUnit process | `unresolved` | `256M` process exhausts memory; explicit 1G run reached 1 893 tests with 1 877 pass and 196 813 assertions, then reported 4 foreign failures + 1 missing foreign importer class |
-| Managed documentation refresh | `unresolved` | `project:docs-refresh --check` reports concurrent drift in README/CODE_STANDARDS/DATA_RELATIONS/SOURCE_PARITY/MAINTENANCE_LOG; broad rewrite not run over shared tree |
-| Commit/push | `pending` | Exact Task 67 scope only |
+| Managed documentation refresh | `completed` | Exact Task 67 staged tree прошёл `project:docs-refresh --check`; generated date/inventory changes добавлены только для README/CODE_STANDARDS/DATA_RELATIONS/MAINTENANCE_LOG без чужой untracked migration |
+| Commit/push | `completed_commit_unresolved_push_authentication` | Exact 54-file commit `cce9fa6` создан в `main` штатными hooks; `git push origin main` завершился кодом 128 до передачи данных: `fatal: could not read Username for 'https://github.com': No such device or address` |
 
 ### Execution checklist
 
@@ -9236,9 +9236,12 @@ SQLite и все foreign changes shared worktree.
    CHANGELOG.
 10. `[completed][critical]` Exact formatting/static/full/backend/frontend
     verification, final requirement reread and repository legacy scan.
-11. `[in_progress][critical]` Exact isolated commit on existing `main`.
-12. `[pending][critical]` Configured non-force push; external rejection is
-    recorded as unresolved.
+11. `[completed][critical]` Exact 54-file commit `cce9fa6` создан в
+    существующей `main` штатными hooks; чужой staged/unstaged/untracked scope
+    не включён.
+12. `[completed_with_unresolved_push][critical]` Configured non-force
+    `git push origin main` выполнен; GitHub отклонил HTTPS-доступ до передачи
+    данных из-за отсутствующей аутентификации.
 
 ## Task 68 — компактная web-проекция главной страницы
 

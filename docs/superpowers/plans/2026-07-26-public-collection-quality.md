@@ -111,12 +111,14 @@ Design:
 - [completed][critical] Перечитать применимые requirements; найти duplicate
   public scopes, old auto-public/demo visibility, stale signals, TODO/debug
   и связанные legacy paths.
-- [in_progress][critical] Проверить `git status`, branch/remote, exact
+- [completed][critical] Проверить `git status`, branch/remote, exact
   staged/unstaged/untracked diff, secrets, debug и formatting noise.
-- [pending][critical] Через изолированный exact manifest commit-ить только
-  Task 67 в существующую `main`; не включать foreign working-tree/index.
-- [pending][critical] Выполнить non-force push configured `main`; exact
-  authentication/remote failure сохранить как `unresolved`.
+- [completed][critical] Через изолированный exact manifest зафиксировать
+  только Task 67 в существующей `main`; commit `cce9fa6` прошёл штатные
+  hooks, foreign working-tree/index не включён.
+- [completed_with_unresolved_push][critical] Выполнить non-force push
+  configured `main`; GitHub отклонил HTTPS-доступ до передачи данных:
+  `fatal: could not read Username for 'https://github.com': No such device or address`.
 
 ## Ожидаемые изменяемые файлы
 
@@ -169,5 +171,5 @@ Design:
 | Frontend/mobile/a11y | `completed` | Existing component/state retained; managed Chromium desktop/mobile/tablet 3/3 |
 | Docs/README/CHANGELOG | `completed` | Canonical/product/operations owners updated |
 | Full default PHPUnit process | `unresolved` | XML `256M` limit exhausts accumulated suite; explicit 1G run has 4 foreign concurrent failures and 1 absent foreign importer class |
-| Managed documentation refresh | `unresolved` | Check reports concurrent drift in five generated owners; broad refresh would capture foreign shared-tree changes |
-| Commit/push | `pending` | Exact Task 67 manifest only |
+| Managed documentation refresh | `completed` | Exact staged tree прошёл `project:docs-refresh --check`; generated blocks взяты из task-only export без чужой untracked migration |
+| Commit/push | `completed_commit_unresolved_push_authentication` | Exact 54-file commit `cce9fa6` создан в `main`; configured push завершился кодом 128 до передачи данных из-за отсутствующей GitHub-аутентификации |
