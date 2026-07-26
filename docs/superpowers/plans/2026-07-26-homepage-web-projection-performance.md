@@ -480,7 +480,7 @@ Search for duplicate/legacy homepage builders, calls to `CatalogHomePageBuilder:
 
 For every applicable domain use only `completed`, `already_compliant`, `not_applicable` or `unresolved`, with exact test/file/browser evidence. Mark physical-device validation `unresolved_external` unless performed on real hardware.
 
-- [ ] **Step 4: Verify exact Task 68 diff and stage only owned hunks**
+- [x] **Step 4: Verify exact Task 68 diff and stage only owned hunks**
 
 Run:
 
@@ -492,7 +492,7 @@ git diff --cached --check
 
 Use patch staging for shared dirty files. Confirm current branch is `main`; do not stage any Task 63/64/65/67 file or foreign hunk.
 
-- [ ] **Step 5: Commit and push**
+- [x] **Step 5: Commit and push**
 
 Create one exact commit:
 
@@ -503,6 +503,16 @@ git push
 
 Expected: commit succeeds on `main`. If configured HTTPS authentication rejects push, record `unresolved_push_authentication` with the exact non-secret failure and do not claim a successful push.
 
-- [ ] **Step 6: Final handoff**
+- [x] **Step 6: Final handoff**
 
 Report the outcome first: before/after bytes, DOM, card count, HIT and throttled mobile LCP. Include commit hash, push result, test/static/build summary and a requirement-by-requirement compliance report with clickable evidence paths.
+
+## Delivery evidence
+
+- Exact product/docs commit: `c59fac2` (`perf: сократить web-проекцию
+  главной`), 12 Task 68 files, 926 insertions and 7 deletions.
+- Configured `git push origin main` was attempted without force and rejected
+  before data transfer: `fatal: could not read Username for
+  'https://github.com': No such device or address`.
+- The shared worktree retains unrelated Task 67 changes; no reset, stash,
+  checkout, broad formatting or foreign staging was used.

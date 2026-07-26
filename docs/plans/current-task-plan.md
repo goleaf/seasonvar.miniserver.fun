@@ -9163,9 +9163,10 @@ temporary B-tree.
   Configured HTTPS push завершился кодом 128 до передачи данных:
   `could not read Username for 'https://github.com'`.
 
+
 ## Task 68 — компактная web-проекция главной страницы
 
-Статус: `implementation_verified_commit_pending`.
+Статус: `implementation_committed_push_unresolved_authentication`.
 
 Дата начала: 26.07.2026.
 
@@ -9248,7 +9249,7 @@ height `30 354 px`. Из них 48 карточек «Последних обн�
 | Managed documentation check | `unresolved` | Reports foreign managed changes in README/CODE_STANDARDS/DATA_RELATIONS/SOURCE_PARITY/MAINTENANCE_LOG; broad refresh not run over shared Task 67 tree |
 | Physical-device verification | `unresolved` | Managed Chromium covers viewports/throttling, not real phone/tablet hardware |
 | README/CHANGELOG/final requirement reread | `completed` | Performance/visitor/changelog owners updated; canonical requirements and Task 68 re-read |
-| Commit/push in `main` | `unresolved` | Exact Task 68 staging/commit/push is the remaining gate |
+| Commit/push in `main` | `unresolved` | Exact 12-file commit `c59fac2` создан в `main`; configured HTTPS push отклонён до передачи данных из-за отсутствующей GitHub-аутентификации |
 
 ### Безлимитный execution order
 
@@ -9267,4 +9268,28 @@ height `30 354 px`. Из них 48 карточек «Последних обн�
    exact failed test passed separately 1/3.
 9. `[completed]` Performance docs, README, CHANGELOG, final requirement reread
    and repository legacy scan.
-10. `[in_progress]` Exact isolated commit on `main` and configured push.
+10. `[completed_commit_unresolved_push_authentication]` Exact 12-file commit
+    `c59fac2` создан в `main`; configured non-force push выполнен и отклонён
+    до передачи данных: `could not read Username for 'https://github.com'`.
+
+### Implementation и verification evidence
+
+- TDD RED остановился на отсутствующем `webData()`; отдельный cache RED —
+  на отсутствующем `response_contract`. Финальный focused matrix:
+  51 test/484 assertions; broad matrix: 215/1 194.
+- Mutation full-snapshot exclusions вернула четыре скрытых web subset
+  candidates и уронила тест после 7 assertions; восстановленная полная
+  граница прошла exact 5 tests/48 assertions.
+- Pint, Larastan (`0` errors), Rector dry-run (`0` changes), Vite
+  (`25` modules) и whitespace check прошли.
+- HTTPS после contract v2: first response около `0,300 s`, четыре `HIT`
+  `0,073–0,081 s`; HTML `458 733` bytes, `2 633` DOM nodes, 40 images,
+  12 update cards и одна full-list link.
+- Managed Chromium: desktop LCP `472 ms`, mobile `252 ms`, throttled mobile
+  `1 168 ms`; CLS/overflow/console/page/request failures равны нулю.
+- Full default process достиг известного cumulative `256M` exhaustion в
+  `UnifiedDiscoveryCollectionsTest`; exact failed test прошёл отдельно 1/3.
+- Exact alternate index после двух race-safe corrections содержал только
+  12 Task 68 файлов; final commit `c59fac2` не изменяет foreign Task 63/67
+  hunks. Push завершился кодом 128 до передачи данных из-за отсутствующей
+  HTTPS-аутентификации.
