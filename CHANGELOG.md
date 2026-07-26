@@ -2,6 +2,20 @@
 
 ## 2026-07-26
 
+- По результатам независимого review исправлен lifecycle build-local
+  memoization страницы `/stats`: каждый вызов `data()` сбрасывает table,
+  presence, distinct/absolute URL, SQLite index и media/missing counters,
+  поэтому повторный snapshot rebuild после version bump не сохраняет
+  значения предыдущей сборки. Новый integration test сначала воспроизвёл
+  stale rebuild, затем подтвердил обновление media/table/index и обоих
+  missing-media counters через реальный `CatalogStatsSnapshotCache`; draft
+  media одновременно проверяет сохранение public visibility scopes.
+  Production read-only comparisons дали точное совпадение 21 URL-поля,
+  159 table counts и 519 index rows. Один resource sample combined
+  `licensed_media` URL aggregate показал `72 868 KiB` maximum RSS против
+  `68 968 KiB` у прежних последовательных запросов, одинаковый filesystem
+  output и меньшее elapsed time; значения не объявляются SLA.
+
 - Добавлен быстрый onboarding вкусов после первого подтверждения email.
   Full-page Livewire маршрут `/onboarding/tastes` позволяет verified owner
   выбрать 5–10 знакомых сериалов, точные исключения, жанры, страны, locale,

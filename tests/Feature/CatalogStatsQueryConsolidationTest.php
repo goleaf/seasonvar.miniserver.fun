@@ -9,6 +9,7 @@ use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Services\Catalog\CatalogStatsPageBuilder;
+use App\Services\Catalog\CatalogStatsSnapshotCache;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
@@ -20,13 +21,51 @@ final class CatalogStatsQueryConsolidationTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_invalidated_snapshot_rebuild_resets_request_local_stats(): void
+    {
+        $title = CatalogTitle::factory()->create();
+        $season = Season::factory()->for($title)->create();
+        $episode = Episode::factory()->for($season)->create();
+        $cache = app(CatalogStatsSnapshotCache::class);
+
+        $before = $cache->snapshot();
+
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $title->id,
+            'season_id' => $season->id,
+            'episode_id' => $episode->id,
+            'path' => 'https://media.example.com/new.mp4',
+            'playback_url' => 'https://media.example.com/new.mp4',
+            'source_url' => 'https://seasonvar.ru/new-source.html',
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+        DB::statement('CREATE INDEX catalog_stats_rebuild_probe_idx ON licensed_media (status)');
+
+        $cache->forget();
+        $after = $cache->snapshot();
+
+        $this->assertSame(0, $this->internalLinkCount($before['data'], 'Выбор видео на странице сериала'));
+        $this->assertSame(1, $this->internalLinkCount($after['data'], 'Выбор видео на странице сериала'));
+        $this->assertSame(1, $this->externalUrlFilledCount($after['data'], 'Ссылка на видео'));
+        $this->assertSame(1, $this->headlineValue($after['data'], 'Видео-ссылок'));
+        $this->assertSame(1, $this->summaryValue($before['data'], 'Каталог', 'Без опубликованного видео'));
+        $this->assertSame(0, $this->summaryValue($after['data'], 'Каталог', 'Без опубликованного видео'));
+        $this->assertSame(1, $this->summaryValue($before['data'], 'Сезоны и серии', 'Серий без опубликованного видео'));
+        $this->assertSame(0, $this->summaryValue($after['data'], 'Сезоны и серии', 'Серий без опубликованного видео'));
+        $this->assertSame(
+            $this->headlineValue($before['data'], 'Индексов базы') + 1,
+            $this->headlineValue($after['data'], 'Индексов базы'),
+        );
+    }
+
     public function test_stats_builder_preserves_exact_values_while_consolidating_repeated_queries(): void
     {
         $title = CatalogTitle::factory()->create();
         $season = Season::factory()->for($title)->create();
-        $firstEpisode = Episode::factory()->for($season)->create();
-        $secondEpisode = Episode::factory()->for($season)->create();
-        Episode::factory()->for($season)->create();
+        $firstEpisode = Episode::factory()->for($season)->create(['number' => 1]);
+        $secondEpisode = Episode::factory()->for($season)->create(['number' => 2]);
+        $draftEpisode = Episode::factory()->for($season)->create(['number' => 3]);
 
         $sharedUrl = 'https://media.example.com/shared.mp4';
 
@@ -39,6 +78,16 @@ final class CatalogStatsQueryConsolidationTest extends TestCase
             'source_url' => 'https://seasonvar.ru/source-one.html',
             'status' => 'published',
             'published_at' => now(),
+        ]);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $title->id,
+            'season_id' => $season->id,
+            'episode_id' => $draftEpisode->id,
+            'path' => 'https://media.example.com/draft.mp4',
+            'playback_url' => 'https://media.example.com/draft.mp4',
+            'source_url' => 'https://seasonvar.ru/draft-source.html',
+            'status' => 'draft',
+            'published_at' => null,
         ]);
         LicensedMedia::factory()->create([
             'catalog_title_id' => $title->id,
@@ -80,21 +129,21 @@ final class CatalogStatsQueryConsolidationTest extends TestCase
         $this->assertSame(2, $linksByLabel->get('Выбор видео на странице сериала')['count']);
         $this->assertSame(2, $linksByLabel->get('Выбор серии на странице сериала')['count']);
         $this->assertSame([
-            'filled_display' => '3',
-            'unique_display' => '2',
-            'absolute_display' => '2',
+            'filled_display' => '4',
+            'unique_display' => '3',
+            'absolute_display' => '3',
             'empty_display' => '0',
         ], $this->urlValues($urlsByLabel, 'Ссылка на видео'));
-        $this->assertSame([
-            'filled_display' => '2',
-            'unique_display' => '1',
-            'absolute_display' => '2',
-            'empty_display' => '1',
-        ], $this->urlValues($urlsByLabel, 'Ссылка воспроизведения'));
         $this->assertSame([
             'filled_display' => '3',
             'unique_display' => '2',
             'absolute_display' => '3',
+            'empty_display' => '1',
+        ], $this->urlValues($urlsByLabel, 'Ссылка воспроизведения'));
+        $this->assertSame([
+            'filled_display' => '4',
+            'unique_display' => '3',
+            'absolute_display' => '4',
             'empty_display' => '0',
         ], $this->urlValues($urlsByLabel, 'Источник видео'));
 
@@ -149,6 +198,71 @@ final class CatalogStatsQueryConsolidationTest extends TestCase
             'absolute_display' => $row['absolute_display'],
             'empty_display' => $row['empty_display'],
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function internalLinkCount(array $data, string $label): int
+    {
+        return (int) $this->rowValue($data, 'internalLinkRows', $label, 'count');
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function externalUrlFilledCount(array $data, string $label): int
+    {
+        return (int) str_replace(' ', '', (string) $this->rowValue(
+            $data,
+            'externalUrlFieldRows',
+            $label,
+            'filled_display',
+        ));
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function headlineValue(array $data, string $label): int
+    {
+        return (int) $this->rowValue($data, 'headlineStats', $label, 'value');
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function summaryValue(array $data, string $sectionTitle, string $label): int
+    {
+        $sections = $data['summarySections'] ?? null;
+
+        if (is_array($sections)) {
+            foreach ($sections as $section) {
+                if (is_array($section) && ($section['title'] ?? null) === $sectionTitle) {
+                    return (int) $this->rowValue($section, 'rows', $label, 'value');
+                }
+            }
+        }
+
+        throw new \RuntimeException('Stats section not found: '.$sectionTitle);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function rowValue(array $data, string $rowsKey, string $label, string $valueKey): mixed
+    {
+        $rows = $data[$rowsKey] ?? null;
+
+        if (is_array($rows)) {
+            foreach ($rows as $row) {
+                if (is_array($row) && ($row['label'] ?? null) === $label) {
+                    return $row[$valueKey] ?? null;
+                }
+            }
+        }
+
+        throw new \RuntimeException('Stats row not found: '.$label);
     }
 
     /**

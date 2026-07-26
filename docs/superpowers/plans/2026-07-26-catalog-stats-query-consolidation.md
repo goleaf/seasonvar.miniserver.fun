@@ -425,3 +425,16 @@ Execution outcome: exact seven-file commit `ab7ac83` created on `main`.
 policy; `GIT_TERMINAL_PROMPT=0 git push origin main` was then attempted and
 rejected before transfer because configured HTTPS credentials are
 unavailable. Push status remains `unresolved_external_auth`.
+
+## Post-delivery independent review correction
+
+- [x] Reviewer inspected committed range `bec22d0..d776ee6`.
+- [x] Integration RED proved that a version-bumped rebuild through the same
+  `CatalogStatsSnapshotCache` graph retained memoized builder values.
+- [x] `CatalogStatsPageBuilder::data()` now resets all eight build-local
+  caches before every exact rebuild.
+- [x] Regression coverage includes same-graph cache invalidation, table and
+  index changes, both missing-media counters and draft-media visibility.
+- [x] Production read-only parity matched 21 URL fields, 159 table counts
+  and 519 index rows; combined/sequential resource samples recorded.
+- [ ] Create exact review-fix commit and retry configured non-force push.

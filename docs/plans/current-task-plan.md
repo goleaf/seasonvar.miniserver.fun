@@ -9674,11 +9674,12 @@ model отложен до отдельного consistency/invalidation/rollback
 | Migration/routes/translations/cache/env/dependencies/DML | `not_applicable` | Explicitly excluded |
 | TDD RED | `completed` | 1 test failed after 5 semantic assertions exactly on missing combined public-media aggregate |
 | Implementation | `completed` | Request-local media/missing counters, table present/URL aggregates и SQLite table/index inventory consolidated; output shape unchanged |
-| Focused/static/profile verification | `completed` | 1/13 exact GREEN; 10/35 stats, 4/87 page, 41/223 cache GREEN; Pint, exact PHPStan и Rector GREEN; three-sample profile recorded |
+| Focused/static/profile verification | `completed` | Review follow-up: exact 2/22, snapshot 2/12, stats 11/44, page 4/87, cache 41/223 GREEN; Pint, exact PHPStan и Rector GREEN; three-sample profile and resource comparison recorded |
 | Full default PHPUnit process | `unresolved` | Оба широких запуска остановлены накопительным configured `256M` ceiling; отдельно пройденный `TieredCacheTest` и весь affected matrix GREEN |
-| Managed documentation check | `completed` | `php artisan project:docs-refresh --check` GREEN; managed blocks unchanged |
+| Managed documentation check | `completed_with_foreign_shared_tree_drift` | Task72 check was GREEN before review fix and managed blocks remain untouched; final shared-tree rerun is blocked only by foreign migration `2026_07_26_231000...` missing from `docs/MAINTENANCE_LOG.md` |
 | README/CHANGELOG/final requirement reread | `completed` | Performance owner, visitor history and Russian changelog updated; requirements and repository-wide legacy/cache/route scan repeated |
-| Commit/push in `main` | `unresolved_external_auth` | Exact seven-file commit `ab7ac83` created on `main`; remote doctor blocked by root Composer policy, configured non-force push rejected before transfer because HTTPS credentials are unavailable |
+| Independent code review | `completed_with_fix` | Reviewer found retained build-local state; integration RED reproduced it, `resetBuildState()` fixed all eight caches, draft visibility and same-graph rebuild coverage added. Full golden/non-SQLite CI remains disproportionate/unsupported; production component parity and existing sanitizer tests cover changed boundaries |
+| Commit/push in `main` | `pending_follow_up` | Base commits `ab7ac83` and `d776ee6` created; review fix requires exact follow-up commit, then another configured non-force push attempt |
 
 ### Безлимитный execution order
 
@@ -9707,6 +9708,15 @@ model отложен до отдельного consistency/invalidation/rollback
 15. `[completed_unresolved_authentication]` Remote doctor was blocked by
     root Composer policy; configured non-force push was attempted and GitHub
     rejected it before transfer because HTTPS credentials are unavailable.
+16. `[completed]` Independent committed-range review found stale build-local
+    state and test/resource evidence gaps.
+17. `[completed]` Integration RED reproduced stale same-graph rebuild;
+    `resetBuildState()` and expanded draft/cache/index/table/missing-media
+    coverage reached GREEN.
+18. `[completed]` Production read-only parity confirmed 21 URL fields,
+    159 table counts and 519 index rows; combined/sequential peak RSS,
+    filesystem output and elapsed were measured.
+19. `[pending]` Exact review-fix commit and configured non-force push.
 
 ## Task 71 — быстрый onboarding вкусов
 

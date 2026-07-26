@@ -117,6 +117,8 @@ class CatalogStatsPageBuilder
      */
     public function data(): array
     {
+        $this->resetBuildState();
+
         $databaseTables = $this->databaseTables();
         $catalogTitles = $this->tableCount('catalog_titles');
         $seasons = $this->tableCount('seasons');
@@ -229,6 +231,18 @@ class CatalogStatsPageBuilder
             'databaseTables' => $databaseTables,
             'seo' => $this->seo(),
         ];
+    }
+
+    private function resetBuildState(): void
+    {
+        $this->tableCounts = [];
+        $this->presentCounts = [];
+        $this->distinctPresentCounts = [];
+        $this->absoluteUrlCounts = [];
+        $this->databaseIndexes = null;
+        $this->publicMediaLinks = null;
+        $this->titlesWithoutPublishedMedia = null;
+        $this->episodesWithoutPublishedMedia = null;
     }
 
     /**
