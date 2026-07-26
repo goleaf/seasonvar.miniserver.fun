@@ -29,6 +29,8 @@ use Illuminate\Support\Facades\Schema;
 
 final class CatalogPublicDiscoveryQuery
 {
+    private const RECENTLY_ADDED_SQLITE_INDEX = 'catalog_titles_created_at_idx';
+
     public function __construct(
         private readonly CatalogRecommendationVisibilityService $visibility,
         private readonly CatalogPopularityQuery $popularity,
@@ -193,13 +195,36 @@ final class CatalogPublicDiscoveryQuery
      */
     private function recentlyAdded(CatalogRecommendationContext $context, array $excludedIds): array
     {
-        $query = $this->eligibleQuery($context, watchable: true, excludedIds: $excludedIds)
+        $query = $this->useRecentlyAddedOrderIndex(
+            $this->eligibleQuery($context, watchable: true, excludedIds: $excludedIds),
+        )
             ->select('catalog_titles.id')
             ->whereNotNull('catalog_titles.created_at')
             ->orderByDesc('catalog_titles.created_at')
             ->orderByDesc('catalog_titles.id');
 
         return $this->rows($query, CatalogRecommendationSource::CatalogPublication, CatalogRecommendationReason::RecentlyAdded);
+    }
+
+    /**
+     * @param  Builder<CatalogTitle>  $query
+     * @return Builder<CatalogTitle>
+     */
+    private function useRecentlyAddedOrderIndex(Builder $query): Builder
+    {
+        $connection = $query->getModel()->getConnection();
+
+        if ($connection->getDriverName() !== 'sqlite') {
+            return $query;
+        }
+
+        $grammar = $connection->getQueryGrammar();
+
+        return $query->fromRaw(
+            $grammar->wrapTable($query->getModel()->getTable())
+            .' INDEXED BY '
+            .$grammar->wrap(self::RECENTLY_ADDED_SQLITE_INDEX),
+        );
     }
 
     /**

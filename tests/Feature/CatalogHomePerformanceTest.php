@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\DTOs\CatalogRecommendationContext;
+use App\Enums\CatalogRecommendationType;
 use App\Models\CatalogTitle;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
@@ -13,6 +15,7 @@ use App\Services\Catalog\CatalogHomeContentAdditionQuery;
 use App\Services\Catalog\CatalogHomeMetricsCache;
 use App\Services\Catalog\CatalogHomePageBuilder;
 use App\Services\Catalog\CatalogHomeSnapshotCache;
+use App\Services\Catalog\CatalogPublicDiscoveryQuery;
 use App\Support\Cache\CacheDomain;
 use App\Support\Cache\CacheKeyFactory;
 use App\Support\Cache\CacheVersionRegistry;
@@ -34,6 +37,68 @@ final class CatalogHomePerformanceTest extends TestCase
         $this->assertSame(
             __('recommendations.types.recently_added.title'),
             $data['homeRecommendationPresentation']['title'],
+        );
+    }
+
+    public function test_recently_added_sqlite_query_uses_the_existing_created_at_order_index(): void
+    {
+        $this->travelTo(now()->setDate(2026, 7, 26)->setTime(12, 0));
+        $olderTitle = CatalogTitle::factory()->create([
+            'created_at' => now()->subDay(),
+        ]);
+        $firstRecentTitle = CatalogTitle::factory()->create([
+            'created_at' => now(),
+        ]);
+        $secondRecentTitle = CatalogTitle::factory()->create([
+            'created_at' => now(),
+        ]);
+        $excludedTitle = CatalogTitle::factory()->create([
+            'created_at' => now()->addMinute(),
+        ]);
+
+        foreach ([$olderTitle, $firstRecentTitle, $secondRecentTitle, $excludedTitle] as $catalogTitle) {
+            LicensedMedia::factory()->create([
+                'catalog_title_id' => $catalogTitle->id,
+                'status' => 'published',
+                'published_at' => now(),
+            ]);
+        }
+
+        $queries = [];
+        DB::listen(function (QueryExecuted $query) use (&$queries): void {
+            $queries[] = str($query->sql)
+                ->replace(['`', '"'], '')
+                ->lower()
+                ->squish()
+                ->toString();
+        });
+        $context = new CatalogRecommendationContext(
+            type: CatalogRecommendationType::RecentlyAdded,
+            user: null,
+            locale: app()->currentLocale(),
+            excludedTitleIds: [$excludedTitle->id],
+            perPage: 8,
+        );
+
+        $candidates = app(CatalogPublicDiscoveryQuery::class)->candidates(
+            $context,
+            [$excludedTitle->id],
+        );
+        $candidateQuery = collect($queries)->first(
+            fn (string $sql): bool => str_contains(
+                $sql,
+                'order by catalog_titles.created_at desc, catalog_titles.id desc',
+            ),
+        );
+
+        $this->assertSame(
+            [$secondRecentTitle->id, $firstRecentTitle->id, $olderTitle->id],
+            collect($candidates)->pluck('id')->all(),
+        );
+        $this->assertIsString($candidateQuery, implode("\n", $queries));
+        $this->assertStringContainsString(
+            'from catalog_titles indexed by catalog_titles_created_at_idx',
+            $candidateQuery,
         );
     }
 

@@ -490,3 +490,37 @@ Same-snapshot direct comparison вернул те же 96 ID и изменил r
 Managed Chromium fallback после недоступности системного Chrome проверил desktop/mobile `/titles?per_page=96&page=2` и `/titles?q=Практика`: четыре ответа `200`, корректные H1, нулевой horizontal overflow и отсутствие console/page/request/first-party response failures. Natural page-2 `MISS` получил DOMContentLoaded за `3,59 s`, следующий mobile `HIT` — за `1,67 s`; search `BYPASS` — за `1,83–2,24 s`. Длительность network-idle включает viewport-lazy facets/background warm requests и не объявляется page-load SLA.
 
 После graceful PHP-FPM reload isolated managed-Chromium smoke показал существенную зависимость от load/cache state: первый desktop `/` при одновременно running critical warm (`28` pending/`43` delayed/`1` reserved) и scheduled media-size importer превысил 30-second navigation timeout, `/en` завершился за `28,1 s`, а последующие mobile `/`, `/titles` и title detail — за `2,6–3,1 s`; отдельные desktop catalogue/title responses заняли `9,7/4,2 s`. Успешные ответы имели `200`, корректный `h1`, нулевой overflow/raw translation keys/console/page/first-party failures и нулевую service-worker registration. Это подтверждает application improvement и сохраняет остаточный contention/catalogue risk открытым; timeout не повышался, cache/queue не очищались.
+
+## Homepage `recently_added` SQLite order path
+
+Follow-up 26.07.2026 отделил стабильный тёплый homepage path от холодного
+публичного пула рекомендаций. Пять прямых samples после прогрева сохранили
+`48/12/8/12` latest/featured/video/media, 12 release groups, 8 рекомендаций
+и 60 уникальных card titles; median builder составила `128,53 ms`, SQL —
+`44,65–47,04 ms` при 45 запросах. До изменения cold
+`recently_added` query занимал `302,21–328,06 ms` независимо от candidate
+limit `24/48/180`: `EXPLAIN QUERY PLAN` выбирал
+`catalog_titles_publication_lookup_idx` и `USE TEMP B-TREE FOR ORDER BY`.
+
+`CatalogPublicDiscoveryQuery` теперь только на SQLite фиксирует этот
+time-sensitive ordered scan за уже существующим
+`catalog_titles_created_at_idx`; identifiers формирует database grammar.
+Canonical `eligibleQuery()`, media/season/episode availability, exclusions,
+`created_at DESC, id DESC`, candidate limit и не-SQLite SQL не менялись.
+Шесть post-change сравнений сохранили точную parity ID: новый SQL занял
+`0,44–13,83 ms` с обычными повторными значениями `0,44–1,39 ms`, а тот же
+SQL без order index — `299,49–369,26 ms`. Новый plan не содержит temporary
+B-tree и продолжает использовать
+`licensed_media_publication_lookup_idx` и primary-key probes дочерних
+release rows.
+
+Safe HTTPS series без cache flush вернула `MISS 0,636 s` и четыре `HIT`
+`0,115–0,228 s`, все ответы `200` и `721 084` bytes. TDD regression сначала
+упал только на отсутствующем compiled `INDEXED BY`, затем прошёл; distinct
+focused/broad matrix дала 138 tests и 1 156 assertions, task-scoped Pint,
+Larastan и Rector — без ошибок. Полный `php artisan test` остановился на
+накопительном `256M` memory exhaustion в
+`UnifiedDiscoveryCollectionsTest`; точный тест отдельно прошёл 1/3. Это
+diagnostic evidence текущего SQLite snapshot, не p95/SLA. Migration, новый
+index, cache key/version/TTL, route, translation, queue, dependency, env или
+production DML не добавлены; rollback — обычный revert кода.

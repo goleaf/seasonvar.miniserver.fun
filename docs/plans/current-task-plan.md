@@ -8826,3 +8826,137 @@ budgets и browser evidence. Затем будут созданы отдельн
 
 Конкретные UI-файлы и изменения не считаются утверждёнными до завершения
 этого evidence-first design gate.
+
+## Task 66 — SQLite order path для `recently_added` на главной
+
+Статус: `approved_design_and_plan_tdd_pending`.
+
+Дата начала: 26.07.2026.
+
+Approved design:
+[`2026-07-26-homepage-recently-added-sqlite-order-design.md`](../superpowers/specs/2026-07-26-homepage-recently-added-sqlite-order-design.md).
+
+Detailed implementation plan:
+[`2026-07-26-homepage-recently-added-sqlite-order.md`](../superpowers/plans/2026-07-26-homepage-recently-added-sqlite-order.md).
+
+### Цель и доказанный root cause
+
+Task 62 уже сократил episode hydration. Новый read-only профиль на
+SQLite `30 186 242 048` bytes показал, что live HIT отвечает за
+`0,099–0,109 s`, а тёплая domain-сборка имеет median `124,20 ms`.
+Оставшийся холодный anonymous `recently_added` candidate query тратит
+`302,21–328,06 ms`: planner выбирает publication lookup и temporary B-tree
+для `created_at DESC, id DESC`.
+
+Уменьшение limit `180 → 48 → 24` не устранило сортировку. Тот же exact SQL,
+закреплённый за уже существующим `catalog_titles_created_at_idx`, во всех
+шести сравнениях вернул те же ID и порядок за `0,417–3,052 ms` без
+temporary B-tree.
+
+### Выбранное решение
+
+1. Сохранить единый `CatalogPublicDiscoveryQuery` и canonical
+   `eligibleQuery()`.
+2. Только для SQLite применить к `recentlyAdded()` существующий
+   `catalog_titles_created_at_idx` через grammar-owned identifiers.
+3. Не менять global candidate limit, DTO, ranking semantics, cache key/TTL,
+   availability или не-SQLite SQL.
+4. Не добавлять migration/index/dependency/config/env/DML.
+
+### Expected changed files
+
+- `app/Services/Catalog/CatalogPublicDiscoveryQuery.php`;
+- `tests/Feature/CatalogHomePerformanceTest.php`;
+- design и detailed plan Task 66;
+- `docs/performance.md`, этот current plan;
+- `README.md`, `CHANGELOG.md`.
+
+### Protected contracts
+
+- `/`, localized home и `/discover/recently_added`;
+- full-page Livewire ownership и HTML/SEO/API/resource shapes;
+- `created_at DESC, id DESC`, exclusions, pagination/diversity window;
+- publication/audience/window/region/premium/media/season/episode
+  availability;
+- recommendation/page/domain cache keys, versions, TTL и invalidation;
+- importer command/data lifecycle и active write throughput;
+- all migrations, translations, permissions, queues and non-SQLite
+  connections;
+- foreign Task 63/64/65/shared worktree changes.
+
+### Cross-feature и risk matrix
+
+| Domain | Статус | Решение / gate |
+| --- | --- | --- |
+| Homepage/discovery | `critical_affected` | Same IDs/order, faster cold pool |
+| Authorization/availability | `protected` | Existing `eligibleQuery()` retained verbatim |
+| Recommendations | `affected_bounded` | Only `RecentlyAdded` SQLite source plan |
+| Cache | `already_compliant` | No key/version/TTL/flush change |
+| Importer | `compatible_improved` | No new index write cost or DML |
+| SQLite schema | `already_compliant` | Existing created-at index required |
+| Other databases | `protected` | Driver guard returns original builder |
+| Routes/API/translations/permissions | `not_applicable` | No contract change |
+| Frontend/mobile/a11y | `not_applicable` | No HTML/CSS/JS change |
+| Production/rollback | `affected_low` | Code revert only; no data/cache cleanup |
+| Shared Git state | `critical_risk_recorded` | Exact alternate-index commit |
+
+### Task-specific requirement-compliance matrix
+
+| Requirement/domain | Статус | Evidence / следующий gate |
+| --- | --- | --- |
+| Root/index/canonical requirements fresh read | `completed` | 26.07.2026 before edits |
+| Applicable architecture/performance/cache/ops/maintenance docs | `completed` | Canonical owners and related Markdown traced |
+| Installed versions/database | `completed` | PHP 8.5.8, Laravel 13.22.0, Boost 2.4.13, Livewire 4.3.3, PHPUnit 12.5.32, SQLite |
+| Official framework/database behavior | `completed` | Laravel 13 query listener/raw warning; SQLite planner/`INDEXED BY` contract |
+| Existing implementation first | `completed` | Home builder/snapshot/facets/cards/recommendation/cache paths traced |
+| Read-only root cause/profile/EXPLAIN | `completed` | Five builder samples, live series, six limit/index comparisons |
+| Alternatives/user authorization | `completed` | Three approaches compared; repeated user preapproval applies |
+| Design/plan/files/contracts/risks | `completed` | Linked approved documents and matrices |
+| TDD RED | `completed` | 1 test/3 assertions; failed only on missing compiled `INDEXED BY` |
+| Implementation | `completed` | SQLite-only grammar-owned source; other drivers return original builder |
+| Focused/static/broad/live verification | `completed` | 138/1 156 distinct matrix, Pint/Larastan/Rector, exact parity/EXPLAIN and HTTPS evidence |
+| Full PHPUnit | `unresolved` | Accumulated `256M` exhaustion in `UnifiedDiscoveryCollectionsTest`; exact 1/3 GREEN |
+| Managed docs check | `unresolved` | `project:docs-refresh --check` reports foreign `docs/MAINTENANCE_LOG.md`; Task 66 changed no managed block |
+| README/CHANGELOG/final requirement reread | `completed` | Visitor/technical/performance owners updated; canonical owners re-read |
+| Commit/push in `main` | `unresolved` | Exact Task 66 delivery still pending |
+
+### Безлимитный execution order
+
+1. `[completed]` Fresh requirements/version/Git/implementation discovery.
+2. `[completed]` Five-sample builder, cold candidate, limit and live profile.
+3. `[completed]` Compare alternatives and approve recommended design.
+4. `[completed]` Write exact detailed plan and compatibility matrix.
+5. `[completed]` TDD RED compiled SQLite order-plan regression.
+6. `[completed]` Minimal driver-guarded implementation and GREEN.
+7. `[completed]` Focused/static/broad/profile/live verification.
+8. `[completed]` Docs/README/CHANGELOG/final reread and legacy scan.
+9. `[pending]` Exact isolated commit in `main` and configured push.
+
+### Implementation и verification evidence
+
+- RED: result order/exclusion assertions passed; third assertion failed on
+  absent `from catalog_titles indexed by catalog_titles_created_at_idx`.
+  GREEN: exact test `1/3`, whole performance class `8/32`.
+- Existing homepage/content/recommendation/page/discovery/privacy-loader
+  matrix: 138 distinct tests, 1 156 assertions, all green.
+- Task-scoped `Pint`, Larastan (`0` errors), Rector dry-run (`0` changed
+  files) and `git diff --check` passed. A later `Pint --dirty` invocation
+  also formatted four foreign recommendation-model files in the shared
+  worktree; they remain explicitly outside Task 66 staging and delivery.
+- Six current/fallback comparisons preserved exact candidate IDs. Current
+  SQLite plan uses `catalog_titles_created_at_idx` without temporary sort
+  and took `0,44–13,83 ms`; fallback took `299,49–369,26 ms`.
+- Five builder samples preserved all section counts; warm median
+  `128,53 ms`, 45 queries and `44,65–47,04 ms` SQL.
+- Anonymous HTTPS: one `MISS 0,636 s`, then four `HIT 0,115–0,228 s`, all
+  `200` and `721 084` bytes. No generation bump, flush or DML was used.
+- Full suite reached unrelated accumulated `256M` exhaustion while encoding
+  `UnifiedDiscoveryCollectionsTest`; the exact failed process test passes
+  separately with 1 test/3 assertions.
+- Managed documentation check reports only foreign
+  `docs/MAINTENANCE_LOG.md`; Task 66 did not edit its generated owner block
+  or run a broad refresh over concurrent work.
+- Final repository scan confirmed one `CatalogPublicDiscoveryQuery`, one
+  `recentlyAdded()` implementation, the single existing index migration and
+  no duplicate route/service/cache path or related unfinished marker. Legacy
+  `indexed_at` matches are historical documentation of the former order.
