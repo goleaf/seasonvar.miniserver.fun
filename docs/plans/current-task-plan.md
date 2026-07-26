@@ -11612,7 +11612,7 @@ Detailed implementation plan:
 
 ## Task 94 — новая персонализированная главная
 
-Статус: `verification_complete_delivery_pending`.
+Статус: `implementation_verified_commit_complete_push_unresolved_authentication`.
 
 Дата начала: 26.07.2026.
 
@@ -11734,7 +11734,7 @@ Discovery, меняющее этот список, требует немедле
 | Static/style/build/full tests | `unresolved` | Task 94 focused 39/304 and UI/Blade 56/423 GREEN; Pint/PHPStan/Vite GREEN. Full suite sharded: 2 065 tests / 203 595 assertions, 8 foreign-tree failures remain |
 | Docs/README/CHANGELOG | `completed` | Canonical owners, visitor history, Russian changelog and executable evidence updated |
 | Final requirement/legacy/debug/secret audit | `completed` | Canonical owners/spec/plan reread; exact Task 94 legacy/duplicate/TODO/debug/secret/diff scan completed; rebased staged tree 95 tests / 727 assertions, Pint/PHPStan/Vite GREEN |
-| Commit/push main | `pending` | Exact isolated Task 94 commit and ordinary push |
+| Commit/push main | `completed_commit_unresolved_push_authentication` | Exact implementation commit `b22a74774e79a5b0f18f76c16fae1c47c9ec2290`; ordinary `GIT_TERMINAL_PROMPT=0 git push origin main` exited `128` before transfer because GitHub HTTPS username is unavailable |
 
 ### Execution order
 
@@ -11762,9 +11762,12 @@ Discovery, меняющее этот список, требует немедле
     compliance reread.
 16. `[completed]` Legacy/duplicate/TODO/debug/secret/status/diff/stat/index/
     remote audit.
-17. `[pending]` Exact Task 94 commit on existing `main`.
-18. `[pending]` Configured non-force push; external failure remains
-    `unresolved`.
+17. `[completed]` Exact 32-file Task 94 implementation commit
+    `b22a74774e79a5b0f18f76c16fae1c47c9ec2290` on existing `main`.
+18. `[completed_unresolved_authentication]` Configured non-force
+    `GIT_TERMINAL_PROMPT=0 git push origin main` exited `128` before
+    transfer: GitHub HTTPS username could not be read with terminal prompts
+    disabled.
 
 ---
 

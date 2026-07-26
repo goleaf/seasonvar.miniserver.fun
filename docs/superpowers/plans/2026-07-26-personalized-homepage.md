@@ -276,7 +276,7 @@ Priority/status: `high / completed`.
 
 ## Task 15 — final audit, commit and push
 
-Priority/status: `critical / in_progress`.
+Priority/status: `critical / completed_commit_unresolved_push_authentication`.
 
 - What: reread applicable requirements/spec/plan; scan legacy homepage
   implementations, TODO/debug/secrets; inspect status/diff/stat/index/remote;
@@ -297,3 +297,10 @@ Task 94 Pint — passed; PHPStan — `0` errors; Vite `8.1.4` production build �
 `26` modules. The sharded full suite remains honestly unresolved only
 because of eight attributed foreign-tree failures listed in the
 current-task matrix.
+
+Delivery evidence: implementation commit
+`b22a74774e79a5b0f18f76c16fae1c47c9ec2290`
+(`feat: redesign personalized homepage`) создан в существующей `main`.
+Configured non-force `GIT_TERMINAL_PROMPT=0 git push origin main` завершился
+кодом `128` до передачи данных:
+`fatal: could not read Username for 'https://github.com': terminal prompts disabled`.
