@@ -298,14 +298,9 @@ class CatalogDirectoryQuery
         $filterType = $directory->filterType?->value;
         abort_if($filterType === null, 404);
         $modelClass = $this->taxonomies->modelClass($filterType);
-        $model = new $modelClass;
-        $table = $model->getTable();
+        $table = (new $modelClass)->getTable();
         $pivot = $this->taxonomies->pivot($filterType);
-        $query = $modelClass::query()->select([
-            $table.'.id',
-            $table.'.name',
-            $table.'.slug',
-        ]);
+        $query = $this->taxonomyCandidates($directory, $search, $letter);
 
         if ($sort === 'count_desc') {
             $counts = DB::table($pivot['table'])
@@ -316,6 +311,13 @@ class CatalogDirectoryQuery
                     $this->titles->visibleTo(null)->select('catalog_titles.id'),
                 )
                 ->groupBy($pivot['related_key']);
+
+            if ($search !== '' || $letter !== '') {
+                $counts->whereIn(
+                    $pivot['related_key'],
+                    (clone $query)->select($table.'.id'),
+                );
+            }
 
             $query
                 ->addSelect('directory_value_counts.published_titles_count')
@@ -339,25 +341,41 @@ class CatalogDirectoryQuery
                 ->whereExists((clone $visibleLinks)->selectRaw('1'));
         }
 
-        $query
+        return $query;
+    }
+
+    /** @return Builder<Model> */
+    private function taxonomyCandidates(
+        CatalogDirectoryDefinition $directory,
+        string $search,
+        string $letter,
+    ): Builder {
+        $filterType = $directory->filterType?->value;
+        abort_if($filterType === null, 404);
+        $modelClass = $this->taxonomies->modelClass($filterType);
+        $model = new $modelClass;
+        $table = $model->getTable();
+        $query = $modelClass::query()
+            ->select([
+                $table.'.id',
+                $table.'.name',
+                $table.'.slug',
+            ])
             ->whereNotNull($table.'.name')
             ->where($table.'.name', '<>', '')
             ->whereNotNull($table.'.slug')
             ->where($table.'.slug', '<>', '');
 
-        if ($model instanceof Tag && Tag::usesCanonicalSchema()) {
+        $localizedTag = $model instanceof Tag && Tag::usesCanonicalSchema();
+
+        if ($localizedTag) {
             $this->constrainCanonicalTags($query, $table);
         }
 
-        $this->applyTaxonomySearch(
-            $query,
-            $table,
-            $search,
-            $model instanceof Tag && Tag::usesCanonicalSchema(),
-        );
+        $this->applyTaxonomySearch($query, $table, $search, $localizedTag);
 
         if ($letter !== '') {
-            $this->applyLetter($query, $table, $letter, $model instanceof Tag && Tag::usesCanonicalSchema());
+            $this->applyLetter($query, $table, $letter, $localizedTag);
         }
 
         return $query;
@@ -440,33 +458,23 @@ class CatalogDirectoryQuery
         $modelClass = $this->taxonomies->modelClass($filterType);
         $table = (new $modelClass)->getTable();
         $pivot = $this->taxonomies->pivot($filterType);
-        $visibleAlias = 'visible_directory_filtered_count_titles';
-        $query = $modelClass::query()
-            ->join($pivot['table'], $pivot['table'].'.'.$pivot['related_key'], '=', $table.'.id')
-            ->joinSub(
+        $candidateIds = $this->taxonomyCandidates($directory, $search, $letter)
+            ->select($table.'.id');
+        $visibleCandidateValues = DB::table($pivot['table'])
+            ->select($pivot['related_key'])
+            ->whereIn($pivot['related_key'], $candidateIds)
+            ->whereIn(
+                $pivot['title_key'],
                 $this->titles->visibleTo(null)->select('catalog_titles.id'),
-                $visibleAlias,
-                $visibleAlias.'.id',
-                '=',
-                $pivot['table'].'.'.$pivot['title_key'],
-            );
+            )
+            ->groupBy($pivot['related_key']);
 
-        if ($modelClass === Tag::class && Tag::usesCanonicalSchema()) {
-            $query->whereIn($table.'.id', Tag::query()->publiclyEligible()->select('tags.id'));
-        }
-
-        $this->applyTaxonomySearch(
-            $query,
-            $table,
-            $search,
-            $modelClass === Tag::class && Tag::usesCanonicalSchema(),
-        );
-
-        if ($letter !== '') {
-            $this->applyLetter($query, $table, $letter, $modelClass === Tag::class && Tag::usesCanonicalSchema());
-        }
-
-        return $query->distinct()->count($table.'.id');
+        return DB::query()
+            ->fromSub(
+                $visibleCandidateValues,
+                'filtered_directory_values',
+            )
+            ->count();
     }
 
     /** @param Builder<Model> $query */

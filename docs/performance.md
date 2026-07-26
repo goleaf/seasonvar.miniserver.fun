@@ -1045,6 +1045,59 @@ invalidation не менялись. RED зафиксировал прежние 
 Новая migration, таблица, индекс, route, Resource, translation, dependency,
 queue или environment value не добавлены.
 
+## Candidate-scoped aggregate фильтрованных справочников
+
+Следующий follow-up 26.07.2026 локализовал оставшийся cold path при `q` или
+`letter`. Прежний `filteredValueCount()` соединял taxonomy со всей pivot
+совокупностью и только затем выполнял `count(distinct taxonomy.id)`;
+`count_desc` группировал все видимые связи до внешнего candidate filter. На
+actor directory это повторяло широкую работу для 111 тысяч значений даже
+тогда, когда поиск оставлял 1 539 кандидатов.
+
+Один `taxonomyCandidates()` builder теперь владеет непустыми identity,
+canonical tag eligibility, localized translation/approved-alias search и
+letter predicates. Filtered total считает строки candidate-scoped grouped
+pivot subquery, а filtered `count_desc` передаёт те же candidate IDs
+внутреннему aggregate до visibility/grouping. Нефильтрованный `count_desc`
+намеренно сохраняет глобальный grouped aggregate, потому что правильная
+сортировка должна сравнить все значения.
+
+Семь чередующихся samples в одной read-only transaction дали:
+
+| Сценарий | Exact total и SHA-256 | Прежний total/result, медиана | Новый total/result, медиана |
+| --- | --- | ---: | ---: |
+| `letter=А` | `10 462`, `c52f2dc3e5592bbeebdc1cbc1e43d9de4162445f1938fadb648e39f56810f1a8` | `575,80 / 312,97 ms` | `124,60 / 161,29 ms` |
+| `q=Александр` | `1 539`, `2226019dfeb0cf9fb49cd469478a31ca199eca7169d0f72adc2821cabe8e50d5` | `537,11 / 265,38 ms` | `143,61 / 149,68 ms` |
+
+Old/new totals и ordered payload hashes совпали во всех samples.
+`EXPLAIN QUERY PLAN` для total/result обоих сценариев выбирает reverse
+covering
+`catalog_title_actor_actor_id_catalog_title_id_index`, прежний
+`catalog_titles_publication_lookup_idx` и primary-key lookup outer actor;
+temporary B-tree остаётся только у обязательной сортировки 48 результатов
+по count/name/id. Correlated taxonomy `EXISTS` отклонён после локального
+`≈11,99 s` letter-probe, а materialized counters и новый index не добавлены:
+проблемой был порядок candidate restriction, не отсутствие pivot index.
+Все timings — локальные read-only observations под текущей SQLite-нагрузкой,
+не p95/SLA.
+
+TDD сначала сохранил 10 правильных behavioral assertions и дал два
+ожидаемых SQL-shape failure, затем optimization class прошёл 8 тестов с 47
+утверждениями, включая localized public tag. Связанная
+web/API/cache/SEO/warming матрица прошла 141 тест с 1 747 утверждениями;
+syntax, `Pint`, task-scoped `PHPStan` с test-only 1 ГБ, `Rector`, Vite и
+live web/API `200` проверены. Штатный full suite дважды остановился на
+известном 256 MB memory limit большого HTML cache test. Временный test-only
+запуск с 1 ГБ выполнил 2 029 тестов: 2 013 прошли, 11 пропущены, а 3
+failure и 2 error относятся к параллельным metadata provenance, account
+session и importer changes; directory tests среди них отсутствуют.
+
+Routes, Resources/OpenAPI, query keys, pagination, SEO, cache
+key/version/TTL/invalidation, schema/index/data, translations, assets,
+dependencies, queues и environment не изменены. Rollback — обычный
+code/test/docs revert и graceful reload без restore, reindex, backfill,
+cache flush или queue recovery.
+
 ## Производительность onboarding вкусов Task 71
 
 Autocomplete ограничен существующим suggestion query и не гидратирует полный

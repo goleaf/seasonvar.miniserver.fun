@@ -7,6 +7,7 @@ namespace Tests\Feature;
 use App\DTOs\CatalogDirectoryDefinition;
 use App\Enums\ContentAudience;
 use App\Enums\PublicationStatus;
+use App\Enums\TagVisibility;
 use App\Models\Actor;
 use App\Models\CatalogTitle;
 use App\Models\Tag;
@@ -93,7 +94,7 @@ final class CatalogDirectoryQueryOptimizationTest extends TestCase
         );
 
         $this->assertStringContainsString(
-            'where exists (select 1 from catalog_title_actor as directory_visible_links',
+            'exists (select 1 from catalog_title_actor as directory_visible_links',
             $resultQuery,
         );
         $this->assertStringContainsString(
@@ -143,6 +144,145 @@ final class CatalogDirectoryQueryOptimizationTest extends TestCase
         );
 
         $this->assertStringContainsString('directory_value_counts', $resultQuery);
+        $this->assertStringContainsString('group by actor_id', $resultQuery);
+        $this->assertStringContainsString(
+            'order by published_titles_count desc, actors.name asc, actors.id asc',
+            $resultQuery,
+        );
+    }
+
+    public function test_filtered_total_groups_only_visible_candidate_pivot_values(): void
+    {
+        $alpha = Actor::query()->create([
+            'name' => 'Alpha Actor',
+            'slug' => 'alpha-filtered-actor',
+        ]);
+        $alphaDraft = Actor::query()->create([
+            'name' => 'Alpha Draft Actor',
+            'slug' => 'alpha-draft-filtered-actor',
+        ]);
+        $beta = Actor::query()->create([
+            'name' => 'Beta Actor',
+            'slug' => 'beta-filtered-actor',
+        ]);
+
+        $alpha->catalogTitles()->attach([
+            CatalogTitle::factory()->create()->id,
+            CatalogTitle::factory()->create()->id,
+        ]);
+        $alphaDraft->catalogTitles()->attach(
+            CatalogTitle::factory()->create([
+                'is_published' => false,
+                'publication_status' => PublicationStatus::Draft,
+            ]),
+        );
+        $beta->catalogTitles()->attach(CatalogTitle::factory()->create());
+
+        $queries = $this->captureQueries(function () use ($alpha): void {
+            $paginator = app(CatalogDirectoryQuery::class)->paginate(
+                $this->actorsDirectory(),
+                search: 'Alpha',
+                letter: '',
+                sort: 'name_asc',
+                decade: null,
+                total: 3,
+                perPage: 48,
+            );
+            $items = $paginator->getCollection();
+
+            $this->assertSame(1, $paginator->total());
+            $this->assertSame([$alpha->id], $items->pluck('id')->all());
+            $this->assertSame([2], $items->pluck('published_titles_count')->map(
+                fn (mixed $count): int => (int) $count,
+            )->all());
+        });
+
+        $totalQuery = collect($queries)->sole(
+            fn (string $sql): bool => str_contains($sql, 'as aggregate')
+                && (
+                    str_contains($sql, 'as filtered_directory_values')
+                    || str_contains($sql, 'count(distinct actors.id)')
+                ),
+        );
+
+        $this->assertStringContainsString(
+            'from (select actor_id from catalog_title_actor where actor_id in (select actors.id from actors',
+            $totalQuery,
+        );
+        $this->assertStringContainsString('group by actor_id) as filtered_directory_values', $totalQuery);
+        $this->assertStringNotContainsString('from actors inner join catalog_title_actor', $totalQuery);
+        $this->assertStringNotContainsString('count(distinct actors.id)', $totalQuery);
+    }
+
+    public function test_filtered_count_order_scopes_the_grouped_aggregate_to_candidates(): void
+    {
+        $alpha = Actor::query()->create([
+            'name' => 'Alpha Actor',
+            'slug' => 'alpha-filtered-count-actor',
+        ]);
+        $alpine = Actor::query()->create([
+            'name' => 'Alpine Actor',
+            'slug' => 'alpine-filtered-count-actor',
+        ]);
+        $beta = Actor::query()->create([
+            'name' => 'Beta Actor',
+            'slug' => 'beta-filtered-count-actor',
+        ]);
+        $hidden = Actor::query()->create([
+            'name' => 'Archived Actor',
+            'slug' => 'archived-filtered-count-actor',
+        ]);
+
+        $firstAlpha = CatalogTitle::factory()->create();
+        $secondAlpha = CatalogTitle::factory()->create();
+        $alpineVisible = CatalogTitle::factory()->create();
+        $betaVisible = CatalogTitle::factory()->count(3)->create();
+        $draft = CatalogTitle::factory()->create([
+            'is_published' => false,
+            'publication_status' => PublicationStatus::Draft,
+        ]);
+        $future = CatalogTitle::factory()->create([
+            'available_from' => now()->addHour(),
+        ]);
+        $expired = CatalogTitle::factory()->create([
+            'available_until' => now()->subHour(),
+        ]);
+        $deleted = CatalogTitle::factory()->create();
+
+        $alpha->catalogTitles()->attach([$firstAlpha->id, $secondAlpha->id]);
+        $alpine->catalogTitles()->attach($alpineVisible);
+        $beta->catalogTitles()->attach($betaVisible);
+        $hidden->catalogTitles()->attach([$draft->id, $future->id, $expired->id, $deleted->id]);
+        $deleted->delete();
+
+        $queries = $this->captureQueries(function () use ($alpha, $alpine): void {
+            $paginator = app(CatalogDirectoryQuery::class)->paginate(
+                $this->actorsDirectory(),
+                search: '',
+                letter: 'A',
+                sort: 'count_desc',
+                decade: null,
+                total: 4,
+                perPage: 48,
+            );
+            $items = $paginator->getCollection();
+
+            $this->assertSame(2, $paginator->total());
+            $this->assertSame([$alpha->id, $alpine->id], $items->pluck('id')->all());
+            $this->assertSame([2, 1], $items->pluck('published_titles_count')->map(
+                fn (mixed $count): int => (int) $count,
+            )->all());
+        });
+
+        $resultQuery = collect($queries)->sole(
+            fn (string $sql): bool => str_contains($sql, 'from actors')
+                && str_contains($sql, 'directory_value_counts'),
+        );
+
+        $this->assertStringContainsString(
+            'actor_id in (select actors.id from actors',
+            $resultQuery,
+        );
         $this->assertStringContainsString('group by actor_id', $resultQuery);
         $this->assertStringContainsString(
             'order by published_titles_count desc, actors.name asc, actors.id asc',
@@ -259,6 +399,52 @@ final class CatalogDirectoryQueryOptimizationTest extends TestCase
         );
 
         $this->assertSame(1, substr_count($alphabetQuery, 'from tag_translations as'));
+    }
+
+    public function test_filtered_tag_candidates_preserve_localized_search_and_public_eligibility(): void
+    {
+        app()->setLocale('ru');
+        config(['app.fallback_locale' => 'ru']);
+
+        $visibleTitle = CatalogTitle::factory()->create();
+        $eligible = Tag::query()->create([
+            'name' => 'Science fiction',
+            'slug' => 'science-fiction-filtered-tag',
+        ]);
+        $eligible->translations()->create([
+            'locale' => 'ru',
+            'label' => 'Научная фантастика',
+        ]);
+        $eligible->catalogTitles()->attach($visibleTitle);
+
+        $internal = Tag::query()->create([
+            'name' => 'Internal science fiction',
+            'slug' => 'internal-science-fiction-filtered-tag',
+            'visibility' => TagVisibility::Internal,
+        ]);
+        $internal->translations()->create([
+            'locale' => 'ru',
+            'label' => 'Скрытая фантастика',
+        ]);
+        $internal->catalogTitles()->attach(CatalogTitle::factory()->create());
+
+        $paginator = app(CatalogDirectoryQuery::class)->paginate(
+            $this->tagsDirectory(),
+            search: 'фантастика',
+            letter: '',
+            sort: 'count_desc',
+            decade: null,
+            total: 2,
+            perPage: 48,
+        );
+        $items = $paginator->getCollection();
+
+        $this->assertSame(1, $paginator->total());
+        $this->assertSame([$eligible->id], $items->pluck('id')->all());
+        $this->assertSame(['Научная фантастика'], $items->pluck('name')->all());
+        $this->assertSame([1], $items->pluck('published_titles_count')->map(
+            fn (mixed $count): int => (int) $count,
+        )->all());
     }
 
     public function test_decades_rebuild_selects_distinct_years_without_database_decade_grouping(): void

@@ -15,6 +15,14 @@ Search suggestions общего `/titles` могут предложить под
 alphabet, locale-aware tag labels, search/letter filters и web/API pagination
 остаются отдельными прежними contracts.
 
+При активном `q` или `letter` filtered total и `count_desc` используют один
+canonical taxonomy candidate subquery до pivot grouping. Поэтому база
+считает видимые связи только для совпавших идентификаторов, а не агрегирует
+весь справочник перед внешней фильтрацией. Нефильтрованный `count_desc`
+остаётся глобальным для правильного сравнения всех значений. Guest-public
+visibility, canonical tag eligibility, localized translation/alias search,
+точные total/count/order и web/API paginator не изменены.
+
 ## Контракт запроса
 
 HTTP query-параметр `q` проходит через `CatalogTitlesRequest`: строка приводится к Unicode NFKC, пробелы по краям удаляются, а последовательности Unicode-пробелов схлопываются. Непустая строка может содержать от 1 до 80 Unicode-символов (`min:1|max:80`), но односимвольный запрос выполняет только точное сопоставление основного, оригинального или альтернативного названия и никогда не запускает FTS/prefix/full-table partial scan. Строка длиннее 80 символов отклоняется без молчаливого обрезания. Array/object-shaped `q` считается пустым безопасным состоянием и не попадает в SQL. Сообщения валидации и имена полей принадлежат `lang/{ru,en}/catalog.php`.

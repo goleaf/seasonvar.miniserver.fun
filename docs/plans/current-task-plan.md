@@ -11342,3 +11342,150 @@ request CTA при нулевом результате.
 14. `[completed_unresolved_authentication]` Normal non-force configured push
     failed with code 128 before transfer; force/remote/history were not
     changed.
+
+## Task 91 — candidate-scoped aggregate фильтрованных справочников
+
+Статус: `verified_delivery_pending`.
+
+Дата начала: 26.07.2026.
+
+Approved design:
+[`2026-07-26-filtered-directory-candidate-aggregate-design.md`](../superpowers/specs/2026-07-26-filtered-directory-candidate-aggregate-design.md).
+
+Detailed implementation plan:
+[`2026-07-26-filtered-directory-candidate-aggregate.md`](../superpowers/plans/2026-07-26-filtered-directory-candidate-aggregate.md).
+
+### Цель и measured root cause
+
+Web и API справочники используют общий `CatalogDirectoryQuery`.
+Предыдущие оптимизации ограничили обычный `name_asc`, compact
+summary/alphabet и decades, но при активном `q` или `letter`
+`filteredValueCount()` по-прежнему соединяет taxonomy со всей pivot
+совокупностью до `count(distinct taxonomy.id)`. Filtered `count_desc`
+группирует связи всех taxonomy values и применяет candidate filter только
+во внешнем запросе.
+
+На текущем actor directory:
+
+- `letter=А`, `count_desc`: total `10 462`, total SQL `518,51 ms`, result SQL
+  `290,47 ms`, полный wall `811,57 ms`;
+- `q=Александр`, `count_desc`: total `1 539`, total SQL `588,32 ms`, result
+  SQL `306,79 ms`, полный wall `897,97 ms`.
+
+Candidate ID subquery до pivot grouping сохранил totals и ordered hashes.
+Одиночные candidate samples дали `120,59/171,88 ms` для letter и
+`137,28/176,02 ms` для search, то есть ожидаемое суммарное SQL-снижение
+около 60–64%. Correlated taxonomy `EXISTS` отклонён после
+`≈11 988,81 ms` на широкой букве; materialized counters/index отклонены как
+необоснованное schema/write усложнение. Значения являются локальными
+read-only observations, не p95/SLA.
+
+Выбран один canonical taxonomy candidate builder. Filtered total и filtered
+`count_desc` ограничат grouped pivot этим ID subquery; нефильтрованный
+`count_desc` намеренно останется глобальным.
+
+### Expected changed files
+
+- `app/Services/Catalog/CatalogDirectoryQuery.php`;
+- `tests/Feature/CatalogDirectoryQueryOptimizationTest.php`;
+- linked Task 91 design и detailed plan;
+- exact Task 91 sections в `docs/catalog-search.md`,
+  `docs/performance.md` и этом current plan;
+- exact Task 91 entries в `README.md` и `CHANGELOG.md`.
+
+Новая migration, index, table, route, Resource, translation, cache resource,
+dependency, queue, environment variable или production DML не планируется.
+
+### Protected files и public contracts
+
+- все web directory routes, localized URLs, full-page Livewire owners и
+  route names;
+- `GET /api/v1/catalog/directories/{directory}`, Resource shape, page size и
+  paginator metadata;
+- normalized/validated `q`, `letter`, `sort`, `decade`, `page`;
+- exact total, rows, `published_titles_count`, ordering and tie-breakers;
+- `CatalogTitleQuery::visibleTo(null)` publication/audience/window/soft
+  delete boundary;
+- canonical tag eligibility, translation/alias search and localized labels;
+- page-only canonical и filtered/sorted `noindex,nofollow`;
+- `name_asc` bounded result и unfiltered global `count_desc`;
+- summary/alphabet/decades snapshot keys/version/TTL/stale/lock/invalidation;
+- importer, homepage, search, recommendations, collections, player, Premium,
+  administration, region/legal, notifications and user-private state;
+- routes, translations, UI/assets, schema/index/data, queues, dependencies
+  and environment;
+- весь foreign Task 84–90 staged/unstaged/untracked scope.
+
+### Cross-feature, query и production risks
+
+| Domain | Статус | Решение / gate |
+| --- | --- | --- |
+| Filtered total/result | `critical_affected` | Exact mixed-visibility fixtures and SQL shape |
+| Unfiltered `count_desc` | `protected_critical` | Existing global aggregate regression |
+| Canonical tags/locales | `protected_critical` | Shared candidate builder + existing tag tests |
+| Web/API pagination | `protected_critical` | Shared service consumer regression matrix |
+| Visibility/security | `protected_critical` | Existing `visibleTo(null)` subquery and draft/future/expired/deleted fixtures |
+| Validation/SQL injection | `already_compliant` | Existing normalization/bindings; identifiers registry-owned |
+| Cache/SEO/warming | `protected_high` | No key/invalidation change; related tests |
+| SQLite query plan | `critical_affected` | Candidate IDs before grouped pivot; reverse covering index |
+| Other DB drivers | `protected_critical` | Portable builder `whereIn`/`fromSub`/`groupBy` |
+| Schema/index/DML | `not_applicable` | No migration, index, backfill or production write |
+| Routes/translations/UI/assets | `not_applicable` | No public shape or presentation change |
+| Dependencies/environment | `not_applicable` | No package, secret, config or `.env` change |
+| Production rollback | `affected_low` | Code/docs revert and reload; no restore/flush/reindex |
+| Shared Git state | `critical_risk_recorded` | Exact alternate-index Task 91 paths/hunks only |
+
+### Task-specific requirement-compliance matrix
+
+| Requirement/domain | Статус | Evidence / следующий gate |
+| --- | --- | --- |
+| Skills/root/index/canonical fresh read | `completed` | 26.07.2026 before Task 91 PHP edit |
+| Architecture/development/multilingual/security/performance/cache/ops/maintenance/integration | `completed` | Mandatory owners and permanent boundaries traced |
+| Feature owners `catalog-search.md`/`api.md`/`testing.md` | `completed` | Shared web/API directory and test contracts traced |
+| UI/admin requirements | `not_applicable` | No UI, copy, translation, control, permission or staff change |
+| Runtime/packages/database/frontend | `completed` | PHP 8.5.8, Laravel 13.22.0, Boost 2.4.13, Livewire 4.3.3, PHPUnit 12.5.32, SQLite 3.46.1, Tailwind 4.3.2, Vite 8.1.4 |
+| Official version-dependent docs | `completed` | Laravel 13 subquery joins, aggregates, query listener and builder docs through Boost |
+| Laravel best-practice rules | `completed` | Database performance, advanced queries, testing, architecture and style reread |
+| Existing implementation/dependants first | `completed` | Query, registry, page/API consumers, cache, tests, schema/indexes and Task 90 overlap inspected |
+| Read-only root-cause profile | `completed` | Current/candidate totals, result hashes, timings and EXPLAIN captured |
+| Alternatives/user authorization | `completed` | Three approaches compared; candidate grouped pivot selected under explicit autonomy |
+| Design/spec self-review | `completed` | Linked design reread; whitespace and placeholder scan passed |
+| Design-only commit | `completed` | Exact docs commit `d2f249b`; foreign shared index repaired to current HEAD without altering other entries |
+| Detailed plan/files/contracts/risks | `completed` | Linked TDD plan and manifests above |
+| TDD RED/GREEN | `completed` | RED: 2 теста / 10 behavioral assertions с двумя ожидаемыми SQL-shape failures; GREEN optimization class 8/47, включая localized public tag |
+| Validation/authorization/security | `already_compliant` | Read-only public input, bindings, registry-owned identifiers и `visibleTo(null)` boundaries unchanged |
+| Migration/index/data | `not_applicable` | No DDL/DML/index/backfill |
+| Cache/resource/invalidation | `already_compliant` | Existing snapshot owners untouched; related cache/warming tests GREEN |
+| Production parity/profile | `completed` | 7 old/new samples: exact totals/hashes; letter 575.80/312.97→124.60/161.29 ms, search 537.11/265.38→143.61/149.68 ms; reverse covering pivot plan |
+| Related web/API/cache regressions | `completed` | 141 tests / 1 747 assertions GREEN; live web/API 200 |
+| Static/style/build/full verification | `completed_with_independent_full_suite_failures` | Pint/syntax/PHPStan 1G/Rector/Vite GREEN; full 1G: 2 013 passed, 11 skipped, 3 foreign failures and 2 foreign errors out of 2 029 |
+| Docs/README/CHANGELOG | `completed_task_scope_with_foreign_snapshot_policy_blocker` | Search/performance owners, README visitor history and Russian CHANGELOG entry authored; docs-refresh/README pass, whole-worktree CHANGELOG policy stops on foreign Task 90 English line 162 |
+| Final requirements/legacy/debug/secret audit | `completed` | Applicable canonical requirements, approved design and prepared plan reread; duplicate service/route, legacy aggregate, Blade query, debug/conflict, secret-like addition, temporary-file and exact diff scans reviewed |
+| Commit/push main | `pending` | Exact Task 91 implementation commit and configured non-force push |
+
+### Безлимитный execution order
+
+1. `[completed]` Fresh skills, requirements, owners, versions and Git audit.
+2. `[completed]` Existing directory web/API/query/cache/test/schema trace.
+3. `[completed]` Production-scale current query profile and EXPLAIN.
+4. `[completed]` Candidate aggregate comparison, exact parity and rejected
+   alternatives.
+5. `[completed]` Approved design self-review and exact commit `d2f249b`.
+6. `[completed]` Detailed TDD plan, expected/protected files, risks and
+   compliance matrix.
+7. `[completed]` Prepared-plan reread and two isolated RED regressions.
+8. `[completed]` Shared taxonomy candidate builder.
+9. `[completed]` Candidate-scoped filtered total and `count_desc`.
+10. `[completed]` Focused GREEN, exact Pint and static checks.
+11. `[completed]` Same-snapshot parity, repeated profile and final EXPLAIN.
+12. `[completed]` Related web/API/cache/SEO/warming regression matrix.
+13. `[completed_with_independent_failures]` Safe runtime smoke, Vite and broad
+    PHPUnit; Task 91 tests GREEN, five foreign full-suite failures recorded.
+14. `[completed_task_scope]` Canonical docs, README and Russian CHANGELOG;
+    whole-worktree policy remains blocked by foreign Task 90 line.
+15. `[completed]` Final requirements/legacy/debug/secret/exact diff audit.
+16. `[pending]` Exact Task 91 implementation/docs commit on existing `main`.
+17. `[pending]` Configured non-force push; external failure remains
+    `unresolved`.
+
+---
