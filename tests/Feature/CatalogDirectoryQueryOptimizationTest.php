@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\DTOs\CatalogDirectoryDefinition;
+use App\Enums\ContentAudience;
 use App\Enums\PublicationStatus;
 use App\Models\Actor;
 use App\Models\CatalogTitle;
@@ -258,6 +259,53 @@ final class CatalogDirectoryQueryOptimizationTest extends TestCase
         );
 
         $this->assertSame(1, substr_count($alphabetQuery, 'from tag_translations as'));
+    }
+
+    public function test_decades_rebuild_selects_distinct_years_without_database_decade_grouping(): void
+    {
+        CatalogTitle::factory()->create(['year' => 2024]);
+        CatalogTitle::factory()->create(['year' => 2021]);
+        CatalogTitle::factory()->create(['year' => 2015]);
+        CatalogTitle::factory()->create([
+            'year' => 1999,
+            'is_published' => false,
+            'publication_status' => PublicationStatus::Draft,
+        ]);
+        CatalogTitle::factory()->create([
+            'year' => 1988,
+            'available_from' => now()->addHour(),
+        ]);
+        CatalogTitle::factory()->create([
+            'year' => 1977,
+            'available_until' => now()->subHour(),
+        ]);
+        CatalogTitle::factory()->create([
+            'year' => 1966,
+            'audience' => ContentAudience::Authenticated,
+        ]);
+        $deleted = CatalogTitle::factory()->create(['year' => 1955]);
+        $deleted->delete();
+        app(CacheVersionRegistry::class)->bump(CacheDomain::CatalogFacets);
+
+        $queries = $this->captureQueries(function (): void {
+            $this->assertSame(
+                [2020, 2010],
+                app(CatalogDirectoryQuery::class)->decades()->all(),
+            );
+        });
+
+        $decadesQuery = collect($queries)->sole(
+            fn (string $sql): bool => str_contains($sql, 'from catalog_titles')
+                && (
+                    str_contains($sql, 'as decade')
+                    || str_contains($sql, 'select distinct year')
+                ),
+        );
+
+        $this->assertStringStartsWith('select distinct year from catalog_titles', $decadesQuery);
+        $this->assertStringContainsString('order by year desc', $decadesQuery);
+        $this->assertStringNotContainsString('cast(year / 10', $decadesQuery);
+        $this->assertStringNotContainsString('group by decade', $decadesQuery);
     }
 
     /**

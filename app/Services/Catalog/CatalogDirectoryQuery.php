@@ -215,12 +215,38 @@ class CatalogDirectoryQuery
     /** @return Collection<int, int> */
     public function decades(): Collection
     {
+        $minimumYear = $this->minimumYear();
+        $maximumYear = $this->maximumYear();
+        $minimumDecade = intdiv($minimumYear, 10) * 10;
+        $maximumDecade = intdiv($maximumYear, 10) * 10;
+
+        return collect($this->snapshots->remember(
+            'directory-decades-v1',
+            [
+                'minimum_year' => $minimumYear,
+                'maximum_year' => $maximumYear,
+            ],
+            fn (): array => $this->buildDecades()
+                ->map(fn (int $decade): array => ['decade' => $decade])
+                ->all(),
+        ))
+            ->map(fn (array $row): int => (int) ($row['decade'] ?? 0))
+            ->filter(fn (int $decade): bool => $decade >= $minimumDecade && $decade <= $maximumDecade)
+            ->unique()
+            ->sortDesc()
+            ->values();
+    }
+
+    /** @return Collection<int, int> */
+    private function buildDecades(): Collection
+    {
         return $this->validYearTitles()
-            ->selectRaw('(cast(year / 10 as integer) * 10) as decade')
-            ->groupBy('decade')
-            ->orderByDesc('decade')
-            ->pluck('decade')
-            ->map(fn (mixed $decade): int => (int) $decade)
+            ->select('year')
+            ->distinct()
+            ->orderByDesc('year')
+            ->pluck('year')
+            ->map(fn (mixed $year): int => intdiv((int) $year, 10) * 10)
+            ->unique()
             ->values();
     }
 

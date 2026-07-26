@@ -963,6 +963,39 @@ summary/alphabet shape, visibility, schema/data, translations, dependencies,
 queues и environment не изменены. Rollback — code/docs revert; versioned
 keys истекают естественно без restore, reindex, backfill или cache flush.
 
+## DISTINCT-year snapshot десятилетий справочника
+
+Следующий независимый follow-up 26.07.2026 измерил
+`CatalogDirectoryQuery::decades()`, который вызывают web `/years` и
+`GET /api/v1/catalog/directories/years`. Прежний запрос группировал
+`cast(year / 10 as integer) * 10`; SQLite использовал
+`catalog_titles_published_year_idx`, но дополнительно строил
+`USE TEMP B-TREE FOR GROUP BY`.
+
+На production-scale SQLite с 33 002 опубликованными rows и 103 уникальными
+годами девять read-only samples прежней формы дали медиану `123,72 ms` и
+p90 `281,48 ms`. `SELECT DISTINCT year ORDER BY year DESC` с тем же
+`CatalogTitleQuery::visibleTo(null)` и преобразованием через `intdiv()` в
+PHP дал тот же SHA-256
+`2ec82a03a7372dd25ec09cc9aada0fe0b9dbcc2564b79a13b700dd9fe409bb72`.
+EXPLAIN final query содержит один поиск по
+`catalog_titles_published_year_idx` без temporary group.
+
+Девять принудительных rebuild новой `CatalogFacets` generation дали
+медиану `5,14 ms` wall и p90 `7,04 ms`; медиана самого SQL после прогрева
+страничного cache составила `0,38 ms`. Повторное чтение той же generation
+заняло `0,35 ms` и выполнило `0` запросов к `catalog_titles`. Это локальная
+read-only диагностика, а не production p95/SLA.
+
+Result хранится как compact `directory-decades-v1` resource существующего
+`CatalogFacetSnapshotCache`; resolved minimum/maximum year входят в cache
+identity. Version/TTL/stale/lock/telemetry/failure и after-commit
+invalidation не менялись. RED зафиксировал прежние вычисляемый `GROUP BY` и
+отсутствие snapshot, GREEN прошёл 11 focused тестов с 49 утверждениями;
+связанные web/API/cache/warming проверки — 148 тестов с 1 165 утверждениями.
+Новая migration, таблица, индекс, route, Resource, translation, dependency,
+queue или environment value не добавлены.
+
 ## Производительность onboarding вкусов Task 71
 
 Autocomplete ограничен существующим suggestion query и не гидратирует полный

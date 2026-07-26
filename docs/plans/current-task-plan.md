@@ -10781,3 +10781,122 @@ rebuild/failure fallback; migration/index/table/queue не добавляютс�
     existing `main`; hooks passed.
 17. `[completed]` Configured non-force push attempted; HTTPS credentials are
     unavailable, so exit 128 before data transfer remains `unresolved`.
+
+---
+
+## Task 89 — быстрый snapshot десятилетий справочника годов
+
+Статус: `verified_delivery_pending`.
+
+Дата начала: 26.07.2026.
+
+Approved design:
+[`2026-07-26-directory-decades-snapshot-design.md`](../superpowers/specs/2026-07-26-directory-decades-snapshot-design.md).
+
+Detailed implementation plan:
+[`2026-07-26-directory-decades-snapshot.md`](../superpowers/plans/2026-07-26-directory-decades-snapshot.md).
+
+### Цель и measured root cause
+
+Web `/years` и
+`GET /api/v1/catalog/directories/years` при каждом чтении вызывают
+`CatalogDirectoryQuery::decades()`. Текущий SQL группирует вычисляемое
+`cast(year / 10 as integer) * 10`, поэтому SQLite использует temporary B-tree
+несмотря на существующий `catalog_titles_published_year_idx`.
+
+На production-scale SQLite с 33 002 опубликованными rows и 103 уникальными
+годами девять read-only samples дали медиану `123,72 ms`, p90 `281,48 ms`.
+Portable `SELECT DISTINCT year` с тем же `visibleTo(null)` scope и
+преобразованием через `intdiv()` вернул тот же набор 13 десятилетий с
+медианой `2,93 ms`, p90 `19,08 ms`.
+
+Выбран быстрый cold rebuild плюс compact `directory-decades-v1` resource
+через существующий `CatalogFacetSnapshotCache`. Новый index, migration,
+table, dependency, queue, route или cache domain не добавляется.
+
+### Expected changed files
+
+- `app/Services/Catalog/CatalogDirectoryQuery.php`;
+- `tests/Feature/CatalogDirectoryQueryOptimizationTest.php`;
+- `tests/Feature/CatalogFacetCacheTest.php`;
+- linked Task 89 design и detailed plan;
+- exact Task 89 sections в `docs/caching.md`, `docs/performance.md`,
+  `docs/catalog-search.md` и этом current plan;
+- exact Task 89 entries в `README.md` и `CHANGELOG.md`.
+
+### Protected files и public contracts
+
+- все web directory routes и full-page `CatalogDirectoryBrowser`;
+- `/api/v1/catalog/directories/{directory}`, Resources, pagination и
+  `meta.decades`;
+- exact descending unique integer result
+  `CatalogDirectoryQuery::decades(): Collection`;
+- `CatalogTitleQuery::visibleTo(null)`, configured year bounds, filters,
+  redirects, SEO/canonical и warming;
+- existing `CatalogFacets` version/TTL/stale/lock/telemetry/failure and
+  after-commit invalidation;
+- separate Homepage `year_buckets` resource и весь foreign Task 84–88 scope;
+- auth, authorization, Premium, payments, ads, regional/legal access,
+  privacy, search, recommendations, sitemap, notifications и personal state.
+
+### Cross-feature, cache и production risks
+
+| Domain | Статус | Решение / gate |
+| --- | --- | --- |
+| Visibility/order/uniqueness | `critical_affected` | Exact mixed-publication fixture |
+| Cold SQL shape | `critical_affected` | DISTINCT year + absence of computed GROUP BY |
+| Cache identity | `affected` | Resource + minimum/resolved maximum dimensions |
+| Calendar/config rollover | `critical_affected` | Bounds participate in cache identity |
+| Invalidation | `already_compliant` | Existing CatalogFacets version after catalog writes |
+| Cache failure | `already_compliant` | Existing TieredCache authoritative rebuild |
+| Web/API/SEO/warming | `protected_critical` | Related exact regression matrix |
+| SQLite plan | `critical_affected` | Existing published-year index, no temp group |
+| Other DB engines | `protected_critical` | Portable Eloquent distinct/pluck |
+| Schema/index/DML | `not_applicable` | No migration, index, backfill or production write |
+| Routes/translations/UI/assets | `not_applicable` | No public shape or presentation change |
+| Dependencies/environment | `not_applicable` | No package, config secret or `.env` change |
+| Rollback | `completed_design` | Code/docs revert; versioned entry expires naturally |
+| Shared Git state | `critical_risk_recorded` | Exact alternate-index Task 89 delivery only |
+
+### Task-specific requirement-compliance matrix
+
+| Requirement/domain | Статус | Evidence / следующий gate |
+| --- | --- | --- |
+| Skills/root/index/canonical fresh read | `completed` | 26.07.2026 before Task 89 application edit |
+| Architecture/development/multilingual/security/performance/cache/ops/maintenance/integration | `completed` | Mandatory owners and permanent boundaries traced |
+| Feature owners `catalog-search.md`/`api.md`/`DATA_RELATIONS.md` | `completed` | Shared web/API/year-directory contract traced |
+| Runtime/packages/database | `completed` | PHP 8.5.8, Laravel 13.22.0, Boost 2.4.13, Livewire 4.3.3, PHPUnit 12.5.32, SQLite 3.46.1 |
+| Official version-dependent docs | `completed` | Laravel 13 distinct/pluck/cache docs through Boost |
+| Existing implementation/dependants first | `completed` | Query/page/API/cache/invalidation/tests/indexes and Task 86 overlap inspected |
+| Read-only root-cause profile | `completed` | Nine old/new samples and EXPLAIN on current production-scale DB |
+| Alternatives/user authorization | `completed` | Fast rebuild + existing facet snapshot selected under explicit autonomy |
+| Design/spec self-review | `completed` | Linked design reread; no placeholders or scope contradiction |
+| Design-only commit | `unresolved_shared_changelog` | Exact alternate-index hook correctly refused because foreign `CHANGELOG.md` is dirty outside that index; prepared spec stays in worktree for final exact delivery |
+| Detailed plan/files/contracts/risks | `completed` | Linked TDD plan and manifests above |
+| TDD RED/GREEN | `completed` | RED 2 tests / 4 assertions with two intended failures; minimal GREEN 2/8; final focused classes 11/49 |
+| Cache lifecycle/failure | `completed` | Version-bump and bounds-identity tests plus TieredCache state/failure matrix GREEN |
+| Production parity/profile | `completed` | Exact SHA-256; 9 rebuilds median 5.14 ms/p90 7.04 ms; hot 0.35 ms/0 SQL; EXPLAIN existing index |
+| Related web/API/cache regressions | `completed` | 148 tests / 1 165 assertions GREEN; focused total makes 159 / 1 214 |
+| Static/style/docs/full verification | `completed_with_unresolved_full_runner_memory` | Exact Pint/syntax/PHPStan 1G/Rector/docs/diff GREEN; monolithic runner repeatedly exhausts XML-enforced 256 MB in foreign large-page cache test |
+| Docs/README/CHANGELOG | `completed_task_scope_with_foreign_policy_blocker` | Caching/performance/search/visitor/technical entries authored; README/docs checks GREEN; whole CHANGELOG policy stops on foreign Task 87 word `source-health` before Task 89 entry |
+| Final requirements/legacy/debug/secret audit | `completed` | Applicable canonical requirements and prepared plan reread; computed-group/cache-key/debug/secret/temporary/diff searches reviewed |
+| Commit/push main | `pending` | Hook-enabled exact task scope; external failure honest |
+
+### Безлимитный execution order
+
+1. `[completed]` Fresh skills, requirements, owners, versions and Git audit.
+2. `[completed]` Query/page/API/cache/invalidation/index/overlap trace.
+3. `[completed]` Production-scale old/new profile and EXPLAIN.
+4. `[completed]` Four alternatives and autonomously approved design.
+5. `[completed]` Design self-review; standalone hook attempt correctly left
+   unresolved by foreign dirty CHANGELOG without creating a commit.
+6. `[completed]` Detailed TDD plan, files/contracts/risks/compliance matrix.
+7. `[completed]` Prepared-plan reread and isolated RED: two intended failures.
+8. `[completed]` Fast DISTINCT-year rebuild and compact snapshot.
+9. `[completed]` Focused GREEN, exact Pint and scoped static checks.
+10. `[completed]` Exact parity, cache lifecycle, query count/profile/EXPLAIN.
+11. `[completed]` Related web/API/cache/SEO/warming regression matrix.
+12. `[completed]` Canonical docs, README and Russian CHANGELOG task hunks.
+13. `[completed]` Full-suite assessment and final requirements/legacy/secret audit.
+14. `[pending]` Exact hook-enabled Task 89 commits on existing `main`.
+15. `[pending]` Configured non-force push; external failure stays `unresolved`.

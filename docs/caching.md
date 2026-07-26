@@ -129,21 +129,25 @@ HTTP API policy: browser `max-age=60`, shared `s-maxage=300`, SWR 60 s, stale-if
 
 ## Compact metadata справочников
 
-`CatalogDirectoryQuery` хранит два ограниченных публичных ресурса через
+`CatalogDirectoryQuery` хранит три ограниченных публичных ресурса через
 существующий `CatalogFacetSnapshotCache`:
 
 - `directory-summary-v1` с dimension `directory` содержит одну строку только
   с целыми `values` и `titles`;
 - `directory-alphabet-v1` с dimension `directory` содержит только
   нормализованные буквы; для canonical tags добавляется SHA-256 подпись
-  упорядоченной пары active/fallback locales.
+  упорядоченной пары active/fallback locales;
+- `directory-decades-v1` с dimensions `minimum_year` и разрешённым
+  `maximum_year` содержит только уникальные целые десятилетия в обратном
+  порядке. Границы в identity защищают configuration change и переход
+  календарного года без общего flush.
 
 Payload не содержит моделей, HTML, пользовательского состояния, исходных
-URL, поискового текста или приватных идентификаторов. Summary и alphabet
-остаются guest-public aggregates; personal/authenticated visibility через
-эту boundary не кешируется.
+URL, поискового текста или приватных идентификаторов. Summary, alphabet и
+decades остаются guest-public aggregates; personal/authenticated visibility
+через эту boundary не кешируется.
 
-Оба ресурса используют прежнюю политику `catalog-facets`: 300 секунд fresh,
+Все три ресурса используют прежнюю политику `catalog-facets`: 300 секунд fresh,
 1 800 секунд stale, 120 секунд hot, общий rebuild lock, telemetry и DB
 fallback. `CatalogCacheInvalidator::catalogChanged()` и
 `TagCacheInvalidator::publicChanged()` уже повышают `CatalogFacets` version
@@ -157,6 +161,11 @@ fallback. `CatalogCacheInvalidator::catalogChanged()` и
 по общей политике. Cache warming продолжает вызывать те же методы query
 owner и автоматически наполняет ресурсы; отдельная job, queue или scheduler
 не добавлены.
+
+Cold rebuild десятилетий не группирует вычисляемое SQL-выражение. Он выбирает
+уникальные допустимые `year` по существующему индексу, а bounded
+преобразование в десятилетия выполняет в приложении. Поэтому cache outage не
+возвращает прежний тяжёлый `GROUP BY decade`.
 
 ## Годовые подборки главной страницы
 

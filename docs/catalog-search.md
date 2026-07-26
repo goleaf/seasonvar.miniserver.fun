@@ -32,7 +32,11 @@ aggregates `CatalogDirectoryQuery`. Холодный alphabet сначала д�
 compact resources общего `CatalogFacetSnapshotCache` и инвалидируются через
 существующий `CatalogFacets` version после catalog/tag writes. Query keys,
 группы `cyrillic`/`latin`/`other`, shape summary, page size и фильтры не
-изменились.
+изменились. Для справочника годов тот же owner хранит компактный список
+десятилетий: cold rebuild выбирает `DISTINCT year` по прежнему public
+visibility scope, а minimum/resolved maximum year входят в identity.
+Web/API получают прежний уникальный descending integer list; отдельный
+вычисляемый `GROUP BY decade` на каждом запросе больше не выполняется.
 
 Расширенный UI «Точный подбор» не вводит новых query keys: он группирует существующие `year_from`, `year_to`, `updated`, `seasons_min`, `seasons_max`, `episodes_min`, `episodes_max`, `rating_source`, `rating_min`, `votes_min`, `video` и повторяемый `quality[]`. Групповой сброс удаляет только эти ключи, сохраняя `q`, обычные группы, `letter`, `sort`, `view` и `per_page`. Livewire action и обычный GET reset URL используют один и тот же allowlist из `CatalogSeriesFilters::ADVANCED_REQUEST_PROPERTIES`.
 

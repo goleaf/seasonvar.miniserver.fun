@@ -122,4 +122,40 @@ final class CatalogFacetCacheTest extends TestCase
             $query->letters($directory)->all(),
         );
     }
+
+    public function test_directory_decades_snapshot_is_reused_until_the_facet_version_changes(): void
+    {
+        CatalogTitle::factory()->create(['year' => 2024]);
+        CatalogTitle::factory()->create(['year' => 2015]);
+        app(CacheVersionRegistry::class)->bump(CacheDomain::CatalogFacets);
+
+        $query = app(CatalogDirectoryQuery::class);
+        $firstDecades = $query->decades()->all();
+
+        $this->assertSame([2020, 2010], $firstDecades);
+
+        CatalogTitle::factory()->create(['year' => 2005]);
+
+        $this->assertSame($firstDecades, $query->decades()->all());
+
+        app(CacheVersionRegistry::class)->bump(CacheDomain::CatalogFacets);
+
+        $this->assertSame([2020, 2010, 2000], $query->decades()->all());
+    }
+
+    public function test_directory_decades_snapshot_identity_includes_resolved_year_bounds(): void
+    {
+        CatalogTitle::factory()->create(['year' => 2024]);
+        CatalogTitle::factory()->create(['year' => 2015]);
+        config(['catalog.directories.maximum_year' => 2019]);
+        app(CacheVersionRegistry::class)->bump(CacheDomain::CatalogFacets);
+
+        $query = app(CatalogDirectoryQuery::class);
+
+        $this->assertSame([2010], $query->decades()->all());
+
+        config(['catalog.directories.maximum_year' => 2024]);
+
+        $this->assertSame([2020, 2010], $query->decades()->all());
+    }
 }
