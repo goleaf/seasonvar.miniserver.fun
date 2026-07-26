@@ -9296,7 +9296,7 @@ height `30 354 px`. Из них 48 карточек «Последних обн�
 
 ## Task 69 — candidate-scoped сортировка каталога «С видео»
 
-Статус: `ready_for_exact_commit`.
+Статус: `implementation_committed_push_unresolved_authentication`.
 
 Дата начала: 26.07.2026.
 
@@ -9378,7 +9378,7 @@ prototype сохранил полный catalog path около `2 296,09 ms`, �
 | Frontend build | `not_applicable` | Task 69 changes only PHP query/tests/docs; no asset assumption changed |
 | Managed documentation check | `unresolved` | Shared worktree reports foreign stale blocks in README/CODE_STANDARDS/DATA_RELATIONS/SOURCE_PARITY/MAINTENANCE_LOG; exact staged policies green |
 | README/CHANGELOG/final requirement reread | `completed` | Owners updated; canonical requirements, Task 69 and visitor history re-read |
-| Commit/push in `main` | `pending` | Exact Task 69 patch only |
+| Commit/push in `main` | `unresolved` | Exact commit `b03511a`; configured HTTPS push failed before transfer because GitHub credentials are unavailable |
 
 ### Безлимитный execution order
 
@@ -9394,5 +9394,5 @@ prototype сохранил полный catalog path около `2 296,09 ms`, �
 10. `[completed_with_known_full_memory_ceiling]` Focused/adjacent/static/profile gates green; full process memory outcome isolated.
 11. `[completed]` Performance/technical-debt/visitor/changelog documentation.
 12. `[completed]` Final requirements reread, repository legacy scan and exact staged manifest.
-13. `[in_progress]` Commit only Task 69 on existing `main`.
-14. `[pending]` Configured non-force push; external rejection remains honest `unresolved`.
+13. `[completed]` Exact nine-file Task 69 commit `b03511a` on existing `main`.
+14. `[completed_unresolved_authentication]` Configured non-force push attempted; GitHub rejected before transfer because credentials are unavailable.

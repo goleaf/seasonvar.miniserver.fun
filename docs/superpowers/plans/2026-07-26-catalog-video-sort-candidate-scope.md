@@ -149,8 +149,8 @@ final focused `10/10`, `44` assertions; scoped Pint и Rector clean, Larastan
 - [x] Проверить `git status --short --branch`; branch обязана быть `main`.
 - [x] Собрать alternate index от текущего `HEAD`, применив только Task 69
   patch, и проверить staged manifest/diff.
-- [ ] Commit в `main`; повторить verification при hook changes.
-- [ ] Выполнить configured non-force push. Ошибку аутентификации или внешнего
+- [x] Commit в `main`; повторить verification при hook changes.
+- [x] Выполнить configured non-force push. Ошибку аутентификации или внешнего
   remote записать как `unresolved`, не как успешную отправку.
 
 Final preparation evidence: canonical owners and Task 69 re-read; legacy
@@ -161,3 +161,9 @@ cleanup of the already committed Task 68 CHANGELOG paragraph. Staged
 README/CHANGELOG policies and whitespace check pass. Managed-doc check on
 the shared worktree remains unresolved because foreign Task 67 changes make
 five generated blocks stale; broad refresh was not run.
+
+Delivery evidence: exact nine-file implementation commit `b03511a` создан в
+существующей `main` поверх `8bd277e`. Configured non-force `git push`
+завершился кодом `128` до передачи данных:
+`could not read Username for 'https://github.com'`; отправка остаётся
+`unresolved_authentication`.
