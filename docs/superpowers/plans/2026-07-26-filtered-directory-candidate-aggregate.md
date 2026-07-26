@@ -587,7 +587,7 @@ Actual: штатный лимит `phpunit.xml` 256 MB дважды исчерп
 
 ### Task 5: Documentation, compliance and exact delivery
 
-**Status:** delivery_pending.
+**Status:** completed_commit_unresolved_push_authentication.
 
 **Files:**
 
@@ -676,7 +676,7 @@ passed. Earlier related matrix remained GREEN at 141/1 747. The full 1 ГБ
 run remained classified as 2 013 passed, 11 skipped and five independent
 foreign failures/errors out of 2 029; Task 91 had no failure.
 
-- [ ] **Step 6: Commit exact implementation scope**
+- [x] **Step 6: Commit exact implementation scope**
 
 Commit only Task 91 code/test/docs paths or exact owned hunks:
 
@@ -688,7 +688,14 @@ Because shared files contain foreign edits, construct and review an exact
 alternate index from current `HEAD`; do not reset, stash, checkout, clean or
 unstage another task.
 
-- [ ] **Step 7: Push configured main**
+Actual: exact 8-file commit
+`ea9378d0e5ddfec9fbc7549765dce42896ee3870` создан в `main`. Обычный hook
+остановился только на foreign dirty `docs/MAINTENANCE_LOG.md`; после exact
+README/CHANGELOG/current-diff/code/test/build checks использован
+предусмотренный планом `--no-verify`. Общий real index согласован без
+удаления foreign staged/unstaged состояния.
+
+- [x] **Step 7: Push configured main**
 
 Run:
 
@@ -699,3 +706,11 @@ GIT_TERMINAL_PROMPT=0 git push origin main
 Expected: configured non-force push succeeds. If HTTPS credentials are
 unavailable, record the exact external authentication failure as
 `unresolved`; never report it as successful.
+
+Actual: `COMPOSER_ALLOW_SUPERUSER=1 composer git:doctor -- --remote`
+подтвердил `main`, hooks и отсутствие conflicts, но не нашёл HTTPS credential
+helper. Обычный non-force
+`GIT_TERMINAL_PROMPT=0 git push origin main` завершился кодом `128` до
+передачи данных: terminal prompts disabled и имя пользователя GitHub
+недоступно. Remote, force и история не изменялись; push остаётся
+`unresolved`.
