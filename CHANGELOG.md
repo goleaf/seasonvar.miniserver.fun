@@ -2,6 +2,25 @@
 
 ## 2026-07-26
 
+- Консолидированы точные запросы прямого rebuild `/stats` без изменения
+  публичного snapshot, маршрутов, cache key/TTL, schema или write paths.
+  `CatalogStatsPageBuilder` теперь одним visibility-aware aggregate считает
+  публичные video/episode links, memoize-ит повторные title/episode
+  `whereDoesntHave`, пакетно получает presence и URL
+  filled/distinct/absolute metrics, собирает SQLite table counts через
+  bounded `UNION ALL`, а index inventory — одним table-valued
+  `pragma_index_list`/`pragma_index_info`. Exact regression fixture сохранил
+  значения duplicate/relative/HTTP/HTTPS media; старые per-table/per-index
+  `PRAGMA` отсутствуют. Два исходных процесса выполняли по 1 042 SQL за
+  `34 592,84–36 403,38 ms`; три процесса после изменения стабильно выполнили
+  142 SQL за `28 618,49–34 990,02 ms`, медиана — `29 061,53 ms`.
+  Оставшийся `COUNT(DISTINCT ...)` по большим URL-полям зафиксирован как
+  отдельная materialized-read-model задача, а не скрыт новым индексом.
+  Focused matrix прошла 56 тестов с 358 проверками, Pint, PHPStan и Rector
+  завершились без ошибок. Полный PHPUnit process остаётся ограничен
+  закреплённым накопительным лимитом `256M`; reported cache files отдельно
+  проходят.
+
 - Из web-проекции главной исключена полная Eloquent hydration двух
   неиспользуемых Blade секций `featuredTitles` и `latestMedia`.
   `CatalogHomePageBuilder::data()` и `/api/v1/home` сохраняют полный

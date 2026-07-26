@@ -51,6 +51,29 @@ class CatalogStatsPageBuilder
     private const LANDING_FILTER_TYPES = ['genre', 'country', 'actor', 'director', 'translation', 'age_rating'];
 
     /**
+     * @var array<string, list<string>>
+     */
+    private const PRESENT_COUNT_COLUMNS = [
+        'catalog_titles' => ['year', 'description', 'poster_url', 'original_title', 'external_id', 'source_url'],
+        'seasons' => ['episodes_total', 'episodes_released', 'source_url'],
+        'episodes' => ['released_at', 'title', 'summary', 'source_url'],
+        'licensed_media' => [
+            'catalog_title_id',
+            'season_id',
+            'episode_id',
+            'quality',
+            'format',
+            'source_media_key',
+            'checked_at',
+            'path',
+            'playback_url',
+            'source_url',
+        ],
+        'source_pages' => ['content_hash', 'last_crawled_at', 'last_imported_at', 'url', 'discovered_from_url'],
+        'catalog_title_reviews' => ['author', 'published_at'],
+    ];
+
+    /**
      * @var array<string, int>
      */
     private array $tableCounts = [];
@@ -74,6 +97,15 @@ class CatalogStatsPageBuilder
      * @var Collection<int, array{table: string, name: string, unique: bool, origin: string, partial: bool, columns: string}>|null
      */
     private ?Collection $databaseIndexes = null;
+
+    /**
+     * @var array{videos: int, episodes: int}|null
+     */
+    private ?array $publicMediaLinks = null;
+
+    private ?int $titlesWithoutPublishedMedia = null;
+
+    private ?int $episodesWithoutPublishedMedia = null;
 
     public function __construct(
         private readonly CatalogStatsPosterUrlGuard $posterUrls,
@@ -126,7 +158,7 @@ class CatalogStatsPageBuilder
                         $this->row('С постером', $this->presentCount('catalog_titles', 'poster_url'), $this->percent($this->presentCount('catalog_titles', 'poster_url'), $catalogTitles)),
                         $this->row('С оригинальным названием', $this->presentCount('catalog_titles', 'original_title'), $this->percent($this->presentCount('catalog_titles', 'original_title'), $catalogTitles)),
                         $this->row('С внешним номером', $this->presentCount('catalog_titles', 'external_id'), $this->percent($this->presentCount('catalog_titles', 'external_id'), $catalogTitles)),
-                        $this->row('Без опубликованного видео', CatalogTitle::query()->whereDoesntHave('licensedMedia', fn (EloquentBuilder $query): EloquentBuilder => $query->where('status', 'published'))->count()),
+                        $this->row('Без опубликованного видео', $this->titlesWithoutPublishedMediaCount()),
                     ],
                 ],
                 [
@@ -141,7 +173,7 @@ class CatalogStatsPageBuilder
                         $this->row('Сезонов с общим количеством серий', $this->presentCount('seasons', 'episodes_total'), $this->percent($this->presentCount('seasons', 'episodes_total'), $seasons)),
                         $this->row('Сезонов с количеством вышедших серий', $this->presentCount('seasons', 'episodes_released'), $this->percent($this->presentCount('seasons', 'episodes_released'), $seasons)),
                         $this->row('Серий с датой выхода', $this->presentCount('episodes', 'released_at'), $this->percent($this->presentCount('episodes', 'released_at'), $episodes)),
-                        $this->row('Серий без опубликованного видео', Episode::query()->whereDoesntHave('licensedMedia', fn (EloquentBuilder $query): EloquentBuilder => $query->where('status', 'published'))->count()),
+                        $this->row('Серий без опубликованного видео', $this->episodesWithoutPublishedMediaCount()),
                     ],
                 ],
                 [
@@ -503,7 +535,7 @@ class CatalogStatsPageBuilder
                 'title' => 'Качество сериалов',
                 'icon' => 'fa-solid fa-clipboard-check',
                 'rows' => [
-                    $this->qualityRow('Без опубликованного видео', CatalogTitle::query()->whereDoesntHave('licensedMedia', fn (EloquentBuilder $query): EloquentBuilder => $query->where('status', 'published'))->count(), $catalogTitles, 'critical'),
+                    $this->qualityRow('Без опубликованного видео', $this->titlesWithoutPublishedMediaCount(), $catalogTitles, 'critical'),
                     $this->qualityRow('Без сезонов', CatalogTitle::query()->whereDoesntHave('seasons')->count(), $catalogTitles, 'warning'),
                     $this->qualityRow('Без серий', CatalogTitle::query()->whereDoesntHave('episodes')->count(), $catalogTitles, 'warning'),
                     $this->qualityRow('Без постера', $this->missingCount('catalog_titles', 'poster_url'), $catalogTitles, 'warning'),
@@ -519,7 +551,7 @@ class CatalogStatsPageBuilder
                 'rows' => [
                     $this->qualityRow('Сезоны без общего числа серий', $this->missingCount('seasons', 'episodes_total'), $seasons, 'info'),
                     $this->qualityRow('Сезоны без числа вышедших серий', $this->missingCount('seasons', 'episodes_released'), $seasons, 'info'),
-                    $this->qualityRow('Серии без опубликованного видео', Episode::query()->whereDoesntHave('licensedMedia', fn (EloquentBuilder $query): EloquentBuilder => $query->where('status', 'published'))->count(), $episodes, 'warning'),
+                    $this->qualityRow('Серии без опубликованного видео', $this->episodesWithoutPublishedMediaCount(), $episodes, 'warning'),
                     $this->qualityRow('Серии без даты выхода', $this->missingCount('episodes', 'released_at'), $episodes, 'info'),
                     $this->qualityRow('Серии без названия', $this->missingCount('episodes', 'title'), $episodes, 'info'),
                     $this->qualityRow('Серии без описания', $this->missingCount('episodes', 'summary'), $episodes, 'info'),
@@ -952,28 +984,65 @@ class CatalogStatsPageBuilder
 
     private function publishedVideoUrlCount(): int
     {
-        return LicensedMedia::query()
-            ->availableTo(null)
-            ->forAvailableReleases(null)
-            ->whereIn('catalog_title_id', $this->titles->visibleTo(null)->select('id'))
-            ->where(function (EloquentBuilder $query): void {
-                $query->where('licensed_media.playback_url', 'like', 'https://%')
-                    ->orWhere('licensed_media.playback_url', 'like', 'http://%')
-                    ->orWhere('licensed_media.path', 'like', 'https://%')
-                    ->orWhere('licensed_media.path', 'like', 'http://%');
-            })
-            ->count();
+        return $this->publicMediaLinkCounts()['videos'];
     }
 
     private function episodePlayerLinkCount(): int
     {
-        return LicensedMedia::query()
+        return $this->publicMediaLinkCounts()['episodes'];
+    }
+
+    /**
+     * @return array{videos: int, episodes: int}
+     */
+    private function publicMediaLinkCounts(): array
+    {
+        if ($this->publicMediaLinks !== null) {
+            return $this->publicMediaLinks;
+        }
+
+        $row = LicensedMedia::query()
             ->availableTo(null)
             ->forAvailableReleases(null)
             ->whereIn('catalog_title_id', $this->titles->visibleTo(null)->select('id'))
-            ->whereNotNull('licensed_media.episode_id')
-            ->distinct()
-            ->count('licensed_media.episode_id');
+            ->selectRaw(
+                'COUNT(CASE WHEN licensed_media.playback_url LIKE ?'
+                .' OR licensed_media.playback_url LIKE ?'
+                .' OR licensed_media.path LIKE ?'
+                .' OR licensed_media.path LIKE ? THEN 1 END) AS video_count',
+                ['https://%', 'http://%', 'https://%', 'http://%'],
+            )
+            ->selectRaw(
+                'COUNT(DISTINCT CASE WHEN licensed_media.episode_id IS NOT NULL'
+                .' THEN licensed_media.episode_id END) AS episode_count',
+            )
+            ->toBase()
+            ->first();
+
+        return $this->publicMediaLinks = [
+            'videos' => (int) ($row->video_count ?? 0),
+            'episodes' => (int) ($row->episode_count ?? 0),
+        ];
+    }
+
+    private function titlesWithoutPublishedMediaCount(): int
+    {
+        return $this->titlesWithoutPublishedMedia ??= CatalogTitle::query()
+            ->whereDoesntHave(
+                'licensedMedia',
+                fn (EloquentBuilder $query): EloquentBuilder => $query->where('status', 'published'),
+            )
+            ->count();
+    }
+
+    private function episodesWithoutPublishedMediaCount(): int
+    {
+        return $this->episodesWithoutPublishedMedia ??= Episode::query()
+            ->whereDoesntHave(
+                'licensedMedia',
+                fn (EloquentBuilder $query): EloquentBuilder => $query->where('status', 'published'),
+            )
+            ->count();
     }
 
     private function paginatedPageCount(int $items, int $pageSize): int
@@ -988,6 +1057,8 @@ class CatalogStatsPageBuilder
     {
         return collect($this->externalUrlFields())
             ->map(function (array $field): array {
+                $this->loadExternalUrlCounts($field['table']);
+
                 $total = $this->tableCount($field['table']);
                 $filled = $this->presentCount($field['table'], $field['column']);
                 $empty = max(0, $total - $filled);
@@ -1151,22 +1222,44 @@ class CatalogStatsPageBuilder
         }
 
         try {
-            $rows = $this->tableNames()
-                ->flatMap(function (string $table): Collection {
-                    return collect(DB::select("PRAGMA index_list('".$this->sqliteLiteral($table)."')"))
-                        ->map(function (object $index) use ($table): array {
-                            $name = (string) $index->name;
-
-                            return [
-                                'table' => $table,
-                                'name' => $name,
-                                'unique' => (bool) $index->unique,
-                                'origin' => (string) $index->origin,
-                                'partial' => (bool) $index->partial,
-                                'columns' => $this->sqliteIndexColumns($name),
-                            ];
-                        });
-                })
+            $rows = collect(DB::select(
+                <<<'SQL'
+                    SELECT
+                        table_name,
+                        index_name,
+                        is_unique,
+                        origin,
+                        partial,
+                        GROUP_CONCAT(column_name, CHAR(44) || CHAR(32)) AS columns
+                    FROM (
+                        SELECT
+                            schema.name AS table_name,
+                            indexes.name AS index_name,
+                            indexes."unique" AS is_unique,
+                            indexes.origin AS origin,
+                            indexes.partial AS partial,
+                            columns.name AS column_name,
+                            columns.seqno AS column_order
+                        FROM sqlite_schema AS schema
+                        JOIN pragma_index_list(schema.name) AS indexes
+                        JOIN pragma_index_info(indexes.name) AS columns
+                        WHERE schema.type = ?
+                            AND schema.name NOT LIKE ?
+                        ORDER BY schema.name, indexes.name, columns.seqno
+                    )
+                    GROUP BY table_name, index_name, is_unique, origin, partial
+                    ORDER BY table_name, index_name
+                    SQL,
+                ['table', 'sqlite_%'],
+            ))
+                ->map(fn (object $index): array => [
+                    'table' => (string) $index->table_name,
+                    'name' => (string) $index->index_name,
+                    'unique' => (bool) $index->is_unique,
+                    'origin' => (string) $index->origin,
+                    'partial' => (bool) $index->partial,
+                    'columns' => (string) $index->columns,
+                ])
                 ->sortBy([['table', 'asc'], ['name', 'asc']])
                 ->values();
 
@@ -1174,20 +1267,6 @@ class CatalogStatsPageBuilder
         } catch (Throwable) {
             return $this->databaseIndexes = collect();
         }
-    }
-
-    private function sqliteIndexColumns(string $indexName): string
-    {
-        return collect(DB::select("PRAGMA index_info('".$this->sqliteLiteral($indexName)."')"))
-            ->sortBy('seqno')
-            ->pluck('name')
-            ->map(fn (mixed $name): string => (string) $name)
-            ->implode(', ');
-    }
-
-    private function sqliteLiteral(string $value): string
-    {
-        return str_replace("'", "''", $value);
     }
 
     /**
@@ -1375,7 +1454,11 @@ class CatalogStatsPageBuilder
      */
     private function databaseTables(): Collection
     {
-        return $this->tableNames()
+        $tableNames = $this->tableNames();
+
+        $this->loadTableCounts($tableNames);
+
+        return $tableNames
             ->map(function (string $table): array {
                 $total = $this->tableCount($table);
 
@@ -1389,6 +1472,40 @@ class CatalogStatsPageBuilder
             })
             ->sortBy([['group', 'asc'], ['table', 'asc']])
             ->values();
+    }
+
+    /**
+     * @param  Collection<int, string>  $tableNames
+     */
+    private function loadTableCounts(Collection $tableNames): void
+    {
+        if (DB::connection()->getDriverName() !== 'sqlite') {
+            return;
+        }
+
+        $grammar = DB::connection()->getQueryGrammar();
+
+        try {
+            $tableNames
+                ->chunk(400)
+                ->each(function (Collection $tables) use ($grammar): void {
+                    $bindings = [];
+                    $sql = $tables
+                        ->map(function (string $table) use ($grammar, &$bindings): string {
+                            $bindings[] = $table;
+
+                            return 'SELECT ? AS table_name, COUNT(*) AS total FROM '
+                                .$grammar->wrapTable($table);
+                        })
+                        ->implode(' UNION ALL ');
+
+                    foreach (DB::select($sql, $bindings) as $row) {
+                        $this->tableCounts[(string) $row->table_name] = (int) $row->total;
+                    }
+                });
+        } catch (Throwable) {
+            // Per-table fallback remains in tableCount().
+        }
     }
 
     /**
@@ -1473,14 +1590,20 @@ class CatalogStatsPageBuilder
     {
         $key = $table.'.'.$column;
 
-        return $this->presentCounts[$key] ??= $this->whereCount($table, fn (QueryBuilder $query): QueryBuilder => $query
-            ->whereNotNull($column)
-            ->where($column, '!=', ''));
+        if (! array_key_exists($key, $this->presentCounts)) {
+            $this->loadPresentCounts($table, $column);
+        }
+
+        return $this->presentCounts[$key];
     }
 
     private function distinctPresentCount(string $table, string $column): int
     {
         $key = $table.'.'.$column;
+
+        if (! array_key_exists($key, $this->distinctPresentCounts)) {
+            $this->loadExternalUrlCounts($table);
+        }
 
         return $this->distinctPresentCounts[$key] ??= (int) DB::table($table)
             ->whereNotNull($column)
@@ -1493,12 +1616,96 @@ class CatalogStatsPageBuilder
     {
         $key = $table.'.'.$column;
 
+        if (! array_key_exists($key, $this->absoluteUrlCounts)) {
+            $this->loadExternalUrlCounts($table);
+        }
+
         return $this->absoluteUrlCounts[$key] ??= $this->whereCount($table, fn (QueryBuilder $query): QueryBuilder => $query
             ->where(function (QueryBuilder $query) use ($column): void {
                 $query
                     ->where($column, 'like', 'https://%')
                     ->orWhere($column, 'like', 'http://%');
             }));
+    }
+
+    private function loadPresentCounts(string $table, string $requiredColumn): void
+    {
+        $columns = collect(self::PRESENT_COUNT_COLUMNS[$table] ?? [])
+            ->push($requiredColumn)
+            ->unique()
+            ->filter(fn (string $column): bool => ! array_key_exists($table.'.'.$column, $this->presentCounts))
+            ->values();
+
+        if ($columns->isEmpty()) {
+            return;
+        }
+
+        $grammar = DB::connection()->getQueryGrammar();
+        $bindings = [];
+        $selects = $columns
+            ->map(function (string $column, int $index) use ($grammar, &$bindings): string {
+                $wrappedColumn = $grammar->wrap($column);
+                $bindings[] = '';
+
+                return 'SUM(CASE WHEN '.$wrappedColumn.' IS NOT NULL AND '.$wrappedColumn
+                    .' != ? THEN 1 ELSE 0 END) AS '.$grammar->wrap('present_'.$index);
+            });
+        $row = DB::table($table)
+            ->selectRaw($selects->implode(', '), $bindings)
+            ->first();
+
+        foreach ($columns as $index => $column) {
+            $this->presentCounts[$table.'.'.$column] = (int) ($row->{'present_'.$index} ?? 0);
+        }
+    }
+
+    private function loadExternalUrlCounts(string $table): void
+    {
+        $fields = collect($this->externalUrlFields())
+            ->where('table', $table)
+            ->values();
+
+        if ($fields->isEmpty() || $fields->every(function (array $field): bool {
+            $key = $field['table'].'.'.$field['column'];
+
+            return array_key_exists($key, $this->presentCounts)
+                && array_key_exists($key, $this->distinctPresentCounts)
+                && array_key_exists($key, $this->absoluteUrlCounts);
+        })) {
+            return;
+        }
+
+        $grammar = DB::connection()->getQueryGrammar();
+        $bindings = [];
+        $selects = $fields
+            ->flatMap(function (array $field) use ($grammar, &$bindings): array {
+                $column = $field['column'];
+                $wrappedColumn = $grammar->wrap($column);
+                $bindings[] = '';
+                $bindings[] = '';
+                $bindings[] = 'https://%';
+                $bindings[] = 'http://%';
+
+                return [
+                    'COUNT(CASE WHEN '.$wrappedColumn.' IS NOT NULL AND '.$wrappedColumn
+                        .' != ? THEN 1 END) AS '.$grammar->wrap($column.'_present'),
+                    'COUNT(DISTINCT CASE WHEN '.$wrappedColumn.' IS NOT NULL AND '.$wrappedColumn
+                        .' != ? THEN '.$wrappedColumn.' END) AS '.$grammar->wrap($column.'_distinct'),
+                    'COUNT(CASE WHEN '.$wrappedColumn.' LIKE ? OR '.$wrappedColumn
+                        .' LIKE ? THEN 1 END) AS '.$grammar->wrap($column.'_absolute'),
+                ];
+            });
+        $row = DB::table($table)
+            ->selectRaw($selects->implode(', '), $bindings)
+            ->first();
+
+        foreach ($fields as $field) {
+            $column = $field['column'];
+            $key = $table.'.'.$column;
+            $this->presentCounts[$key] = (int) ($row->{$column.'_present'} ?? 0);
+            $this->distinctPresentCounts[$key] = (int) ($row->{$column.'_distinct'} ?? 0);
+            $this->absoluteUrlCounts[$key] = (int) ($row->{$column.'_absolute'} ?? 0);
+        }
     }
 
     private function missingCount(string $table, string $column): int

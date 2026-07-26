@@ -9577,3 +9577,131 @@ API-only секции, их eager relations и card counts.
 11. `[completed_unresolved_authentication]` Configured non-force push
     attempted; GitHub rejected before transfer because HTTPS credentials are
     unavailable.
+
+## Task 72 — консолидация запросов `/stats`
+
+Статус: `implementation_complete_commit_pending`.
+
+Дата начала: 26.07.2026.
+
+Approved design:
+[`2026-07-26-catalog-stats-query-consolidation-design.md`](../superpowers/specs/2026-07-26-catalog-stats-query-consolidation-design.md).
+
+Detailed implementation plan:
+[`2026-07-26-catalog-stats-query-consolidation.md`](../superpowers/plans/2026-07-26-catalog-stats-query-consolidation.md).
+
+### Цель и measured root cause
+
+После Task 69 полный нефильтрованный `with_video` остаётся около `2,3 s`,
+но прямой exact rebuild `CatalogStatsPageBuilder::data()` занимает
+`34,59–36,40 s`, выполняет 1042 SQL statement и в одном sample набирает
+`31,29 s` SQL. Документированный более ранний cold rebuild достигал
+`65,074 s`, поэтому `/stats` выбран следующим приоритетом.
+
+Главные доказанные затраты: около `9,1 s` на три media URL
+`COUNT(DISTINCT)`, `5,1 s` на два отдельно материализуемых visibility-aware
+media aggregate, `2,3 s` на duplicate episode-without-media count и сотни
+per-table/per-index `PRAGMA`.
+
+Выбрана code-only консолидация внутри существующего builder. Read-only
+experiments вернули те же значения: один media URL aggregate занял
+`8 085,54 ms`, объединённый public video/episode aggregate —
+`2 762,96 ms`, SQLite index inventory — `4,17 ms`, table counts —
+`1 117,64 ms`.
+
+После реализации три независимых процесса стабильно выполнили 142 SQL
+вместо 1042 и заняли `28 618,49`, `29 061,53` и `34 990,02 ms`;
+медиана — `29 061,53 ms` против midpoint двух исходных наблюдений
+`35 498,11 ms`. SQL median после изменения — `25 933,88 ms`; исходное
+representative наблюдение — `31 289,22 ms`. Exact regression fixture
+подтвердил прежние public media и URL значения. Оставшийся главный cost —
+тройной exact URL `COUNT(DISTINCT ...)` (`8 251,07 ms`); materialized read
+model отложен до отдельного consistency/invalidation/rollback design.
+
+### Expected changed files
+
+- `app/Services/Catalog/CatalogStatsPageBuilder.php`;
+- new `tests/Feature/CatalogStatsQueryConsolidationTest.php`;
+- linked Task 72 design и detailed plan;
+- task-specific hunks `docs/performance.md` и этого current plan;
+- `docs/maintenance/technical-debt.md` только если фактически меняется
+  `TD-011`;
+- task-specific hunks `README.md` и `CHANGELOG.md`.
+
+### Protected files и public contracts
+
+- `CatalogStatsSnapshotCache`, `CatalogStatsSnapshotBuilder`,
+  `CatalogStatsSnapshotSanitizer`;
+- `/stats`, localized/full-response cache behavior, `stats.poster`,
+  Livewire state, Blade/HTML/SEO and sanitized snapshot shape;
+- `CatalogTitleQuery::visibleTo()`, `LicensedMedia::availableTo()` и
+  `forAvailableReleases()`;
+- cache `CatalogStats` key/version/TTL/stale/invalidation/warming;
+- all routes, translations, permissions, migrations, schema, importer,
+  queues, dependencies, config/environment and external HTTP;
+- Task 67/70/71 и все foreign shared-worktree changes.
+
+### Cross-feature и risk matrix
+
+| Domain | Статус | Решение / gate |
+| --- | --- | --- |
+| `/stats` exact rebuild | `critical_affected` | Same values/shape, fewer scans/round trips |
+| Catalog/media visibility | `protected_critical` | Existing canonical scopes retained in one aggregate |
+| Cache | `already_compliant` | No key/version/TTL/invalidation/flush |
+| SQLite metadata | `affected_bounded` | Driver-guarded table-valued PRAGMA; portable fallback |
+| Import/write throughput | `already_compliant` | No migration/index/DML |
+| Routes/API/SEO | `already_compliant` | No route/resource/canonical change |
+| Livewire/Blade/mobile/a11y | `not_applicable` | No presentation or payload change |
+| Translations | `not_applicable` | No user-facing string change |
+| Auth/permissions/privacy | `already_compliant` | Public sanitized aggregate only |
+| Premium/region/legal | `protected` | Visibility owners unchanged |
+| Production/rollback | `affected_low` | Code revert only; no restore/cache clear |
+| Shared Git state | `critical_risk_recorded` | Exact alternate-index commit only |
+
+### Task-specific requirement-compliance matrix
+
+| Requirement/domain | Статус | Evidence / следующий gate |
+| --- | --- | --- |
+| Root/index/canonical requirements fresh read | `completed` | 26.07.2026 before edits |
+| Applicable architecture/performance/cache/ops/maintenance docs | `completed` | Canonical owners and feature docs traced |
+| Installed versions/database | `completed` | PHP 8.5.8, Laravel 13.22.0, Boost 2.4.13, Livewire 4.3.3, PHPUnit 12.5.32, SQLite |
+| Official version-dependent docs | `completed` | Laravel 13 query listener, subquery joins, cache and query docs via Boost |
+| Existing implementation first | `completed` | 1993-line builder, snapshot/cache/sanitizer/Livewire/tests traced |
+| Read-only root-cause profile | `completed` | Two full profiles and isolated aggregate comparisons |
+| Alternatives/user authorization | `completed` | Consolidation/index/read-model options compared; repeated direct preapproval applies |
+| Design self-review/commit | `completed` | Spec committed as `36b860b`; no placeholders/contradictions |
+| Detailed plan/files/contracts/risks | `completed` | Linked TDD plan and matrices |
+| Migration/routes/translations/cache/env/dependencies/DML | `not_applicable` | Explicitly excluded |
+| TDD RED | `completed` | 1 test failed after 5 semantic assertions exactly on missing combined public-media aggregate |
+| Implementation | `completed` | Request-local media/missing counters, table present/URL aggregates и SQLite table/index inventory consolidated; output shape unchanged |
+| Focused/static/profile verification | `completed` | 1/13 exact GREEN; 10/35 stats, 4/87 page, 41/223 cache GREEN; Pint, exact PHPStan и Rector GREEN; three-sample profile recorded |
+| Full default PHPUnit process | `unresolved` | Оба широких запуска остановлены накопительным configured `256M` ceiling; отдельно пройденный `TieredCacheTest` и весь affected matrix GREEN |
+| Managed documentation check | `completed` | `php artisan project:docs-refresh --check` GREEN; managed blocks unchanged |
+| README/CHANGELOG/final requirement reread | `completed` | Performance owner, visitor history and Russian changelog updated; requirements and repository-wide legacy/cache/route scan repeated |
+| Commit/push in `main` | `pending` | Exact Task 72 scope only |
+
+### Безлимитный execution order
+
+1. `[completed]` Fresh skills/requirements/versions/Git/docs/code audit.
+2. `[completed]` Read-only full `with_video` versus `/stats` priority review.
+3. `[completed]` Two full stats profiles and heavy query-shape ranking.
+4. `[completed]` Isolated aggregate/index/table-count experiments.
+5. `[completed]` Three alternatives, approved design and design commit
+   `36b860b`.
+6. `[completed]` Exact TDD implementation plan, file/contract/risk maps and
+   compliance matrix.
+7. `[completed]` RED exact values + missing combined query boundary:
+   1 failed after 5 passing semantic assertions.
+8. `[completed]` GREEN public media and duplicate count consolidation.
+9. `[completed]` GREEN present/URL conditional aggregates.
+10. `[completed]` GREEN SQLite table/index inventory consolidation.
+11. `[completed_with_full_suite_memory_ceiling]` Focused/adjacent/static
+    verification passed; full configured process exhausted cumulative
+    `256M`, while its reported cache files pass separately.
+12. `[completed]` Three-sample after profile, exact parity and remaining-risk
+    analysis.
+13. `[completed]` Performance/visitor/changelog documentation and final
+    requirement reread.
+14. `[pending]` Exact isolated Task 72 commit on existing `main`.
+15. `[pending]` Configured non-force push; external failure remains
+    `unresolved`.
