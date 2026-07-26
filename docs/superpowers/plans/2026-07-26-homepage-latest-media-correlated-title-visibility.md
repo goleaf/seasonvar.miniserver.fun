@@ -454,17 +454,29 @@ Mark every requirement only from evidence using `completed`,
 `already_compliant`, `not_applicable` or `unresolved`.
 
 Observed: the current task matrix records verified, already-compliant and
-not-applicable domains separately and leaves the two foreign full-suite
-problems plus managed-doc/shared-diff drift explicitly unresolved.
+not-applicable domains separately, marks the final managed-doc check green
+and leaves the two foreign full-suite problems plus shared diff explicitly
+unresolved.
 
-- [ ] **Step 5: Commit exact Task 83 scope on `main`**
+- [x] **Step 5: Commit exact Task 83 scope on `main`**
 
 Use an alternate Git index based on current `HEAD`; stage only Task 83
 files/hunks. Verify branch, cached name list, cached diff and
 `git diff --cached --check`. Preserve every foreign staged/unstaged change.
 
-- [ ] **Step 6: Push configured non-force remote**
+Observed: alternate index was rebuilt from the final concurrent `HEAD`,
+contained exactly seven Task 83 files/hunks, passed cached diff/secret checks
+and repository hooks, and produced commit `c1d1c4a` on existing `main`.
+
+- [x] **Step 6: Push configured non-force remote**
 
 Run `composer git:doctor -- --remote` when safe and `git push origin main`.
 If credentials or another external condition rejects transfer, record exact
 failure as `unresolved`; never claim successful push without evidence.
+
+Observed: `composer git:doctor -- --remote` confirmed `main`, hooks and
+`ahead=69, behind=0`, then failed because the HTTPS remote has no detected
+credential helper. `git push origin main` requested a GitHub username and
+was cancelled before transfer; configured push is
+`unresolved_authentication`, with no force, remote rewrite or history
+rewrite.

@@ -10429,7 +10429,7 @@ revert без restore, reindex или cache flush.
 
 ## Task 83 — correlated visibility для latest media главной
 
-Статус: `verified_exact_commit_pending`.
+Статус: `completed_commit_unresolved_push_authentication`.
 
 Дата начала: 26.07.2026.
 
@@ -10515,7 +10515,8 @@ SHA-256 `412fd422115fe129a5e25dea93d452af315d618a18088f0168b6388809ba8c64`.
 | Shared repository diff | `unresolved_foreign` | Three foreign Markdown blank-line errors only; Task 83 alternate-index diff GREEN |
 | Documentation/README/CHANGELOG | `completed` | Performance owner, visitor history and dated Russian entry updated |
 | Final requirement reread/diff audit | `completed` | Owners/task reread; only distinct count/sitemap/profile list queries remain; task artifacts/secrets/legacy/Blade queries absent |
-| Commit/push in `main` | `pending` | Exact task-only delivery; external failure stays unresolved |
+| Exact commit in `main` | `completed` | Seven-file implementation/docs commit `c1d1c4a`; design commit `c456bff` |
+| Configured remote push | `unresolved` | HTTPS has no credential helper; username prompt cancelled before transfer |
 
 ### Безлимитный execution order
 
@@ -10537,6 +10538,8 @@ SHA-256 `412fd422115fe129a5e25dea93d452af315d618a18088f0168b6388809ba8c64`.
 13. `[completed]` Desktop/mobile/localized/API browser verification.
 14. `[completed]` Performance owner, README and Russian CHANGELOG.
 15. `[completed]` Final canonical reread and legacy/debug/secret/cache audit.
-16. `[pending]` Exact Task 83 implementation/docs commit on existing `main`.
-17. `[pending]` Configured non-force push; external failure remains
-    `unresolved`.
+16. `[completed]` Exact seven-file Task 83 implementation/docs commit
+    `c1d1c4a` on existing `main`.
+17. `[completed_unresolved_authentication]` Configured non-force push reached
+    the GitHub HTTPS username prompt and was cancelled before transfer; no
+    force or remote/history rewrite.
