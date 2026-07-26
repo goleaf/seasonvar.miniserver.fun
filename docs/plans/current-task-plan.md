@@ -11612,7 +11612,7 @@ Detailed implementation plan:
 
 ## Task 95 — повторное использование subtitle facet главной
 
-Статус: `verification_completed_commit_in_progress`.
+Статус: `implementation_committed_push_unresolved_authentication`.
 
 Дата начала: 26.07.2026.
 
@@ -11721,7 +11721,7 @@ queue, scheduler, config или environment change не планируется. 
 | Docs/README/CHANGELOG | `completed` | Canonical cache/performance owners and visitor/technical histories updated |
 | Static/style/full/build/browser checks | `completed` | Exact gates passed; full suite has only eight foreign unresolved outcomes listed below |
 | Final requirement/legacy/debug/secret audit | `completed` | Final reread and repository-wide identity/debug/secret searches completed |
-| Commit/push main | `in_progress` | Exact isolated Task 95 commit and ordinary push |
+| Commit/push main | `completed_commit_unresolved_push_authentication` | Exact commit `c31bb5974c40631d175ca734060e5fa9435eb743`; ordinary push exited `128` before transfer because HTTPS username is unavailable |
 
 ### Verification evidence
 
@@ -11769,7 +11769,11 @@ queue, scheduler, config или environment change не планируется. 
 12. `[completed]` Pint/syntax/focused/related/full/static/build/browser checks;
     eight foreign full-suite outcomes recorded without masking.
 13. `[completed]` Requirement reread and legacy/duplicate/debug/secret audit.
-14. `[in_progress]` Exact Task 95 diff/index/commit on existing `main`.
-15. `[pending]` Configured non-force push; external failure recorded honestly.
+14. `[completed]` Exact eight-file Task 95 commit
+    `c31bb5974c40631d175ca734060e5fa9435eb743`
+    (`perf: reuse homepage subtitle facet snapshot`) on existing `main`.
+15. `[completed_unresolved_authentication]` Configured non-force
+    `GIT_TERMINAL_PROMPT=0 git push origin main` exited `128` before transfer:
+    GitHub HTTPS username could not be read with terminal prompts disabled.
 
 ---

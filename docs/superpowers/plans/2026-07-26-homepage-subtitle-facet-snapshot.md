@@ -531,7 +531,7 @@ debug и binary checks прочитаны полностью.
 ### Task 9.3 — Commit
 
 **Приоритет:** critical
-**Статус:** in_progress
+**Статус:** completed
 
 **Ожидаемый commit:** `perf: reuse homepage subtitle facet snapshot`.
 
@@ -541,10 +541,15 @@ Design commit уже отделён как
 **Проверка:** branch `main`, commit tree содержит только заявленные Task 95
 изменения, hook/policy results зафиксированы.
 
+**Evidence:** hook-enabled commit
+`c31bb5974c40631d175ca734060e5fa9435eb743`
+(`perf: reuse homepage subtitle facet snapshot`) содержит восемь exact Task
+95 файлов/hunks.
+
 ### Task 9.4 — Push
 
 **Приоритет:** critical
-**Статус:** pending
+**Статус:** unresolved
 
 **Команда:** обычный `git push origin main` либо configured upstream push, без
 force.
@@ -554,3 +559,7 @@ force.
 **Проверка:** сохранить фактический stdout/stderr. При отказе оставить
 локальные commits, указать branch/hash/command/error и отметить
 `unresolved`.
+
+**Evidence:** `GIT_TERMINAL_PROMPT=0 git push origin main` завершился с
+кодом `128` до передачи данных:
+`fatal: could not read Username for 'https://github.com': terminal prompts disabled`.
