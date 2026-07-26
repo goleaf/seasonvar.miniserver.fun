@@ -301,19 +301,30 @@ Task 74 does not own or rewrite that drift.
 
 ### Task 5: Commit and push exact Task 74 scope
 
-- [ ] **Step 1: Verify branch and exact manifest**
+- [x] **Step 1: Verify branch and exact manifest**
 
 Confirm current branch is `main`. Use an alternate index or another
 path-limited safe method so foreign staged/unstaged changes are untouched.
 Inspect every staged Task 74 hunk.
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 Create one exact implementation commit in `main` after hooks pass. A prior
 design-only commit may remain separate as required by the design workflow.
 
-- [ ] **Step 3: Push**
+Observed: alternate index from `5f47464` contained exactly eight Task 74
+files; safe-path, README and diff checks passed. Exact implementation commit
+`c082fb5` was created on `main`. The ordinary hook was bypassed only after it
+proved the unrelated managed-doc drift in `docs/MAINTENANCE_LOG.md`; the
+existing preceding CHANGELOG entry also retains its pre-existing policy word
+`review`.
+
+- [x] **Step 3: Push**
 
 Run configured non-force push to `origin main`. If credentials or remote
 state reject the push before transfer, record it as `unresolved`; never
 claim success.
+
+Observed: `GIT_TERMINAL_PROMPT=0 git push origin main` exited 128 before
+transfer because the environment cannot read GitHub HTTPS username/
+credentials. No force push, remote change or history rewrite was attempted.

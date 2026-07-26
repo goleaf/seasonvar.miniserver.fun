@@ -9858,7 +9858,7 @@ worktree changes remain compatible.
 
 ## Task 74 — консолидация hydration карточек главной
 
-Статус: `implementation_and_verification_complete_commit_pending`.
+Статус: `implementation_committed_push_unresolved_authentication`.
 
 Дата начала: 26.07.2026.
 
@@ -9944,7 +9944,7 @@ SQL statements без изменения HTML, API, cache или visibility cont
 | Focused/full/static/profile verification | `completed_with_unrelated_full_suite_failures` | Committed-contract 38/319 focused, 174/1013 broad, Pint/production PHPStan/Rector/Vite green; full 1G 1 897/1 914 passed, 11 skipped, six foreign Task 73/account/importer failures/errors; final managed-doc check is `unresolved_shared_worktree` on foreign `docs/MAINTENANCE_LOG.md` |
 | Browser/API verification | `completed` | Desktop/mobile `/` and `/ru`, API 200; 12/8 and 48/12/8/12, no overflow/errors |
 | README/CHANGELOG/final requirement reread | `completed` | Owners updated for committed-main contract; canonical reread and builder/consumer/cache/TODO scan completed |
-| Commit/push in `main` | `pending` | Exact Task 74 scope only |
+| Commit/push in `main` | `completed_commit_unresolved_push` | Exact 8-file commit `c082fb5`; configured non-force push exited 128 before transfer because GitHub HTTPS credentials are unavailable |
 
 ### Безлимитный execution order
 
@@ -9960,6 +9960,7 @@ SQL statements без изменения HTML, API, cache или visibility cont
 10. `[completed]` Desktop/mobile/localized/API browser verification.
 11. `[completed]` Performance/README/CHANGELOG documentation.
 12. `[completed]` Final canonical reread and repository legacy/debug scan.
-13. `[pending]` Exact isolated Task 74 implementation commit on `main`.
-14. `[pending]` Configured non-force push; external failure remains
-    `unresolved`.
+13. `[completed]` Exact isolated 8-file Task 74 implementation commit
+    `c082fb5` on `main`.
+14. `[completed_unresolved_authentication]` Configured non-force push exited
+    128 before transfer: GitHub HTTPS username/credentials are unavailable.
