@@ -56,14 +56,21 @@ class CatalogHomePageBuilder
      */
     public function webData(?User $user = null): array
     {
-        return $this->buildData($user, self::WEB_LATEST_TITLE_LIMIT);
+        return $this->buildData(
+            $user,
+            self::WEB_LATEST_TITLE_LIMIT,
+            includeApiOnlySections: false,
+        );
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function buildData(?User $user, ?int $latestTitleLimit = null): array
-    {
+    private function buildData(
+        ?User $user,
+        ?int $latestTitleLimit = null,
+        bool $includeApiOnlySections = true,
+    ): array {
         $accountSettings = $this->accountSettings->resolve($user);
         $locale = app()->currentLocale();
         $genres = $this->facets->taxonomies('genre');
@@ -99,25 +106,29 @@ class CatalogHomePageBuilder
                 $latestUpdateTimes->get((int) $catalogTitle->id),
             );
         });
-        $featuredTitles = $this->orderedTitles(
-            $snapshot['featured_title_ids'],
-            $this->titleSummaryQuery($user)->with($this->taxonomies->cardSummaryLoads()),
-        );
+        $featuredTitles = $includeApiOnlySections
+            ? $this->orderedTitles(
+                $snapshot['featured_title_ids'],
+                $this->titleSummaryQuery($user)->with($this->taxonomies->cardSummaryLoads()),
+            )
+            : collect();
         $videoTitles = $this->orderedTitles(
             $snapshot['video_title_ids'],
             $this->titleSummaryQuery($user)->with($this->taxonomies->cardSummaryLoads()),
         );
-        $latestMedia = $this->orderedMedia(LicensedMedia::query()
-            ->published()
-            ->forAvailableReleases(null)
-            ->select(['id', 'catalog_title_id', 'season_id', 'episode_id', 'title', 'quality', 'translation_name', 'format', 'published_at'])
-            ->with([
-                'catalogTitle' => fn ($query) => $query
-                    ->availableTo(null)
-                    ->select(['id', 'slug', 'title', 'original_title', 'type', 'year', 'poster_url', 'indexed_at']),
-                'season:id,catalog_title_id,number,kind,sort_order,title',
-                'episode:id,season_id,number,kind,sort_order,title,released_at',
-            ]), $snapshot['latest_media_ids']);
+        $latestMedia = $includeApiOnlySections
+            ? $this->orderedMedia(LicensedMedia::query()
+                ->published()
+                ->forAvailableReleases(null)
+                ->select(['id', 'catalog_title_id', 'season_id', 'episode_id', 'title', 'quality', 'translation_name', 'format', 'published_at'])
+                ->with([
+                    'catalogTitle' => fn ($query) => $query
+                        ->availableTo(null)
+                        ->select(['id', 'slug', 'title', 'original_title', 'type', 'year', 'poster_url', 'indexed_at']),
+                    'season:id,catalog_title_id,number,kind,sort_order,title',
+                    'episode:id,season_id,number,kind,sort_order,title,released_at',
+                ]), $snapshot['latest_media_ids'])
+            : collect();
         $latestMediaTitles = $latestMedia
             ->map(fn (LicensedMedia $media): ?CatalogTitle => $media->catalogTitle)
             ->filter(fn (?CatalogTitle $title): bool => $title instanceof CatalogTitle)
@@ -133,8 +144,11 @@ class CatalogHomePageBuilder
             $latestTitles,
             $latestTitleUpdates->all(),
         );
+        $featuredRecommendationIds = $includeApiOnlySections
+            ? $featuredTitles->pluck('id')
+            : collect($snapshot['featured_title_ids']);
         $excludedRecommendationIds = collect($allLatestTitleIds)
-            ->concat($featuredTitles->pluck('id'))
+            ->concat($featuredRecommendationIds)
             ->concat($videoTitles->pluck('id'))
             ->map(fn (mixed $id): int => (int) $id)
             ->unique()

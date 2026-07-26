@@ -609,3 +609,52 @@ Migration, route, API schema, translation, dependency, environment, queue
 или production DML не добавлены. Rollback возвращает прежний PHP/Blade
 commit и штатно пересобирает compiled views/config с graceful PHP-FPM
 reload; database restore и cache flush не требуются.
+
+## Исключение API-only hydration из web главной
+
+Следующий follow-up 26.07.2026 проверил уже компактную web-проекцию на
+лишнюю серверную работу. Пять fresh-process вызовов `webData()` до изменения
+стабильно выполняли 57 SQL statements, из которых полная гидратация
+`featuredTitles` и `latestMedia` вместе с eager relations и card counts не
+имела ни одного потребителя в Blade. Эти секции принадлежат
+`CatalogHomeResource` и полному `/api/v1/home`, но ранее строились и для
+full-page Livewire.
+
+`CatalogHomePageBuilder::webData()` теперь явно выключает только эти две
+API-only ветки. Прежние array keys остаются и содержат пустые коллекции,
+поэтому boundary компонента не разветвляется. `data()` сохраняет full mode,
+а recommendation exclusions при пропущенной model hydration получают
+полные scalar `featured_title_ids` из прежнего snapshot. Порядок,
+publication/availability/audience/region/Premium/legal predicates,
+`response_contract=2`, cache key/TTL/invalidation и HTML не менялись.
+
+Стабильная web-серия после изменения выполняет ровно 47 запросов вместо 57
+(`−17,5%`). В шести чередующихся same-state парах медиана `webData()`
+составила `165,91 ms` против `206,64 ms` у полного `data()` (`−19,7%`), а
+медиана учтённого SQL — `33,73 ms` против `65,67 ms` (`−48,6%`). Это
+сравнение двух projection modes в одной текущей нагрузке, а не p95/SLA и не
+абсолютный before/after wall-time benchmark. Полный builder и live API
+сохранили counts `48/12/8/12` для latest/featured/video/latest-media и
+прежний набор Resource keys.
+
+Managed Chromium без cache flush подтвердил `200`, H1 «Сериалы онлайн»,
+12 свежих карточек, 8 рекомендаций и 12 групп новых серий. Cold `MISS`
+получил первый байт примерно за `395 ms`; повторные `HIT` — за `49–75 ms`.
+На мобильном профиле с `4×` CPU throttling и ограниченным 4G полная загрузка
+заняла `2 999 ms`, FCP/LCP — `1 164 ms`; horizontal overflow,
+console/page/request failures отсутствовали. Mobile CLS был нулевым.
+Отдельный cold desktop capture показал CLS `0,782` при неизменённом HTML;
+это наблюдаемое соседнее UI-состояние не маскируется как исправленное этой
+server-query задачей.
+
+TDD сначала получил 2 ожидаемых отказа после 7 assertions, затем точный
+GREEN прошёл 2 теста с 27 assertions. Focused matrix прошла 37/297, broad
+homepage/discovery/cache/recommendation matrix — 173/991; task-scoped Pint,
+PHPStan, Rector, `project:docs-refresh --check`, diff check и Vite завершились
+успешно. Полный suite с отдельным test-only лимитом 1 ГБ выполнил 1 907
+тестов: 1 890 passed, 11 skipped, а шесть отказов/ошибок принадлежат
+параллельным незавершённым onboarding, account-session, translation и
+import-batcher изменениям вне этой задачи. Migration, route, API schema,
+translation, dependency, environment, queue, production DML или cache
+generation не добавлены; rollback — обычный revert PHP-кода без очистки
+данных или кеша.

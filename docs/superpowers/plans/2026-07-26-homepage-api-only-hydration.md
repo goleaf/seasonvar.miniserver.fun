@@ -67,7 +67,7 @@
 - Produces: expected empty web `featuredTitles`/`latestMedia`, full API
   preservation and bounded query-shape assertions.
 
-- [ ] **Step 1: Extend the existing full-versus-web behavior test**
+- [x] **Step 1: Extend the existing full-versus-web behavior test**
 
 After building `$full` and `$web`, add:
 
@@ -80,7 +80,7 @@ $this->assertEmpty($web['latestMedia']);
 
 Keep the existing full latest-title/API assertions unchanged.
 
-- [ ] **Step 2: Add a query-shape test**
+- [x] **Step 2: Add a query-shape test**
 
 Build the same 16-title fixture through a private helper, refresh the
 snapshot before attaching `DB::listen()`, then call only `webData()`.
@@ -90,7 +90,13 @@ Normalize SQL and assert:
 $this->assertCount(2, $cardTitleHydrations);
 $this->assertEmpty($latestMediaHydrations);
 
-foreach (['genres', 'countries', 'age_ratings', 'translations', 'tags'] as $table) {
+foreach ([
+    'genres' => 'catalog_title_genre',
+    'countries' => 'catalog_title_country',
+    'age_ratings' => 'age_rating_catalog_title',
+    'translations' => 'catalog_title_translation',
+    'tags' => 'catalog_title_tag',
+] as $table => $pivotTable) {
     $this->assertCount(2, $taxonomyHydrations[$table] ?? collect());
 }
 ```
@@ -99,7 +105,7 @@ The two card groups are latest and video. The fixture excludes all available
 titles from recommendations, so a third taxonomy group proves the unused
 featured branch still ran.
 
-- [ ] **Step 3: Run RED**
+- [x] **Step 3: Run RED**
 
 Run:
 
@@ -111,6 +117,12 @@ Expected: FAIL because current `webData()` returns 12 featured and 12 latest
 media rows. Query assertions should also expose three card taxonomy groups
 and one API latest-media hydration.
 
+Observed RED: 2 tests failed after 7 assertions; both stopped exactly on the
+expected non-empty `web['featuredTitles']` boundary before implementation.
+During GREEN, the first query-shape matcher was corrected to use the exact
+existing `age_rating_catalog_title` pivot name; this changed only diagnostic
+matching, not the expected application behavior.
+
 ### Task 2: Implement the minimal web hydration switch
 
 **Files:**
@@ -121,7 +133,7 @@ and one API latest-media hydration.
 - Produces: unchanged `data()` full result and pruned `webData()` internal
   projection.
 
-- [ ] **Step 1: Add an explicit private projection argument**
+- [x] **Step 1: Add an explicit private projection argument**
 
 Use:
 
@@ -145,7 +157,7 @@ private function buildData(
 `data()` keeps calling `buildData($user)` and therefore preserves the full
 projection.
 
-- [ ] **Step 2: Skip only the unused model hydration**
+- [x] **Step 2: Skip only the unused model hydration**
 
 Wrap the existing featured/media builders:
 
@@ -162,7 +174,7 @@ $latestMedia = $includeApiOnlySections
 Do not modify title/media scopes, selected fields or eager loads in full
 mode.
 
-- [ ] **Step 3: Preserve recommendation exclusions**
+- [x] **Step 3: Preserve recommendation exclusions**
 
 Use full scalar featured IDs only when their models were intentionally
 skipped:
@@ -184,7 +196,7 @@ $excludedRecommendationIds = collect($allLatestTitleIds)
 This retains exact full-mode behavior and prevents web presentation pruning
 from changing recommendation membership.
 
-- [ ] **Step 4: Run GREEN**
+- [x] **Step 4: Run GREEN**
 
 Run:
 
@@ -193,6 +205,8 @@ php artisan test tests/Feature/CatalogHomeWebProjectionTest.php
 ```
 
 Expected: both tests PASS; full API assertions remain unchanged.
+
+Observed GREEN: 2 tests passed with 27 assertions.
 
 ### Task 3: Verify related contracts and measure the result
 
@@ -206,7 +220,7 @@ Expected: both tests PASS; full API assertions remain unchanged.
 - Consumes: existing homepage/API/cache/recommendation tests.
 - Produces: measured before/after evidence without wall-time assertions.
 
-- [ ] **Step 1: Run focused tests**
+- [x] **Step 1: Run focused tests**
 
 ```bash
 php artisan test \
@@ -221,25 +235,40 @@ php artisan test \
 
 Expected: PASS.
 
-- [ ] **Step 2: Repeat the five-process builder profile**
+Observed: corrected API owner path
+`tests/Feature/Api/V1/CatalogDiscoveryTest.php`; focused matrix passed
+37 tests with 297 assertions.
+
+- [x] **Step 2: Repeat the five-process builder profile**
 
 Bootstrap Laravel in a fresh PHP process per sample, attach `DB::listen()`,
 call `webData()` and record wall time, query count, SQL time and section
 counts. Expected semantic counts: 12 latest, 0 featured, 8 video, 0 latest
 media, 8 recommendations. Do not encode wall time in PHPUnit.
 
-- [ ] **Step 3: Verify full projection parity**
+Observed stable samples: every web run used 47 queries versus the previous
+57. A six-pair same-state comparison gave median web builder `165,91 ms`
+versus full `206,64 ms`; median SQL `33,73 ms` versus `65,67 ms`. This is
+diagnostic evidence under current shared load, not an SLA.
+
+- [x] **Step 3: Verify full projection parity**
 
 Call `data()` and confirm its section counts remain 48/12/8/12 on the same
 snapshot. Compare `/api/v1/home` keys/counts with the pre-change contract.
 
-- [ ] **Step 4: Run broad related tests**
+Observed direct full projection and live API counts `48/12/8/12`; API keys
+remain `stats/latest_titles/featured_titles/titles_with_video/latest_releases/
+year_buckets/genres/countries/subtitle_tag`.
+
+- [x] **Step 4: Run broad related tests**
 
 ```bash
 php artisan test --filter='CatalogHome|CatalogRecommendation|CatalogDiscovery|PublicPageCache|EagerLoadProjection'
 ```
 
 Expected: PASS or exact unrelated blocker documented.
+
+Observed: 173 tests passed with 991 assertions.
 
 ### Task 4: Static, browser and documentation gates
 
@@ -253,7 +282,7 @@ Expected: PASS or exact unrelated blocker documented.
 - Produces: measured documentation, completed compliance matrix and delivery
   evidence.
 
-- [ ] **Step 1: Format and analyze exact PHP scope**
+- [x] **Step 1: Format and analyze exact PHP scope**
 
 ```bash
 ./vendor/bin/pint \
@@ -267,7 +296,10 @@ Expected: PASS or exact unrelated blocker documented.
   tests/Feature/CatalogHomeWebProjectionTest.php
 ```
 
-- [ ] **Step 2: Run build/docs/diff checks**
+Observed: exact Pint and Rector reported no changes; PHPStan completed with
+zero errors, and the exact projection test remained GREEN at 2/27.
+
+- [x] **Step 2: Run build/docs/diff checks**
 
 ```bash
 npm run build
@@ -279,26 +311,45 @@ Build remains required because the public HTML route is affected even though
 no frontend asset is edited. Managed docs foreign drift must not be silently
 rewritten.
 
-- [ ] **Step 3: Browser and live HTTP verification**
+Observed: Vite built 25 modules in `2,13 s`;
+`project:docs-refresh --check` and task-scoped `git diff --check` passed.
+
+- [x] **Step 3: Browser and live HTTP verification**
 
 Check desktop `1440×1200`, mobile `390×844` and throttled mobile `/`.
 Capture HTTP status, page-cache state, H1, update/recommendation cards,
 HTML bytes, DOM nodes, images, LCP/FCP/CLS, overflow, console/page/request
 failures. No cache flush, generation bump or production DML.
 
-- [ ] **Step 4: Update documentation**
+Observed: Chromium returned `200`; cold first-byte `395 ms`, HIT first-byte
+`49–75 ms`; throttled mobile load `2 999 ms` with FCP/LCP `1 164 ms`.
+Counts were 12 latest, 8 recommendations and 12 release groups; no
+horizontal overflow or browser/network errors. Mobile CLS was zero; cold
+desktop reported CLS `0,782`, recorded as a neighboring unresolved UI
+observation because Task 70 does not change rendered HTML.
+
+- [x] **Step 4: Update documentation**
 
 Append measured evidence to `docs/performance.md`; add one visitor-facing
 README history bullet and one Russian technical CHANGELOG bullet. Complete
 Task 70 matrix with `completed`, `already_compliant`, `not_applicable` and
 honest `unresolved`.
 
-- [ ] **Step 5: Final requirement and legacy scan**
+Observed: performance owner, visitor history, Russian changelog and current
+compliance evidence were updated with exact Task 70 hunks.
+
+- [x] **Step 5: Final requirement and legacy scan**
 
 Re-read applicable canonical requirements and Task 70. Search the repository
 for all `webData`, `featuredTitles`, `latestMedia`, homepage builder/API
 consumers, old cache dimensions, duplicate services and unfinished markers.
 Do not remove text matches without dependency review.
+
+Observed: final canonical reread completed. Repository scan confirms
+`webData()` is consumed only by `CatalogHomePage`, neither API-only
+collection is read by Blade, `CatalogHomeResource` remains the full
+consumer, `response_contract=2` remains unchanged, and no Task 70
+TODO/FIXME, duplicate builder or stale cache path remains.
 
 ### Task 5: Commit and push exact Task 70 scope
 

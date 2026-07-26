@@ -9475,3 +9475,103 @@ prototype сохранил полный catalog path около `2 296,09 ms`, �
 12. `[completed]` Final requirements reread, repository legacy scan and exact staged manifest.
 13. `[completed]` Exact nine-file Task 69 commit `b03511a` on existing `main`.
 14. `[completed_unresolved_authentication]` Configured non-force push attempted; GitHub rejected before transfer because credentials are unavailable.
+
+## Task 70 — исключение API-only hydration из web главной
+
+Статус: `delivery_pending`.
+
+Дата начала: 26.07.2026.
+
+Approved design:
+[`2026-07-26-homepage-api-only-hydration-design.md`](../superpowers/specs/2026-07-26-homepage-api-only-hydration-design.md).
+
+Detailed implementation plan:
+[`2026-07-26-homepage-api-only-hydration.md`](../superpowers/plans/2026-07-26-homepage-api-only-hydration.md).
+
+### Цель и measured root cause
+
+После Task 68 `webData()` стабильно отдаёт компактный HTML, но пять fresh
+process samples заняли `144,63–186,93 ms`, `57` SQL statements и
+`29,25–36,98 ms` SQL. Consumer trace подтвердил, что Blade не читает
+`featuredTitles` и `latestMedia`, хотя web-path полностью гидратирует обе
+API-only секции, их eager relations и card counts.
+
+Выбрано расширение существующей projection boundary: `data()` и
+`/api/v1/home` сохраняют full rows, `webData()` сохраняет прежние array keys,
+но пропускает две неиспользуемые hydration ветки. Scalar featured snapshot
+остаётся в recommendation exclusions.
+
+### Expected changed files
+
+- `app/Services/Catalog/CatalogHomePageBuilder.php`;
+- `tests/Feature/CatalogHomeWebProjectionTest.php`;
+- linked design/detailed/current plans;
+- `docs/performance.md`;
+- `README.md`;
+- `CHANGELOG.md`.
+
+### Protected contracts
+
+- `/`, `/ru`, `/en`, full-page Livewire and byte-equivalent used HTML;
+- `/api/v1/home`, `CatalogHomeResource` shape and full section counts;
+- 48-row snapshot schema/order/key/TTL/invalidation;
+- 12 latest web rows, 8 video rows, release groups, collections and SEO;
+- recommendation exclusions/ranking/shown-state;
+- publication, availability, audience, region, Premium, legal and policies;
+- cache `response_contract=2`, routes, translations, schema, dependencies,
+  environment, importer, queues and foreign shared-tree changes.
+
+### Cross-feature and risk matrix
+
+| Domain | Статус | Решение / gate |
+| --- | --- | --- |
+| Homepage web cold path | `critical_affected` | Skip only two unused hydration branches; query-shape and live profile |
+| API/mobile clients | `protected_critical` | Controller remains on full `data()`; Resource parity test |
+| Recommendations | `protected_critical` | Full latest + scalar featured + hydrated video exclusions |
+| HTML/SEO/no-JS | `already_compliant` | Used render data and markup unchanged |
+| Cache | `already_compliant` | HTML contract stays v2; no key/TTL/version/flush |
+| Authorization/privacy/legal | `already_compliant` | Existing scopes untouched |
+| Translations/mobile/a11y | `already_compliant` | No strings, markup, CSS or JS change |
+| Database/import/queue | `not_applicable` | No schema, DML, command or job |
+| Production/rollback | `affected_low` | Code-only deploy/revert; no data/cache cleanup |
+| Shared Git state | `critical_risk_recorded` | Exact Task 70 hunks only on existing `main` |
+
+### Task-specific requirement-compliance matrix
+
+| Requirement/domain | Статус | Evidence / следующий gate |
+| --- | --- | --- |
+| Root/index/canonical requirements fresh read | `completed` | 26.07.2026 before production edits |
+| Applicable architecture/performance/cache/frontend/UI/ops/maintenance docs | `completed` | Canonical owners and Task 68 contract traced |
+| Installed versions/database | `completed` | PHP 8.5.8, Laravel 13.22.0, Boost 2.4.13, Livewire 4.3.3, PHPUnit 12.5.32, SQLite |
+| Official framework behavior | `completed` | Laravel 13 eager-load/query-listener/testing docs checked through Boost |
+| Existing implementation first | `completed` | Builder → Livewire/Blade and builder → API/Resource consumers traced |
+| Read-only root-cause profile | `completed` | Five processes, SQL ranking, HTTPS HIT series and dead-consumer search |
+| Alternatives/user authorization | `completed` | TTL/lazy/projection compared; repeated explicit preapproval applies |
+| Design/plan/files/contracts/risks | `completed` | Linked approved design and unlimited plan |
+| Migration/routes/translations/cache/env/dependencies/DML | `not_applicable` | Explicitly excluded |
+| TDD RED | `completed` | 2 tests failed after 7 assertions exactly on non-empty web API-only collections |
+| Implementation | `completed` | `webData()` skips featured/media hydration; full `data()` and scalar exclusions preserved |
+| Focused/full/static/browser verification | `completed_with_unrelated_full_suite_failures` | 37/297 focused, 173/991 broad, exact Pint/PHPStan/Rector, docs check, Vite and Chromium GREEN; full 1G suite 1 890/1 907 passed with six foreign onboarding/account/translation/import failures |
+| README/CHANGELOG/final requirement reread | `completed` | Performance, README and CHANGELOG updated; canonical reread and repository consumer/cache/TODO scan complete |
+| Commit/push in `main` | `pending` | Exact Task 70 scope only |
+
+### Безлимитный execution order
+
+1. `[completed]` Fresh requirements/skills/versions/Git/code/docs audit.
+2. `[completed]` Five-process builder and live HTTPS baseline.
+3. `[completed]` Consumer/query trace and root-cause isolation.
+4. `[completed]` Alternatives, approved design, contracts and rollback.
+5. `[completed]` Detailed TDD implementation plan and compliance matrix.
+6. `[completed]` RED for API-only web hydration and query shape: both tests
+   failed after 7 assertions on non-empty `featuredTitles`.
+7. `[completed]` Minimal full/web builder projection switch; exact GREEN:
+   2 tests and 27 assertions.
+8. `[completed_with_unrelated_full_suite_failures]` Focused 37/297 and broad
+   173/991 GREEN; exact static/docs/build gates pass; Chromium `200` and
+   throttled mobile `2,999 s`; full 1G suite passed 1 890 of 1 907 with six
+   foreign unfinished-feature failures.
+9. `[completed]` Performance/README/CHANGELOG evidence, canonical reread and
+   repository consumer/cache/TODO scan complete.
+10. `[pending]` Exact isolated commit on existing `main`.
+11. `[pending]` Configured non-force push; external failure remains
+    `unresolved`.
