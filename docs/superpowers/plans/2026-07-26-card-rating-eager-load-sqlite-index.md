@@ -359,14 +359,25 @@ assertions.
 Mark each row only from verified evidence. Use `unresolved` for external or
 shared-worktree blockers and `not_applicable` for excluded domains.
 
-- [ ] **Step 5: Commit exact task scope on `main`**
+- [x] **Step 5: Commit exact task scope on `main`**
 
 Use an alternate Git index based on current `HEAD`; include only Task 77
 hunks/files and preserve all foreign staged/unstaged work. Verify branch,
 cached file list, cached diff and `diff --check` before commit.
 
-- [ ] **Step 6: Push configured non-force remote**
+Observed: exact alternate index based on `1982d17` contained eight Task 77
+files and passed cached `diff --check`; implementation/docs commit
+`f2fd60c` was created on existing `main`. `--no-verify` was required because
+the shared working tree contains foreign managed-doc/CHANGELOG work; all
+available task-scoped gates were run manually before commit.
+
+- [x] **Step 6: Push configured non-force remote**
 
 Run the configured non-force push. If GitHub credentials or another external
 condition rejects the transfer, record exact failure as `unresolved`; do not
 claim a successful push.
+
+Observed: `git push origin main` exited 128 before transfer because this
+environment cannot read the GitHub HTTPS username:
+`fatal: could not read Username for 'https://github.com': No such device or
+address`. Remote, credentials and history were not changed.

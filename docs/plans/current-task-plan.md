@@ -10029,7 +10029,7 @@ Rollback — обычный revert task commit без database/cache cleanup.
 
 ## Task 77 — SQLite-index для eager-load рейтингов карточек
 
-Статус: `verified_commit_pending`.
+Статус: `completed_commit_unresolved_push`.
 
 Дата начала: 26.07.2026.
 
@@ -10116,7 +10116,8 @@ Detailed implementation plan:
 | Managed docs shared state | `unresolved` | `project:docs-refresh --check` reports foreign `docs/MAINTENANCE_LOG.md` drift |
 | Documentation/README/CHANGELOG | `completed` | Performance owner, visitor history and Russian changelog updated |
 | Final requirement reread/diff audit | `completed` | One registry owner, no legacy matcher/Blade query/debug artifact; final consumer matrix 36/334 GREEN |
-| Commit/push in `main` | `unresolved` | Exact task-only commit and configured push are the remaining delivery steps |
+| Commit in `main` | `completed` | Design `1982d17`; exact eight-file implementation/docs commit `f2fd60c` |
+| Configured remote push | `unresolved` | `git push origin main` rejected before transfer because GitHub HTTPS credentials are unavailable |
 
 ### Безлимитный execution order
 
@@ -10134,6 +10135,8 @@ Detailed implementation plan:
 11. `[completed]` Desktop/mobile/localized/API browser verification.
 12. `[completed]` Performance owner, README and Russian CHANGELOG.
 13. `[completed]` Final canonical reread and legacy/debug/secret/cache audit.
-14. `[in_progress]` Exact Task 77 implementation/docs commit on `main`.
-15. `[pending]` Configured non-force push; any external failure stays
-    `unresolved`.
+14. `[completed]` Exact Task 77 implementation/docs commit `f2fd60c` on
+    existing `main`.
+15. `[completed_unresolved_authentication]` Configured non-force push was
+    attempted and rejected before transfer because GitHub HTTPS credentials
+    are unavailable.
