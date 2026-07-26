@@ -9785,9 +9785,9 @@ worktree changes remain compatible.
 | Alternatives/design/files/contracts/risks | `completed` | Linked approved design and detailed unlimited plan |
 | TDD RED | `completed` | Initial 11 tests: 5 passed, 2 failures, 4 errors; recommendation RED: 5 tests, 2 failures, 3 errors, all on missing Task 71 behavior |
 | Implementation | `completed` | Additive schema, typed services, full-page Livewire, recommendation/lifecycle integration and docs implemented |
-| Verification/docs | `completed` | Task matrix 52/52 (73 746 assertions), final 27/27 (73 610), schema rollback/EXPLAIN, Pint/PHPStan/Rector/docs/Vite and Playwright 3/3 GREEN |
+| Verification/docs | `completed` | Task matrix 52/52 (73 746 assertions), final 27/27 (73 610), schema rollback/EXPLAIN, merge-index matrix 5/5 (48), Pint/PHPStan/Rector/docs/Vite and Playwright 3/3 GREEN |
 | Full-suite foreign state | `unresolved` | Full 1 GiB suite 1 895/1 909 passed; two foreign failures and one foreign missing-class error remain outside Task 71 |
-| Commit | `completed` | Exact 57-file Task 71 commit `763ad12` (`feat: add taste onboarding for recommendations`) on existing `main` |
+| Commit | `completed` | Feature `763ad12`, delivery docs `0728e46` and merge-index follow-up `cc8aac8` committed on existing `main` |
 | Push | `unresolved` | `git push origin main` exited 128 before transfer: GitHub HTTPS username/credentials unavailable |
 
 ### Execution checklist
@@ -9813,6 +9813,9 @@ worktree changes remain compatible.
     `main`.
 12. `[completed][critical]` Configured non-force push attempted; external
     HTTPS authentication rejection recorded as unresolved.
+13. `[completed][high]` Final database review reproduced the title-merge
+    table scan, added the minimal reversible `(catalog_title_id,id)` index
+    and committed the tested follow-up as `cc8aac8`.
 
 ### Verification evidence
 
@@ -9836,3 +9839,7 @@ worktree changes remain compatible.
   formatting hunks. `git push origin main` завершился кодом 128 до передачи
   данных: `fatal: could not read Username for 'https://github.com': No such
   device or address`.
+- Database follow-up `cc8aac8` добавил только reversible
+  `(catalog_title_id,id)` merge index, его schema/merger matrix прошла
+  5/5 tests с 48 assertions; disposable SQLite подтвердил
+  migrate/rollback/remigrate.

@@ -297,4 +297,5 @@ Design:
   добавила только `(catalog_title_id,id)`, после чего schema/merger прошли
   5/5 tests с 48 assertions и disposable SQLite подтвердил
   migrate/rollback/remigrate. Genre-first/country-first indexes не добавлены
-  без выполняемых запросов.
+  без выполняемых запросов. Follow-up зафиксирован commit `cc8aac8`
+  (`perf: index taste onboarding title merges`) на existing `main`.

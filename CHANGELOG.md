@@ -36,7 +36,8 @@
   как неиспользуемые. RED воспроизвёл два отказа и `SCAN`, после исправления
   schema и merger matrix прошла 5 тестов с 48 проверками, а disposable SQLite
   успешно выполнил migrate, rollback и повторное применение follow-up
-  migration.
+  migration. Исправление зафиксировано отдельным commit `cc8aac8` в
+  существующей `main`.
 
 - Консолидированы точные запросы прямого rebuild `/stats` без изменения
   публичного snapshot, маршрутов, cache key/TTL, schema или write paths.
