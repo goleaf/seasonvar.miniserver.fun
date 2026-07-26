@@ -395,9 +395,16 @@ Observed:
   записи с английским обычным словом; точный staged Task 85 snapshot остаётся
   обязательным commit gate.
 
-- [ ] **Step 6: Exact commit и configured push**
+- [x] **Step 6: Exact commit и configured push**
 
 Проверить `main`, сформировать hook-enabled commit только из Task 85 paths/
 hunks и выполнить non-force `git push origin main`. HTTPS authentication или
 shared-tree failure фиксируется `unresolved`; hooks, force, reset, stash,
 unstage чужих изменений и смена remote запрещены.
+
+Observed: hook-enabled exact implementation/docs snapshot зафиксирован в
+существующей `main` commit-ом `34a84c9`. Обычный
+`GIT_TERMINAL_PROMPT=0 git push origin main` завершился кодом `128` до
+передачи данных: среда не предоставила имя пользователя GitHub HTTPS.
+Хуки, remote и история не обходились и не переписывались; push остаётся
+`unresolved_authentication`.

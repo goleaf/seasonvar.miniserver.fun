@@ -10607,7 +10607,7 @@ SHA-256 `412fd422115fe129a5e25dea93d452af315d618a18088f0168b6388809ba8c64`.
 
 ## Task 85 — compact snapshot сводки и алфавита справочников
 
-Статус: `implementation_verified_ready_for_exact_commit`.
+Статус: `implementation_committed_push_unresolved_authentication`.
 
 Дата: 26.07.2026.
 
@@ -10647,7 +10647,7 @@ Implementation plan:
 | Security/privacy/auth/Premium/legal | `already_compliant` | Только guest-public scalar metadata через прежнюю visibility boundary |
 | Production rollback/data safety | `completed` | Code/docs revert; versioned keys истекают, restore/reindex/backfill/flush не нужны |
 | README/CHANGELOG/owners | `completed` | Visitor history, отдельная русская запись и тематические owners обновлены |
-| Commit/push main | `in_progress` | Только exact Task 85 snapshot; non-force configured push после commit |
+| Commit/push main | `completed_with_unresolved_push` | Exact implementation/docs commit `34a84c9` создан в `main`; обычный `git push origin main` завершился кодом 128 до передачи данных из-за отсутствующего имени пользователя GitHub HTTPS |
 
 ### Изменяемые и защищённые contracts
 
