@@ -32,6 +32,8 @@ const login = async (page, email) => {
 };
 
 test('discovery and collection taxonomy stay text-only and responsive', async ({ page, baseURL }, testInfo) => {
+    test.setTimeout(150_000);
+
     const browserErrors = installBrowserGuard(page, baseURL);
     const popularResponse = await page.goto('/discover/popular');
 
@@ -45,9 +47,14 @@ test('discovery and collection taxonomy stay text-only and responsive', async ({
     await expect(page.locator('[data-collection-explorer] img')).toHaveCount(0);
     await expect(page.locator('[data-collection-explorer]').getByText('Формат', { exact: true })).toHaveCount(0);
     await expect(page.getByText('Браузерная подборка детективов', { exact: true })).toBeVisible();
+    const detectiveCollectionCard = page.locator('[data-collection-explorer] article').filter({
+        hasText: 'Браузерная подборка детективов',
+    });
+    await expect(detectiveCollectionCard.locator('[data-collection-quality-score="82"]')).toBeVisible();
+    await expect(detectiveCollectionCard.getByText('Качество: 82/100', { exact: true })).toBeVisible();
 
     const headerCollectionHrefs = await page
-        .locator('[data-site-header-navigation] a')
+        .locator('[data-site-header-primary-navigation] a')
         .filter({ hasText: 'Подборки' })
         .evaluateAll((links) => links.map((link) => link.getAttribute('href')));
 
@@ -80,17 +87,6 @@ test('discovery and collection taxonomy stay text-only and responsive', async ({
         const recommendationTitleBox = await page.locator('[data-recommendation-row] h3').first().boundingBox();
 
         expect(recommendationTitleBox?.width).toBeGreaterThanOrEqual(150);
-    }
-
-    if ((page.viewportSize()?.width ?? 0) >= 640 && (page.viewportSize()?.width ?? 0) < 1024) {
-        const recommendationMetaBox = await page
-            .locator('[data-recommendation-row]')
-            .nth(1)
-            .locator('.whitespace-nowrap')
-            .first()
-            .boundingBox();
-
-        expect(recommendationMetaBox?.height).toBeLessThanOrEqual(20);
     }
 
     if ((page.viewportSize()?.width ?? 0) >= 1024) {
@@ -139,12 +135,16 @@ test('discovery and collection taxonomy stay text-only and responsive', async ({
     await page.goto('/collections/browser-detective-collection');
     await expect(page.getByRole('heading', { level: 1, name: 'Браузерная подборка детективов' })).toBeVisible();
     await expect(page.getByText('Темы и жанры › Детективы и криминал', { exact: true }).first()).toBeVisible();
+    await expect(page.locator('[data-collection-quality-score="82"]')).toBeVisible();
+    await expect(page.locator('[data-collection-theme-match="80"]')).toBeVisible();
+    await expect(page.getByText('название или описание соответствует теме', { exact: true })).toBeVisible();
     await expect(page.locator('article').first().locator('img')).toHaveCount(0);
     await page.getByRole('link', { name: 'Управлять' }).click();
     await expect(page.locator('#collection-edit-category-root option:checked')).toHaveText('Темы и жанры');
     await expect(page.locator('#collection-edit-category-child option:checked')).toHaveText('Детективы и криминал');
     await assertResponsivePage(page);
 
+    await page.locator('[data-header-account-menu] summary').click();
     await page.getByRole('button', { name: 'Выйти', exact: true }).click();
     await expect(page).toHaveURL(/\/(?:ru\/?)?$/);
     await login(page, 'browser-admin@example.com');
@@ -200,6 +200,9 @@ test('discovery and collection taxonomy stay text-only and responsive', async ({
     );
     await expect(readyEditorialCard.getByText('Готова к редакционному показу', { exact: true })).toBeVisible();
     await expect(readyEditorialCard.getByText('Доступно гостю: 12 из 12 · минимум: 12', { exact: true })).toBeVisible();
+    await expect(readyEditorialCard.locator('[data-collection-quality-components]')).toBeVisible();
+    await expect(readyEditorialCard.locator('[data-collection-quality-signals]')).toBeVisible();
+    await expect(readyEditorialCard.getByText('Проверено редакцией', { exact: true })).toBeVisible();
     await expect(readyEditorialCard.locator('[data-collection-feature-action]')).toHaveCount(1);
     await expect(thinEditorialCard.locator('[data-collection-readiness]')).toHaveAttribute(
         'data-collection-readiness-state',

@@ -348,3 +348,22 @@ owner rows. Rolling schema guard не раскрывает состояние п
 развёрнутой миграции. Проверки покрывают guest, unverified user, invisible и
 unknown title ID, duplicate/overlap, чужой ресурс, rate-bound write,
 reset/merge/export и отсутствие selected IDs в query string.
+
+## Security и privacy качества подборок Task 101
+
+`quality_score`, сигнатуры, JSON evidence, item match/reason, issue
+fingerprint/status и editorial verification исключены из `$fillable`.
+Production write выполняют только internal assessor/moderation boundaries
+через `forceFill`, bounded `upsert`, transaction и повторную server-side
+авторизацию. Browser не может назначить score, canonical duplicate,
+verification actor/version или закрыть issue; UI visibility не заменяет
+`collections.moderate`.
+
+Similarity и issue evidence используют SHA-256, stable codes и ограниченные
+counters, не raw query, source URL или untrusted HTML. Engagement query
+возвращает только агрегаты saves/completions/returns/reports; user IDs,
+индивидуальный progress, email и attribution не сохраняются в
+`quality_details`, run rows, public view, API, SEO, cache или audit. SQL
+строится query builder с bindings, Blade выводит локализованные enum labels
+через escaped `{{ }}`. Команда не выполняет внешние HTTP calls и не меняет
+environment/secrets.

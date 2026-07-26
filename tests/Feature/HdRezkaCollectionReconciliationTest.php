@@ -235,11 +235,28 @@ final class HdRezkaCollectionReconciliationTest extends TestCase
             'position' => 100,
             'is_active' => true,
         ]);
-        CatalogCollection::query()->firstOrFail()->forceFill([
+        $publishedCollection = CatalogCollection::query()->firstOrFail();
+        $publishedCollection->forceFill([
             'catalog_collection_category_id' => $category->id,
             'visibility' => CatalogCollectionVisibility::Public,
             'moderation_status' => CatalogCollectionModerationStatus::Approved,
             'published_at' => now(),
+            'quality_score' => 59,
+            'quality_content_version' => $publishedCollection->content_version,
+            'quality_evaluated_at' => now(),
+        ])->save();
+        $lowQuality = $signalSync->synchronizeForRun($complete->refresh());
+
+        $this->assertSame(0, $lowQuality['upserted']);
+        $this->assertDatabaseMissing('catalog_title_recommendation_signals', [
+            'source' => 'hdrezka',
+            'signal_type' => 'editorial_collection',
+            'signal_key' => $this->definition()->sourceKey,
+        ]);
+
+        $publishedCollection->forceFill([
+            'quality_score' => 80,
+            'quality_content_version' => $publishedCollection->content_version,
         ])->save();
         $published = $signalSync->synchronizeForRun($complete->refresh());
 
@@ -292,7 +309,7 @@ final class HdRezkaCollectionReconciliationTest extends TestCase
         $final->update(['status' => CatalogCollectionSyncStatus::Completed, 'completed_at' => now()]);
         $finalResult = $signalSync->synchronizeForRun($final->refresh());
 
-        $this->assertSame(1, $finalResult['deleted']);
+        $this->assertSame(2, $finalResult['deleted']);
         $this->assertEqualsCanonicalizing([$first->id, $second->id], $finalResult['title_ids']);
         $this->assertDatabaseMissing('catalog_title_recommendation_signals', [
             'catalog_title_id' => $second->id,

@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Livewire\Collections;
 
 use App\DTOs\CatalogCollectionItemCriteria;
+use App\Enums\CatalogCollectionInclusionReason;
 use App\Enums\CatalogCollectionReportReason;
 use App\Enums\CatalogCollectionSort;
 use App\Enums\CatalogCollectionVisibility;
 use App\Livewire\Concerns\InteractsWithCollectionLocale;
 use App\Livewire\Concerns\InteractsWithPaginationIslands;
+use App\Models\CatalogTitle;
 use App\Models\User;
 use App\Services\Collections\CatalogCollectionItemService;
 use App\Services\Collections\CatalogCollectionQuery;
@@ -191,6 +193,27 @@ final class CatalogCollectionPage extends Component
             perPage: 24,
         );
         $items = $query->items($collection, $itemViewer, $criteria);
+        $items->getCollection()->each(function (CatalogTitle $item) use ($collection): void {
+            $reasonCode = $item->getAttribute('collection_inclusion_reason_code');
+            $qualityContentVersion = $item->getAttribute('collection_quality_content_version');
+            $themeMatchPercent = $item->getAttribute('collection_theme_match_percent');
+            $reason = is_string($reasonCode)
+                ? CatalogCollectionInclusionReason::tryFrom($reasonCode)
+                : null;
+            $current = $qualityContentVersion === $collection->content_version
+                && is_int($themeMatchPercent)
+                && $reason !== null;
+            $item->setAttribute(
+                'presentation_theme_match_percent',
+                $current ? $themeMatchPercent : null,
+            );
+            $item->setAttribute(
+                'presentation_inclusion_reason',
+                $current
+                    ? __('collections.quality.inclusion_reasons.'.$reason->value)
+                    : null,
+            );
+        });
         $queryState = array_filter([
             'q' => $this->search,
             'genre' => $this->genre,
@@ -240,6 +263,12 @@ final class CatalogCollectionPage extends Component
             'collectionUpdatedAtLabel' => $collection->updated_at?->format('d.m.Y'),
             'isEditorial' => $collection->type->value === 'editorial',
             'isSmart' => $collection->isSmart(),
+            'isDynamic' => $collection->isSmart() || (bool) $collection->getAttribute('has_import_source'),
+            'isEditoriallyVerified' => $collection->editorially_verified_at !== null
+                && $collection->editorially_verified_content_version === $collection->content_version,
+            'qualityScore' => $collection->hasCurrentQuality()
+                ? $collection->quality_score
+                : null,
             'canShare' => $collection->visibility !== CatalogCollectionVisibility::Private,
             'headerItemCountLabel' => trans_choice('collections.page.items', $headerItemCount, [
                 'count' => $headerItemCount,

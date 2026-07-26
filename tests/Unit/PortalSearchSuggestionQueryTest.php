@@ -88,9 +88,9 @@ final class PortalSearchSuggestionQueryTest extends TestCase
         $this->assertNotContains(route('requests.show', $privateRequest), $results->pluck('url')->all());
         $this->assertNotContains(route('users.show', ['username' => $privateProfile->username]), $results->pluck('url')->all());
         $this->assertLessThanOrEqual(
-            24,
+            25,
             count(DB::getQueryLog()),
-            'Поиск по всем публичным типам портала должен оставаться ограниченным фиксированным числом запросов.',
+            'Поиск по всем публичным типам портала должен оставаться ограниченным фиксированным числом запросов, включая один cached schema capability probe качества подборок.',
         );
     }
 

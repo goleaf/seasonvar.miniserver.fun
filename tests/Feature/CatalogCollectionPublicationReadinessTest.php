@@ -213,6 +213,7 @@ final class CatalogCollectionPublicationReadinessTest extends TestCase
         $ready = $this->collection('feature-ready');
         $this->attachWatchableTitles($thin, 11);
         $this->attachWatchableTitles($ready, 12);
+        $this->markCurrentQuality($ready);
         $service = app(CatalogCollectionModerationService::class);
 
         try {
@@ -272,6 +273,7 @@ final class CatalogCollectionPublicationReadinessTest extends TestCase
         $admin = User::factory()->create(['email' => 'admin@example.com']);
         $collection = $this->collection('stale-featured');
         $this->attachWatchableTitles($collection, 12);
+        $this->markCurrentQuality($collection);
         $service = app(CatalogCollectionModerationService::class);
         $featured = $service->feature($admin, $collection, true);
 
@@ -415,5 +417,16 @@ final class CatalogCollectionPublicationReadinessTest extends TestCase
             'last_successful_sync_at' => now(),
             'missing_since_at' => $missing ? now() : null,
         ]);
+    }
+
+    private function markCurrentQuality(
+        CatalogCollection $collection,
+        int $score = 80,
+    ): void {
+        $collection->forceFill([
+            'quality_score' => $score,
+            'quality_content_version' => $collection->content_version,
+            'quality_evaluated_at' => now(),
+        ])->save();
     }
 }

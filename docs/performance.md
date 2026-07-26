@@ -1328,3 +1328,26 @@ eager loading и user overlay остаются прежними. `grid` пере
 Существующие query-budget и FTS `EXPLAIN QUERY PLAN` tests остаются
 канонической проверкой индексов. Схема, cache keys/TTL/invalidation, queue,
 dependencies и production configuration не изменены.
+
+## Query contract качества подборок Task 101
+
+`CatalogCollectionSchema` получает список таблиц один раз на request и
+проверяет quality capability по последней таблице additive migration. Refresh
+читает collections bounded chunks, загружает items ordered stream и делает
+одну выборку уже сохранённых composition signatures на chunk. Privacy-safe
+engagement считается grouped-запросами; title/theme hydration не выполняется
+для списка больше public cap.
+
+Fuzzy similarity не выполняет полный O(n²) scan. Нормализованный corpus
+ограничен 10 000 rows, token sets вычисляются один раз, кандидаты попадают в
+общие token buckets и отбрасываются по несовместимой длине до Jaccard.
+Canonical exact duplicate определяется самым ранним persisted ID, поэтому
+повторный chunked run детерминирован.
+
+SQLite `EXPLAIN QUERY PLAN` подтвердил
+`catalog_collections_content_signature_idx`,
+`catalog_collections_quality_refresh_idx` и
+`catalog_collection_quality_issues_queue_idx`. Public scope продолжает
+использовать прежний `catalog_collections_public_idx`; предложенный отдельный
+public-quality index был удалён после измерения как неиспользуемый и
+увеличивающий стоимость INSERT/UPDATE.

@@ -473,6 +473,9 @@
 - `2026_07_25_140300_drop_catalog_collection_cover_columns.php`
 - `2026_07_25_220709_create_release_calendar_feeds_table.php`
 - `2026_07_26_045634_create_catalog_title_quality_tables.php`
+- `2026_07_26_064318_create_catalog_metadata_provenance_tables.php`
+- `2026_07_26_064319_add_quality_run_links_to_catalog_quality_tables.php`
+- `2026_07_26_095636_create_catalog_collection_quality_system.php`
 - `2026_07_26_120000_replace_recommendation_feedback_index_for_activity_order.php`
 - `2026_07_26_230000_create_catalog_recommendation_feedback_preferences.php`
 - `2026_07_26_231000_add_taste_onboarding_to_catalog_recommendations.php`

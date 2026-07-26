@@ -7,11 +7,13 @@ namespace App\Models;
 use App\DTOs\CatalogSmartCollectionRules;
 use App\Enums\CatalogCollectionMode;
 use App\Enums\CatalogCollectionModerationStatus;
+use App\Enums\CatalogCollectionQualityIssueStatus;
 use App\Enums\CatalogCollectionSort;
 use App\Enums\CatalogCollectionType;
 use App\Enums\CatalogCollectionVisibility;
 use App\Enums\CommentTargetType;
 use App\Policies\CatalogCollectionPolicy;
+use App\Services\Collections\CatalogCollectionSchema;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\UsePolicy;
@@ -41,6 +43,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property string|null $content_locale
  * @property bool $is_featured
  * @property int $content_version
+ * @property int|null $quality_score
+ * @property int|null $quality_content_version
+ * @property array<string, mixed>|null $quality_details
+ * @property CarbonImmutable|null $quality_evaluated_at
+ * @property CarbonImmutable|null $editorially_verified_at
+ * @property int|null $editorially_verified_content_version
  * @property CarbonImmutable|null $published_at
  * @property CarbonImmutable|null $updated_at
  * @property CarbonImmutable|null $deleted_at
@@ -119,6 +127,18 @@ final class CatalogCollection extends Model
     public function reports(): HasMany
     {
         return $this->hasMany(CatalogCollectionReport::class);
+    }
+
+    /** @return HasMany<CatalogCollectionQualityIssue, $this> */
+    public function qualityIssues(): HasMany
+    {
+        return $this->hasMany(CatalogCollectionQualityIssue::class);
+    }
+
+    /** @return BelongsTo<User, $this> */
+    public function editoriallyVerifiedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'editorially_verified_by_id');
     }
 
     /** @return HasMany<ReleaseCalendarFeed, $this> */
@@ -209,11 +229,97 @@ final class CatalogCollection extends Model
             ->where('moderation_status', CatalogCollectionModerationStatus::Approved->value)
             ->whereNotNull('published_at')
             ->eligibleForPublicListing();
+
+        if (! app(CatalogCollectionSchema::class)->qualityAvailable()) {
+            return;
+        }
+
+        $query
+            ->whereDoesntHave('qualityIssues', fn (Builder $issues): Builder => $issues
+                ->where('status', CatalogCollectionQualityIssueStatus::Open->value)
+                ->whereIn('code', ['exact_duplicate', 'template_content']))
+            ->where(function (Builder $quality): void {
+                $quality
+                    ->where(function (Builder $current): void {
+                        $current
+                            ->whereColumn('quality_content_version', 'content_version')
+                            ->whereNotNull('quality_evaluated_at')
+                            ->where(
+                                'quality_evaluated_at',
+                                '>=',
+                                now()->subDays(self::qualityStaleAfterDays()),
+                            )
+                            ->where(
+                                'quality_score',
+                                '>=',
+                                min(
+                                    100,
+                                    max(
+                                        0,
+                                        (int) config(
+                                            'catalog-collections.quality.minimum_public_score',
+                                            60,
+                                        ),
+                                    ),
+                                ),
+                            );
+                    })
+                    ->orWhere(function (Builder $legacy): void {
+                        $legacy
+                            ->whereNull('quality_score')
+                            ->whereNull('quality_content_version')
+                            ->whereNull('quality_evaluated_at');
+                    });
+            });
+    }
+
+    /** @param Builder<CatalogCollection> $query */
+    public function scopeWithCurrentQuality(Builder $query): void
+    {
+        $query
+            ->whereNotNull('quality_score')
+            ->whereColumn('quality_content_version', 'content_version')
+            ->whereNotNull('quality_evaluated_at')
+            ->where(
+                'quality_evaluated_at',
+                '>=',
+                now()->subDays(self::qualityStaleAfterDays()),
+            );
+    }
+
+    public function hasCurrentQuality(): bool
+    {
+        return $this->quality_score !== null
+            && $this->quality_content_version === $this->content_version
+            && $this->quality_evaluated_at !== null
+            && ! $this->quality_evaluated_at->isBefore(
+                now()->subDays(self::qualityStaleAfterDays()),
+            );
+    }
+
+    public function meetsPublicQualityThreshold(): bool
+    {
+        return $this->hasCurrentQuality()
+            && $this->quality_score >= min(
+                100,
+                max(
+                    0,
+                    (int) config('catalog-collections.quality.minimum_public_score', 60),
+                ),
+            );
     }
 
     public function isOwnedBy(?User $user): bool
     {
         return $user !== null && $this->owner_id !== null && $this->owner_id === $user->getKey();
+    }
+
+    private static function qualityStaleAfterDays(): int
+    {
+        return max(
+            1,
+            (int) config('catalog-collections.quality.stale_after_days', 14),
+        );
     }
 
     public function isSmart(): bool
@@ -257,6 +363,12 @@ final class CatalogCollection extends Model
             'smart_rules_version' => 'integer',
             'is_featured' => 'boolean',
             'content_version' => 'integer',
+            'quality_score' => 'integer',
+            'quality_content_version' => 'integer',
+            'quality_evaluated_at' => 'immutable_datetime',
+            'quality_details' => 'array',
+            'editorially_verified_at' => 'immutable_datetime',
+            'editorially_verified_content_version' => 'integer',
             'published_at' => 'immutable_datetime',
         ];
     }

@@ -263,6 +263,7 @@ return [
             'media_archived' => 'Архивирован источник',
             'collection_moderated' => 'Проведена модерация коллекции',
             'collection_featured' => 'Изменено выделение коллекции',
+            'collection_quality_verified' => 'Изменена редакционная проверка качества подборки',
             'collection_report_resolved' => 'Решена жалоба на коллекцию',
             'collection_category_created' => 'Создана категория подборок',
             'collection_category_updated' => 'Обновлена категория подборок',

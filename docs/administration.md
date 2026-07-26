@@ -244,3 +244,30 @@ Existing catalog administration остаётся единственной write 
 Bookmark, status, feedback/blacklist, exact progress, markers и acknowledgments являются owner-private состоянием и не получают общего staff editor/list. Existing catalog admin управляет только title/episode/media publication и canonical release events; collection moderation сохраняет существующие отдельные policy/gates. Изменение контента отражается в personal update query через visibility и release identity, а не через ручное редактирование пользовательских строк.
 
 Merge tooling обязано вызывать existing `CatalogTitleUserDataMerger` до удаления duplicate identity. Администратор не может через UI подменить owner ID, открыть private marker или сбросить progress; account export/delete выполняются владельцем через existing privacy workflow.
+
+## Очередь качества подборок Task 101
+
+Существующий full-page Livewire-раздел
+`/admin/catalog?section=collections` остаётся единственной административной
+поверхностью. Его URL-backed quality filter принимает только allowlisted
+значения: `all`, `low_score`, `duplicate`, `similar`, `template`, `theme`,
+`structure`, `reported`, `stale` и `unassessed`. Общая очередь сохраняет
+прежние pending/report/editorial candidates; специализированный quality
+filter дополнительно находит user/system rows с соответствующим evidence.
+
+Каждая строка показывает только current score либо честное состояние
+«требуется пересчёт», четыре компонента `metadata/structure/theme/trust`,
+агрегаты сохранений, досмотров, возвратов и жалоб, stable issue codes и
+связанную duplicate collection. Данные подготавливает Livewire/query
+boundary; Blade не выполняет запросов. Verification/unverification повторно
+авторизуется через `collections.moderate`, блокирует текущую запись, требует
+`editorial + public + approved`, current score не ниже minimum и фиксирует
+точную `content_version` через `AdminAuditRecorder`. Изменение состава
+автоматически делает badge недействительным.
+
+Quality refresh выполняется оператором через
+`php artisan catalog-collections:quality-refresh`; default режим ограничен
+dirty/stale batch, `--all` остаётся chunked, а `--dry-run` не создаёт run,
+issues или score writes. Автоматический similarity detector только ставит
+очередь на проверку: broad delete, merge по похожему тексту и массовая
+публикация запрещены.

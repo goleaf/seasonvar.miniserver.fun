@@ -721,3 +721,31 @@ writers: сначала откатывается отдельный merge index,
 её `down()` удалит onboarding relations и preference columns, то есть приватные
 выбранные вкусы будут потеряны. Queue, importer, provider, storage, service
 worker и external credentials этой функцией не изменяются.
+
+## Rollout качества подборок Task 101
+
+До выпуска сохранить штатный backup SQLite, проверить свободное место,
+`php artisan migrate:status`, отсутствие длительного writer/importer и
+работоспособность rollback-копии приложения. Migration
+`2026_07_26_095636_create_catalog_collection_quality_system.php` additive:
+она добавляет nullable derived columns и две пустые таблицы без backfill,
+удаления или внешнего HTTP.
+
+Порядок выпуска: развернуть совместимый PHP/Vite код, выполнить
+`php artisan migrate --force`, затем запустить
+`php artisan catalog-collections:quality-refresh --dry-run --limit=50`.
+После проверки counters выполнить такой же bounded canary с записью,
+подтвердить admin quality filters, public hiding, score/reason badges и
+scheduler. Полный пересчёт остаётся chunked operator action
+`catalog-collections:quality-refresh --all`; cache-wide flush и queue clear
+не требуются.
+
+Partial migration fail-closed: quality write/read gate открывается только
+после появления последней таблицы migration. Failed provider отсутствует,
+поскольку refresh не делает network calls; failed chunk сохраняет bounded
+run error и может быть повторён идемпотентно. Application rollback сначала
+возвращает PHP/assets и сохраняет additive columns/tables. `migrate:rollback`
+после накопления scores/issues удалит только derived evidence, но допустим
+лишь после backup и остановки writers. Public legacy rows без current score
+не следует повторно открывать вручную; безопасное восстановление — исправить
+данные и повторить bounded assessment.

@@ -67,14 +67,29 @@
         <x-form.status-message :message="$notice" />
     @endif
 
-    <div wire:loading.delay wire:target="moderate,feature,resolveReports" role="status" aria-live="polite">
+    <div wire:loading.delay wire:target="moderate,feature,verifyQuality,resolveReports" role="status" aria-live="polite">
         <div class="flex items-center gap-2 rounded-control bg-sky-50 px-4 py-3 text-sm font-bold text-sky-700">
             <x-ui.icon name="fa-solid fa-spinner fa-spin" />{{ __('collections.page.loading') }}
         </div>
     </div>
 
     <x-ui.panel :title="__('collections.directory.search_label')" icon="fa-solid fa-magnifying-glass">
-        <x-form.field :label="__('collections.directory.search_label')" for="collection-admin-search" :placeholder="__('collections.directory.search_placeholder')" wire:model.live.debounce.400ms="search" />
+        <div @class([
+            'grid gap-4',
+            'md:grid-cols-[minmax(0,1fr)_minmax(14rem,20rem)]' => $qualityAvailable,
+        ])>
+            <x-form.field :label="__('collections.directory.search_label')" for="collection-admin-search" :placeholder="__('collections.directory.search_placeholder')" wire:model.live.debounce.400ms="search" />
+            @if ($qualityAvailable)
+            <div>
+                <label for="collection-quality-filter" class="block text-sm font-bold text-slate-700">{{ __('collections.admin.quality_filter') }}</label>
+                <select id="collection-quality-filter" wire:model.live="qualityFilter" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100">
+                    @foreach ($qualityFilterOptions as $value => $label)
+                        <option value="{{ $value }}">{{ $label }}</option>
+                    @endforeach
+                </select>
+            </div>
+            @endif
+        </div>
     </x-ui.panel>
 
     @island(name: 'collection-administration-pagination', always: true, with: $this->paginationIslandPage)
@@ -104,6 +119,46 @@
                                 <span>{{ $collection->presentation_items_label }}</span>
                                 <span>{{ $collection->presentation_open_reports_label }}</span>
                             </div>
+                            @if ($qualityAvailable)
+                            <div data-collection-quality-score="{{ $collection->public_id }}" class="mt-3 rounded-control border border-slate-200 bg-slate-50 px-3 py-3">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <span class="text-sm font-black text-slate-800">{{ $collection->presentation_quality_label }}</span>
+                                    @if ($collection->presentation_quality_verified)
+                                        <x-ui.status-pill variant="success" icon="fa-solid fa-shield-halved">{{ __('collections.admin.quality_verified') }}</x-ui.status-pill>
+                                    @endif
+                                </div>
+                                @if ($collection->presentation_quality_issues !== [])
+                                    <p class="mt-2 text-xs font-bold text-slate-700">{{ __('collections.admin.quality_issues_title') }}</p>
+                                    <ul class="mt-1 space-y-1 text-xs leading-5 text-slate-600">
+                                        @foreach ($collection->presentation_quality_issues as $issue)
+                                            <li class="flex items-start gap-2"><x-ui.icon name="fa-solid fa-triangle-exclamation" align="start" class="shrink-0 text-amber-700" /><span>{{ $issue }}</span></li>
+                                        @endforeach
+                                    </ul>
+                                @endif
+                                @if ($collection->presentation_quality_components !== [])
+                                    <p class="mt-3 text-xs font-bold text-slate-700">{{ __('collections.admin.quality_components_title') }}</p>
+                                    <dl data-collection-quality-components="{{ $collection->public_id }}" class="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                                        @foreach ($collection->presentation_quality_components as $component)
+                                            <div class="rounded-control bg-white px-2.5 py-2">
+                                                <dt class="text-xs font-semibold text-slate-500">{{ $component['label'] }}</dt>
+                                                <dd class="mt-1 text-sm font-black text-slate-800">{{ $component['value'] }}</dd>
+                                            </div>
+                                        @endforeach
+                                    </dl>
+                                @endif
+                                @if ($collection->presentation_quality_signals !== [])
+                                    <p class="mt-3 text-xs font-bold text-slate-700">{{ __('collections.admin.quality_signals_title') }}</p>
+                                    <dl data-collection-quality-signals="{{ $collection->public_id }}" class="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                                        @foreach ($collection->presentation_quality_signals as $signal)
+                                            <div class="rounded-control bg-white px-2.5 py-2">
+                                                <dt class="text-xs font-semibold text-slate-500">{{ $signal['label'] }}</dt>
+                                                <dd class="mt-1 text-sm font-black text-slate-800">{{ $signal['value'] }}</dd>
+                                            </div>
+                                        @endforeach
+                                    </dl>
+                                @endif
+                            </div>
+                            @endif
                         </div>
                         @unless ($collection->presentation_deleted)
                             <a href="{{ route('collections.show', ['collectionSlug' => $collection->slug]) }}" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-slate-100 px-3 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-200"><x-ui.icon name="fa-solid fa-eye" />{{ __('collections.admin.review') }}</a>
@@ -154,6 +209,9 @@
                             <button type="button" wire:click="moderate('{{ $collection->public_id }}', 'archived')" wire:loading.attr="disabled" class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-control bg-slate-100 px-3 text-sm font-bold text-slate-700 hover:bg-slate-200 sm:flex-none"><x-ui.icon name="fa-solid fa-box-archive" />{{ __('collections.admin.archive') }}</button>
                             @if ($collection->presentation_can_feature)
                                 <button type="button" data-collection-feature-action="{{ $collection->public_id }}" wire:click="feature('{{ $collection->public_id }}', {{ $collection->presentation_feature_next }})" wire:loading.attr="disabled" class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-control bg-amber-50 px-3 text-sm font-bold text-amber-800 hover:bg-amber-100 sm:flex-none"><x-ui.icon name="fa-solid fa-star" />{{ $collection->presentation_feature_label }}</button>
+                            @endif
+                            @if ($collection->presentation_can_verify_quality)
+                                <button type="button" data-collection-quality-verification="{{ $collection->public_id }}" wire:click="verifyQuality('{{ $collection->public_id }}', {{ $collection->presentation_quality_verification_next }})" wire:loading.attr="disabled" class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-control bg-sky-50 px-3 text-sm font-bold text-sky-700 hover:bg-sky-100 sm:flex-none"><x-ui.icon name="fa-solid fa-shield-halved" />{{ $collection->presentation_quality_verification_label }}</button>
                             @endif
                         @endunless
                         @if ($collection->presentation_has_open_reports)

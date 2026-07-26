@@ -514,3 +514,20 @@ Full-page `CatalogSeries` остаётся владельцем поиска, ф
 JavaScript. Filter apply/cancel, sort, alphabet, view и page size используют
 существующие Livewire loading targets, не допускают двойного submit и не
 добавляют frontend dependency.
+
+## Frontend lifecycle качества подборок Task 101
+
+Public card и detail получают готовый current score из
+`CatalogCollectionCardViewModel`/Livewire и показывают локализованный badge
+`Качество N/100`. Stale или never-assessed значение не выводится как
+достоверное. Source-managed manual и private smart collection используют
+один truthful badge «Динамическая подборка»; «Проверено редакцией»
+отображается только при совпадении verified и current content version.
+
+Каждый materialized item может показать `theme_match_percent` и одну короткую
+локализованную причину из stable enum. Длинный generated marketing copy в DB
+и Blade отсутствует. Текст экранируется, badges переносятся на узком экране,
+кнопки модерации сохраняют существующие 44px target/loading/error/disabled
+состояния. Browser не вычисляет score, match, duplicate или verification и
+не передаёт их обратно как trusted state; дополнительных JavaScript package,
+route или client store нет.

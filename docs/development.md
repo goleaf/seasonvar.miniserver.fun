@@ -324,3 +324,26 @@ Pest и `npm run lint` сейчас не установлены. Rector 2 исп
 Полные help articles редактируются в canonical DB/admin boundary, а не в Blade/PHP translation. Initial immutable corpus меняют только до первого production rollout; после него используется новая revision через `/admin/help`. Interface key добавляется синхронно в `lang/ru/help.php` и `lang/en/help.php` с parity placeholders.
 
 Перед завершением проверьте enum/category/route allowlists, sanitizer/link validation, draft/internal exclusion, locale fallback, cache/SEO/sitemap и Task 19/20 links по [`help-center.md`](help-center.md). Новую очередь, cron, external search/CMS или article media package без отдельного решения не добавлять.
+
+### Изменение качества подборок
+
+Для безопасной диагностики сначала используйте:
+
+```bash
+php artisan catalog-collections:quality-refresh --dry-run --limit=50
+```
+
+Запись ограниченного batch выполняется той же командой без `--dry-run`;
+`--all` предназначен только для контролируемого chunked operator run.
+Канонические focused проверки:
+
+```bash
+php artisan test --filter=CatalogCollectionQuality
+php artisan test --filter=RefreshCatalogCollectionQualityCommandTest
+php artisan test --filter=CatalogCollection
+```
+
+После PHP-правок запускайте Pint только по task scope, затем scoped Larastan,
+fresh/rollback migration, `EXPLAIN QUERY PLAN`, полный PHPUnit, Vite и
+Playwright public/admin collection flow. Тестовые engagement rows не должны
+обращаться к внешнему HTTP или раскрывать individual user evidence.

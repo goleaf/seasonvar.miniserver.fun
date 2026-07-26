@@ -14,6 +14,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $catalog_title_id
  * @property int|null $added_by_id
  * @property int $position
+ * @property int|null $theme_match_percent
+ * @property string|null $inclusion_reason_code
+ * @property int|null $quality_content_version
  * @property-read int $aggregate
  * @property-read int $maximum_position
  */
@@ -52,6 +55,10 @@ final class CatalogCollectionItem extends Model
     /** @return array<string, string> */
     protected function casts(): array
     {
-        return ['position' => 'integer'];
+        return [
+            'position' => 'integer',
+            'theme_match_percent' => 'integer',
+            'quality_content_version' => 'integer',
+        ];
     }
 }

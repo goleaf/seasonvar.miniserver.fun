@@ -7,6 +7,7 @@ namespace App\Services\Collections;
 use App\DTOs\CatalogCollectionItemCriteria;
 use App\Enums\CatalogCollectionMode;
 use App\Enums\CatalogCollectionModerationStatus;
+use App\Enums\CatalogCollectionQualityIssueStatus;
 use App\Enums\CatalogCollectionReportStatus;
 use App\Enums\CatalogCollectionSort;
 use App\Enums\CatalogCollectionSourceScope;
@@ -38,6 +39,16 @@ use Illuminate\Support\Str;
 
 final class CatalogCollectionQuery
 {
+    /** @var array<string, list<string>> */
+    private const QUALITY_ISSUE_FILTER_CODES = [
+        'duplicate' => ['exact_duplicate'],
+        'similar' => ['similar_text'],
+        'template' => ['template_content'],
+        'theme' => ['weak_theme'],
+        'structure' => ['missing_category', 'empty_collection', 'too_many_items'],
+        'reported' => ['user_reports'],
+    ];
+
     private const SOURCE_MATCH_METHOD_METRIC_KEYS = [
         'matched:primary' => 'matched_primary',
         'matched:original' => 'matched_original',
@@ -358,6 +369,19 @@ final class CatalogCollectionQuery
                     'collection_position' => 'integer',
                     'collection_added_at' => 'immutable_datetime',
                 ]);
+
+            if ($this->schema->qualityAvailable()) {
+                $query
+                    ->addSelect([
+                        'collection_item.theme_match_percent as collection_theme_match_percent',
+                        'collection_item.inclusion_reason_code as collection_inclusion_reason_code',
+                        'collection_item.quality_content_version as collection_quality_content_version',
+                    ])
+                    ->withCasts([
+                        'collection_theme_match_percent' => 'integer',
+                        'collection_quality_content_version' => 'integer',
+                    ]);
+            }
         }
 
         $query
@@ -416,6 +440,18 @@ final class CatalogCollectionQuery
         };
 
         $paginator = $query->paginate(max(6, min(48, $criteria->perPage)), pageName: $pageName);
+
+        if ($collection->isSmart()) {
+            $paginator->getCollection()->each(function (CatalogTitle $title) use ($collection): void {
+                $title->setAttribute('collection_theme_match_percent', 100);
+                $title->setAttribute('collection_inclusion_reason_code', 'smart_rule');
+                $title->setAttribute(
+                    'collection_quality_content_version',
+                    $collection->content_version,
+                );
+            });
+        }
+
         $this->cardStates->load(collect($paginator->items()), $viewer);
 
         return $paginator;
@@ -492,8 +528,11 @@ final class CatalogCollectionQuery
     }
 
     /** @return LengthAwarePaginator<int, CatalogCollection> */
-    public function moderationQueue(string $search = '', int $perPage = 20): LengthAwarePaginator
-    {
+    public function moderationQueue(
+        string $search = '',
+        string $qualityFilter = 'all',
+        int $perPage = 20,
+    ): LengthAwarePaginator {
         $perPage = max(10, min(50, $perPage));
 
         if (! $this->schema->available()) {
@@ -501,27 +540,126 @@ final class CatalogCollectionQuery
         }
 
         $search = $this->search->display(mb_substr($search, 0, 100));
+        $qualityAvailable = $this->schema->qualityAvailable();
+        $qualityFilter = in_array($qualityFilter, [
+            'all',
+            'critical',
+            'warning',
+            'low',
+            'stale',
+            'unassessed',
+            'verified',
+            ...array_keys(self::QUALITY_ISSUE_FILTER_CODES),
+        ], true) && $qualityAvailable ? $qualityFilter : 'all';
 
-        return $this->summaryQuery()
+        $query = $this->summaryQuery()
             ->withTrashed()
             ->withCount(['reports as open_reports_count' => fn (Builder $query): Builder => $query->where('status', CatalogCollectionReportStatus::Open->value)])
             ->when($search !== '', fn (Builder $query): Builder => $query->where(function (Builder $query) use ($search): void {
                 $query->where('name', 'like', '%'.$search.'%')
                     ->orWhere('slug', 'like', $search.'%');
             }))
-            ->where(function (Builder $query): void {
-                $query->where('moderation_status', CatalogCollectionModerationStatus::Pending->value)
-                    ->orWhereHas('reports', fn (Builder $query): Builder => $query->where('status', CatalogCollectionReportStatus::Open->value))
-                    ->orWhere(fn (Builder $query): Builder => $query
-                        ->where('type', CatalogCollectionType::Editorial->value)
-                        ->where('visibility', CatalogCollectionVisibility::Public->value)
-                        ->where('moderation_status', CatalogCollectionModerationStatus::Approved->value)
-                        ->whereNull('catalog_collections.deleted_at'));
-            })
+            ->when($qualityFilter === 'all', fn (Builder $query): Builder => $query
+                ->where(function (Builder $queue) use ($qualityAvailable): void {
+                    $queue
+                        ->where('moderation_status', CatalogCollectionModerationStatus::Pending->value)
+                        ->orWhereHas('reports', fn (Builder $reports): Builder => $reports
+                            ->where('status', CatalogCollectionReportStatus::Open->value))
+                        ->orWhere(fn (Builder $editorial): Builder => $editorial
+                            ->where('type', CatalogCollectionType::Editorial->value)
+                            ->where('visibility', CatalogCollectionVisibility::Public->value)
+                            ->where('moderation_status', CatalogCollectionModerationStatus::Approved->value)
+                            ->whereNull('catalog_collections.deleted_at'));
+
+                    if ($qualityAvailable) {
+                        $queue->orWhereHas('qualityIssues', fn (Builder $issues): Builder => $issues
+                            ->where('status', CatalogCollectionQualityIssueStatus::Open->value));
+                    }
+                }))
+            ->when(
+                in_array($qualityFilter, ['critical', 'warning'], true),
+                fn (Builder $query): Builder => $query->whereHas(
+                    'qualityIssues',
+                    fn (Builder $issues): Builder => $issues
+                        ->where('status', CatalogCollectionQualityIssueStatus::Open->value)
+                        ->where('severity', $qualityFilter),
+                ),
+            )
+            ->when($qualityFilter === 'low', fn (Builder $query): Builder => $query
+                ->whereColumn('quality_content_version', 'content_version')
+                ->where(
+                    'quality_score',
+                    '<',
+                    min(100, max(0, (int) config(
+                        'catalog-collections.quality.minimum_public_score',
+                        60,
+                    ))),
+                ))
+            ->when($qualityFilter === 'stale', fn (Builder $query): Builder => $query
+                ->where(function (Builder $assessed): void {
+                    $assessed
+                        ->whereNotNull('quality_score')
+                        ->orWhereNotNull('quality_content_version')
+                        ->orWhereNotNull('quality_evaluated_at');
+                })
+                ->where(function (Builder $quality): void {
+                    $quality
+                        ->whereNull('quality_score')
+                        ->orWhereNull('quality_content_version')
+                        ->orWhereNull('quality_evaluated_at')
+                        ->orWhereColumn('quality_content_version', '!=', 'content_version')
+                        ->orWhere(
+                            'quality_evaluated_at',
+                            '<',
+                            now()->subDays(max(
+                                1,
+                                (int) config(
+                                    'catalog-collections.quality.stale_after_days',
+                                    14,
+                                ),
+                            )),
+                        );
+                }))
+            ->when($qualityFilter === 'unassessed', fn (Builder $query): Builder => $query
+                ->whereNull('quality_score')
+                ->whereNull('quality_content_version')
+                ->whereNull('quality_evaluated_at'))
+            ->when($qualityFilter === 'verified', fn (Builder $query): Builder => $query
+                ->whereNotNull('editorially_verified_at')
+                ->whereColumn('editorially_verified_content_version', 'content_version'))
+            ->when(
+                isset(self::QUALITY_ISSUE_FILTER_CODES[$qualityFilter]),
+                fn (Builder $query): Builder => $query->whereHas(
+                    'qualityIssues',
+                    fn (Builder $issues): Builder => $issues
+                        ->where('status', CatalogCollectionQualityIssueStatus::Open->value)
+                        ->whereIn(
+                            'code',
+                            self::QUALITY_ISSUE_FILTER_CODES[$qualityFilter],
+                        ),
+                ),
+            )
             ->orderByRaw('CASE WHEN moderation_status = ? THEN 0 ELSE 1 END', [CatalogCollectionModerationStatus::Pending->value])
             ->orderByDesc('updated_at')
-            ->orderByDesc('id')
-            ->paginate($perPage, pageName: 'collectionAdminPage');
+            ->orderByDesc('id');
+
+        if ($qualityAvailable) {
+            $query->with(['qualityIssues' => fn ($issues) => $issues
+                ->select(['id', 'catalog_collection_id', 'code'])
+                ->where('status', CatalogCollectionQualityIssueStatus::Open->value)
+                ->orderBy('id')]);
+        }
+
+        $paginator = $query->paginate($perPage, pageName: 'collectionAdminPage');
+
+        if (! $qualityAvailable) {
+            $paginator->getCollection()->each(
+                fn (CatalogCollection $collection): CatalogCollection => $collection
+                    ->setRelation('qualityIssues', new EloquentCollection),
+            );
+        }
+
+        return $paginator;
     }
 
     /**

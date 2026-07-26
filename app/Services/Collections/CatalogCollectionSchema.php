@@ -23,6 +23,13 @@ final class CatalogCollectionSchema
 
     private ?bool $sourceSyncAvailable = null;
 
+    private ?bool $qualityAvailable = null;
+
+    /** @var list<string>|null */
+    private ?array $tables = null;
+
+    private bool $tablesResolved = false;
+
     public function available(): bool
     {
         $configured = config('catalog-collections.schema_available');
@@ -36,9 +43,10 @@ final class CatalogCollectionSchema
         }
 
         try {
-            $tables = Schema::getTableListing(schemaQualified: false);
+            $tables = $this->tables();
 
-            return $this->available = array_diff(self::REQUIRED_TABLES, $tables) === []
+            return $this->available = $tables !== null
+                && array_diff(self::REQUIRED_TABLES, $tables) === []
                 && Schema::hasColumn('users', 'public_id')
                 && Schema::hasColumns('catalog_collections', [
                     'mode',
@@ -63,10 +71,49 @@ final class CatalogCollectionSchema
         }
 
         try {
-            return $this->sourceSyncAvailable = Schema::hasTable('catalog_collection_sync_runs')
-                && Schema::hasTable('catalog_collection_sources');
+            $tables = $this->tables();
+
+            return $this->sourceSyncAvailable = $tables !== null
+                && array_diff([
+                    'catalog_collection_sync_runs',
+                    'catalog_collection_sources',
+                ], $tables) === [];
         } catch (Throwable) {
             return $this->sourceSyncAvailable = false;
+        }
+    }
+
+    public function qualityAvailable(): bool
+    {
+        if ($this->qualityAvailable !== null) {
+            return $this->qualityAvailable;
+        }
+
+        try {
+            $tables = $this->tables();
+
+            // The issues table is created last by the additive migration and
+            // dropped first on rollback, so it is the rolling-deploy marker.
+            return $this->qualityAvailable = $tables !== null
+                && in_array('catalog_collection_quality_issues', $tables, true);
+        } catch (Throwable) {
+            return $this->qualityAvailable = false;
+        }
+    }
+
+    /** @return list<string>|null */
+    private function tables(): ?array
+    {
+        if ($this->tablesResolved) {
+            return $this->tables;
+        }
+
+        $this->tablesResolved = true;
+
+        try {
+            return $this->tables = Schema::getTableListing(schemaQualified: false);
+        } catch (Throwable) {
+            return $this->tables = null;
         }
     }
 }

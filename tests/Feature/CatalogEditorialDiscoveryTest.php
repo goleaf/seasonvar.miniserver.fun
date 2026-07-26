@@ -93,7 +93,12 @@ final class CatalogEditorialDiscoveryTest extends TestCase
             'content_version' => 1,
             'published_at' => $publishedAt,
         ]);
-        $collection->forceFill(['updated_at' => $publishedAt])->saveQuietly();
+        $collection->forceFill([
+            'quality_score' => 80,
+            'quality_content_version' => $collection->content_version,
+            'quality_evaluated_at' => now(),
+            'updated_at' => $publishedAt,
+        ])->saveQuietly();
 
         return $collection;
     }

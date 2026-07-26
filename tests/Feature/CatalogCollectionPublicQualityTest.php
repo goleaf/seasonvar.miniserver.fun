@@ -13,6 +13,7 @@ use App\Models\CatalogCollection;
 use App\Models\CatalogCollectionCategory;
 use App\Models\CatalogCollectionItem;
 use App\Models\CatalogTitle;
+use App\Models\LicensedMedia;
 use App\Models\User;
 use App\Services\Collections\CatalogCollectionItemService;
 use App\Services\Collections\CatalogCollectionModerationService;
@@ -133,7 +134,13 @@ final class CatalogCollectionPublicQualityTest extends TestCase
         );
         self::assertNull($collection->fresh()->published_at);
 
+        $collection->forceFill([
+            'description' => 'Содержательное описание тематической подборки перед публикацией.',
+        ])->save();
         $this->attachTitles($collection, 1);
+        $collection->forceFill([
+            'content_version' => $collection->content_version + 1,
+        ])->save();
         $approved = $service->moderate(
             $admin,
             $collection->fresh(),
@@ -250,6 +257,10 @@ final class CatalogCollectionPublicQualityTest extends TestCase
     {
         CatalogTitle::factory()->count($count)->create()->each(
             function (CatalogTitle $title, int $index) use ($collection): void {
+                LicensedMedia::factory()->for($title)->create([
+                    'status' => 'published',
+                    'published_at' => now(),
+                ]);
                 CatalogCollectionItem::query()->create([
                     'catalog_collection_id' => $collection->id,
                     'catalog_title_id' => $title->id,

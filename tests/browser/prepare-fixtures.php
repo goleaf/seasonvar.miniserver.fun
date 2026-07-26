@@ -455,12 +455,36 @@ $collection = CatalogCollection::query()->create([
     'content_version' => 1,
     'published_at' => now()->subMinute(),
 ]);
-CatalogCollectionItem::query()->create([
+$collectionItem = CatalogCollectionItem::query()->create([
     'catalog_collection_id' => $collection->id,
     'catalog_title_id' => $title->id,
     'added_by_id' => $user->id,
     'position' => 1,
 ]);
+$collectionItem->forceFill([
+    'theme_match_percent' => 80,
+    'inclusion_reason_code' => 'title_theme',
+    'quality_content_version' => $collection->content_version,
+])->save();
+$collection->forceFill([
+    'quality_score' => 82,
+    'quality_content_version' => $collection->content_version,
+    'quality_evaluated_at' => now(),
+    'quality_details' => [
+        'components' => [
+            'metadata' => 22,
+            'structure' => 25,
+            'theme' => 23,
+            'trust' => 12,
+        ],
+        'engagement' => [
+            'saves' => 1,
+            'completions' => 0,
+            'returns' => 0,
+            'reports' => 0,
+        ],
+    ],
+])->save();
 
 $uncategorizedCollection = CatalogCollection::query()->create([
     'public_id' => (string) Str::uuid(),
@@ -541,6 +565,28 @@ $editorialTitles->take(11)->each(function (CatalogTitle $catalogTitle, int $inde
         'position' => $index + 1,
     ]);
 });
+$readyEditorialCollection->forceFill([
+    'quality_score' => 88,
+    'quality_content_version' => $readyEditorialCollection->content_version,
+    'quality_evaluated_at' => now(),
+    'quality_details' => [
+        'components' => [
+            'metadata' => 25,
+            'structure' => 25,
+            'theme' => 25,
+            'trust' => 13,
+        ],
+        'engagement' => [
+            'saves' => 1,
+            'completions' => 1,
+            'returns' => 1,
+            'reports' => 0,
+        ],
+    ],
+    'editorially_verified_at' => now(),
+    'editorially_verified_by_id' => $administrator->id,
+    'editorially_verified_content_version' => $readyEditorialCollection->content_version,
+])->save();
 
 UserAccountSetting::query()->create([
     'user_id' => $englishUser->id,

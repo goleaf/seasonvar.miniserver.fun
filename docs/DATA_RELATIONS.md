@@ -714,3 +714,27 @@ page-level presenter ограничен 50 title ID и не выполняет �
 Обе migrations additive и обратимы: сначала удаляются nullable run links,
 затем runs/versions/conflicts/observations; authoritative catalog, tag и
 quality rows при этом не меняются.
+
+## Качество и дедупликация подборок Task 101
+
+Migration
+`2026_07_26_095636_create_catalog_collection_quality_system.php` additive
+расширяет существующие ручные подборки, не меняя их identity, visibility,
+membership или source provenance.
+
+| Таблица / relation | Владелец и целостность |
+| --- | --- |
+| `catalog_collections` | Nullable `quality_score`, `quality_content_version`, `quality_evaluated_at`, `content_signature`, `normalized_text_hash`, bounded `quality_details` и versioned editorial verification. Derived поля не mass-assignable и не увеличивают `content_version`. |
+| `catalog_collection_items` | Nullable `theme_match_percent`, stable `inclusion_reason_code` и `quality_content_version`; значения действительны только для совпадающей версии подборки. |
+| `catalog_collection_quality_issues` | Collection FK cascade, nullable related collection FK `nullOnDelete`, stable code/severity/status, unique fingerprint, bounded JSON evidence. Fuzzy issue не удаляет и не объединяет подборку. |
+| `catalog_collection_quality_runs` | Bounded status/counters/timestamps и безопасное error summary без пользовательских ID, текстов, source URL или stack trace. |
+
+Индекс `catalog_collections_content_signature_idx` обслуживает exact
+duplicate lookup, `catalog_collections_quality_refresh_idx` — dirty/stale
+очередь, `catalog_collection_quality_issues_queue_idx` — административные
+фильтры. Отдельный public-quality индекс после `EXPLAIN QUERY PLAN` не
+добавлен: фактический public scope уже начинает план с существующего
+`catalog_collections_public_idx`, а лишний индекс увеличивал бы стоимость
+записи. `down()` сначала снимает verification FK/derived columns, затем
+удаляет quality tables; после накопления production evidence такой
+destructive rollback допустим только при остановленных writers и backup.

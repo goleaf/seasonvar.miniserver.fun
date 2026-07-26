@@ -19,7 +19,10 @@ final class CatalogCollectionPublicationReadiness
 
     public const SOURCE_REQUIRED_ITEMS = 4;
 
-    public function __construct(private readonly CatalogWatchableTitleQuery $watchableTitles) {}
+    public function __construct(
+        private readonly CatalogWatchableTitleQuery $watchableTitles,
+        private readonly CatalogCollectionSchema $schema,
+    ) {}
 
     /**
      * @return array{
@@ -62,6 +65,7 @@ final class CatalogCollectionPublicationReadiness
         $metricsById = $this->metricsQuery($ids)
             ->get()
             ->keyBy(static fn (object $row): int => (int) $row->collection_id);
+        $qualityAvailable = $this->schema->qualityAvailable();
         $results = [];
 
         foreach ($collectionById as $id => $collection) {
@@ -74,6 +78,25 @@ final class CatalogCollectionPublicationReadiness
             $totalItems = $collectionMissing ? 0 : (int) $metrics->total_items;
             $visibleItems = $collectionMissing ? 0 : (int) $metrics->visible_items;
             $unavailableItems = max(0, $totalItems - $visibleItems);
+            $qualityScore = ! $qualityAvailable
+                || $collectionMissing
+                || $metrics->quality_score === null
+                ? null
+                : (int) $metrics->quality_score;
+            $qualityContentVersion = ! $qualityAvailable
+                || $collectionMissing
+                || $metrics->quality_content_version === null
+                ? null
+                : (int) $metrics->quality_content_version;
+            $qualityEvaluatedAt = ! $qualityAvailable || $collectionMissing
+                ? null
+                : $metrics->quality_evaluated_at;
+            $contentVersion = ! $qualityAvailable || $collectionMissing
+                ? null
+                : (int) $metrics->content_version;
+            $qualityWasAssessed = $qualityScore !== null
+                || $qualityContentVersion !== null
+                || $qualityEvaluatedAt !== null;
             $requiredItems = $sourceManaged
                 ? self::SOURCE_REQUIRED_ITEMS
                 : self::LOCAL_REQUIRED_ITEMS;
@@ -105,6 +128,20 @@ final class CatalogCollectionPublicationReadiness
                 $reasonCodes[] = CatalogCollectionReadinessReason::UnavailableItems->value;
             }
 
+            if ($qualityWasAssessed && (
+                $qualityScore === null
+                || $qualityContentVersion === null
+                || $qualityContentVersion !== $contentVersion
+                || $qualityEvaluatedAt === null
+                || $qualityEvaluatedAt < now()
+                    ->subDays($this->qualityStaleAfterDays())
+                    ->toDateTimeString()
+            )) {
+                $reasonCodes[] = CatalogCollectionReadinessReason::StaleQuality->value;
+            } elseif ($qualityScore !== null && $qualityScore < $this->minimumPublicScore()) {
+                $reasonCodes[] = CatalogCollectionReadinessReason::LowQuality->value;
+            }
+
             $results[(int) $id] = [
                 'ready' => $reasonCodes === [],
                 'visible_items' => $visibleItems,
@@ -121,7 +158,7 @@ final class CatalogCollectionPublicationReadiness
 
     public function eligibleFeaturedCollectionIds(): Builder
     {
-        return $this->baseQuery()
+        $query = $this->baseQuery()
             ->select('readiness_collections.id')
             ->where('readiness_collections.type', CatalogCollectionType::Editorial->value)
             ->where('readiness_collections.visibility', CatalogCollectionVisibility::Public->value)
@@ -141,6 +178,26 @@ final class CatalogCollectionPublicationReadiness
                 'COUNT(readiness_titles.id) >= CASE WHEN MAX(CASE WHEN readiness_sources.id IS NULL THEN 0 ELSE 1 END) = 1 THEN ? ELSE ? END',
                 [self::SOURCE_REQUIRED_ITEMS, self::LOCAL_REQUIRED_ITEMS],
             );
+
+        if ($this->schema->qualityAvailable()) {
+            $query
+                ->whereColumn(
+                    'readiness_collections.quality_content_version',
+                    'readiness_collections.content_version',
+                )
+                ->where(
+                    'readiness_collections.quality_score',
+                    '>=',
+                    $this->minimumPublicScore(),
+                )
+                ->where(
+                    'readiness_collections.quality_evaluated_at',
+                    '>=',
+                    now()->subDays($this->qualityStaleAfterDays()),
+                );
+        }
+
+        return $query;
     }
 
     /**
@@ -148,7 +205,7 @@ final class CatalogCollectionPublicationReadiness
      */
     private function metricsQuery(array $ids): Builder
     {
-        return $this->baseQuery()
+        $query = $this->baseQuery()
             ->selectRaw('readiness_collections.id as collection_id')
             ->selectRaw('COUNT(readiness_items.id) as total_items')
             ->selectRaw('COUNT(readiness_titles.id) as visible_items')
@@ -166,6 +223,20 @@ final class CatalogCollectionPublicationReadiness
             )
             ->whereIn('readiness_collections.id', $ids)
             ->groupBy('readiness_collections.id');
+
+        if ($this->schema->qualityAvailable()) {
+            $query
+                ->selectRaw('MAX(readiness_collections.content_version) as content_version')
+                ->selectRaw('MAX(readiness_collections.quality_score) as quality_score')
+                ->selectRaw(
+                    'MAX(readiness_collections.quality_content_version) as quality_content_version',
+                )
+                ->selectRaw(
+                    'MAX(readiness_collections.quality_evaluated_at) as quality_evaluated_at',
+                );
+        }
+
+        return $query;
     }
 
     private function baseQuery(): Builder
@@ -241,6 +312,25 @@ final class CatalogCollectionPublicationReadiness
         return max(
             1,
             (int) config('catalog-collections.maximum_public_items_per_collection', 500),
+        );
+    }
+
+    private function minimumPublicScore(): int
+    {
+        return min(
+            100,
+            max(
+                0,
+                (int) config('catalog-collections.quality.minimum_public_score', 60),
+            ),
+        );
+    }
+
+    private function qualityStaleAfterDays(): int
+    {
+        return max(
+            1,
+            (int) config('catalog-collections.quality.stale_after_days', 14),
         );
     }
 }

@@ -17,6 +17,8 @@ enum CatalogCollectionReadinessReason: string
     case TooManyItems = 'too_many_items';
     case InsufficientVisibleItems = 'insufficient_visible_items';
     case UnavailableItems = 'unavailable_items';
+    case StaleQuality = 'stale_quality';
+    case LowQuality = 'low_quality';
 
     public function label(): string
     {

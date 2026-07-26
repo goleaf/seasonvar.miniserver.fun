@@ -90,6 +90,7 @@ final class AdminAuditRecorder
         'relations.translation',
         'moderation_status',
         'is_featured',
+        'editorially_verified_at',
         'report_status',
         'code',
         'visibility',

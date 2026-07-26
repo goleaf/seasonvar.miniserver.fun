@@ -263,6 +263,7 @@ return [
             'media_archived' => 'Source archived',
             'collection_moderated' => 'Collection moderated',
             'collection_featured' => 'Collection feature state changed',
+            'collection_quality_verified' => 'Collection quality verification changed',
             'collection_report_resolved' => 'Collection report resolved',
             'collection_category_created' => 'Collection category created',
             'collection_category_updated' => 'Collection category updated',

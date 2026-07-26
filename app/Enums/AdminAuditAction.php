@@ -30,6 +30,7 @@ enum AdminAuditAction: string
     case MediaArchived = 'media.archived';
     case CollectionModerated = 'collection.moderated';
     case CollectionFeatured = 'collection.featured';
+    case CollectionQualityVerified = 'collection.quality_verified';
     case CollectionReportResolved = 'collection.report_resolved';
     case CollectionCategoryCreated = 'collection_category.created';
     case CollectionCategoryUpdated = 'collection_category.updated';

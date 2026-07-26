@@ -9,9 +9,11 @@ use App\Enums\CatalogCollectionModerationStatus;
 use App\Enums\CatalogCollectionReportStatus;
 use App\Enums\CatalogCollectionVisibility;
 use App\Models\CatalogCollection;
+use App\Models\CatalogCollectionItem;
 use App\Models\CatalogCollectionReport;
 use App\Models\User;
 use App\Services\Admin\AdminAuditRecorder;
+use App\Services\Collections\Quality\CatalogCollectionQualityAssessor;
 use App\Support\UserPlainText;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -23,11 +25,23 @@ final class CatalogCollectionModerationService
         private readonly CatalogCollectionCacheInvalidator $cache,
         private readonly AdminAuditRecorder $audit,
         private readonly CatalogCollectionPublicationReadiness $readiness,
+        private readonly CatalogCollectionQualityAssessor $quality,
+        private readonly CatalogCollectionSchema $schema,
     ) {}
 
     public function moderate(User $actor, CatalogCollection $collection, CatalogCollectionModerationStatus $status): CatalogCollection
     {
         Gate::forUser($actor)->authorize('moderate', CatalogCollection::class);
+
+        if ($status === CatalogCollectionModerationStatus::Approved
+            && $collection->visibility === CatalogCollectionVisibility::Public) {
+            $this->ensureQualityAvailable();
+
+            if ($this->qualityNeedsRefresh($collection)) {
+                $this->quality->refreshCollection((int) $collection->id);
+            }
+        }
+
         $result = DB::transaction(function () use ($actor, $collection, $status): array {
             $locked = CatalogCollection::query()->withTrashed()->lockForUpdate()->findOrFail($collection->id);
             Gate::forUser($actor)->authorize('moderate', CatalogCollection::class);
@@ -48,6 +62,23 @@ final class CatalogCollectionModerationService
                             (int) config(
                                 'catalog-collections.maximum_public_items_per_collection',
                                 500,
+                            ),
+                        ),
+                    ])],
+                ]);
+            }
+
+            if ($shouldBePublished && ! $locked->meetsPublicQualityThreshold()) {
+                throw ValidationException::withMessages([
+                    'moderation' => [__('collections.errors.collection_quality_score_not_ready', [
+                        'score' => min(
+                            100,
+                            max(
+                                0,
+                                (int) config(
+                                    'catalog-collections.quality.minimum_public_score',
+                                    60,
+                                ),
                             ),
                         ),
                     ])],
@@ -76,12 +107,32 @@ final class CatalogCollectionModerationService
                 $changedFields = ['moderation_status'];
             }
 
+            $nextContentVersion = $locked->content_version + 1;
+            $carryCurrentQuality = $locked->hasCurrentQuality();
+            $carryEditorialVerification = $locked->editorially_verified_at !== null
+                && $locked->editorially_verified_content_version === $locked->content_version;
             $locked->forceFill([
                 'moderation_status' => $status,
                 'is_featured' => $featured,
                 'published_at' => $publishedAt,
-                'content_version' => $locked->content_version + 1,
+                'content_version' => $nextContentVersion,
+                ...$this->carriedQualityAttributes(
+                    $locked,
+                    $nextContentVersion,
+                    $carryCurrentQuality,
+                    $carryEditorialVerification,
+                ),
             ])->save();
+
+            if ($this->schema->qualityAvailable() && $carryCurrentQuality) {
+                CatalogCollectionItem::query()
+                    ->where('catalog_collection_id', $locked->id)
+                    ->where('quality_content_version', $nextContentVersion - 1)
+                    ->update([
+                        'quality_content_version' => $nextContentVersion,
+                        'updated_at' => now(),
+                    ]);
+            }
             $this->audit->record(
                 $actor,
                 AdminAuditAction::CollectionModerated,
@@ -105,6 +156,15 @@ final class CatalogCollectionModerationService
     public function feature(User $actor, CatalogCollection $collection, bool $featured): CatalogCollection
     {
         Gate::forUser($actor)->authorize('feature', $collection);
+
+        if ($featured) {
+            $this->ensureQualityAvailable();
+
+            if ($this->qualityNeedsRefresh($collection)) {
+                $this->quality->refreshCollection((int) $collection->id);
+            }
+        }
+
         $result = DB::transaction(function () use ($actor, $collection, $featured): array {
             $locked = CatalogCollection::query()->lockForUpdate()->findOrFail($collection->id);
             Gate::forUser($actor)->authorize('feature', $locked);
@@ -118,10 +178,30 @@ final class CatalogCollectionModerationService
             }
 
             $before = $this->fingerprint($locked);
+            $nextContentVersion = $locked->content_version + 1;
+            $carryCurrentQuality = $locked->hasCurrentQuality();
+            $carryEditorialVerification = $locked->editorially_verified_at !== null
+                && $locked->editorially_verified_content_version === $locked->content_version;
             $locked->forceFill([
                 'is_featured' => $featured,
-                'content_version' => $locked->content_version + 1,
+                'content_version' => $nextContentVersion,
+                ...$this->carriedQualityAttributes(
+                    $locked,
+                    $nextContentVersion,
+                    $carryCurrentQuality,
+                    $carryEditorialVerification,
+                ),
             ])->save();
+
+            if ($this->schema->qualityAvailable() && $carryCurrentQuality) {
+                CatalogCollectionItem::query()
+                    ->where('catalog_collection_id', $locked->id)
+                    ->where('quality_content_version', $nextContentVersion - 1)
+                    ->update([
+                        'quality_content_version' => $nextContentVersion,
+                        'updated_at' => now(),
+                    ]);
+            }
             $this->audit->record(
                 $actor,
                 AdminAuditAction::CollectionFeatured,
@@ -142,6 +222,66 @@ final class CatalogCollectionModerationService
         }
 
         return $collection->refresh();
+    }
+
+    public function verifyQuality(
+        User $actor,
+        CatalogCollection $collection,
+        bool $verified,
+    ): CatalogCollection {
+        Gate::forUser($actor)->authorize('feature', $collection);
+        $this->ensureQualityAvailable();
+
+        if ($verified && $this->qualityNeedsRefresh($collection)) {
+            $this->quality->refreshCollection((int) $collection->id);
+        }
+
+        $result = DB::transaction(function () use ($actor, $collection, $verified): array {
+            $locked = CatalogCollection::query()->lockForUpdate()->findOrFail($collection->id);
+            Gate::forUser($actor)->authorize('feature', $locked);
+            $currentlyVerified = $locked->editorially_verified_at !== null
+                && $locked->editorially_verified_content_version === $locked->content_version;
+
+            if ($verified && ! $locked->meetsPublicQualityThreshold()) {
+                throw ValidationException::withMessages([
+                    'quality' => [__('collections.errors.collection_quality_score_not_ready', [
+                        'score' => $this->minimumPublicQualityScore(),
+                    ])],
+                ]);
+            }
+
+            if ($currentlyVerified === $verified) {
+                return ['collection' => $locked, 'changed' => false];
+            }
+
+            $before = $this->fingerprint($locked);
+            $locked->forceFill([
+                'editorially_verified_at' => $verified ? now() : null,
+                'editorially_verified_by_id' => $verified ? $actor->id : null,
+                'editorially_verified_content_version' => $verified
+                    ? $locked->content_version
+                    : null,
+            ])->save();
+            $this->audit->record(
+                $actor,
+                AdminAuditAction::CollectionQualityVerified,
+                $locked,
+                $before,
+                $this->fingerprint($locked),
+                ['editorially_verified_at'],
+            );
+
+            return ['collection' => $locked, 'changed' => true];
+        }, attempts: 3);
+
+        /** @var CatalogCollection $verifiedCollection */
+        $verifiedCollection = $result['collection'];
+
+        if ($result['changed']) {
+            $this->quality->refreshCollection((int) $verifiedCollection->id);
+        }
+
+        return $verifiedCollection->refresh();
     }
 
     public function resolveReport(
@@ -196,7 +336,69 @@ final class CatalogCollectionModerationService
             'version' => $collection->content_version,
             'moderation' => $collection->moderation_status->value,
             'featured' => $collection->is_featured,
+            'editorially_verified_at' => $collection->editorially_verified_at?->toAtomString(),
+            'editorially_verified_content_version' => $collection->editorially_verified_content_version,
             'updated_at' => $collection->updated_at?->toAtomString(),
         ], JSON_THROW_ON_ERROR));
+    }
+
+    private function qualityNeedsRefresh(CatalogCollection $collection): bool
+    {
+        return ! $collection->hasCurrentQuality()
+            || $collection->quality_evaluated_at === null
+            || $collection->quality_evaluated_at->isBefore(
+                now()->subDays(max(
+                    1,
+                    (int) config('catalog-collections.quality.stale_after_days', 14),
+                )),
+            );
+    }
+
+    private function minimumPublicQualityScore(): int
+    {
+        return min(
+            100,
+            max(
+                0,
+                (int) config('catalog-collections.quality.minimum_public_score', 60),
+            ),
+        );
+    }
+
+    /**
+     * @return array{
+     *     quality_content_version?: int|null,
+     *     editorially_verified_content_version?: int|null
+     * }
+     */
+    private function carriedQualityAttributes(
+        CatalogCollection $collection,
+        int $nextContentVersion,
+        bool $carryCurrentQuality,
+        bool $carryEditorialVerification,
+    ): array {
+        if (! $this->schema->qualityAvailable()) {
+            return [];
+        }
+
+        return [
+            'quality_content_version' => $carryCurrentQuality
+                ? $nextContentVersion
+                : $collection->quality_content_version,
+            'editorially_verified_content_version' => $carryEditorialVerification
+                ? $nextContentVersion
+                : $collection->editorially_verified_content_version,
+        ];
+    }
+
+    private function ensureQualityAvailable(): void
+    {
+        if ($this->schema->qualityAvailable()) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'quality' => [__('collections.errors.quality_system_unavailable')],
+        ]);
     }
 }

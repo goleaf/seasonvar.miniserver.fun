@@ -13,6 +13,15 @@
                     @if ($isSmart)
                         <x-ui.status-pill variant="success" icon="fa-solid fa-wand-magic-sparkles">{{ __('collections.smart.badge') }}</x-ui.status-pill>
                     @endif
+                    @if ($isDynamic)
+                        <span data-collection-dynamic><x-ui.status-pill variant="muted" icon="fa-solid fa-arrows-rotate">{{ __('collections.quality.dynamic_badge') }}</x-ui.status-pill></span>
+                    @endif
+                    @if ($isEditoriallyVerified)
+                        <span data-collection-editorially-verified><x-ui.status-pill variant="success" icon="fa-solid fa-shield-halved">{{ __('collections.quality.editorially_verified') }}</x-ui.status-pill></span>
+                    @endif
+                    @if ($qualityScore !== null)
+                        <span data-collection-quality-score="{{ $qualityScore }}"><x-ui.status-pill variant="muted" icon="fa-solid fa-gauge-high">{{ __('collections.quality.score_badge', ['score' => $qualityScore]) }}</x-ui.status-pill></span>
+                    @endif
                     @if ($canManage)
                         <x-ui.status-pill variant="muted">{{ $collectionVisibilityLabel }}</x-ui.status-pill>
                         <x-ui.status-pill variant="muted">{{ $collectionModerationLabel }}</x-ui.status-pill>
@@ -147,6 +156,13 @@
                 @foreach ($items as $item)
                     <li wire:key="collection-item-{{ $item->collection_item_id }}" class="relative min-w-0">
                         <x-catalog.title-card :title="$item" layout="list" :show-description="false" readable />
+                        @if ($item->presentation_theme_match_percent !== null)
+                            <div data-collection-theme-match="{{ $item->presentation_theme_match_percent }}" class="relative z-20 mx-3 mb-3 rounded-control bg-emerald-50 px-3 py-2 text-xs font-semibold leading-5 text-emerald-900 sm:mx-4">
+                                <span class="font-black">{{ __('collections.quality.match_percent', ['percent' => $item->presentation_theme_match_percent]) }}</span>
+                                <span aria-hidden="true"> · </span>
+                                <span>{{ $item->presentation_inclusion_reason }}</span>
+                            </div>
+                        @endif
                         @if ($canManageItems)
                             <div class="relative z-20 flex justify-end border-t border-slate-100 px-3 pb-3 pt-2 sm:px-4">
                                 <button type="button" wire:click="removeItem({{ $item->id }})" wire:confirm="{{ __('collections.confirmations.remove_item') }}" wire:loading.attr="disabled" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-rose-50 px-3 text-sm font-bold text-rose-700 hover:bg-rose-100 sm:w-auto"><x-ui.icon name="fa-solid fa-xmark" />{{ __('collections.actions.remove') }}</button>

@@ -38,6 +38,15 @@ Schedule::command('catalog:quality-refresh --limit='.(int) config('catalog-quali
     ->withoutOverlapping(10)
     ->onOneServer();
 
+Schedule::command(
+    'catalog-collections:quality-refresh --limit='
+    .(int) config('catalog-collections.quality.refresh_batch_size', 50),
+)
+    ->everyTenMinutes()
+    ->name('catalog-collections-quality-refresh')
+    ->withoutOverlapping(10)
+    ->onOneServer();
+
 Schedule::command('catalog-collections:sync-hdrezka')
     ->dailyAt((string) config('catalog-collection-imports.hdrezka.schedule', '03:37'))
     ->name('hdrezka-editorial-collections-sync')

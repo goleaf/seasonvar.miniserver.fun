@@ -510,3 +510,20 @@ Server autocomplete продолжает использовать только p
 `sessionStorage` текущей вкладки с in-memory fallback. Они не отправляются в
 профиль, session Laravel, shared cache, логи или аналитику и удаляются
 явной кнопкой либо завершением browser session.
+
+## Инвалидация качества подборок Task 101
+
+Отдельный cache score не создаётся: источником истины являются versioned
+columns `catalog_collections` и `catalog_collection_items`. Асессор сравнивает
+старую и новую public eligibility и вызывает существующую
+`CatalogCacheInvalidator::collectionsChanged()` только для реально
+изменившихся подборок. Эта граница обновляет уже существующие generation
+domains collection directory/detail, homepage, sitemap, title detail,
+recommendations и API; user-specific engagement evidence в shared cache не
+попадает.
+
+Техническая запись нового score сохраняет прежний пользовательский
+`updated_at`, поэтому не создаёт ложную «недавно обновлённую» подборку и не
+зацикливает refresh. Неизменный повтор команды не bump-ит cache generation.
+После failed refresh прежний score остаётся version-checked, а stale public
+row закрывается canonical query без store-wide flush.

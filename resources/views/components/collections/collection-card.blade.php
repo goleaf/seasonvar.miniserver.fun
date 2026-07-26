@@ -21,6 +21,15 @@
             @if ($card->smart)
                 <x-ui.status-pill variant="success" icon="fa-solid fa-wand-magic-sparkles">{{ __('collections.smart.badge') }}</x-ui.status-pill>
             @endif
+            @if ($card->dynamic)
+                <x-ui.status-pill variant="muted" icon="fa-solid fa-arrows-rotate">{{ $card->dynamicLabel }}</x-ui.status-pill>
+            @endif
+            @if ($card->verified)
+                <x-ui.status-pill variant="success" icon="fa-solid fa-shield-halved">{{ $card->verifiedLabel }}</x-ui.status-pill>
+            @endif
+            @if ($card->qualityScore !== null)
+                <span data-collection-quality-score="{{ $card->qualityScore }}"><x-ui.status-pill variant="muted" icon="fa-solid fa-gauge-high">{{ $card->qualityScoreLabel }}</x-ui.status-pill></span>
+            @endif
             @if ($card->featured)
                 <x-ui.status-pill variant="warning">{{ $card->featuredLabel }}</x-ui.status-pill>
             @endif

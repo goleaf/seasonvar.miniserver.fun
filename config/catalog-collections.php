@@ -18,6 +18,13 @@ return [
     'maximum_public_items_per_collection' => 500,
     'maximum_collections_per_user' => 100,
     'maximum_reorder_items' => 500,
+    'quality' => [
+        'minimum_public_score' => 60,
+        'refresh_batch_size' => 50,
+        'stale_after_days' => 14,
+        'similarity_threshold' => 0.80,
+        'template_repetition_threshold' => 3,
+    ],
     'supported_locales' => ['ru', 'en'],
     'default_locale' => 'ru',
     'rate_limits' => [

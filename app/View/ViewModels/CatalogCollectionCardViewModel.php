@@ -36,6 +36,14 @@ final readonly class CatalogCollectionCardViewModel
 
     public bool $smart;
 
+    public bool $dynamic;
+
+    public bool $verified;
+
+    public ?int $qualityScore;
+
+    public ?string $qualityScoreLabel;
+
     public string $visibilityLabel;
 
     public string $moderationStatusLabel;
@@ -51,6 +59,10 @@ final readonly class CatalogCollectionCardViewModel
     public string $featuredLabel;
 
     public string $importedLabel;
+
+    public string $dynamicLabel;
+
+    public string $verifiedLabel;
 
     public function __construct(
         CatalogCollection $collection,
@@ -83,6 +95,15 @@ final readonly class CatalogCollectionCardViewModel
         $this->editorial = $collection->type === CatalogCollectionType::Editorial;
         $this->imported = (bool) $collection->getAttribute('has_import_source');
         $this->smart = $collection->isSmart();
+        $this->dynamic = $this->smart || $this->imported;
+        $this->verified = $collection->editorially_verified_at !== null
+            && $collection->editorially_verified_content_version === $collection->content_version;
+        $this->qualityScore = $collection->hasCurrentQuality()
+            ? $collection->quality_score
+            : null;
+        $this->qualityScoreLabel = $this->qualityScore === null
+            ? null
+            : __('collections.quality.score_badge', ['score' => $this->qualityScore]);
         $this->visibilityLabel = $collection->visibility->label();
         $this->moderationStatusLabel = $collection->moderation_status->label();
         $this->typeLabel = $collection->type->label();
@@ -95,6 +116,8 @@ final readonly class CatalogCollectionCardViewModel
             ]);
         $this->featuredLabel = __('collections.page.featured');
         $this->importedLabel = __('collections.page.automatically_updated');
+        $this->dynamicLabel = __('collections.quality.dynamic_badge');
+        $this->verifiedLabel = __('collections.quality.editorially_verified');
     }
 
     private function categoryPath(CatalogCollection $collection): string
