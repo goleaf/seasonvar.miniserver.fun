@@ -9679,7 +9679,7 @@ model отложен до отдельного consistency/invalidation/rollback
 | Managed documentation check | `completed_with_foreign_shared_tree_drift` | Task72 check was GREEN before review fix and managed blocks remain untouched; final shared-tree rerun is blocked only by foreign migration `2026_07_26_231000...` missing from `docs/MAINTENANCE_LOG.md` |
 | README/CHANGELOG/final requirement reread | `completed` | Performance owner, visitor history and Russian changelog updated; requirements and repository-wide legacy/cache/route scan repeated |
 | Independent code review | `completed_with_fix` | Reviewer found retained build-local state; integration RED reproduced it, `resetBuildState()` fixed all eight caches, draft visibility and same-graph rebuild coverage added. Full golden/non-SQLite CI remains disproportionate/unsupported; production component parity and existing sanitizer tests cover changed boundaries |
-| Commit/push in `main` | `pending_follow_up` | Base commits `ab7ac83` and `d776ee6` created; review fix requires exact follow-up commit, then another configured non-force push attempt |
+| Commit/push in `main` | `unresolved_external_auth` | Base commits `ab7ac83`/`d776ee6` and exact review fix `c53e17c` created on `main`; configured non-force pushes rejected before transfer because HTTPS credentials are unavailable |
 
 ### Безлимитный execution order
 
@@ -9716,7 +9716,9 @@ model отложен до отдельного consistency/invalidation/rollback
 18. `[completed]` Production read-only parity confirmed 21 URL fields,
     159 table counts and 519 index rows; combined/sequential peak RSS,
     filesystem output and elapsed were measured.
-19. `[pending]` Exact review-fix commit and configured non-force push.
+19. `[completed_unresolved_authentication]` Exact seven-file review fix
+    `c53e17c` created on `main`; configured non-force push was attempted and
+    rejected before transfer because HTTPS credentials are unavailable.
 
 ## Task 71 — быстрый onboarding вкусов
 

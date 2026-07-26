@@ -437,4 +437,6 @@ unavailable. Push status remains `unresolved_external_auth`.
   index changes, both missing-media counters and draft-media visibility.
 - [x] Production read-only parity matched 21 URL fields, 159 table counts
   and 519 index rows; combined/sequential resource samples recorded.
-- [ ] Create exact review-fix commit and retry configured non-force push.
+- [x] Exact seven-file review-fix commit `c53e17c` created on `main`;
+  configured non-force push retried and rejected before transfer because
+  HTTPS credentials remain unavailable.
