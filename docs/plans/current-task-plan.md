@@ -11003,7 +11003,7 @@ table, dependency, queue, route или cache domain не добавляется.
     credentials are unavailable; force, remote and history were not changed.
 ## Task 90 — correlated season availability для обновлений главной
 
-Статус: `verified_commit_pending`.
+Статус: `completed_with_unresolved_push_authentication`.
 
 Дата начала: 26.07.2026.
 
@@ -11101,7 +11101,8 @@ schema и index остаются прежними.
 | Full suite/shared repository | `unresolved` | Default 256M ceiling reproduced; temporary 1G: 2 023 total, 2 010 passed, 202 135 assertions, 11 skipped, 1 account failure + 1 missing importer-class error; no Task 90 failure; temp removed |
 | Docs/README/CHANGELOG | `completed` | Canonical performance evidence, visitor history and Russian technical history; docs refresh and 23/63 policy tests GREEN |
 | Final requirements/legacy/debug/secret audit | `completed` | Applicable owners/design/plan reread; remaining season-ID subqueries reviewed as distinct domains; exact diff/check and added-line secret/debug scans passed |
-| Commit/push main | `pending` | Exact Task 90 implementation commit; configured non-force push |
+| Commit main | `completed` | Hook-enabled exact implementation/docs commit `42515b2c2d96817a025038dd2051a7947ce3c7e7` |
+| Push origin/main | `unresolved` | `GIT_TERMINAL_PROMPT=0 git push origin main` exited 128 before transfer: GitHub HTTPS username/credentials unavailable |
 
 ### Безлимитный execution order
 
@@ -11130,9 +11131,11 @@ schema и index остаются прежними.
 15. `[completed]` Canonical performance docs, README and Russian CHANGELOG;
     docs refresh and 23 tests / 63 assertions passed.
 16. `[completed]` Final requirements/legacy/debug/secret/exact diff audit.
-17. `[pending]` Exact Task 90 implementation/docs commit on existing `main`.
-18. `[pending]` Configured non-force push; external failure remains
-    `unresolved`.
+17. `[completed]` Exact hook-enabled Task 90 implementation/docs commit
+    `42515b2c2d96817a025038dd2051a7947ce3c7e7` on existing `main`.
+18. `[completed]` Configured non-force push was attempted and exited 128
+    before transfer because GitHub HTTPS credentials are unavailable; the
+    delivery result remains `unresolved`.
 
 ---
 

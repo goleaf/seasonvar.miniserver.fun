@@ -1129,7 +1129,7 @@ date-only update. The shared checkout remains dirty with unrelated work; Task
 
 ### Task 12: Exact commit and configured push
 
-**Status:** pending.
+**Status:** completed.
 
 **Priority:** critical.
 
@@ -1142,7 +1142,7 @@ date-only update. The shared checkout remains dirty with unrelated work; Task
 - Consumes: verified final exact diff.
 - Produces: one implementation/docs commit on `main` and push result.
 
-- [ ] **Step 1: Reconfirm branch, remote and shared status**
+- [x] **Step 1: Reconfirm branch, remote and shared status**
 
 Run:
 
@@ -1155,7 +1155,7 @@ git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}'
 
 Expected: `main`, configured `origin/main`, no Task 90 file omitted.
 
-- [ ] **Step 2: Build an exact alternate index**
+- [x] **Step 2: Build an exact alternate index**
 
 Create a temporary alternate index from current `HEAD`, apply/stage only Task
 90 file versions/hunks, then inspect:
@@ -1183,7 +1183,7 @@ The design spec is already in `450e6df` and must not be duplicated.
 Risk: README/CHANGELOG/current plan contain concurrent edits. Stage only Task
 90 hunks against current `HEAD`; never use blind `git add .`.
 
-- [ ] **Step 3: Run hook or exact manual equivalent**
+- [x] **Step 3: Run hook or exact manual equivalent**
 
 Attempt normal commit first. If the pre-commit hook refuses solely because a
 foreign unstaged `CHANGELOG.md`/docs change exists outside the alternate
@@ -1191,7 +1191,7 @@ index, do not stage that work. Record the exact blocker, run every
 task-relevant hook command manually, and use `--no-verify` only for the exact
 alternate-index commit.
 
-- [ ] **Step 4: Create implementation commit**
+- [x] **Step 4: Create implementation commit**
 
 Commit message:
 
@@ -1201,13 +1201,13 @@ perf: correlate homepage episode season checks
 
 Expected: commit contains only verified Task 90 code/test/docs.
 
-- [ ] **Step 5: Reconcile only Task 90 paths in the real index**
+- [x] **Step 5: Reconcile only Task 90 paths in the real index**
 
 After alternate-index commit advances `HEAD`, reset index metadata only for
 Task 90 paths whose worktree content equals committed content. Do not alter
 foreign staged/unstaged files.
 
-- [ ] **Step 6: Audit committed diff**
+- [x] **Step 6: Audit committed diff**
 
 Run:
 
@@ -1220,7 +1220,7 @@ git status --short --branch
 Expected: exact commit, current `main`; any remaining dirty paths are
 pre-existing/concurrent and listed as external blockers, not removed.
 
-- [ ] **Step 7: Push normally**
+- [x] **Step 7: Push normally**
 
 Run:
 
@@ -1237,6 +1237,18 @@ git push -u origin main
 Expected: non-force push success. If HTTPS authentication or remote policy
 fails, preserve local commits and report exact command, exit/error, branch
 and both hashes as `unresolved`; do not retry with force or alter remote.
+
+Actual: the normal hook-enabled commit
+`42515b2c2d96817a025038dd2051a7947ce3c7e7` was created on `main` with
+exactly the seven Task 90 implementation/test/documentation paths. The
+alternate index was rebuilt after concurrent `main` advanced, and the real
+shared index was reconciled without removing its foreign staged content.
+`composer git:doctor -- --remote` confirmed `main`, hooks and no conflicts,
+but reported no HTTPS credential helper. `GIT_TERMINAL_PROMPT=0 git push
+origin main` exited `128` before transfer with
+`fatal: could not read Username for 'https://github.com': terminal prompts
+disabled`. The remote and history were not changed; push remains
+`unresolved`.
 
 ---
 
@@ -1269,7 +1281,8 @@ and both hashes as `unresolved`; do not retry with force or alter remote.
 | Production/rollback | completed | Code-only, no cache flush/data restore |
 | Docs/README/CHANGELOG | completed | Performance owner, visitor/technical history and 23/63 docs tests |
 | Final secret/debug/diff audit | completed | Requirements reread, legacy/dependency review, exact diff/check and added-line scan passed |
-| Commit/push | pending | Existing `main`, non-force; external failure honest |
+| Commit | completed | Hook-enabled exact commit `42515b2c2d96817a025038dd2051a7947ce3c7e7` on existing `main` |
+| Push | unresolved | Non-force `git push origin main` exited 128 before transfer because GitHub HTTPS credentials are unavailable |
 
 ## Skipped / not applicable inventory
 
