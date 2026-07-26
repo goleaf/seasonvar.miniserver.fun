@@ -666,7 +666,7 @@ isolated index. `project:docs-refresh --check` сейчас сообщает т�
 ### Task 11.3 — Создать logical commits на `main`
 
 **Приоритет:** critical
-**Статус:** pending
+**Статус:** completed
 
 **Что:** design/plan и verified performance implementation/docs разделить
 логично; staged diff перечитать перед каждым commit.
@@ -676,10 +676,15 @@ isolated index. `project:docs-refresh --check` сейчас сообщает т�
 **Проверка:** isolated temporary index при необходимости; commit tree contains
 only Task 99; branch remains `main`; normal working index untouched.
 
+**Evidence:** design commit
+`c52d1a05e2386376b5f05ce847d2352fd788a38c`; implementation/docs commit
+`62c2e5316673a1ce76cdb6f1697a57103cb5cf48` содержит ровно семь Task 99
+файлов. Shared index восстановлен с сохранением foreign staged hunks.
+
 ### Task 11.4 — Выполнить ordinary push
 
 **Приоритет:** critical
-**Статус:** pending
+**Статус:** completed
 
 **Что:** `git push origin main` либо existing upstream equivalent, без force.
 
@@ -687,6 +692,11 @@ only Task 99; branch remains `main`; normal working index untouched.
 
 **Проверка:** exact command/exit/output; failure status `unresolved`, local
 commit/hash сохранён.
+
+**Evidence:** `GIT_TERMINAL_PROMPT=0 git push origin main` завершился с кодом
+`128` до передачи: `fatal: could not read Username for
+'https://github.com': terminal prompts disabled`. Push остаётся
+`unresolved`; локальные commits не откатывались.
 
 ---
 
@@ -715,8 +725,8 @@ commit/hash сохранён.
 | Tests/static/build/browser | `completed` | 147/1 425 related GREEN; full foreign failures classified; static/build/browser complete |
 | Docs/README/CHANGELOG | `completed` | Canonical performance, visitor history and Russian technical history updated |
 | Final legacy/debug/secret audit | `completed` | Requirement reread; identity/debug/secret/diff/route checks complete |
-| Commit main | `pending` | Exact Task 99 scope |
-| Push main | `pending` | Ordinary non-force; auth failure honest |
+| Commit main | `completed` | `c52d1a0` design + exact seven-file `62c2e53` implementation |
+| Push main | `unresolved` | Ordinary push exited 128 before transfer: HTTPS username unavailable |
 
 ## Execution order
 
@@ -734,5 +744,6 @@ commit/hash сохранён.
 12. `[completed]` Related/full/static/build/browser verification.
 13. `[completed]` Performance owner, README, CHANGELOG and verified evidence.
 14. `[completed]` Requirements/legacy/debug/secret/diff audit.
-15. `[pending]` Exact logical commits on existing `main`.
-16. `[pending]` Configured ordinary push.
+15. `[completed]` Exact logical commits on existing `main`.
+16. `[completed]` Configured ordinary push attempted; external HTTPS
+    authentication failure recorded as `unresolved`.

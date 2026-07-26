@@ -12106,7 +12106,7 @@ queue, scheduler, config или environment change не планируется. 
 
 ## Task 99 — season-bound «Продолжить просмотр» на главной
 
-Статус: `final_audit_completed_commit_pending`.
+Статус: `implementation_committed_push_unresolved_authentication`.
 
 Канонический design:
 [`2026-07-26-homepage-continue-watching-season-bound-design.md`](../superpowers/specs/2026-07-26-homepage-continue-watching-season-bound-design.md).
@@ -12177,7 +12177,7 @@ config и environment change не планируются.
 | Errors/logging/concurrency | `not_applicable` | Read-only local query |
 | Tests/static/build/browser | `completed` | 147/1 425 related GREEN; full foreign failures classified; static/build/browser complete |
 | Docs/README/CHANGELOG | `completed` | Canonical performance, visitor history and Russian technical history updated |
-| Final audit/commit/push | `in_progress` | Requirement/identity/debug/secret/diff gates complete; exact commit next |
+| Final audit/commit/push | `completed_commit_unresolved_push_authentication` | Design `c52d1a0`; implementation `62c2e53`; ordinary push exited 128 before transfer because HTTPS username is unavailable |
 
 ### Execution order
 
@@ -12194,5 +12194,6 @@ config и environment change не планируются.
 10. `[completed]` Full/static/build/browser checks.
 11. `[completed]` Canonical performance docs, README, CHANGELOG and evidence.
 12. `[completed]` Requirement/legacy/debug/secret/final diff audit.
-13. `[pending]` Exact logical Task 99 commits on existing `main`.
-14. `[pending]` Ordinary configured push; external refusal remains unresolved.
+13. `[completed]` Exact logical Task 99 commits on existing `main`.
+14. `[completed]` Ordinary configured push attempted; external HTTPS
+    authentication failure remains `unresolved`.
