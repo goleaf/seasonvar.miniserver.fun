@@ -21,6 +21,7 @@ const installBrowserGuard = async (page, baseURL) => {
     const sameOriginFailures = [];
     const externalLeaks = [];
     const consoleErrors = [];
+    const reportOnlyDiagnostics = [];
     const pageErrors = [];
 
     await page.context().route('**/*', async (route) => {
@@ -67,13 +68,30 @@ const installBrowserGuard = async (page, baseURL) => {
         }
     });
     page.on('console', (message) => {
-        if (message.type() === 'error' && !message.text().startsWith('Failed to load resource:')) {
-            consoleErrors.push(message.text());
+        if (message.type() !== 'error' || message.text().startsWith('Failed to load resource:')) {
+            return;
         }
+
+        if (
+            message.text().includes('Content-Security-Policy: (Report-Only policy)')
+            && message.text().includes('/vendor/livewire/livewire')
+        ) {
+            reportOnlyDiagnostics.push(message.text());
+
+            return;
+        }
+
+        consoleErrors.push(message.text());
     });
     page.on('pageerror', (error) => pageErrors.push(error.message));
 
-    return { sameOriginFailures, externalLeaks, consoleErrors, pageErrors };
+    return {
+        sameOriginFailures,
+        externalLeaks,
+        consoleErrors,
+        reportOnlyDiagnostics,
+        pageErrors,
+    };
 };
 
 const assertNoBrowserErrors = (errors) => {
@@ -153,6 +171,49 @@ const assertResponsivePlayer = async (page) => {
 const waitForFixtureCount = async (fixtures, suffix, minimum) => {
     await expect.poll(() => fixtures.count(suffix)).toBeGreaterThanOrEqual(minimum);
 };
+
+test('desktop Chromium and Firefox decode and advance the verified MP4 fixture', async ({ page, baseURL }, testInfo) => {
+    test.skip(
+        !['Desktop Chromium', 'Desktop Firefox'].includes(testInfo.project.name),
+        'Physical and responsive projects have separate evidence boundaries.',
+    );
+
+    const errors = await installBrowserGuard(page, baseURL);
+    const fixtures = await installPlayerMediaFixtures(page);
+
+    await page.goto('/titles/browser-smoke?episode=1&format=mp4');
+    await waitForPlayer(page);
+    await currentVideo(page).evaluate(async (media) => {
+        media.muted = true;
+        media.currentTime = 0;
+        await media.play();
+    });
+
+    await expect.poll(() => currentVideo(page).evaluate((media) => ({
+        currentTime: media.currentTime,
+        readyState: media.readyState,
+        error: media.error?.code ?? null,
+    }))).toMatchObject({
+        error: null,
+    });
+    await expect.poll(
+        () => currentVideo(page).evaluate((media) => media.readyState),
+    ).toBeGreaterThanOrEqual(2);
+    await expect.poll(
+        () => currentVideo(page).evaluate((media) => media.currentTime),
+    ).toBeGreaterThan(0.05);
+    await waitForFixtureCount(fixtures, '/direct.mp4', 1);
+    expect(fixtures.observations.some(({ path, status }) => (
+        path.endsWith('/direct.mp4') && [200, 206].includes(status)
+    ))).toBe(true);
+
+    await currentVideo(page).evaluate((media) => media.pause());
+    expect(errors.reportOnlyDiagnostics.every((message) => (
+        message.includes('Content-Security-Policy: (Report-Only policy)')
+        && message.includes('/vendor/livewire/livewire')
+    ))).toBe(true);
+    assertNoBrowserErrors(errors);
+});
 
 for (const locale of [
     { code: 'ru', prefix: '' },

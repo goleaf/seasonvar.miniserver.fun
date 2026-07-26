@@ -249,6 +249,8 @@ class CatalogBladeComponentTest extends TestCase
             'path' => 'https://media.example.com/component-video.m3u8',
             'quality' => '1080p',
             'format' => 'm3u8',
+            'check_status' => 'available',
+            'last_successful_check_at' => now(),
             'status' => 'published',
             'published_at' => now(),
         ]);

@@ -69,6 +69,8 @@ final class CatalogTitleDetailTest extends TestCase
             'variant_key' => 'original',
             'quality' => '1080p',
             'format' => 'm3u8',
+            'check_status' => 'available',
+            'last_successful_check_at' => now(),
             'duration_seconds' => 1440,
             'published_at' => now(),
         ]);

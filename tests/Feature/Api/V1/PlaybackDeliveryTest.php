@@ -135,6 +135,8 @@ final class PlaybackDeliveryTest extends TestCase
             'quality' => '1080p',
             'format' => 'm3u8',
             'duration_seconds' => 600,
+            'check_status' => 'available',
+            'last_successful_check_at' => now(),
         ]);
 
         return [$title, $episode, $media];

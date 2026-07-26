@@ -684,6 +684,7 @@ final class CatalogTitlePlaybackQuery
             'health_status',
             'last_http_status',
             'checked_at',
+            'last_successful_check_at',
             'deleted_at',
         ]);
     }

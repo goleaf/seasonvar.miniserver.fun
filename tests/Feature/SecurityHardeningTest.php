@@ -352,6 +352,7 @@ class SecurityHardeningTest extends TestCase
             'health_status' => 'degraded',
             'check_status' => 'check_failed',
             'last_http_status' => 503,
+            'last_successful_check_at' => now()->subMinute(),
         ]);
         $degraded = $resolver->resolve(
             $title,

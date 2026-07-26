@@ -16,6 +16,8 @@ return [
     'enforce_public_dns' => filter_var(env('PLAYBACK_ENFORCE_PUBLIC_DNS', true), FILTER_VALIDATE_BOOL),
     'allowed_storage_disks' => ['local', 's3'],
     'allowed_formats' => ['m3u8', 'mp4', 'm4v', 'webm', 'mov'],
+    'established_formats' => ['mp4'],
+    'release_record_path' => public_path('build/player-release.json'),
     'supported_qualities' => ['4320p', '2160p', '1440p', '1080p', '720p', '576p', '540p', '480p', '360p', '240p'],
     'supported_subtitle_languages' => ['ru', 'en', 'ko', 'ja', 'zh', 'es', 'de', 'fr', 'it', 'pt'],
     'provider_priority' => [

@@ -334,3 +334,22 @@ Importer не создаёт audio/subtitle/region/age данные из дог�
 Importer не владеет bookmark/status/feedback/progress/marker/acknowledgment/collection rows и никогда не переписывает их при refresh. Новая серия/сезон/перевод создают personal update только через подтверждённый canonical `ReleaseScheduleEntry`; raw provider text и model `updated_at` indicator не создают. Source replacement сохраняет stable episode identity, поэтому automatic progress, manual completion и playback marker остаются привязаны к серии.
 
 Title merge использует `CatalogTitleUserDataMerger`: bookmark/rating/status/feedback, acknowledgments, markers, progress и collection memberships reconciled до duplicate delete. Status/feedback precedence preserves strongest explicit intent, unique conflicts collapse idempotently, media URLs/provider metadata не попадают в private rows. Отдельный import command или personal-state backfill Task 09 не добавлен.
+
+## Verified media formats Task 102
+
+`seasonvar:import` остаётся единственной публичной командой импорта. Existing
+MP4 rows сохраняют backward-compatible playability даже для исторических
+`not_checked` записей. Любой новый format допускается в public media scopes
+только после successful bounded availability evidence:
+`check_status=available` либо сохранённого `last_successful_check_at`.
+
+`degraded`/`check_failed` после прежнего успеха не стирает факт когда-то
+подтверждённой совместимости и оставляет обычному health/fallback contract
+решение временного отказа. Новый format без единого успеха остаётся скрыт.
+Importer не должен выставлять success из расширения URL, provider label или
+ожидаемой browser поддержки.
+
+Отдельная audio/subtitle track требует реального URL/body identity,
+format/language metadata и собственной успешной availability-проверки.
+Текущие `has_subtitles`, `translation_name` и `variant_name` не создают
+фиктивную дорожку. Schema/backfill и новый scheduler Task 102 не добавляет.

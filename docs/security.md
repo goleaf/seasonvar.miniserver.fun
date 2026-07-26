@@ -367,3 +367,23 @@ counters, не raw query, source URL или untrusted HTML. Engagement query
 строится query builder с bindings, Blade выводит локализованные enum labels
 через escaped `{{ }}`. Команда не выполняет внешние HTTP calls и не меняет
 environment/secrets.
+
+## Security boundary player release Task 102
+
+`PlayerReleaseReadiness` fail-closed принимает только schema `1`, безопасные
+relative paths внутри project/public build roots, обычные файлы без symlink и
+точно совпадающие размеры/SHA-256. Source descriptor и release record не
+содержат исходный код, external media URL, credentials, tokens или private
+host paths. Vite manifest graph должен включать player entry; missing,
+tampered, stale и unrecorded graph asset блокируют release check.
+
+Format gate строится Eloquent bindings без raw user SQL. Explicit requested
+media сначала проходит прежнюю hierarchy/entitlement проверку, затем
+неподтверждённый новый format возвращает контролируемый `503`, а не выдаёт URL
+и не маскируется как чужой `404`. Established MP4 сохраняет compatibility;
+allowlist/расширение URL само по себе не открывает новый format.
+
+Task 102 не меняет CSP enforcement, signed grant TTL, SSRF/DNS/host validation,
+CSRF, policies, rate limits или private/no-store contracts. PWA по-прежнему не
+кеширует video/HLS/signed playback. Secret/debug scan выполняется по exact
+staged diff перед commit.

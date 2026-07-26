@@ -191,10 +191,61 @@ class LicensedMedia extends Model
      */
     public function scopeWithoutKnownFailures(Builder $query): Builder
     {
-        return $query->whereIn($this->qualifyColumn('health_status'), [
-            MediaHealthStatus::Active->value,
-            MediaHealthStatus::Degraded->value,
-        ]);
+        return $query
+            ->withVerifiedPlaybackFormat()
+            ->whereIn($this->qualifyColumn('health_status'), [
+                MediaHealthStatus::Active->value,
+                MediaHealthStatus::Degraded->value,
+            ]);
+    }
+
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    public function scopeWithVerifiedPlaybackFormat(Builder $query): Builder
+    {
+        $establishedFormats = collect((array) config('playback.established_formats', ['mp4']))
+            ->filter(fn (mixed $format): bool => is_string($format) && trim($format) !== '')
+            ->map(fn (string $format): string => mb_strtolower(trim($format)))
+            ->unique()
+            ->values()
+            ->all();
+        $formatColumn = $this->qualifyColumn('format');
+
+        return $query->where(function (Builder $query) use ($establishedFormats, $formatColumn): void {
+            $query
+                ->whereNull($formatColumn)
+                ->orWhere($formatColumn, '');
+
+            if ($establishedFormats !== []) {
+                $query->orWhereIn($formatColumn, $establishedFormats);
+            }
+
+            $query->orWhere(function (Builder $query): void {
+                $query
+                    ->where($this->qualifyColumn('check_status'), 'available')
+                    ->orWhereNotNull($this->qualifyColumn('last_successful_check_at'));
+            });
+        });
+    }
+
+    public function hasVerifiedPlaybackFormat(?string $resolvedFormat = null): bool
+    {
+        $format = mb_strtolower(trim((string) ($resolvedFormat ?? $this->format)));
+
+        if ($format === '') {
+            return true;
+        }
+
+        $establishedFormats = collect((array) config('playback.established_formats', ['mp4']))
+            ->filter(fn (mixed $candidate): bool => is_string($candidate) && trim($candidate) !== '')
+            ->map(fn (string $candidate): string => mb_strtolower(trim($candidate)))
+            ->contains($format);
+
+        return $establishedFormats
+            || $this->check_status === 'available'
+            || $this->last_successful_check_at !== null;
     }
 
     public function effectivePlaybackUrl(): ?string

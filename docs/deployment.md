@@ -749,3 +749,22 @@ run error и может быть повторён идемпотентно. Appl
 лишь после backup и остановки writers. Public legacy rows без current score
 не следует повторно открывать вручную; безопасное восстановление — исправить
 данные и повторить bounded assessment.
+
+## Атомарный rollout проигрывателя Task 102
+
+Player PHP/config и Vite assets являются одной release unit. Перед
+публикацией выполняется `npm run build`: после Vite команда автоматически
+запускает `php artisan player:release-check --json`. Успех означает, что
+`resources/player-release.json`, source fingerprint, Vite manifest graph,
+размер и SHA-256 каждого записанного asset совпадают.
+
+Нельзя копировать только PHP, только `public/build`, отдельный chunk или
+release record. Production switch разрешён лишь после полной успешной сборки
+в staging/release directory. При interrupted build, missing asset, symlink,
+hash drift или stale PHP deployment остаётся на предыдущей целой версии;
+`cache:clear`, migration, queue restart и data repair не требуются.
+
+Rollback — вернуть единый предыдущий commit/release directory и полностью
+пересобрать его. Task 102 не меняет schema, данные, dependencies, environment
+или provider allowlist. Реальный production deploy в рамках Task 102 не
+выполнялся.

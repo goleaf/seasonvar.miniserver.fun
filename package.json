@@ -3,10 +3,10 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "build": "vite build",
+        "build": "vite build && php artisan player:release-check --json",
         "dev": "vite",
         "test:browser": "playwright test",
-        "test:browser:install": "playwright install chromium"
+        "test:browser:install": "playwright install chromium firefox"
     },
     "devDependencies": {
         "@axe-core/playwright": "^4.12.1",

@@ -591,3 +591,25 @@ Service worker update не вызывает `skipWaiting()` или forced reload
 logout; account switch и подтверждённый `401/403` делают ту же очистку.
 Install, offline shell, queue, push states, accessibility и отсутствие
 private/media cache проверяются Playwright на desktop/mobile/tablet.
+
+## Browser acceptance и release identity проигрывателя Task 102
+
+Release identity охватывает PHP/player source descriptor и полный достижимый
+Vite graph. `player-release.json` записывается после финальной обработки
+chunks; readiness повторно проверяет source hash, manifest imports/assets,
+размеры, SHA-256, отсутствие symlink и unsafe paths. Частично совместимый
+PHP/JS/CSS rollout не поддерживается.
+
+Deterministic direct MP4 fixture фактически декодирован в Desktop Chromium и
+Desktop Firefox: browser получил `200/206`, `readyState >= 2`, `currentTime`
+продвинулся, `media.error` отсутствовал. Firefox report-only CSP diagnostics
+Livewire отделяются только по точному диагностическому шаблону и не ослабляют
+CSP. Provider live URL в Firefox дал network reset после `206`; это
+зафиксированная provider/browser несовместимость, а не основание скрывать
+ошибку или блокировать Firefox.
+
+Mobile/tablet viewport остаётся responsive evidence. Физические Android/iOS,
+hardware decoder, OS-owned native fullscreen и host WebKit codecs не были
+доступны и остаются `unresolved_device`. Новая format/quality/audio/subtitle
+option появляется только из реально доступной source row/track identity;
+пустой label или boolean не создаёт UI control.

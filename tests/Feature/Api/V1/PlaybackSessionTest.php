@@ -235,6 +235,8 @@ final class PlaybackSessionTest extends TestCase
             'audience' => $title->audience,
             'quality' => $quality,
             'format' => $format,
+            'check_status' => $format === 'mp4' ? 'not_checked' : 'available',
+            'last_successful_check_at' => $format === 'mp4' ? null : now(),
             'variant_name' => ucfirst($variant),
             'variant_key' => $variant,
             'duration_seconds' => 600,

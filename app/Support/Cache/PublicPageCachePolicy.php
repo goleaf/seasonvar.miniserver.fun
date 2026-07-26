@@ -389,7 +389,22 @@ final class PublicPageCachePolicy
 
     private function assetBuildFingerprint(): string
     {
-        return $this->assetBuildFingerprint ??= $this->vite->manifestHash() ?? 'manifest-unavailable';
+        if ($this->assetBuildFingerprint !== null) {
+            return $this->assetBuildFingerprint;
+        }
+
+        $releasePath = (string) config(
+            'playback.release_record_path',
+            public_path('build/player-release.json'),
+        );
+        $releaseFingerprint = is_file($releasePath) && ! is_link($releasePath)
+            ? hash_file('sha256', $releasePath)
+            : false;
+
+        return $this->assetBuildFingerprint = hash('sha256', implode("\0", [
+            $this->vite->manifestHash() ?? 'manifest-unavailable',
+            is_string($releaseFingerprint) ? $releaseFingerprint : 'player-release-unavailable',
+        ]));
     }
 
     private function canonicalOrigin(): ?string

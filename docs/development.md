@@ -347,3 +347,27 @@ php artisan test --filter=CatalogCollection
 fresh/rollback migration, `EXPLAIN QUERY PLAN`, полный PHPUnit, Vite и
 Playwright public/admin collection flow. Тестовые engagement rows не должны
 обращаться к внешнему HTTP или раскрывать individual user evidence.
+
+### Изменение проигрывателя и media formats
+
+`resources/player-release.json` является явным перечнем source-файлов release
+unit. При изменении player PHP/config/Blade/JS/CSS сначала обновите descriptor,
+затем выполните:
+
+```bash
+npm run build
+php artisan player:release-check --json
+npx playwright test tests/browser/player-lifecycle.spec.js \
+  --project="Desktop Chromium" --project="Desktop Firefox"
+```
+
+`npm run build` уже включает readiness check и завершается ненулевым кодом при
+mixed/stale asset graph. Browser decode test обязан реально вызвать `play()`,
+дождаться `readyState >= 2` и продвижения `currentTime` без `media.error`.
+Viewport emulation не называется проверкой физического устройства.
+
+MP4 остаётся established compatibility format. Fixture или production row с
+новым format должна иметь real successful-check evidence:
+`check_status=available` либо `last_successful_check_at`. Boolean subtitle
+flag, имя перевода или предполагаемая browser capability не являются
+доказательством отдельной дорожки.

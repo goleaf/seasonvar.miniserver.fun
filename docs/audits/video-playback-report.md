@@ -1,6 +1,6 @@
 # Каноническая архитектура video playback
 
-Проверено: 24.07.2026. Этот документ — владелец фактического playback-контракта Task 07 и последующих изменений проигрывателя. Живой чек-лист реализации и отката находится в `docs/plans/laravel-video-portal-modernization.md`. Портал воспроизводит только разрешённые проекту источники и не реализует обход DRM, подписи, оплаты, региона или ограничений поставщика.
+Проверено: 26.07.2026. Этот документ — владелец фактического playback-контракта Task 07 и последующих изменений проигрывателя. Живой чек-лист реализации и отката находится в `docs/plans/laravel-video-portal-modernization.md`. Портал воспроизводит только разрешённые проекту источники и не реализует обход DRM, подписи, оплаты, региона или ограничений поставщика.
 
 ## Итог аудита
 
@@ -88,6 +88,20 @@ Client-provided source ID никогда не превращается в URL н
 
 ## Formats, quality и source fallback
 
+- MP4 остаётся established progressive format для обратной совместимости с
+  существующим каталогом. Явно импортированный новый format допускается в
+  public playback, watchability, counts и recommendations только после
+  фактической успешной проверки строки: `check_status=available` либо
+  сохранённого `last_successful_check_at`. Одной конфигурационной allowlist,
+  расширения URL или client capability недостаточно. Исторический `NULL`
+  format разрешается только как compatibility input и всё равно проходит
+  server-side определение MIME/format, URL/storage и health.
+- Временный `check_failed`/`degraded` не отзывает уже подтверждённый новый
+  format, если имеется `last_successful_check_at`; новый format без единого
+  успеха остаётся fail-closed. Requested media не превращается в `404`: при
+  корректной identity, но неподтверждённом format delivery boundary отвечает
+  контролируемым `503`, чтобы ошибка availability не маскировалась как
+  отсутствие ресурса.
 - Progressive MP4/M4V/WebM/MOV: каждая строка `LicensedMedia` — отдельный server-authorized вариант. Смена ссылки сохраняет position через bounded `sessionStorage` handoff, pause/play state восстанавливается браузером из канонического resume, а volume/mute/speed остаются в player preferences.
 - HLS: native HLS используется там, где browser умеет его сам; иначе один HLS.js instance обслуживает manifest и segments. Automatic ABR остаётся native/HLS.js. Manual HLS level menu не заявляется, пока importer не хранит правдивые manifest levels.
 - Quality selector показывает только реально доступные progressive rows выбранного variant. Stable technical values не переводятся; `auto` остаётся account preference и означает server/browser safe selection, а не выдуманный adaptive stream.
@@ -107,6 +121,33 @@ Client-provided source ID никогда не превращается в URL н
 - показывать original/subtitle source variant без выдачи фиктивной отдельной audio track.
 
 Отдельной таблицы audio tracks, нормализованных audio-language codes или subtitle tracks/bodies в проекте нет. `has_subtitles` не является URL дорожки. Поэтому пустые Audio/Subtitles menus не отображаются и fake controls не создаются. Если `<track kind="subtitles|captions">` появится из будущего канонического subtitle service, Plyr применит native selection, RU/EN labels и non-fatal load error; raw SRT/ASS/SSA/HTML сейчас не вставляется и не исполняется. Отдельная поддержка WebVTT/SRT conversion/ASS renderer потребует additive domain, importer/admin ownership и отдельной проверки.
+
+Новый audio/subtitle format или отдельная дорожка публикуется только после
+того, как importer или специализированный canonical service сохранил реальный
+source URL/body identity, format/language metadata и успешную bounded
+availability-проверку. Boolean, provider label, предполагаемая browser
+поддержка или похожее имя не создают track и не считаются подтверждением.
+
+## Версия player-кода и ресурсов
+
+- Production build выпускает player source contract и весь достижимый Vite
+  asset graph одной проверяемой версией. Детерминированный source fingerprint
+  строится по явному repository descriptor, а build record содержит SHA-256 и
+  размер каждого сгенерированного файла без source code, credentials или
+  private paths.
+- `php artisan player:release-check --json` fail-closed проверяет descriptor,
+  source fingerprint, Vite manifest graph, наличие, размер и hash каждого
+  build asset. Отсутствующий, подменённый, симлинкованный или устаревший файл
+  блокирует успешный production build; смешанный выпуск PHP/JS/CSS запрещён.
+- Guest HTML cache generation включает fingerprint player release record,
+  поэтому новый совместимый build не обслуживается под прежним asset
+  generation. Service worker по-прежнему не кеширует video, HLS, signed
+  playback или provider URL и не перезагружает активный player.
+- Browser acceptance включает фактический play/decode progressive MP4 fixture
+  в Desktop Chromium и Desktop Firefox. Viewport emulation остаётся только
+  responsive-проверкой, а не доказательством физического устройства.
+  Native iOS fullscreen, hardware decoder и реальные Android/iOS устройства
+  должны фиксироваться отдельным evidence либо честным `unresolved_device`.
 
 ## Progress, resume, restart и completion
 
@@ -324,3 +365,26 @@ schema отсутствует, поэтому Task 104 не обещает WebVT
 рисует фиктивные options. Ошибка показывает bounded retry, существующий source
 menu и существующий report flow; raw URL/grant и global health mutation
 запрещены.
+
+## Task 102 — verified formats и атомарный player release
+
+Task 102 закрепляет два release gates. Первый допускает новый media format
+только при `check_status=available` либо сохранённом
+`last_successful_check_at`; established MP4 и исторический null-format
+сохраняют прежнюю совместимость, а explicit неподтверждённый source отвечает
+`503`. Gate применяется к public availability/count/recommendation scopes и
+до bounded candidate limit resolver.
+
+Второй gate связывает 29 явно перечисленных player sources с 19 фактически
+записанными Vite assets. Build record создаётся после финальной обработки
+chunks, а `player:release-check` повторно проверяет descriptor, manifest graph,
+path/symlink boundary, bytes и SHA-256. Guest HTML cache generation включает
+release record hash; partial PHP/assets rollout запрещён.
+
+Локальная deterministic MP4 проверка прошла фактическое декодирование в
+Desktop Chromium и Desktop Firefox. Live provider в Firefox сбросил ответ
+после `206`; это записано как external provider/browser failure без
+blacklist/ignore. Физические Android/iOS, hardware decoder, native iOS
+fullscreen и WebKit codec host остаются `unresolved_device`. Новые
+audio/subtitle дорожки не добавлены: в данных нет отдельного проверенного
+URL/body identity.

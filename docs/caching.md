@@ -527,3 +527,18 @@ recommendations и API; user-specific engagement evidence в shared cache не
 зацикливает refresh. Неизменный повтор команды не bump-ит cache generation.
 После failed refresh прежний score остаётся version-checked, а stale public
 row закрывается canonical query без store-wide flush.
+
+## Asset generation проигрывателя Task 102
+
+`PublicPageCachePolicy::assetBuildFingerprint()` связывает публичную HTML
+generation с SHA-256 Vite manifest и SHA-256
+`public/build/player-release.json`. Release record создаётся только после
+записи финальных файлов сборки и содержит размеры и SHA-256 всего достижимого
+asset graph. Поэтому PHP/player sources и JS/CSS chunks нельзя незаметно
+смешать под прежним ключом.
+
+Отсутствующий или невалидный release record получает стабильную
+`unavailable`-размерность и не делает readiness успешной. Новый cache store,
+полный flush или user dimension не добавлены. Signed playback, HLS/video,
+provider URL, progress, preferences и authenticated HTML по-прежнему запрещены
+в shared cache и Cache Storage.

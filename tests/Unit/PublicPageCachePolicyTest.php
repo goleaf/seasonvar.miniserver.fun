@@ -12,6 +12,8 @@ use App\Support\Cache\CacheVersionRegistry;
 use App\Support\Cache\PublicPageCachePolicy;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Route;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 final class PublicPageCachePolicyTest extends TestCase
@@ -68,6 +70,33 @@ final class PublicPageCachePolicyTest extends TestCase
         $this->assertSame('title:73', $context->versionScope);
         $this->assertSame($globalVersion, $context->dimensions['global_title_version']);
         $this->assertSame(['catalogTitle' => 73], $context->dimensions['parameters']);
+    }
+
+    public function test_player_release_record_rotates_the_public_asset_dimension(): void
+    {
+        $recordPath = sys_get_temp_dir().'/seasonvar-player-release-cache-'.Str::uuid().'.json';
+        config()->set('playback.release_record_path', $recordPath);
+
+        try {
+            File::put($recordPath, '{"source_fingerprint":"first"}');
+            $first = app(PublicPageCachePolicy::class)->context(
+                $this->request('GET', '/', 'home'),
+                'homepage',
+            );
+
+            app()->forgetInstance(PublicPageCachePolicy::class);
+            File::put($recordPath, '{"source_fingerprint":"second"}');
+            $second = app(PublicPageCachePolicy::class)->context(
+                $this->request('GET', '/', 'home'),
+                'homepage',
+            );
+
+            $this->assertNotNull($first);
+            $this->assertNotNull($second);
+            $this->assertNotSame($first->dimensions['assets'], $second->dimensions['assets']);
+        } finally {
+            File::delete($recordPath);
+        }
     }
 
     public function test_top_list_filter_queries_have_stable_and_distinct_cache_dimensions(): void

@@ -1351,3 +1351,20 @@ SQLite `EXPLAIN QUERY PLAN` подтвердил
 использовать прежний `catalog_collections_public_idx`; предложенный отдельный
 public-quality index был удалён после измерения как неиспользуемый и
 увеличивающий стоимость INSERT/UPDATE.
+
+## Query contract verified media formats Task 102
+
+`LicensedMedia::scopeWithVerifiedPlaybackFormat()` применяется внутри общего
+`withoutKnownFailures()` и в source resolver до `limit(100)`. Поэтому сотня
+неподтверждённых новых formats не вытесняет established MP4 fallback и не
+создаёт дополнительный запрос на каждую строку. Проверка использует уже
+загруженные `format`, `check_status` и `last_successful_check_at`; Blade
+запросов не выполняет.
+
+SQLite `EXPLAIN QUERY PLAN` для resolver query использовал
+`licensed_media_publication_lookup_idx` по
+`catalog_title_id/status/audience/deleted_at`; season/episode existence
+проверяется по primary key в correlated subqueries. Отдельный format-health
+index не выбран планировщиком для title-scoped bounded набора и не добавлен,
+чтобы не повышать стоимость importer INSERT/UPDATE без измеренной пользы.
+Migration, N+1 и новый cache отсутствуют.

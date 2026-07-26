@@ -25,14 +25,15 @@ final class BrowserCiContractTest extends TestCase
         $playerSuite = File::get($playerSuitePath);
 
         $this->assertSame('playwright test', $package['scripts']['test:browser']);
-        $this->assertSame('playwright install chromium', $package['scripts']['test:browser:install']);
+        $this->assertSame('playwright install chromium firefox', $package['scripts']['test:browser:install']);
         $this->assertArrayHasKey('@playwright/test', $package['devDependencies']);
         $this->assertArrayHasKey('@axe-core/playwright', $package['devDependencies']);
 
-        foreach (['Desktop Chromium', 'Tablet Chromium', 'Mobile Chromium', '1440', '768', '390', 'output/playwright'] as $contract) {
+        foreach (['Desktop Chromium', 'Desktop Firefox', 'Tablet Chromium', 'Mobile Chromium', '1440', '768', '390', 'output/playwright'] as $contract) {
             $this->assertStringContainsString($contract, $config);
         }
 
+        $this->assertStringContainsString('testMatch: /player-lifecycle\\.spec\\.js/', $config);
         $this->assertStringContainsString('DB_DATABASE', $config);
         $this->assertStringContainsString("process.env.PLAYWRIGHT_RUNTIME_NAME || 'browser'", $config);
         $this->assertStringContainsString('output/playwright/${runtimeName}.sqlite', $config);
@@ -62,6 +63,9 @@ final class BrowserCiContractTest extends TestCase
         $this->assertStringContainsString("testInfo.project.name !== 'Desktop Chromium'", $playerSuite);
         $this->assertStringContainsString('PageTransitionEvent', $playerSuite);
         $this->assertStringContainsString('data-player-session', $playerSuite);
+        $this->assertStringContainsString('media.currentTime', $playerSuite);
+        $this->assertStringContainsString('media.readyState', $playerSuite);
+        $this->assertStringContainsString('media.error', $playerSuite);
         $this->assertStringContainsString('Content-Range', $fixtureRouter);
         $this->assertStringContainsString('data-player-media-option', $playerView);
         $this->assertStringContainsString('data-player-media-format', $playerView);

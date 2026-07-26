@@ -2403,6 +2403,8 @@ class CatalogPageTest extends TestCase
             'variant_key' => 'voiceover-studio',
             'quality' => '1080p',
             'format' => 'm3u8',
+            'check_status' => 'available',
+            'last_successful_check_at' => now(),
         ]);
         LicensedMedia::factory()->create([
             'catalog_title_id' => $catalogTitle->id,

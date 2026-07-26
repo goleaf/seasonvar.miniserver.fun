@@ -203,6 +203,8 @@ final class PlaybackProgressTest extends TestCase
             'published_at' => now(),
             'quality' => '1080p',
             'format' => 'm3u8',
+            'check_status' => 'available',
+            'last_successful_check_at' => now(),
             'duration_seconds' => 600,
         ]);
 

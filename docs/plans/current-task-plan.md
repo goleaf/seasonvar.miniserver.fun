@@ -1,97 +1,81 @@
-# Текущая задача — Task 101: рейтинг качества подборок
+# Текущая задача — Task 102: verified player release
 
 ## Реестр активных workstreams
 
 | Workstream | Status | Evidence |
 | --- | --- | --- |
-| Task 101 — quality score, очистка и объяснимость подборок | `in_progress: commit and push` | [Design](../superpowers/specs/2026-07-26-collection-quality-rating-design.md), [checklist](../superpowers/plans/2026-07-26-collection-quality-rating.md), [evidence](archive/2026-07-26-collection-quality-evidence.md) |
+| Task 102 — допуск media formats после успешной проверки, единая версия player code/assets и реальное декодирование в Chromium/Firefox | `completed` | Единственный owner lease `task-102-player-release-verification`; [design](../superpowers/specs/2026-07-26-player-verified-release-gates-design.md), [implementation plan](../superpowers/plans/2026-07-26-player-verified-release-gates.md), [compliance](task-102-player-release-verification-compliance.md) |
 
 ## Реестр blocked/unresolved
 
 | Workstream | Status | Evidence |
 | --- | --- | --- |
-| Общий checkout содержит изменения других задач | `unresolved: clean pre-push gate depends on foreign workstreams` | [Task 101 evidence](archive/2026-07-26-collection-quality-evidence.md) |
-| Full suite содержит unrelated failures | `unresolved: foreign/snapshot boundaries` | [Task 101 evidence](archive/2026-07-26-collection-quality-evidence.md) |
+| Физические iOS/Android устройства и host WebKit codecs | `unresolved` | На доступном host нет подключённых физических устройств, `adb`, `idevice_id`, `xcrun` и WebKit codec package; viewport emulation не выдана за device evidence |
+| Full shared-tree regression suite | `unresolved` | Default `256M` исчерпан чужим demo raster fixture; финальный 1G run после Task 102 fixes: 2 184 tests, 2 156 passed, 11 skipped, 16 foreign failures и 1 foreign importer error |
+| Exact clean documentation graph | `unresolved` | Отслеживаемый общий archive уже ссылается на 10 незакоммиченных документов PWA/statistics другого owner; они не добавлены в Task 102 index |
+| HTTPS push текущей `main` | `unresolved` | Task 104 push был отклонён из-за отсутствия HTTPS username; Task 102 повторит обычный `git push origin main` после точного commit |
 
 ## Task-specific compliance matrix
 
 | Requirement | Status | Evidence |
 | --- | --- | --- |
-| Permanent requirements и Laravel 13 boundaries | `completed` | [Compliance matrix](task-101-collection-quality-compliance.md) |
-| Additive schema и reversible migration | `completed` | [Design](../superpowers/specs/2026-07-26-collection-quality-rating-design.md) |
-| Explainable score, duplicates, theme и engagement | `completed` | [Implementation checklist](../superpowers/plans/2026-07-26-collection-quality-rating.md) |
-| Public/admin/verification security gates | `completed` | [Compliance matrix](task-101-collection-quality-compliance.md) |
-| Full verification | `completed` | [Task 101 evidence](archive/2026-07-26-collection-quality-evidence.md) |
-| Commit и push | `in_progress: delivery gate` | [Task 101 evidence](archive/2026-07-26-collection-quality-evidence.md) |
-| Likes, follows, collaborators и public smart rules | `not_applicable` | Они явно остаются нереализованными product boundaries |
+| Один owner, exact manifest и проверяемый index | `completed` | Живой lease, NUL-delimited manifest расширен до 39 путей до новых edits, baseline сохранён вне repository |
+| MP4 backward compatibility и подтверждение новых форматов | `completed` | `LicensedMedia::scopeWithVerifiedPlaybackFormat()`, resolver/query integration и focused regressions |
+| Единая версия PHP/player assets | `completed` | Vite release plugin, `player-release.json`, fail-closed `PlayerReleaseReadiness` и `npm run build` gate |
+| Реальное browser decode evidence | `completed` | Deterministic MP4 fixture продвигает `currentTime` без `media.error` в Desktop Chromium и Desktop Firefox |
+| Новые audio/subtitle tracks только после фактической доступности | `already_compliant` | Отдельные реальные URL/body для новых дорожек не обнаружены; фиктивные дорожки не создаются |
+| Schema/index/dependency change | `not_applicable` | Existing health columns и `licensed_media_publication_lookup_idx` покрывают новый query; migration/package install не требуются |
+| Документация, final review, commit и push | `in_progress` | Тематические документы/evidence и точный alternate index завершаются после полного regression analysis |
 
 ## Последнее подтверждённое evidence
 
-- [Архив Task 101](archive/2026-07-26-collection-quality-evidence.md)
+Текущее подтверждение сохранено в
+[Task 102 evidence](archive/2026-07-26-player-release-verification-evidence.md).
+Предыдущая итерация не удалена и остаётся в
+[Task 104 evidence](archive/2026-07-26-player-workspace-redesign-evidence.md).
+Подтверждение ранее активного редакционного workstream также сохранено в
+[Task 101 evidence](archive/2026-07-26-collection-quality-evidence.md).
 
-## Текущая задача — Task 104: рабочее пространство player
+## Живой checklist
 
-## Активный workstream
+Полный список с приоритетом, причиной, файлами, зависимостями, риском и
+проверкой находится в
+[Task 102 implementation plan](../superpowers/plans/2026-07-26-player-verified-release-gates.md).
 
-| Workstream | Status | Evidence |
+| Stage | Status | Verification |
 | --- | --- | --- |
-| Task 104 — theatre mode, compact context, descriptive episode navigation и recovery UX | `unresolved: local commit complete, push authentication unavailable` | [Design](../superpowers/specs/2026-07-26-player-workspace-redesign-design.md), [implementation checklist](../superpowers/plans/2026-07-26-player-workspace-redesign.md), [compliance](task-104-player-workspace-compliance.md) |
+| Requirements/version/code/database/browser discovery | completed | Canonical docs, Boost, repository, SQLite и browser evidence |
+| Exclusive owner и exact file manifest | completed | Task 102 lease, `paths_declared=yes`, 39 paths, external baseline |
+| Format gate tests/implementation | completed | Focused PHPUnit и query-plan review |
+| Atomic release tests/implementation | completed | Unit tests, `npm run build`, readiness JSON |
+| Chromium/Firefox deterministic media decode | completed | Actual `play()`, `readyState`, `currentTime`, status 200/206, no media error |
+| Security/static/related verification | completed | Pint, PHPStan, Rector, build, related PHP/browser matrix |
+| Full suite reconciliation | completed | Task 102 fixtures green; 16 foreign failures и 1 foreign error перечислены в evidence |
+| Documentation | completed | README/CHANGELOG/thematic owners/compliance/archive evidence |
+| Exact index/commit/push | pending | staged snapshot, `main` commit, ordinary push |
 
-## Приоритеты и живой checklist
+## Scope, compatibility и последнее discovery
 
-| Priority | Status | Что / зачем | Файлы и зависимости | Риск | Проверка |
-| --- | --- | --- | --- | --- | --- |
-| critical | completed | Повторно прочитать permanent requirements, player docs, фактические версии и реализацию, чтобы не создать второй lifecycle | `AGENTS.md`, `docs/requirements/*`, player docs/code; Laravel 13.22, Livewire 4.3 | скрытый конфликт с playback/PWA/security | audit evidence, Boost application info/docs |
-| critical | completed | Получить exclusive lease и сохранить чужие staged/unstaged изменения | repository guard, точный declared scope | пересечение shared docs/index | lease status и exact-path staging |
-| critical | completed | Сначала закрепить постоянный theatre/context/recovery contract | `docs/UI_STANDARDS.md`, `docs/frontend.md`, `docs/architecture.md`, `docs/views.md`, playback report | расходящиеся требования | повторное чтение canonical sections |
-| critical | completed | Добавить RED tests для server projection, Blade markers и JS lifecycle | focused PHP/unit/browser tests | тесты могут зафиксировать markup вместо поведения | RED зафиксировал отсутствующие workspace contracts; финальный GREEN с translation parity: 33 теста, 80 915 утверждений |
-| critical | completed | Подготовить truthful media context без raw URL и Blade query | playback query, view model, transition factory/DTO | stale context после in-place swap | payload содержит только display metadata и public query; browser hot-swap обновляет context controls |
-| high | completed | Перестроить player Blade в один спокойный workspace | player/detail Blade, existing components | потеря старых actions или `wire:ignore` ownership | сохранён один keyed `wire:ignore`, обычные ссылки и существующие report/download actions |
-| high | completed | Реализовать theatre lifecycle с focus return и modal/fullscreen Escape priority | `player-navigation.js`, CSS | разрушение media DOM или застрявший body class | Playwright проверил scope, Escape, возврат фокуса и геометрию |
-| high | completed | Реализовать loading/fallback/error states и source recovery | `player.js`, `player-menu.js`, translations | бесконечный retry, fake source option | browser recovery открывает существующий выбор перевода; вымышленные источники не создаются |
-| high | completed | Сделать navigation и mobile controls понятными и ≥44 px | Blade, CSS, existing menu | overlap на 320 px/landscape | Playwright desktop/mobile/tablet: 8 passed, 1 skipped |
-| high | completed | Сохранить signed playback, authorization, progress, report и PWA boundaries | existing services/routes/jobs/worker | утечка provider URL/grant или второй report flow | route/service boundaries не менялись; transition payload не содержит URL источника |
-| medium | completed | Проверить query columns/N+1/indexes; не добавлять speculative DDL | playback query/schema | лишняя media hydration или потеря позднего выбранного source | точечная projection и eager-loaded relations; UI ограничен 24 уникальными options после active-first, DB-выборка не отбрасывает доступные media; DDL не требуется |
-| medium | completed | Запустить focused → full PHP, Pint, Vite и browser QA | existing test/build stack | широкий regression или flaky browser | Task 104 + translation parity: 33/33 PHP и 8 passed/1 skipped Playwright; полный PHPUnit выполнен с отдельным 1G config и выявил только параллельные repository regressions |
-| medium | completed | Обновить visitor/product docs и evidence | README, CHANGELOG, archive evidence | неактуальная документация | canonical docs, README, CHANGELOG, compliance и archive evidence обновлены |
-| critical | completed | Проверить точный diff, staged scope, secrets/debug и main | Git/lease guard | чужие файлы в commit | alternate-index staged diff, secret/debug scan и guard verify прошли для 32 путей |
-| critical | unresolved | Создать осмысленный commit и выполнить ordinary push | `main`, configured remote | отсутствие HTTPS credentials | commit `ed77c9eb` создан; `git push origin main` отклонён: terminal prompts disabled |
-
-## Неизменяемые public contracts
-
-- route `/titles/{catalogTitle:slug}` и route model binding;
-- public query keys `season`, `episode`, `media`, `variant`, `quality`, `format`;
-- один `CatalogTitlePlayer`, один keyed `wire:ignore`, один video/Plyr/HLS instance;
-- signed same-origin playback grant, source authorization, entitlement и fallback;
-- progress/session/telemetry/report contracts и обычные navigation `href`;
-- responsive player menu и PWA no-video-cache boundary;
-- русские интерфейсные тексты и RU/EN dictionary parity.
-
-## Database, routes, translations, cache и rollback
-
-- Migration и новый index не нужны: используется существующий nullable
-  `licensed_media.subtitle_language`; projection расширяется только этим полем.
-- Новые route, permission, cache key, external dependency и production service
-  не вводятся.
-- Rollback: revert Task 104 commit. Schema/data остаются неизменными; старые
-  playback grants/progress/report routes продолжают работать.
-
-## Последнее discovery
-
-Laravel Boost подтвердил PHP 8.5, Laravel 13.22, Livewire 4.3 и SQLite.
-Livewire 4 предоставляет component cleanup/morph hooks; существующая
-реализация уже использует правильное разделение `player.js`,
-`player-menu.js`, `player-navigation.js`, поэтому новый controller/store не
-понадобился. Subtitle track URL/body в schema отсутствует: UI показывает
-только реальную доступность source variant. Последняя проверка hot-swap
-выявила риск устаревших ссылок context-bar после бесшовной смены серии:
-transition payload расширен только безопасными display/query-метаданными, а
-контекстные варианты теперь перестраиваются вместе с episode navigation без
-раскрытия `source_url` или playback grant.
-Code review дополнительно выявил четыре edge case: доступный source за первой
-сотней строк, потерю языка субтитров, устаревший encrypted report context после
-hot-swap и сброс theatre state после Livewire morph. Все четыре закрыты
-регрессионными тестами. Полный PHPUnit подтвердил отсутствие Task 104 failures,
-но оставил внешние regressions параллельных workstreams, включая season query
-state вложенного Livewire player, шаблон offline layout, shared-plan policy и
-отсутствующий collection-quality class; они не входят в этот lease.
+- Меняются только объявленные 39 paths; shared dirty files коммитятся через
+  isolated alternate index относительно сохранённого baseline.
+- Public routes, query keys, API response, signed grants, entitlement,
+  progress, report/download, Livewire player identity и MP4 остаются
+  совместимыми.
+- Cache меняется только в public asset build dimension; media/signed/private
+  caching остаётся запрещён.
+- Rollback: revert единого Task 102 commit и полный rebuild предыдущей версии;
+  частичный PHP/assets rollout недопустим.
+- Catalog snapshot содержит только `mp4`; 248 опубликованных MP4 без
+  historical health-check остаются доступными по backward-compatible
+  established-format rule.
+- Новые форматы проходят только при `check_status=available` либо
+  `last_successful_check_at`; degraded формат без прежнего success скрывается.
+- Новых независимых subtitle/audio URL и подтверждённого body нет, поэтому
+  новые дорожки не создаются.
+- Связанный regression-run выявил legacy mobile/API/Blade/Livewire HLS
+  fixtures без availability evidence. Manifest расширен до 39 путей до edits,
+  а fixtures теперь хранят тот же successful-check contract, что production
+  importer.
+- Отдельные `CatalogPageTest` и `CatalogBladeComponentTest` regressions
+  воспроизводятся с доступным MP4/HLS и относятся к параллельному
+  Livewire/player workspace, а не к Task 102 format gate.

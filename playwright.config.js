@@ -18,6 +18,14 @@ const defaultProjects = [
         },
     },
     {
+        name: 'Desktop Firefox',
+        testMatch: /player-lifecycle\.spec\.js/,
+        use: {
+            browserName: 'firefox',
+            viewport: { width: 1440, height: 1200 },
+        },
+    },
+    {
         name: 'Mobile Chromium',
         use: {
             browserName: 'chromium',

@@ -79,6 +79,8 @@ class CatalogPlaybackSourceResolver
 
         if ($requestedMediaId !== null) {
             $query->whereKey($requestedMediaId);
+        } else {
+            $query->withVerifiedPlaybackFormat();
         }
 
         $excludedMediaIds = collect($excludedMediaIds)
@@ -93,8 +95,7 @@ class CatalogPlaybackSourceResolver
         }
 
         $hiddenVariantKeys = collect($preferences->hiddenVariantKeys)
-            ->filter(fn (mixed $key): bool => is_string($key)
-                && preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $key) === 1)
+            ->filter(fn (string $key): bool => preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $key) === 1)
             ->unique()
             ->take(50)
             ->values()
@@ -211,7 +212,9 @@ class CatalogPlaybackSourceResolver
         $raw = $media->playback_url ?: $media->path;
         $format = $this->format($media, $raw);
 
-        if ($format === null || ! in_array($format, (array) config('playback.allowed_formats', []), true)) {
+        if ($format === null
+            || ! in_array($format, (array) config('playback.allowed_formats', []), true)
+            || ! $media->hasVerifiedPlaybackFormat($format)) {
             return $this->sourceResult(PlaybackAvailability::TemporarilyUnavailable);
         }
 
@@ -431,7 +434,9 @@ class CatalogPlaybackSourceResolver
             'has_subtitles',
             'subtitle_language',
             'format',
+            'check_status',
             'health_status',
+            'last_successful_check_at',
             'deleted_at',
         ];
     }
