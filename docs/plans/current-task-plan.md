@@ -9162,3 +9162,109 @@ temporary B-tree.
   параллельные незавершённые задачи. Commit `e2f25af` создан в `main`.
   Configured HTTPS push завершился кодом 128 до передачи данных:
   `could not read Username for 'https://github.com'`.
+
+## Task 68 — компактная web-проекция главной страницы
+
+Статус: `implementation_verified_commit_pending`.
+
+Дата начала: 26.07.2026.
+
+Approved design:
+[`2026-07-26-homepage-web-projection-performance-design.md`](../superpowers/specs/2026-07-26-homepage-web-projection-performance-design.md).
+
+Detailed implementation plan:
+[`2026-07-26-homepage-web-projection-performance.md`](../superpowers/plans/2026-07-26-homepage-web-projection-performance.md).
+
+### Цель и evidence
+
+После Task 66 серверный cache `HIT` отвечает за `0,075–0,119 s`, live
+`BYPASS` — за `0,387–0,531 s`, а throttled mobile LCP составляет
+`1,436 s`. Остаточная нагрузка находится в presentation: uncompressed HTML
+имеет `715 641` bytes, `3 983` DOM nodes, `76` poster elements и mobile
+height `30 354 px`. Из них 48 карточек «Последних обновлений» занимают
+`319 741` bytes.
+
+Выбрана отдельная 12-row web-проекция перед Eloquent hydration. Полный
+48-row snapshot и `/api/v1/home` сохраняются; recommendation exclusions
+продолжают учитывать все 48 snapshot IDs. Lazy Livewire island, новая
+таблица/index, dependency, config/env и cache flush отклонены.
+
+### Expected changed files
+
+- `app/Services/Catalog/CatalogHomePageBuilder.php`;
+- `app/Livewire/CatalogHomePage.php`;
+- `app/Support/Cache/PublicPageCachePolicy.php`;
+- `resources/views/livewire/catalog-home-page.blade.php`;
+- new `tests/Feature/CatalogHomeWebProjectionTest.php`;
+- `tests/Unit/PublicPageCachePolicyTest.php`;
+- design/detailed/current plans, `docs/performance.md`, `README.md`,
+  `CHANGELOG.md`.
+
+### Protected contracts
+
+- `/`, localized home, `/discover/recently_updated` и `/api/v1/home`;
+- full-page Livewire, HTML/SEO and no-JavaScript navigation;
+- full 48-row snapshot schema/key/TTL/invalidation and stable ordering;
+- API Resource shape and safe-field filtering;
+- recommendation candidates/exclusions/ranking/shown-state;
+- publication, availability, audience, region, Premium, legal and policies;
+- title-card markup outside scoped marker;
+- search, sitemap, importer, administration, translations, routes, schema,
+  dependencies, environment and foreign shared-tree changes.
+
+### Cross-feature и risk matrix
+
+| Domain | Статус | Решение / gate |
+| --- | --- | --- |
+| Homepage web SSR | `critical_affected` | 12 ordered rows before hydration; HTML/DOM/browser budgets |
+| API/mobile clients | `protected` | Controller retains full `data()` and current Resource |
+| Recommendations | `protected_critical` | Exclusions derive from all snapshot IDs |
+| SEO/no-JS | `affected_bounded` | Web ItemList matches shown rows; canonical full-list link |
+| Cache | `affected_versioned` | Homepage `response_contract=2`; no flush/bump |
+| Authorization/privacy/legal | `already_compliant` | Existing server-side visibility queries unchanged |
+| Translations | `already_compliant` | Existing RU/EN `home.actions.view_all` |
+| Database/import/queues | `not_applicable` | No schema, DML, command or job changes |
+| Frontend/mobile/a11y | `affected_validation` | Existing card/link components, 44px action, Playwright matrix |
+| Production/rollback | `affected_low` | Code/compiled-view rollback; no data restore |
+| Shared Git state | `critical_risk_recorded` | Exact patch staging in existing `main` only |
+
+### Task-specific requirement-compliance matrix
+
+| Requirement/domain | Статус | Evidence / следующий gate |
+| --- | --- | --- |
+| Root/index/canonical requirements fresh read | `completed` | 26.07.2026 before implementation |
+| Applicable architecture/performance/cache/frontend/UI/ops/maintenance docs | `completed` | Canonical owners and linked operation runbook traced |
+| Installed versions/runtime/database | `completed` | PHP 8.5.8, Laravel 13.22.0, Boost 2.4.13, Livewire 4.3.3, SQLite, Tailwind 4.3.2 |
+| Official version-dependent framework docs | `completed` | Laravel 13/Livewire 4 projection/eager-load/full-page lazy docs via Boost |
+| Existing implementation first | `completed` | Builder/snapshot/API/resource/Livewire/Blade/cache/recommendation paths traced |
+| Read-only profile/root cause | `completed` | HTTP, HTML/DOM and managed Chromium evidence above |
+| Alternatives/user authorization | `completed` | Three options compared; repeated user preapproval applies |
+| Design/plan/files/contracts/risks | `completed` | Linked approved design and exact unlimited plan |
+| Migrations/routes/API schema/env/dependencies | `not_applicable` | Explicitly excluded |
+| TDD RED | `completed` | Projection: 1 test/0 assertions, missing `webData()`; cache: 1 test/4 assertions, missing dimension |
+| Implementation | `completed` | Builder/Livewire/Blade and homepage cache contract v2 GREEN |
+| Focused/static/build/browser/live verification | `completed` | 51/484 focused, 215/1 194 broad, exact final 5/48; static/build/live/browser green |
+| Full default PHPUnit process | `unresolved` | Known cumulative `256M` exhaustion in `UnifiedDiscoveryCollectionsTest`; exact failed test separately green 1/3 |
+| Managed documentation check | `unresolved` | Reports foreign managed changes in README/CODE_STANDARDS/DATA_RELATIONS/SOURCE_PARITY/MAINTENANCE_LOG; broad refresh not run over shared Task 67 tree |
+| Physical-device verification | `unresolved` | Managed Chromium covers viewports/throttling, not real phone/tablet hardware |
+| README/CHANGELOG/final requirement reread | `completed` | Performance/visitor/changelog owners updated; canonical requirements and Task 68 re-read |
+| Commit/push in `main` | `unresolved` | Exact Task 68 staging/commit/push is the remaining gate |
+
+### Безлимитный execution order
+
+1. `[completed]` Fresh requirements, versions, Git and implementation discovery.
+2. `[completed]` Live HTTP/DOM/managed Chromium profile and root-cause isolation.
+3. `[completed]` Alternatives, approved design, compatibility and rollback.
+4. `[completed]` Exact detailed plan, file map, protected contracts and matrices.
+5. `[completed]` TDD RED for full API versus 12-row web projection.
+6. `[completed]` Minimal shared builder boundary and Livewire/Blade GREEN:
+   final projection test 1/14; mutation of full exclusions failed after
+   7 assertions as required.
+7. `[completed]` TDD RED/GREEN homepage cache `response_contract=2`:
+   policy 4 tests/34 assertions; projection 1 test/13 assertions.
+8. `[completed]` Focused/broad/static/build/live browser verification;
+   default full process reached known cumulative `256M` exhaustion and the
+   exact failed test passed separately 1/3.
+9. `[completed]` Performance docs, README, CHANGELOG, final requirement reread
+   and repository legacy scan.
+10. `[in_progress]` Exact isolated commit on `main` and configured push.

@@ -109,6 +109,7 @@ final class PublicPageCachePolicy
 
         if ($profile === 'homepage') {
             $dimensions['translations'] = $this->homepageTranslationFingerprint();
+            $dimensions['response_contract'] = 2;
         }
 
         if ($profile === 'calendar') {

@@ -14,7 +14,7 @@ final class CatalogHomePage extends Component
     public function render(CatalogHomePageBuilder $page): View
     {
         $viewer = auth()->user();
-        $data = $page->data($viewer instanceof User ? $viewer : null);
+        $data = $page->webData($viewer instanceof User ? $viewer : null);
 
         return view('livewire.catalog-home-page', $data)
             ->extends('layouts.app', [

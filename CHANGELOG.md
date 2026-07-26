@@ -2,6 +2,22 @@
 
 ## 2026-07-26
 
+- Главная страница получила отдельную компактную web-проекцию:
+  `CatalogHomePageBuilder::webData()` гидратирует и передаёт в full-page
+  Livewire не более 12 свежих тайтлов, а обычная ссылка «Показать все» ведёт
+  на существующий индексируемый `/discover/recently_updated`. Полный
+  `CatalogHomeSnapshotCache` и `CatalogHomePageBuilder::data()` сохраняют до
+  48 factual updates для `/api/v1/home`; исключения рекомендаций также
+  продолжают учитывать все snapshot IDs. Homepage full-response cache
+  получил dimension `response_contract=2`, поэтому прежний HTML становится
+  недостижим без общего `flush`. На рабочем HTTPS uncompressed HTML
+  уменьшился с `715 641` до `458 733` bytes, DOM — с `3 983` до `2 633`
+  узлов, число изображений — с `76` до `40`; повторные `HIT` заняли
+  `0,073–0,081 s`, а throttled mobile Chromium показал LCP `1 168 ms` без
+  CLS, горизонтального переполнения и ошибок браузера. Focused и broad
+  матрицы прошли 215 тестов с 1 194 проверками, Larastan, Rector и Vite —
+  без ошибок. Маршруты, API shape, schema/data, permissions, translations,
+  dependencies, environment, importer и очереди не менялись.
 - Персональные рекомендации получили структурированную обратную связь:
   `CatalogRecommendationFeedbackReason` поддерживает 11 стабильных причин,
   а `CatalogRecommendationFeedbackService` проверяет право владельца,

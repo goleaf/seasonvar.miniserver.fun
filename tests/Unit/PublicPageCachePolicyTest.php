@@ -34,6 +34,7 @@ final class PublicPageCachePolicyTest extends TestCase
         $this->assertSame(CacheDomain::Homepage, $homepage->domain);
         $this->assertSame('public', $homepage->versionScope);
         $this->assertSame('home', $homepage->dimensions['route']);
+        $this->assertSame(2, $homepage->dimensions['response_contract']);
 
         $first = app(PublicPageCachePolicy::class)->context(
             $this->request('GET', '/titles?genre[0]=drama&genre[1]=comedy&year[0]=2026&year[1]=2025&page=2', 'titles.index'),

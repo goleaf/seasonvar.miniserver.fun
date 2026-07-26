@@ -55,7 +55,12 @@
                             </div>
 
                             @foreach ($titlesForDate as $catalogTitle)
-                                <x-catalog.title-card :title="$catalogTitle" layout="list" :show-description="false" />
+                                <x-catalog.title-card
+                                    :title="$catalogTitle"
+                                    layout="list"
+                                    :show-description="false"
+                                    data-home-latest-update-card="{{ $catalogTitle->id }}"
+                                />
                             @endforeach
                         @empty
                             <div class="p-6 text-sm text-slate-500">
@@ -63,6 +68,18 @@
                             </div>
                         @endforelse
                     </div>
+                    @if ($hasMoreLatestTitles)
+                        <div class="border-t border-slate-200 bg-slate-50 px-4 py-3 text-right">
+                            <a
+                                href="{{ $recentlyUpdatedUrl }}"
+                                data-home-latest-updates-all
+                                class="inline-flex min-h-11 items-center gap-2 rounded-control px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100"
+                            >
+                                <span>{{ __('home.actions.view_all') }}</span>
+                                <x-ui.icon name="fa-solid fa-arrow-right" />
+                            </a>
+                        </div>
+                    @endif
                 </x-ui.panel>
 
                 <x-ui.panel :title="__('home.sections.new_episodes')" icon="fa-solid fa-circle-play" :pad="false">

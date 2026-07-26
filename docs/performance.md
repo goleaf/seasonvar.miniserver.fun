@@ -546,3 +546,47 @@ Larastan и Rector — без ошибок. Полный `php artisan test` ос
 diagnostic evidence текущего SQLite snapshot, не p95/SLA. Migration, новый
 index, cache key/version/TTL, route, translation, queue, dependency, env или
 production DML не добавлены; rollback — обычный revert кода.
+
+## Компактная web-проекция главной
+
+Follow-up 26.07.2026 после устранения SQL bottleneck отделил полный factual
+snapshot от HTML presentation. До изменения anonymous `HIT` занимал
+`0,075–0,119 s`, `BYPASS` — `0,387–0,531 s`, но uncompressed response
+содержал `715 641` bytes, `3 983` DOM nodes, `76` изображений и имел высоту
+`30 354 px` на mobile. Только 48 полноразмерных карточек «Последних
+обновлений» занимали `319 741` bytes; gzip transfer около `39,3 KB`
+подтвердил, что остаточная цена находилась в PHP/DOM parsing/layout, а не в
+сети.
+
+`CatalogHomePageBuilder::webData()` теперь ограничивает только full-page
+Livewire первыми 12 stable ordered `latest_title_ids` до Eloquent hydration.
+`data()` и `/api/v1/home` сохраняют прежние до 48 строк и текущую Resource
+shape. Recommendation exclusions строятся из полного scalar snapshot, а не
+из web subset; factual ordering, availability, audience, region, Premium,
+legal и publication predicates не менялись. Blade использует существующий
+RU/EN `home.actions.view_all` и canonical indexable
+`/discover/recently_updated`; lazy island, второй HTTP-запрос и
+JavaScript-only content boundary не добавлены.
+
+Новый homepage `response_contract=2` делает прежние HTML envelopes
+недостижимыми без scan, flush или generation bump. Первый запрос namespace
+вернул `200` примерно за `0,300 s`, следующие `HIT` — за `0,073–0,081 s`.
+Uncompressed HTML уменьшился до `458 733` bytes (`−35,9%`), DOM — до
+`2 633` nodes (`−33,9%`), изображения — до `40`, gzip transfer — примерно
+до `28,95 KB`; карточек обновлений ровно 12, full-list link один.
+
+Managed Chromium подтвердил: desktop `1440×1200` FCP/LCP `472 ms`, mobile
+`390×844` — `252 ms`, mobile document height `20 720 px`; при `4×` CPU
+throttling и ограниченном 4G FCP/LCP составил `1 168 ms`,
+DOMContentLoaded — `1 441 ms`. Во всех трёх профилях CLS и horizontal
+overflow равны нулю, console/page/request failures отсутствуют. Это
+read-only diagnostic observation текущего сервера, а не p95/SLA.
+
+TDD зафиксировал отдельные RED для отсутствующих `webData()` и homepage
+cache dimension; focused matrix прошла 51 тест с 484 проверками, broad
+homepage/discovery/cache/recommendation matrix — 215 тестов с 1 194
+проверками. Task-scoped Pint, Larastan, Rector и Vite завершились успешно.
+Migration, route, API schema, translation, dependency, environment, queue
+или production DML не добавлены. Rollback возвращает прежний PHP/Blade
+commit и штатно пересобирает compiled views/config с graceful PHP-FPM
+reload; database restore и cache flush не требуются.

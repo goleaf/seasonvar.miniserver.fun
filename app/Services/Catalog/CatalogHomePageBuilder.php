@@ -23,6 +23,8 @@ use Illuminate\Support\Collection;
 
 class CatalogHomePageBuilder
 {
+    private const WEB_LATEST_TITLE_LIMIT = 12;
+
     public function __construct(
         private readonly CatalogSeoBuilder $seo,
         private readonly CatalogFacetQuery $facets,
@@ -46,6 +48,22 @@ class CatalogHomePageBuilder
      */
     public function data(?User $user = null): array
     {
+        return $this->buildData($user);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function webData(?User $user = null): array
+    {
+        return $this->buildData($user, self::WEB_LATEST_TITLE_LIMIT);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildData(?User $user, ?int $latestTitleLimit = null): array
+    {
         $accountSettings = $this->accountSettings->resolve($user);
         $locale = app()->currentLocale();
         $genres = $this->facets->taxonomies('genre');
@@ -57,12 +75,16 @@ class CatalogHomePageBuilder
             ]));
         });
         $snapshot = $this->snapshot->snapshot();
+        $allLatestTitleIds = $snapshot['latest_title_ids'];
+        $latestTitleIds = $latestTitleLimit === null
+            ? $allLatestTitleIds
+            : array_slice($allLatestTitleIds, 0, $latestTitleLimit);
         $stats = [
             ...$this->metrics->metrics(),
             'genres' => $genres->count(),
             'countries' => $countries->count(),
         ];
-        $latestTitles = $this->orderedTitles($snapshot['latest_title_ids'], $this->titleSummaryQuery($user)
+        $latestTitles = $this->orderedTitles($latestTitleIds, $this->titleSummaryQuery($user)
             ->with(array_merge([
                 'latestSeason' => fn ($query) => $query->select(['seasons.id', 'seasons.catalog_title_id', 'seasons.number']),
             ], $this->taxonomies->cardSummaryLoads())));
@@ -111,10 +133,9 @@ class CatalogHomePageBuilder
             $latestTitles,
             $latestTitleUpdates->all(),
         );
-        $excludedRecommendationIds = $latestTitles
-            ->concat($featuredTitles)
-            ->concat($videoTitles)
-            ->pluck('id')
+        $excludedRecommendationIds = collect($allLatestTitleIds)
+            ->concat($featuredTitles->pluck('id'))
+            ->concat($videoTitles->pluck('id'))
             ->map(fn (mixed $id): int => (int) $id)
             ->unique()
             ->values()
@@ -184,8 +205,10 @@ class CatalogHomePageBuilder
             'homeRecommendationPresentation' => $homeRecommendationPresentation,
             'collectionsUrl' => $this->discoveryUrl(CatalogRecommendationType::Popular).'#collections',
             'discoveryUrl' => $this->discoveryUrl($recommendationResult->displayType),
+            'hasMoreLatestTitles' => count($allLatestTitleIds) > $latestTitles->count(),
             'topRatedUrl' => $this->discoveryUrl(CatalogRecommendationType::TopRated),
             'recentlyAddedUrl' => $this->discoveryUrl(CatalogRecommendationType::RecentlyAdded),
+            'recentlyUpdatedUrl' => $this->discoveryUrl(CatalogRecommendationType::RecentlyUpdated),
             'upcomingUrl' => $this->localeRoute('calendar.upcoming'),
             'randomUrl' => $this->discoveryUrl(CatalogRecommendationType::Random),
             'continueWatchingUrl' => $user !== null
