@@ -12,6 +12,7 @@ final readonly class CatalogRecommendationListItem
 {
     /**
      * @param  list<string>  $reasonLabels
+     * @param  array{genres?: list<array{id: int, name: string}>, countries?: list<array{id: int, name: string}>, actors?: list<array{id: int, name: string}>}  $feedbackOptions
      */
     public function __construct(
         public CatalogTitle $title,
@@ -22,5 +23,6 @@ final readonly class CatalogRecommendationListItem
         public CatalogRecommendationSource $source = CatalogRecommendationSource::ContentSimilarity,
         public ?string $relationType = null,
         public bool $canDismiss = false,
+        public array $feedbackOptions = [],
     ) {}
 }

@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services\Auth;
 
+use App\Models\CatalogRecommendationFeedbackDetail;
+use App\Models\CatalogRecommendationHiddenGenre;
+use App\Models\CatalogRecommendationPreference;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleUpdateState;
 use App\Models\CatalogTitleUserState;
@@ -11,6 +14,7 @@ use App\Models\EpisodePlaybackMarker;
 use App\Models\EpisodeViewProgress;
 use App\Models\User;
 use App\Models\UserTag;
+use App\Services\Catalog\CatalogRecommendationPreferenceSchema;
 use App\Services\Catalog\PersonalLibrarySchema;
 use App\Services\Collections\CatalogCollectionAccountService;
 use App\Services\Comments\CommentAccountService;
@@ -46,6 +50,7 @@ final class AccountDataExportService
         private readonly HelpAccountService $helpCenter,
         private readonly AccountSettingsService $settings,
         private readonly PersonalLibrarySchema $personalLibrarySchema,
+        private readonly CatalogRecommendationPreferenceSchema $recommendationSchema,
     ) {}
 
     /** @return array<string, mixed> */
@@ -114,6 +119,7 @@ final class AccountDataExportService
             'premium' => $this->premium->export($user),
             'help_center' => $this->helpCenter->export($user),
             'notifications' => $this->notifications($user),
+            'recommendations' => $this->recommendations($user),
             'library' => CatalogTitleUserState::query()
                 ->whereBelongsTo($user)
                 ->with('catalogTitle:id,slug,title')
@@ -151,6 +157,73 @@ final class AccountDataExportService
                 ])->all(),
             'playback_markers' => $this->playbackMarkers($user),
             'library_update_acknowledgements' => $this->updateAcknowledgements($user),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function recommendations(User $user): array
+    {
+        if (! $this->recommendationSchema->ready()) {
+            return [
+                'preferences' => [
+                    'diversity' => 'balanced',
+                    'freshness' => 'balanced',
+                    'profile_reset_at' => null,
+                ],
+                'feedback' => [],
+                'temporarily_hidden_genres' => [],
+            ];
+        }
+
+        $preference = CatalogRecommendationPreference::query()->find($user->id);
+        $feedback = CatalogRecommendationFeedbackDetail::query()
+            ->whereBelongsTo($user)
+            ->with([
+                'catalogTitle' => fn ($query) => $query->withTrashed()->select(['id', 'slug', 'title']),
+                'genre:id,name',
+                'country:id,name',
+                'actor:id,name',
+            ])
+            ->oldest('created_at')
+            ->oldest('id')
+            ->get()
+            ->map(fn (CatalogRecommendationFeedbackDetail $detail): array => [
+                'title_slug' => $detail->catalogTitle?->slug,
+                'title' => $detail->catalogTitle?->title,
+                'reason' => $detail->reason->value,
+                'subject_type' => $detail->reason->subjectType(),
+                'subject' => match ($detail->reason->subjectType()) {
+                    'genre' => $detail->genre?->name,
+                    'country' => $detail->country?->name,
+                    'actor' => $detail->actor?->name,
+                    default => null,
+                },
+                'created_at' => $detail->created_at?->toAtomString(),
+                'updated_at' => $detail->updated_at?->toAtomString(),
+            ])
+            ->all();
+        $hiddenGenres = CatalogRecommendationHiddenGenre::query()
+            ->whereBelongsTo($user)
+            ->with('genre:id,name')
+            ->oldest('created_at')
+            ->oldest('id')
+            ->get()
+            ->map(fn (CatalogRecommendationHiddenGenre $hidden): array => [
+                'genre' => $hidden->genre?->name,
+                'hidden_until' => $hidden->hidden_until->toAtomString(),
+                'created_at' => $hidden->created_at?->toAtomString(),
+                'updated_at' => $hidden->updated_at?->toAtomString(),
+            ])
+            ->all();
+
+        return [
+            'preferences' => [
+                'diversity' => $preference?->diversity->value ?? 'balanced',
+                'freshness' => $preference?->freshness->value ?? 'balanced',
+                'profile_reset_at' => $preference?->profile_reset_at?->toAtomString(),
+            ],
+            'feedback' => $feedback,
+            'temporarily_hidden_genres' => $hiddenGenres,
         ];
     }
 

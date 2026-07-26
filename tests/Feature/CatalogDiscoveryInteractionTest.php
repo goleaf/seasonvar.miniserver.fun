@@ -6,12 +6,19 @@ namespace Tests\Feature;
 
 use App\DTOs\CatalogRecommendationContext;
 use App\Enums\CatalogPopularityPeriod;
+use App\Enums\CatalogRecommendationDiversityPreference;
 use App\Enums\CatalogRecommendationFeedback;
+use App\Enums\CatalogRecommendationFeedbackReason;
+use App\Enums\CatalogRecommendationFreshnessPreference;
 use App\Enums\CatalogRecommendationType;
 use App\Livewire\CatalogDiscoveryPage;
+use App\Models\CatalogRecommendationFeedbackDetail;
+use App\Models\CatalogRecommendationHiddenGenre;
+use App\Models\CatalogRecommendationPreference;
 use App\Models\CatalogTitle;
 use App\Models\Episode;
 use App\Models\EpisodeViewProgress;
+use App\Models\Genre;
 use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Models\User;
@@ -172,6 +179,77 @@ final class CatalogDiscoveryInteractionTest extends TestCase
             'recommendation_feedback' => null,
         ]);
         $this->assertContains('more_like_this', CatalogRecommendationFeedback::values());
+    }
+
+    public function test_verified_user_must_choose_a_reason_and_subject_is_saved_server_side(): void
+    {
+        $user = User::factory()->create();
+        $title = $this->playableTitle('Осмысленный отрицательный сигнал');
+        $genre = Genre::query()->create([
+            'name' => 'Жанр причины',
+            'slug' => 'reason-subject-genre',
+        ]);
+        $title->genres()->attach($genre);
+        $component = Livewire::actingAs($user)
+            ->test(CatalogDiscoveryPage::class, ['type' => 'personalized'])
+            ->call('setFeedback', $title->id, 'not_interested')
+            ->assertHasErrors(['recommendationFeedback'])
+            ->call(
+                'setFeedbackReason',
+                $title->id,
+                CatalogRecommendationFeedbackReason::DislikeGenre->value,
+                $genre->id,
+            )
+            ->assertHasNoErrors()
+            ->assertSet('lastFeedbackTitleId', $title->id);
+
+        $detail = CatalogRecommendationFeedbackDetail::query()->sole();
+        $this->assertSame(CatalogRecommendationFeedbackReason::DislikeGenre, $detail->reason);
+        $this->assertSame($genre->id, $detail->genre_id);
+        $component->call('undoFeedback')->assertHasNoErrors();
+        $this->assertSame(0, CatalogRecommendationFeedbackDetail::query()->count());
+    }
+
+    public function test_personalized_controls_update_preferences_hide_genre_and_reset_profile(): void
+    {
+        $user = User::factory()->create();
+        $genre = Genre::query()->create([
+            'name' => 'Временно скрываемая комедия',
+            'slug' => 'livewire-temporary-hidden-genre',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(CatalogDiscoveryPage::class, ['type' => 'personalized'])
+            ->call(
+                'updateRecommendationPreferences',
+                CatalogRecommendationDiversityPreference::Varied->value,
+                CatalogRecommendationFreshnessPreference::Newer->value,
+            )
+            ->assertHasNoErrors()
+            ->assertSet('diversityPreference', 'varied')
+            ->assertSet('freshnessPreference', 'newer')
+            ->call('hideRecommendationGenre', $genre->id)
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('catalog_recommendation_preferences', [
+            'user_id' => $user->id,
+            'diversity' => 'varied',
+            'freshness' => 'newer',
+        ]);
+        $this->assertDatabaseHas('catalog_recommendation_hidden_genres', [
+            'user_id' => $user->id,
+            'genre_id' => $genre->id,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(CatalogDiscoveryPage::class, ['type' => 'personalized'])
+            ->call('resetRecommendationProfile')
+            ->assertHasNoErrors()
+            ->assertSet('diversityPreference', 'balanced')
+            ->assertSet('freshnessPreference', 'balanced');
+
+        $this->assertNotNull(CatalogRecommendationPreference::query()->find($user->id)?->profile_reset_at);
+        $this->assertSame(0, CatalogRecommendationHiddenGenre::query()->count());
     }
 
     private function guestPersonalizedContext(): CatalogRecommendationContext

@@ -7,6 +7,7 @@ use App\Models\Concerns\HasCatalogTitles;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 
+/** @property string $name */
 #[Fillable(['name', 'slug', 'source_url'])]
 class Country extends Model
 {

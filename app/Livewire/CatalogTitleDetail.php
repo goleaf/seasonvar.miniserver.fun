@@ -6,13 +6,16 @@ namespace App\Livewire;
 
 use App\DTOs\CatalogTitleRefreshState;
 use App\Enums\CatalogRecommendationFeedback;
+use App\Enums\CatalogRecommendationFeedbackReason;
 use App\Enums\SeasonvarImportStatus;
 use App\Http\Requests\CatalogShowRequest;
 use App\Models\CatalogTitle;
+use App\Models\Genre;
 use App\Models\User;
+use App\Services\Catalog\CatalogRecommendationFeedbackService;
+use App\Services\Catalog\CatalogRecommendationPreferenceService;
 use App\Services\Catalog\CatalogTitlePageBuilder;
 use App\Services\Catalog\CatalogTitleQuery;
-use App\Services\Catalog\CatalogUserStateService;
 use App\Services\Collections\CatalogCollectionQuery;
 use App\Services\Seasonvar\CatalogTitleRefreshCoordinator;
 use App\Services\Seasonvar\CatalogTitleRefreshStateStore;
@@ -47,7 +50,9 @@ class CatalogTitleDetail extends Component
 
     protected CatalogTitleQuery $titles;
 
-    protected CatalogUserStateService $userStates;
+    protected CatalogRecommendationFeedbackService $feedback;
+
+    protected CatalogRecommendationPreferenceService $preferences;
 
     #[Locked]
     public ?int $lastRecommendationFeedbackTitleId = null;
@@ -60,14 +65,16 @@ class CatalogTitleDetail extends Component
         CatalogTitleRefreshStateStore $states,
         CatalogCollectionQuery $collections,
         CatalogTitleQuery $titles,
-        CatalogUserStateService $userStates,
+        CatalogRecommendationFeedbackService $feedback,
+        CatalogRecommendationPreferenceService $preferences,
     ): void {
         $this->pages = $pages;
         $this->refreshes = $refreshes;
         $this->states = $states;
         $this->collections = $collections;
         $this->titles = $titles;
-        $this->userStates = $userStates;
+        $this->feedback = $feedback;
+        $this->preferences = $preferences;
     }
 
     public function mount(CatalogShowRequest $request, CatalogTitle $catalogTitle): void
@@ -116,17 +123,108 @@ class CatalogTitleDetail extends Component
             return;
         }
 
+        if ($feedback === CatalogRecommendationFeedback::NotInterested) {
+            $this->addError('recommendationFeedback', __('recommendations.feedback.reason_required'));
+
+            return;
+        }
+
         try {
             $title = $this->titles->visibleTo($user)->findOrFail($titleId);
-            $this->userStates->setRecommendationFeedback($user, $title, $feedback);
+
+            if ($feedback === CatalogRecommendationFeedback::MoreLikeThis) {
+                $this->feedback->savePositive($user, $title);
+                $this->recommendationNotice = __('recommendations.feedback.saved_more_like_this');
+            } else {
+                $this->feedback->save($user, $title, CatalogRecommendationFeedbackReason::NotThisTitle);
+                $this->recommendationNotice = __('recommendations.feedback.saved_reason');
+            }
+
             $this->lastRecommendationFeedbackTitleId = $title->id;
-            $this->recommendationNotice = __("recommendations.feedback.saved_{$feedback->value}");
             $this->pages->forget($this->catalogTitleId, $user);
             $this->resetErrorBag('recommendationFeedback');
         } catch (ValidationException $exception) {
             $this->addError(
                 'recommendationFeedback',
                 (string) ($exception->errors()['recommendationFeedback'][0] ?? __('recommendations.feedback.error')),
+            );
+        } catch (Throwable $exception) {
+            report($exception);
+            $this->addError('recommendationFeedback', __('recommendations.feedback.error'));
+        }
+    }
+
+    public function setRecommendationFeedbackReason(
+        mixed $catalogTitleId,
+        mixed $reason,
+        mixed $subjectId = null,
+    ): void {
+        $user = $this->user();
+
+        if (! $user instanceof User) {
+            $this->redirectRoute('login', navigate: true);
+
+            return;
+        }
+
+        $titleId = filter_var($catalogTitleId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $reason = is_string($reason) ? CatalogRecommendationFeedbackReason::tryFrom($reason) : null;
+        $subjectId = $subjectId === null
+            ? null
+            : filter_var($subjectId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+
+        if (! is_int($titleId)
+            || $titleId === $this->catalogTitleId
+            || ! $reason instanceof CatalogRecommendationFeedbackReason
+            || ($subjectId !== null && ! is_int($subjectId))) {
+            $this->addError('recommendationFeedback', __('recommendations.feedback.invalid_reason'));
+
+            return;
+        }
+
+        try {
+            $title = $this->titles->visibleTo($user)->findOrFail($titleId);
+            $this->feedback->save($user, $title, $reason, $subjectId);
+            $this->lastRecommendationFeedbackTitleId = $title->id;
+            $this->recommendationNotice = __('recommendations.feedback.saved_reason');
+            $this->pages->forget($this->catalogTitleId, $user);
+            $this->resetErrorBag('recommendationFeedback');
+        } catch (ValidationException $exception) {
+            $this->addError(
+                'recommendationFeedback',
+                (string) (
+                    $exception->errors()['recommendationFeedbackSubject'][0]
+                    ?? $exception->errors()['recommendationFeedback'][0]
+                    ?? __('recommendations.feedback.error')
+                ),
+            );
+        } catch (Throwable $exception) {
+            report($exception);
+            $this->addError('recommendationFeedback', __('recommendations.feedback.error'));
+        }
+    }
+
+    public function hideRecommendationGenre(mixed $genreId): void
+    {
+        $user = $this->user();
+        $genreId = filter_var($genreId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+
+        if (! $user instanceof User || ! is_int($genreId)) {
+            $this->addError('recommendationFeedback', __('recommendations.preferences.invalid'));
+
+            return;
+        }
+
+        try {
+            $genre = Genre::query()->findOrFail($genreId);
+            $this->preferences->hideGenre($user, $genre);
+            $this->recommendationNotice = __('recommendations.preferences.genre_hidden');
+            $this->pages->forget($this->catalogTitleId, $user);
+            $this->resetErrorBag('recommendationFeedback');
+        } catch (ValidationException $exception) {
+            $this->addError(
+                'recommendationFeedback',
+                (string) ($exception->errors()['recommendationPreferences'][0] ?? __('recommendations.feedback.error')),
             );
         } catch (Throwable $exception) {
             report($exception);
@@ -144,7 +242,7 @@ class CatalogTitleDetail extends Component
 
         try {
             $title = $this->titles->visibleTo($user)->findOrFail($this->lastRecommendationFeedbackTitleId);
-            $this->userStates->undoRecommendationFeedback($user, $title);
+            $this->feedback->undo($user, $title);
             $this->lastRecommendationFeedbackTitleId = null;
             $this->recommendationNotice = __('recommendations.feedback.undone');
             $this->pages->forget($this->catalogTitleId, $user);

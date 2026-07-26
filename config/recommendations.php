@@ -12,6 +12,18 @@ return [
         'max_ids' => 96,
         'days' => 7,
     ],
+    'feedback' => [
+        'hidden_genre_days' => 30,
+        'explicit_feature_demotion' => 90,
+        'freshness_adjustment_cap' => 40,
+        'new_title_years' => 2,
+        'proven_title_years' => 5,
+        'classic_age_years' => 15,
+        'long_title_episode_count' => 40,
+        'low_rating_threshold' => 6.0,
+        'completed_status_slugs' => ['zavershen', 'completed', 'finished'],
+        'maximum_subject_options' => 12,
+    ],
     'diversity' => [
         'franchise_limit' => 2,
         'primary_genre_limit' => 5,

@@ -116,6 +116,7 @@ final class CatalogPersonalizedCandidateScorer
                 ),
                 'support_count' => count($candidate['contributions']),
                 'normalized_relevance' => round($candidate['normalized_relevance'], 6),
+                'taste_demotions_applied' => true,
             ];
         }
 
@@ -124,6 +125,7 @@ final class CatalogPersonalizedCandidateScorer
         return $rows;
     }
 
+    /** @param array<string, mixed>|object $row */
     private function value(array|object $row, string $key): mixed
     {
         return is_array($row) ? ($row[$key] ?? null) : ($row->{$key} ?? null);

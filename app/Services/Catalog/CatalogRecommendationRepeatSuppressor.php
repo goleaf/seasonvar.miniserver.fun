@@ -48,6 +48,18 @@ final class CatalogRecommendationRepeatSuppressor
         $this->session->put(self::SESSION_KEY, $all);
     }
 
+    public function forget(User $user): void
+    {
+        $all = $this->session->get(self::SESSION_KEY, []);
+
+        if (! is_array($all)) {
+            return;
+        }
+
+        unset($all[$this->scope($user)]);
+        $this->session->put(self::SESSION_KEY, $all);
+    }
+
     /** @return list<array{id: int, shown_at: int}> */
     private function rows(?User $user): array
     {

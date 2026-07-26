@@ -348,6 +348,17 @@ watching/completed/dropped exclusions и накапливает public fallback 
 
 Public catalog/editorial/rating/comment/review/rebuild/title-merge mutations bump existing recommendation version after commit. Progress bump происходит только при первом meaningful threshold/completion, не на heartbeat; watchlist и rating используют canonical state invalidators. Cache failure не откатывает mutation и выполняет bounded authoritative query. Full-store flush, wildcard key scan, второй cache store или mandatory warming queue не добавлены.
 
+Reason detail, diversity/freshness, profile reset cutoff и временно скрытые
+жанры никогда не входят в shared recommendation key/value. Для
+authenticated personalized request `CatalogRecommendationPreferenceQuery`
+загружает одну owner row и bounded active genre IDs request-scoped, а
+visibility применяет active genres серверным indexed `NOT EXISTS`.
+Feedback/preference mutation не сканирует и не очищает global cache:
+personalized выдача и так bypass shared result, existing canonical feedback
+invalidator сохраняется только для совместимого общего user-state lifecycle.
+Reset отдельно забывает bounded repeat-suppression текущего owner session и
+не затрагивает другие сессии или public cache namespace.
+
 Existing optional `PublicPageCacheWarmer` additionally resolves exactly the five stable default indexable discovery URLs from `CatalogRecommendationType`: `trending`, `popular`, `top_rated`, `recently_added`, `recently_updated`. They reuse the same same-origin HTTP timeout/retry, bounded URL manifest, sanitized guest page cache and scalar recommendation snapshots. Personalized/authenticated, random, editorial, upcoming, localized, filtered, paginated and private-feedback state is not proactively warmed. Queue/cache outage still falls back to the bounded authoritative discovery query; no second cache domain, queue or scheduler was added.
 
 ## Cache lifecycle file-size и downloads

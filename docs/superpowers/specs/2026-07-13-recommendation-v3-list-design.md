@@ -164,6 +164,16 @@ Hard exclusions централизованы: current title, explicit page exclu
 
 `more_like_this`, `not_interested` и `blacklisted` — три значения существующей one-row-per-user/title state, а не второй preference table. Первое является bounded positive evidence; только два последних означают отрицательный intent, входят в `hidden-recommendations` и подавляют релизные уведомления. Mutation authenticated, policy-authorized, rate-limited, idempotent, CSRF-protected и не использует GET. Undo очищает только feedback; history, progress, collection membership, watchlist и direct access сохраняются. Другая учётная запись это состояние не видит.
 
+Детализированный web-feedback не создаёт второй blacklist и не меняет эти
+три canonical значения. Один private current-state detail уточняет причину
+`not_interested|blacklisted` и при необходимости связывает только
+server-verified genre/country/actor данного тайтла. Owner preference row
+хранит stable diversity/freshness codes и reset cutoff, а временно скрытые
+жанры — отдельные expiry rows. Append-only impression/click analytics,
+произвольные feature keys и client weights запрещены. Полный contract причин,
+reset, ranking, privacy и rollback принадлежит
+[`smart recommendation feedback design`](2026-07-26-smart-recommendation-feedback-design.md).
+
 Explanation выбирается только из реально победившего signal/source. Формулировки широкие: явный положительный feedback, история, watchlist, status, collection membership, own tags, rating, metadata similarity, public activity, editorial choice, release/update или random. Каждая карточка явно обозначает этот блок как «Почему это показано». Exact source title, episode, progress, time, device, personal tag/collection name и internal weight не выводятся. Stored similarity reasons локализуются presenter-ом. В UI отсутствуют fake match percentages, «идеально для вас» и AI labels.
 
 ### Similarity и explicit relations

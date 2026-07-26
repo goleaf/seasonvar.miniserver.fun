@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Catalog;
 
+use App\Enums\CatalogRecommendationDiversityPreference;
 use App\Enums\CatalogTitleRelationType;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -16,8 +17,11 @@ final class CatalogRecommendationDiversityService
      * @param  list<array{id: int, score: int, source: string, reason: string, relation_type?: string|null}>  $candidates
      * @return list<array{id: int, score: int, source: string, reason: string, relation_type?: string|null}>
      */
-    public function diversify(array $candidates, int $limit): array
-    {
+    public function diversify(
+        array $candidates,
+        int $limit,
+        CatalogRecommendationDiversityPreference $preference = CatalogRecommendationDiversityPreference::Balanced,
+    ): array {
         if ($candidates === [] || $limit < 1) {
             return [];
         }
@@ -32,9 +36,18 @@ final class CatalogRecommendationDiversityService
         $dominantGenres = $this->dominantFeatureByTitle($genreRows, 'genre_id');
         $dominantActors = $this->dominantFeatureByTitle($actorRows, 'actor_id');
         $franchises = $this->franchiseByTitle($titleIds->all());
-        $genreLimit = max(1, (int) config('recommendations.diversity.primary_genre_limit', 5));
-        $actorLimit = max(1, (int) config('recommendations.diversity.leading_actor_limit', 4));
-        $franchiseLimit = max(1, (int) config('recommendations.diversity.franchise_limit', 2));
+        $genreLimit = $this->preferenceLimit(
+            max(1, (int) config('recommendations.diversity.primary_genre_limit', 5)),
+            $preference,
+        );
+        $actorLimit = $this->preferenceLimit(
+            max(1, (int) config('recommendations.diversity.leading_actor_limit', 4)),
+            $preference,
+        );
+        $franchiseLimit = $this->preferenceLimit(
+            max(1, (int) config('recommendations.diversity.franchise_limit', 2)),
+            $preference,
+        );
         $genreCounts = [];
         $actorCounts = [];
         $franchiseCounts = [];
@@ -80,6 +93,17 @@ final class CatalogRecommendationDiversityService
         }
 
         return array_slice($selected, 0, $limit);
+    }
+
+    private function preferenceLimit(
+        int $balanced,
+        CatalogRecommendationDiversityPreference $preference,
+    ): int {
+        return match ($preference) {
+            CatalogRecommendationDiversityPreference::Focused => max(1, $balanced * 2),
+            CatalogRecommendationDiversityPreference::Balanced => max(1, $balanced),
+            CatalogRecommendationDiversityPreference::Varied => max(1, (int) ceil($balanced / 2)),
+        };
     }
 
     /**

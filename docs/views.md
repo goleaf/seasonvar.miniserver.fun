@@ -117,7 +117,22 @@ Create view показывает search-before-submit, type descriptions, stable
 
 `CatalogRecommendationPresenter` — единственная boundary для type metadata, relation labels, stored similarity badges и broad explanation templates. `CatalogRecommendationListItem` содержит уже загруженный card title, rank/reason codes и permission to dismiss; Blade не видит score breakdown, user history или query services.
 
-Homepage показывает не более одной recommendation section; title detail — explicit related перед computed similar; discovery — filtered paginated list с working not-interested/blacklist/undo; library — link на personal discovery и owner-only hidden restore; search no-result — labelled popular link. Все состояния используют `lang/{ru,en}/recommendations.php`, existing cards/buttons/panels and escaped output. No fake percentage/AI label/dead feedback/carousel/hover-only reason exists.
+Homepage показывает не более одной recommendation section; title detail —
+explicit related перед computed similar; discovery — filtered paginated list
+с reason-aware feedback и owner-only настройками вкуса; library — link на
+personal discovery и восстановление exact hidden titles; search no-result —
+labelled popular link. «Не интересует» сначала раскрывает один из 11
+стабильных вариантов, а genre/country/actor показывает только заранее
+подготовленные связи exact title. Общий Blade component используется на
+карточке и detail, не делает запросов и сохраняет loading/disabled,
+keyboard/focus и 44 px touch targets. Панель personal discovery меняет
+focused/balanced/varied diversity, newer/balanced/proven freshness,
+временно скрывает/восстанавливает жанры и подтверждает reset выученного
+профиля без удаления библиотеки. Все состояния используют
+`lang/{ru,en}/recommendations.php`, existing cards/buttons/panels and
+escaped output. No fake percentage/AI label/dead feedback/carousel/hover-only
+reason exists; «Почему это показано» остаётся broad truthful explanation без
+score/history/private feature details.
 
 ## Представление рейтингов Top 100
 

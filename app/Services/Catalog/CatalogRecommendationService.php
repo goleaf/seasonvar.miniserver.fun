@@ -7,9 +7,11 @@ namespace App\Services\Catalog;
 use App\DTOs\CatalogRecommendationContext;
 use App\DTOs\CatalogRecommendationExplanation;
 use App\DTOs\CatalogRecommendationItem;
+use App\DTOs\CatalogRecommendationPreferenceData;
 use App\DTOs\CatalogRecommendationResult;
 use App\Enums\CatalogPersonalizationConfidence;
 use App\Enums\CatalogPopularityPeriod;
+use App\Enums\CatalogRecommendationDiversityPreference;
 use App\Enums\CatalogRecommendationReason;
 use App\Enums\CatalogRecommendationSource;
 use App\Enums\CatalogRecommendationType;
@@ -38,10 +40,15 @@ final class CatalogRecommendationService
         private readonly CatalogRecommendationPresenter $presenter,
         private readonly CatalogRecommendationExplorationMixer $exploration,
         private readonly CatalogPersonalizationRollout $personalizationRollout,
+        private readonly CatalogRecommendationPreferenceQuery $preferences,
+        private readonly CatalogRecommendationTasteReranker $taste,
     ) {}
 
     public function discover(CatalogRecommendationContext $context): CatalogRecommendationResult
     {
+        $preference = $context->type === CatalogRecommendationType::Personalized && $context->user !== null
+            ? $this->preferences->forUser($context->user)
+            : CatalogRecommendationPreferenceData::defaults();
         $baseHardExclusions = $this->exclusions->hardExclusions($context);
         $recentExclusions = $context->seed !== null
             ? $this->exclusions->recentExclusions($context)
@@ -183,9 +190,13 @@ final class CatalogRecommendationService
         $candidates = $this->availability->rerank($context, $candidates);
 
         if ($preserveBlendOrder) {
-            usort($candidates, static fn (array $left, array $right): int => (($left['blend_position'] ?? PHP_INT_MAX) <=> ($right['blend_position'] ?? PHP_INT_MAX))
+            usort($candidates, fn (array $left, array $right): int => ($this->blendPosition($left) <=> $this->blendPosition($right))
                 ?: ($right['score'] <=> $left['score'])
                 ?: ($right['id'] <=> $left['id']));
+        }
+
+        if ($context->type === CatalogRecommendationType::Personalized && $context->user !== null) {
+            $candidates = $this->taste->rerank($context->user, $candidates, $preference);
         }
 
         return $this->result(
@@ -196,6 +207,7 @@ final class CatalogRecommendationService
             coldStart: $coldStart,
             watchable: $context->type !== CatalogRecommendationType::Upcoming,
             personalizationConfidence: $personalizationConfidence,
+            diversityPreference: $preference->diversity,
         );
     }
 
@@ -342,11 +354,12 @@ final class CatalogRecommendationService
         bool $coldStart,
         bool $watchable,
         ?CatalogPersonalizationConfidence $personalizationConfidence = null,
+        CatalogRecommendationDiversityPreference $diversityPreference = CatalogRecommendationDiversityPreference::Balanced,
     ): CatalogRecommendationResult {
         $perPage = $context->boundedPerPage();
         $page = $context->boundedPage();
         $through = min(count($candidates), ($page * $perPage) + 1);
-        $diversified = $this->diversity->diversify($candidates, $through);
+        $diversified = $this->diversity->diversify($candidates, $through, $diversityPreference);
         $window = array_slice($diversified, ($page - 1) * $perPage, $perPage + 1);
         $hasMore = count($window) > $perPage;
         $window = array_slice($window, 0, $perPage);
@@ -370,7 +383,7 @@ final class CatalogRecommendationService
             );
         });
         $hasDisplayedPersonalRow = collect($window)->contains(
-            fn (array $row): bool => str_starts_with((string) ($row['source'] ?? ''), 'user_'),
+            fn (array $row): bool => str_starts_with((string) $row['source'], 'user_'),
         );
 
         return new CatalogRecommendationResult(
@@ -384,6 +397,14 @@ final class CatalogRecommendationService
             coldStart: $coldStart,
             personalizationConfidence: $personalizationConfidence,
         );
+    }
+
+    /** @param array<string, mixed> $candidate */
+    private function blendPosition(array $candidate): int
+    {
+        $position = $candidate['blend_position'] ?? null;
+
+        return is_int($position) ? $position : PHP_INT_MAX;
     }
 
     /**

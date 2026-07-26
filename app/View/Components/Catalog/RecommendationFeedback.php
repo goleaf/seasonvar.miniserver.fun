@@ -10,9 +10,17 @@ use InvalidArgumentException;
 
 final class RecommendationFeedback extends Component
 {
+    /**
+     * @param array{
+     *     genres?: list<array{id: int, name: string}>,
+     *     countries?: list<array{id: int, name: string}>,
+     *     actors?: list<array{id: int, name: string}>
+     * } $feedbackOptions
+     */
     public function __construct(
         public readonly int $titleId,
         public readonly string $action,
+        public readonly array $feedbackOptions = [],
     ) {
         if ($titleId < 1) {
             throw new InvalidArgumentException('Recommendation feedback title ID must be positive.');
@@ -21,6 +29,13 @@ final class RecommendationFeedback extends Component
         if (! in_array($action, ['setFeedback', 'setRecommendationFeedback'], true)) {
             throw new InvalidArgumentException('Unsupported recommendation feedback action.');
         }
+    }
+
+    public function reasonAction(): string
+    {
+        return $this->action === 'setFeedback'
+            ? 'setFeedbackReason'
+            : 'setRecommendationFeedbackReason';
     }
 
     public function render(): View

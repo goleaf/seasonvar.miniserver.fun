@@ -30,6 +30,7 @@ final class CatalogTitlePageBuilder
         private readonly CatalogUserCardStateLoader $cardStates,
         private readonly CatalogRecommendationService $recommendations,
         private readonly CatalogRecommendationPresenter $recommendationPresenter,
+        private readonly CatalogRecommendationFeedbackOptionQuery $feedbackOptions,
     ) {}
 
     /**
@@ -144,6 +145,10 @@ final class CatalogTitlePageBuilder
      */
     private function presentRecommendationItems(Collection $items, bool $canDismiss): Collection
     {
+        $options = $canDismiss
+            ? $this->feedbackOptions->forTitles($items->pluck('title'))
+            : [];
+
         return $items->map(fn (CatalogRecommendationItem $item): CatalogRecommendationListItem => new CatalogRecommendationListItem(
             title: $item->title,
             rank: $item->rank,
@@ -153,6 +158,7 @@ final class CatalogTitlePageBuilder
             source: $item->source,
             relationType: $item->relationType,
             canDismiss: $canDismiss,
+            feedbackOptions: $options[$item->title->id] ?? [],
         ));
     }
 

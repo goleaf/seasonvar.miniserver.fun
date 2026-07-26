@@ -48,6 +48,16 @@ test('catalog card surfaces never render the redundant open-title action', async
     const personalizedRows = page.locator('[data-recommendation-list] [data-recommendation-row]');
 
     expect(personalizedResponse?.status()).toBe(200);
+    const preferences = page.locator('[data-recommendation-preferences]');
+
+    await expect(preferences.getByRole('heading', { name: 'Настройка личных рекомендаций' })).toBeVisible();
+    await expect(preferences.getByRole('button', { name: 'Больше разнообразия' })).toBeVisible();
+    await expect(preferences.getByRole('button', { name: 'Больше новых' })).toBeVisible();
+    await expect(preferences.getByRole('button', { name: 'Больше проверенных' })).toBeVisible();
+    await expect(preferences.getByRole('button', { name: 'Сбросить профиль вкусов' })).toBeVisible();
+    await preferences.getByRole('button', { name: 'Больше новых' }).click();
+    await expect(page.getByText('Настройки личных рекомендаций сохранены.', { exact: true })).toBeVisible();
+    await expect(preferences.getByRole('button', { name: 'Больше новых' })).toHaveAttribute('aria-pressed', 'true');
     await expect(personalizedRows.getByRole('link', { name: 'Рекомендованный браузерный сериал' })).toBeVisible();
     const personalizedReasonGroup = personalizedRows.first().locator('[aria-label="Почему это показано"]');
 
@@ -57,8 +67,14 @@ test('catalog card surfaces never render the redundant open-title action', async
 
     await feedback.getByText('Настроить рекомендацию', { exact: true }).click();
     await expect(feedback.getByText('Учтём интерес к похожим темам и признакам.', { exact: true })).toBeVisible();
-    await expect(feedback.getByText('Скроем этот сериал из рекомендаций.', { exact: true })).toBeVisible();
-    await expect(feedback.getByText('Полностью исключим сериал из рекомендаций и релизных уведомлений.', { exact: true })).toBeVisible();
+    await feedback.getByText('Не интересует', { exact: true }).click();
+    await expect(feedback.getByText('Почему рекомендация не подходит?', { exact: true })).toBeVisible();
+    await expect(feedback.getByRole('button', { name: 'Уже смотрел в другом месте' })).toBeVisible();
+    await expect(feedback.getByText('Не нравится жанр', { exact: true })).toBeVisible();
+    await expect(feedback.getByRole('button', { name: 'Браузерная драма', exact: true })).toBeVisible();
+    await expect(
+        feedback.getByRole('button', { name: 'Скрыть жанр «Браузерная драма» на 30 дней', exact: true }),
+    ).toBeVisible();
     await page.screenshot({
         path: `output/playwright/recommendation-feedback-${testInfo.project.name.toLowerCase().replaceAll(' ', '-')}.png`,
         fullPage: true,

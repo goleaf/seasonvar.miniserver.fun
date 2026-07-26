@@ -233,7 +233,29 @@ Static acceptance must inspect generated SQL and SQLite `EXPLAIN QUERY PLAN` aga
 - Public/person queries begin with one visibility builder; watchable types use correlated media `EXISTS`, not a materialized full ID list or per-card check. Candidate pools cap at 180, personal source history at 120 titles and stored similarity rows at 24/source. Random uses at most 12 indexed range probes ×8 and один bounded indexed fill оставшихся ID, никогда не выполняя catalogue-wide random sort.
 - Popularity is one canonical ordered builder reused by discovery and catalogue popularity sort. Meaningful distinct viewers exclude zero/accidental progress. Trending aggregates indexed recent progress/watchlist/review/comment events for a bounded 1/7/30-day window and never reads title `updated_at`.
 - Title hydration selects card fields/active relations once, loads user card overlay once and computes episode/media/review counts through three grouped queries. Diversity uses two bounded pivot queries plus optional explicit-franchise query. Facet controls use one UNION batch for seven canonical taxonomies. Blade adds zero queries.
+- Feedback subject options загружаются одним bounded batch на не более чем 48
+  видимых тайтлов и 12 genre/country/actor values каждого тайтла; Blade и
+  каждый reason не создают отдельный query. Preference state читается одной
+  owner row и одним bounded active-hidden-genre lookup на request.
+- Explicit reason profile ограничен current rows после `profile_reset_at`;
+  extractor загружает только востребованные candidate features и не строит
+  append-only impression history. Temporary genre exclusion использует
+  `(user_id,hidden_until,id)` и genre pivot `EXISTS`, не materialized
+  catalogue-wide title ID list. Freshness/taste/diversity rerank работают
+  только над уже bounded candidate batch и не добавляют per-card запросы.
 - Additive indexes and rationale are in `DATA_RELATIONS.md`; live inspection confirmed no duplicate index prefix with the existing user-first owner paths. SQLite remains the SQL baseline; no engine-specific random/window/vector function was added.
+
+Task 63 exact regression зафиксировал ровно три subject-option query как для
+одного, так и для максимального batch из 48 тайтлов. Disposable SQLite
+`EXPLAIN QUERY PLAN` выбрал
+`catalog_recommendation_feedback_detail_user_activity_idx` для owner/cutoff
+reason window, primary key preference row и
+`catalog_recommendation_hidden_genre_user_expiry_idx` для preference/active
+genre lookup; correlated visibility дополнительно использует unique
+`catalog_title_genre(catalog_title_id,genre_id)`. Первоначальный
+`ORDER BY hidden_genres.id` создавал temporary B-tree и был удалён:
+детерминированная сортировка bounded genre IDs теперь выполняется после
+загрузки. Это query-plan/query-count evidence, не latency или p95/SLA.
 
 Deterministic guest discovery, включая server-seeded refresh, читает один
 канонический scalar pool из `TieredCache` namespace `discovery-ids-v3`.

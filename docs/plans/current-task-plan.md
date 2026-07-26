@@ -8635,6 +8635,111 @@ key/version/invalidation lifecycle.
   отсутствующей GitHub-аутентификации; force, branch/worktree или
   credential mutation не применялись.
 
+## Task 63 — умная обратная связь рекомендаций
+
+Статус: `implementation_and_verification_completed_delivery_in_progress`.
+
+Дата начала: 26.07.2026.
+
+Approved design:
+[`2026-07-26-smart-recommendation-feedback-design.md`](../superpowers/specs/2026-07-26-smart-recommendation-feedback-design.md).
+
+Detailed implementation plan:
+[`2026-07-26-smart-recommendation-feedback.md`](../superpowers/plans/2026-07-26-smart-recommendation-feedback.md).
+
+### Цель и baseline
+
+Negative web feedback должен требовать одну из 11 стабильных причин,
+subject-aware причины должны проверяться относительно exact title, а
+personalized discovery должен реально поддерживать temporary genre hide,
+focused/balanced/varied diversity, newer/balanced/proven freshness и reset
+старого learned profile.
+
+Текущий overall feedback уже canonical в одной user/title row; visible broad
+«Почему это показано» уже реализовано и сохраняется. Выбран normalized
+private current-state detail, не append-only analytics и не polymorphic
+свободная строка.
+
+### Ожидаемые изменяемые файлы
+
+- новые stable enums, preference DTO и three models;
+- one additive reversible migration with three owner-private tables;
+- schema, feedback option/mutation, preference read/write and taste reranker
+  services;
+- recommendation context/orchestration/visibility/diversity/feature/profile,
+  legacy query/scorer/repeat suppression;
+- page-builder/list DTO, both Livewire surfaces, reusable feedback component
+  and personalized settings UI;
+- export/title merge lifecycle, RU/EN translations/config;
+- focused unit/feature/browser tests;
+- recommendation/data/security/performance/frontend owners, README,
+  CHANGELOG и эта evidence section.
+
+### Protected contracts
+
+- branch `main`, current history and foreign Task 61/62 working tree/index;
+- all routes/names/model binding/discovery query string/pagination;
+- public API/OpenAPI/mobile sync response and operation codes;
+- canonical feedback values/versions/hidden library/release suppression;
+- library/history/progress/ratings/status/collections/tags;
+- recommendation public types/sources/reasons/explanation/cache keys;
+- v6 importer/build/shadow activation and queue/scheduler;
+- entitlement/auth/premium/region/legal/SEO/service-worker;
+- existing migrations and production data.
+
+### Cross-feature и production risks
+
+| Domain | Статус | Решение |
+| --- | --- | --- |
+| Canonical user/title feedback | `critical_affected` | Existing value remains owner; detail only refines reason |
+| Personalized legacy/v2 ranking | `critical_affected` | Same reset/detailed/freshness semantics, no double demotion |
+| Visibility | `critical_affected` | Temporary genre via indexed subquery and expiry |
+| UI/mobile/a11y/locales | `high_affected` | One reusable RU/EN reason component and owner panel |
+| Account export/delete | `high_affected` | Safe stable export and FK cascade |
+| Title merge/taxonomy delete | `high_affected` | Deterministic detail merge and subject nullOnDelete |
+| Hidden library/calendar/API | `compatible` | Existing canonical negative values remain unchanged |
+| Cache/SEO/search/import/admin | `unaffected` | No shared cache/key, public metadata or importer changes |
+| Database | `critical_affected` | Additive no-backfill migration with three tables/indexes; reversible DDL |
+| Dependencies/env/queue | `not_applicable` | No package/env/job/scheduler |
+| Production rollout | `affected` | Migrate-before-code, backup assessment, PHP-FPM/cache refresh, smoke |
+| Rollback | `completed` | Code rollback leaves inert rows; export/backup required before destructive DDL rollback |
+| Shared Git state | `critical_risk_recorded` | Exact alternate index; no foreign reset/stash/unstage |
+
+### Task-specific requirement-compliance matrix
+
+| Requirement/domain | Статус | Evidence / следующий gate |
+| --- | --- | --- |
+| Root/index/canonical owners fresh read | `completed` | Выполнено 26.07.2026 до PHP edits |
+| Recommendation/UI/security/perf/ops owners | `completed` | Existing v3/v6/personalized/explainability contracts traced |
+| Installed versions and official docs | `completed` | PHP 8.5.8, Laravel 13.22, Livewire 4.3.3, Boost docs for transaction/enum/validation/casts |
+| Existing implementation/data first | `completed` | Service→query→DTO→Blade and mutation/export/merge mapped; production SQLite read-only |
+| Alternatives/user authorization | `completed` | Three approaches compared; user explicitly ordered recommended implementation |
+| Canonical design before PHP | `completed` | Linked design and owner amendment |
+| Unlimited plan/files/contracts/risks | `completed` | 76 exact plan items linked |
+| Migration/routes/translations/cache | `completed` | One additive migration/three tables; no route/cache key; RU/EN parity |
+| Production/rollback/data safety | `completed` | No backfill/DML; migrate-before-code; rollback/export documented |
+| TDD RED | `completed` | Enums/schema/service/ranking/UI/lifecycle failed before implementation |
+| Implementation | `completed` | Domain, ranking, Livewire, export/merge and compatibility paths implemented |
+| Query/security/browser verification | `completed_with_external_blocker` | Related 137/1 245, PHPStan 0, Pint/Rector/build passed; Playwright 3/3; full runner blocked by tracked 256M accumulation and foreign collection assertions |
+| Docs/README/CHANGELOG | `completed` | Canonical owners, visitor capability/history and dated technical entry updated |
+| Commit/push in main | `pending` | Exact task scope after verification |
+
+### Live execution checklist
+
+1. `[completed]` Requirements/version/Git/code/data discovery.
+2. `[completed]` Compare three approaches and approve normalized design.
+3. `[completed]` Write design, canonical amendment and unlimited plan.
+4. `[completed]` Record expected files/protected contracts/cross-feature risks.
+5. `[completed]` Self-review plan and create exact RED tests.
+6. `[completed]` Additive schema and typed domain GREEN.
+7. `[completed]` Feedback mutation/options and both Livewire surfaces.
+8. `[completed]` Preferences/reset/temporary genre and ranking integration.
+9. `[completed]` Export/merge/delete and compatibility regressions.
+10. `[completed]` Focused/static/build/browser/EXPLAIN/security verification; full-suite external blocker recorded.
+11. `[completed]` Final owners/README/CHANGELOG update, requirement reread,
+    compliance matrix and repository legacy scan.
+12. `[in_progress]` Exact commit in `main` and configured non-force push.
+
 ## Task 63 — provenance-first качество тегов
 
 Статус: `implementation_committed_push_unresolved`; production DML

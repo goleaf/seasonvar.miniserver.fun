@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Services\Catalog;
 
 use App\Enums\CatalogRecommendationFeedback;
+use App\Enums\CatalogRecommendationFeedbackReason;
 use App\Enums\CatalogWatchStatus;
+use App\Models\CatalogRecommendationFeedbackDetail;
 use App\Models\CatalogTitleUserState;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -18,7 +20,10 @@ final class CatalogPersonalNegativePreferenceBuilder
     /** @var list<string>|null */
     private ?array $stateColumns = null;
 
-    public function __construct(private readonly CatalogRecommendationFeatureExtractor $features) {}
+    public function __construct(
+        private readonly CatalogRecommendationFeatureExtractor $features,
+        private readonly CatalogRecommendationPreferenceQuery $preferences,
+    ) {}
 
     /**
      * @param  list<int>  $positiveTitleIds
@@ -27,9 +32,11 @@ final class CatalogPersonalNegativePreferenceBuilder
     public function forUser(User $user, array $positiveTitleIds = []): array
     {
         $columns = $this->stateColumns();
+        $resetAt = $this->preferences->forUser($user)->profileResetAt;
 
         if (! in_array('recommendation_feedback', $columns, true)
-            && ! in_array('watch_status', $columns, true)) {
+            && ! in_array('watch_status', $columns, true)
+            && ! Schema::hasTable('catalog_recommendation_feedback_details')) {
             return [];
         }
 
@@ -71,7 +78,13 @@ final class CatalogPersonalNegativePreferenceBuilder
 
         foreach ($states as $state) {
             $titleId = (int) $state->catalog_title_id;
-            $factor = $this->recencyFactor($this->activityForState($state));
+            $activity = $this->activityForState($state);
+
+            if ($resetAt !== null && ($activity === null || ! $activity->isAfter($resetAt))) {
+                continue;
+            }
+
+            $factor = $this->recencyFactor($activity);
 
             foreach ($featuresByTitle[$titleId] ?? [] as $feature) {
                 $support[$feature]['titles'][$titleId] = true;
@@ -90,18 +103,21 @@ final class CatalogPersonalNegativePreferenceBuilder
             }
         }
 
-        $demotions = [];
+        $demotions = $this->explicitDemotions($user, $resetAt);
 
         foreach ($support as $feature => $data) {
-            if (count($data['titles'] ?? []) < $minimumSources) {
+            if (count($data['titles']) < $minimumSources) {
                 continue;
             }
 
-            $demotion = min($featureCap, (int) round(30 * (float) ($data['weight'] ?? 0.0)));
+            $demotion = min($featureCap, (int) round(30 * $data['weight']));
             $demotion = max(0, $demotion - (15 * (int) ($positiveCounts[$feature] ?? 0)));
 
             if ($demotion > 0) {
-                $demotions[$feature] = $demotion;
+                $demotions[$feature] = min(
+                    $featureCap,
+                    ($demotions[$feature] ?? 0) + $demotion,
+                );
             }
         }
 
@@ -124,6 +140,74 @@ final class CatalogPersonalNegativePreferenceBuilder
         ksort($bounded);
 
         return $bounded;
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function explicitDemotions(User $user, ?CarbonImmutable $resetAt): array
+    {
+        if (! Schema::hasTable('catalog_recommendation_feedback_details')) {
+            return [];
+        }
+
+        $details = CatalogRecommendationFeedbackDetail::query()
+            ->whereBelongsTo($user)
+            ->when($resetAt !== null, fn (Builder $query): Builder => $query->where('updated_at', '>', $resetAt))
+            ->latest('updated_at')
+            ->limit(120)
+            ->get(['catalog_title_id', 'reason', 'genre_id', 'country_id', 'actor_id']);
+
+        if ($details->isEmpty()) {
+            return [];
+        }
+
+        $featuresByTitle = $this->features->forTitleIds($details
+            ->pluck('catalog_title_id')
+            ->map(static fn (mixed $id): int => (int) $id)
+            ->all());
+        $weight = max(1, (int) config('recommendations.feedback.explicit_feature_demotion', 90));
+        $featureCap = max($weight, (int) config('recommendations.personalized_v2.negative_feature_cap', 120));
+        $demotions = [];
+
+        foreach ($details as $detail) {
+            $reason = $detail->reason;
+
+            $titleFeatures = $featuresByTitle[(int) $detail->catalog_title_id] ?? [];
+            $features = match ($reason) {
+                CatalogRecommendationFeedbackReason::DislikeGenre => $this->subjectFeature('genre', $detail->genre_id),
+                CatalogRecommendationFeedbackReason::DislikeCountry => $this->subjectFeature('country', $detail->country_id),
+                CatalogRecommendationFeedbackReason::DislikeActor => $this->subjectFeature('actor', $detail->actor_id),
+                CatalogRecommendationFeedbackReason::TooManyEpisodes => ['length:long'],
+                CatalogRecommendationFeedbackReason::Unfinished => ['status:unfinished'],
+                CatalogRecommendationFeedbackReason::TooOld => ['era:classic'],
+                CatalogRecommendationFeedbackReason::LowRating => ['rating:low'],
+                CatalogRecommendationFeedbackReason::WrongMood => array_values(array_filter(
+                    $titleFeatures,
+                    static fn (string $feature): bool => str_starts_with($feature, 'theme:'),
+                )),
+                CatalogRecommendationFeedbackReason::NotSimilar => array_values(array_filter(
+                    $titleFeatures,
+                    static fn (string $feature): bool => str_starts_with($feature, 'genre:')
+                        || str_starts_with($feature, 'tag:')
+                        || str_starts_with($feature, 'theme:'),
+                )),
+                CatalogRecommendationFeedbackReason::WatchedElsewhere,
+                CatalogRecommendationFeedbackReason::NotThisTitle => [],
+            };
+
+            foreach (array_unique($features) as $feature) {
+                $demotions[$feature] = min($featureCap, ($demotions[$feature] ?? 0) + $weight);
+            }
+        }
+
+        return $demotions;
+    }
+
+    /** @return list<string> */
+    private function subjectFeature(string $type, mixed $id): array
+    {
+        return is_int($id) && $id > 0 ? ["{$type}:{$id}"] : [];
     }
 
     private function activityForState(CatalogTitleUserState $state): ?CarbonImmutable

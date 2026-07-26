@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Enums\CatalogRecommendationFeedbackReason;
 use App\Jobs\RefreshSeasonvarCatalogTitle;
 use App\Livewire\CatalogTitleDetail;
 use App\Livewire\CatalogTitlePlayer;
+use App\Models\CatalogRecommendationFeedbackDetail;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleUserState;
 use App\Models\Episode;
+use App\Models\Genre;
 use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Models\User;
@@ -188,6 +191,43 @@ class CatalogTitleLiveRefreshTest extends TestCase
 
         $this->assertNull($state->recommendation_feedback);
         $this->assertSame(2, $state->recommendationFeedbackVersion());
+    }
+
+    public function test_verified_user_can_save_a_validated_reason_and_temporarily_hide_its_genre(): void
+    {
+        $user = User::factory()->create();
+        $source = $this->refreshableTitle();
+        $candidate = CatalogTitle::factory()->create(['title' => 'Рекомендация с причиной']);
+        $genre = Genre::query()->create([
+            'name' => 'Скрываемая драма',
+            'slug' => 'title-detail-hidden-drama',
+        ]);
+        $candidate->genres()->attach($genre);
+        LicensedMedia::factory()->for($candidate)->create([
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(CatalogTitleDetail::class, ['catalogTitle' => $source])
+            ->call(
+                'setRecommendationFeedbackReason',
+                $candidate->id,
+                CatalogRecommendationFeedbackReason::DislikeGenre->value,
+                $genre->id,
+            )
+            ->assertHasNoErrors()
+            ->assertSet('lastRecommendationFeedbackTitleId', $candidate->id)
+            ->call('hideRecommendationGenre', $genre->id)
+            ->assertHasNoErrors();
+
+        $detail = CatalogRecommendationFeedbackDetail::query()->sole();
+        $this->assertSame(CatalogRecommendationFeedbackReason::DislikeGenre, $detail->reason);
+        $this->assertSame($genre->id, $detail->genre_id);
+        $this->assertDatabaseHas('catalog_recommendation_hidden_genres', [
+            'user_id' => $user->id,
+            'genre_id' => $genre->id,
+        ]);
     }
 
     public function test_recommendation_feedback_rejects_guest_invalid_current_and_invisible_targets(): void

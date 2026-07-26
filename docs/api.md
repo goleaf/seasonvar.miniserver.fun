@@ -164,6 +164,14 @@ Task 14 adds web/Livewire public profiles only. Existing v1 user/account/library
 
 Для гостя endpoint остаётся public/content-contextual. Валидный optional Sanctum bearer передаёт только уже разрешённого текущего `User` в canonical visibility и `CatalogRecommendationService::forTitle()`: это позволяет учитывать audience, blacklist и `not_interested` владельца, но не добавляет watch history, progress, watchlist, status, collection, personal tag, private explanation или новое поле ответа. Authenticated response уже отделён как `private, no-store`, shared public API cache его не обслуживает. Internal score breakdown, source/algorithm/provider signal, raw media URL и relation administration fields не выдаются. Additive owner-only user-state/library resources включают stable `recommendation_feedback`, feedback version/time, `watch_status` и version; они остаются authenticated `private, no-store` и описаны в `resources/api/openapi.json`.
 
+Причина отрицательной обратной связи, выбранный genre/country/actor,
+настройки diversity/freshness, reset cutoff и временно скрытые жанры не
+добавлены в public/mobile API и не меняют OpenAPI response shape. Они
+принадлежат server-side personalized ranking и private account export:
+экспорт возвращает только stable codes, безопасные названия и сроки без
+внутренних numeric subject/title IDs, feature keys, score breakdown или
+истории показов.
+
 ## Video size и download API boundary
 
 Текущий public/mobile v1 contract не отвечает за authenticated web attachment, поэтому его response shape не меняется. `file_size_bytes`, formatted size, download capability и download URL не добавляются в public title/media resources; raw `path`, `playback_url`, `source_url`, size-check error/status и provider headers по-прежнему закрыты. Offline-sync/download video через mobile API остаётся unsupported.

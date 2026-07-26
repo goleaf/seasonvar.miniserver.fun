@@ -9,6 +9,8 @@ use App\Models\CatalogTitle;
 use App\Models\LicensedMedia;
 use App\Models\Tag;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 final class CatalogRecommendationVisibilityService
 {
@@ -43,6 +45,23 @@ final class CatalogRecommendationVisibilityService
 
         if ($excludedIds !== []) {
             $query->whereKeyNot($excludedIds);
+        }
+
+        if ($context->user !== null && Schema::hasTable('catalog_recommendation_hidden_genres')) {
+            $query->whereNotExists(function ($hidden) use ($context): void {
+                $hidden
+                    ->from('catalog_title_genre as hidden_genre_pivot')
+                    ->join(
+                        'catalog_recommendation_hidden_genres as hidden_genres',
+                        'hidden_genres.genre_id',
+                        '=',
+                        'hidden_genre_pivot.genre_id',
+                    )
+                    ->whereColumn('hidden_genre_pivot.catalog_title_id', 'catalog_titles.id')
+                    ->where('hidden_genres.user_id', $context->user->id)
+                    ->where('hidden_genres.hidden_until', '>', now())
+                    ->select(DB::raw(1));
+            });
         }
 
         foreach (self::FILTER_RELATIONS as $key => $relation) {

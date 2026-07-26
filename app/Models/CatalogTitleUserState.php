@@ -6,10 +6,21 @@ namespace App\Models;
 
 use App\Enums\CatalogRecommendationFeedback;
 use App\Enums\CatalogWatchStatus;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property bool $in_watchlist
+ * @property int|null $rating
+ * @property CatalogRecommendationFeedback|null $recommendation_feedback
+ * @property CatalogWatchStatus|null $watch_status
+ * @property CarbonInterface|null $watchlist_updated_at
+ * @property CarbonInterface|null $rating_updated_at
+ * @property CarbonInterface|null $recommendation_feedback_updated_at
+ * @property CarbonInterface|null $watch_status_updated_at
+ */
 #[Fillable([
     'user_id',
     'catalog_title_id',

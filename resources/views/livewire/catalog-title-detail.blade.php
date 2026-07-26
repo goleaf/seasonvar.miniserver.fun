@@ -277,7 +277,7 @@
                             <li wire:key="title-related-{{ $title->id }}-{{ $recommendationItem->title->id }}" data-recommendation-row>
                                 <x-catalog.title-card :title="$recommendationItem->title" layout="recommendation" :rank="$recommendationItem->rank" :reason-labels="$recommendationItem->reasonLabels" />
                                 @if ($recommendationItem->canDismiss)
-                                    <x-catalog.recommendation-feedback :title-id="$recommendationItem->title->id" action="setRecommendationFeedback" />
+                                    <x-catalog.recommendation-feedback :title-id="$recommendationItem->title->id" action="setRecommendationFeedback" :feedback-options="$recommendationItem->feedbackOptions" />
                                 @endif
                             </li>
                         @endforeach
@@ -300,7 +300,7 @@
                                     :reason-labels="$recommendationItem->reasonLabels"
                                 />
                                 @if ($recommendationItem->canDismiss)
-                                    <x-catalog.recommendation-feedback :title-id="$recommendationItem->title->id" action="setRecommendationFeedback" />
+                                    <x-catalog.recommendation-feedback :title-id="$recommendationItem->title->id" action="setRecommendationFeedback" :feedback-options="$recommendationItem->feedbackOptions" />
                                 @endif
                             </li>
                         @endforeach

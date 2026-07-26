@@ -531,6 +531,34 @@ Rollback performance-only изменения безопасно удаляет `
 5. Smoke anonymous public types/filters/random, authenticated cold/low/medium/high, all three personal feedback actions and undo, negative-only library restore, positive-source explanations, release-notification suppression only for negative values, deterministic refresh/exploration, title related-before-similar, homepage/search, owner API/export compatibility and admin relation authorization. Verify personal/random/filter pages noindex and only nonempty stable public types in sitemap.
 6. Rollback web code may leave additive rows inert. `240100` removes only pending dirty state; `240000` removes only shadow history and never active `catalog_title_recommendations`. Before rolling application code back past `more_like_this`, first keep enum recognition with the positive weight/UI disabled or normalize those rows through an explicit reviewed operation; old non-null negative predicates must never reinterpret positive rows as hidden. The feedback-index migration may remain in place or be rolled down separately inside the same stopped-writer/backup boundary. Before any schema down after real feedback/editorial writes, export/backup them; task 18 downs do not remove watchlist/rating/progress/stored active similarity/editorial collections. Prefer roll-forward because removing state would lose explicit user feedback/provenance and build evidence.
 
+### Дополнение: умная обратная связь Task 63
+
+1. В существующей stopped-writer/verified-backup SQLite boundary примените
+   additive
+   `2026_07_26_230000_create_catalog_recommendation_feedback_preferences.php`
+   до включения нового web code. Migration не делает backfill/DML и не
+   меняет canonical user state; после `migrate --force` проверьте три таблицы,
+   foreign keys, unique owner/title и owner/genre, activity/expiry indexes.
+2. Пересоберите config/views и Vite assets, затем штатно reload PHP-FPM.
+   Новых routes, cache keys, workers, scheduled tasks, environment variables
+   или внешних providers нет. Rolling code до завершения DDL fail-closed
+   показывает прежний feedback без partial private writes.
+3. Smoke verified owner: каждая из 11 причин, foreign subject rejection,
+   undo/overwrite, focused/balanced/varied, newer/balanced/proven,
+   hide/restore genre, reset с сохранением history/watchlist/rating/status и
+   broad «Почему это показано». Guest и чужой owner не должны записывать
+   данные; public API/shared cache/SEO не должны содержать reason/preferences.
+4. При stale cache достаточно обычного config/view deployment recovery:
+   private preference rows не кэшируются. Failed migration не требует data
+   repair, потому что DDL additive и code проверяет полную schema readiness;
+   восстановите исправную миграцию и выполните roll-forward.
+5. Code rollback оставляет новые rows inert и сохраняет старый canonical
+   feedback. Schema `down()` удаляет только private reason/preferences/hides,
+   поэтому после реальных writes сначала нужен account/domain export и
+   проверенный backup/restore plan. Roll-forward предпочтителен; history,
+   progress, ratings, watchlist, statuses, collections, tags и exact feedback
+   DDL rollback не удаляет.
+
 ## Rollout file-size metadata и authenticated downloads
 
 1. До SQLite DDL штатно остановите importer writers/workers по общему preflight, сделайте backup и примените additive migrations `2026_07_16_190000` и `2026_07_16_190100`. Existing nullable media rows продолжают playback без немедленного backfill; `down()` удаляет только новые fields/index/counters.

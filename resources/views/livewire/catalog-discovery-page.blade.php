@@ -1,7 +1,7 @@
 <div class="relative space-y-6" data-catalog-discovery-page data-recommendation-type="{{ $type }}">
     <div
         wire:loading.flex
-        wire:target="period,ratingSource,genre,country,tag,actor,director,translation,studio,yearFrom,yearTo,quality,subtitles,ratingMin,votesMin,clearFilters,previousPage,nextPage,refreshRecommendations,setFeedback,undoFeedback"
+        wire:target="period,ratingSource,genre,country,tag,actor,director,translation,studio,yearFrom,yearTo,quality,subtitles,ratingMin,votesMin,clearFilters,previousPage,nextPage,refreshRecommendations,setFeedback,setFeedbackReason,undoFeedback,updateRecommendationPreferences,hideRecommendationGenre,restoreRecommendationGenre,resetRecommendationProfile"
         class="fixed inset-x-3 bottom-4 z-40 mx-auto max-w-md items-center justify-center gap-3 rounded-panel bg-slate-900/95 px-5 py-4 text-sm font-bold text-white shadow-xl sm:inset-x-auto sm:right-6"
         role="status"
         aria-live="polite"
@@ -47,6 +47,106 @@
             @endforeach
         </div>
     </nav>
+
+    @if ($showRecommendationPreferences)
+        <section class="rounded-panel border border-emerald-200 bg-emerald-50/60 p-4 shadow-sm sm:p-6" aria-labelledby="recommendation-preferences-title" data-recommendation-preferences>
+            <div class="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+                <div class="max-w-3xl">
+                    <h2 id="recommendation-preferences-title" class="flex items-center gap-2 text-lg font-black text-slate-900">
+                        <x-ui.icon name="fa-solid fa-wand-magic-sparkles text-emerald-700" />
+                        <span>{{ __('recommendations.preferences.title') }}</span>
+                    </h2>
+                    <p class="mt-2 text-sm leading-6 text-slate-600">{{ __('recommendations.preferences.description') }}</p>
+                </div>
+                <button
+                    type="button"
+                    wire:click="resetRecommendationProfile"
+                    wire:confirm="{{ __('recommendations.preferences.reset_confirm') }}"
+                    wire:loading.attr="disabled"
+                    wire:target="resetRecommendationProfile"
+                    class="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-control border border-rose-200 bg-white px-4 py-2 text-sm font-bold text-rose-700 hover:bg-rose-50 disabled:cursor-wait disabled:opacity-60"
+                >
+                    <x-ui.icon name="fa-solid fa-rotate-left" />
+                    <span>{{ __('recommendations.preferences.reset') }}</span>
+                </button>
+            </div>
+
+            <div class="mt-5 grid gap-5 lg:grid-cols-2">
+                <fieldset>
+                    <legend class="text-sm font-black text-slate-800">{{ __('recommendations.preferences.diversity') }}</legend>
+                    <div class="mt-2 grid gap-2 sm:grid-cols-3">
+                        @foreach ([
+                            'focused' => __('recommendations.preferences.focused'),
+                            'balanced' => __('recommendations.preferences.balanced_diversity'),
+                            'varied' => __('recommendations.preferences.varied'),
+                        ] as $value => $label)
+                            <button
+                                type="button"
+                                wire:click="updateRecommendationPreferences('{{ $value }}', '{{ $freshnessPreference }}')"
+                                wire:loading.attr="disabled"
+                                wire:target="updateRecommendationPreferences"
+                                aria-pressed="{{ $diversityPreference === $value ? 'true' : 'false' }}"
+                                @class([
+                                    'min-h-11 rounded-control border px-3 py-2 text-sm font-bold disabled:cursor-wait disabled:opacity-60',
+                                    'border-emerald-700 bg-emerald-700 text-white' => $diversityPreference === $value,
+                                    'border-slate-200 bg-white text-slate-700 hover:border-emerald-300 hover:bg-emerald-50' => $diversityPreference !== $value,
+                                ])
+                            >{{ $label }}</button>
+                        @endforeach
+                    </div>
+                </fieldset>
+
+                <fieldset>
+                    <legend class="text-sm font-black text-slate-800">{{ __('recommendations.preferences.freshness') }}</legend>
+                    <div class="mt-2 grid gap-2 sm:grid-cols-3">
+                        @foreach ([
+                            'newer' => __('recommendations.preferences.newer'),
+                            'balanced' => __('recommendations.preferences.balanced_freshness'),
+                            'proven' => __('recommendations.preferences.proven'),
+                        ] as $value => $label)
+                            <button
+                                type="button"
+                                wire:click="updateRecommendationPreferences('{{ $diversityPreference }}', '{{ $value }}')"
+                                wire:loading.attr="disabled"
+                                wire:target="updateRecommendationPreferences"
+                                aria-pressed="{{ $freshnessPreference === $value ? 'true' : 'false' }}"
+                                @class([
+                                    'min-h-11 rounded-control border px-3 py-2 text-sm font-bold disabled:cursor-wait disabled:opacity-60',
+                                    'border-emerald-700 bg-emerald-700 text-white' => $freshnessPreference === $value,
+                                    'border-slate-200 bg-white text-slate-700 hover:border-emerald-300 hover:bg-emerald-50' => $freshnessPreference !== $value,
+                                ])
+                            >{{ $label }}</button>
+                        @endforeach
+                    </div>
+                </fieldset>
+            </div>
+
+            @if ($hiddenRecommendationGenres->isNotEmpty())
+                <div class="mt-5 border-t border-emerald-200 pt-4">
+                    <h3 class="text-sm font-black text-slate-800">{{ __('recommendations.preferences.hidden_genres') }}</h3>
+                    <div class="mt-2 flex flex-wrap gap-2">
+                        @foreach ($hiddenRecommendationGenres as $hiddenGenre)
+                            <button
+                                type="button"
+                                wire:click="restoreRecommendationGenre({{ $hiddenGenre->id }})"
+                                wire:loading.attr="disabled"
+                                wire:target="restoreRecommendationGenre({{ $hiddenGenre->id }})"
+                                class="inline-flex min-h-11 items-center gap-2 rounded-control border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:border-emerald-300 hover:bg-emerald-50 disabled:cursor-wait disabled:opacity-60"
+                            >
+                                <x-ui.icon name="fa-solid fa-eye" />
+                                <span>{{ __('recommendations.preferences.restore_genre', ['genre' => $hiddenGenre->name]) }}</span>
+                            </button>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
+            <p class="mt-4 text-xs leading-5 text-slate-500">{{ __('recommendations.preferences.reset_hint') }}</p>
+            @if ($errors->has('recommendationPreferences'))
+                <p class="mt-3 rounded-control border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800" role="alert">{{ $errors->first('recommendationPreferences') }}</p>
+            @endif
+        </section>
+    @endif
 
     @if ($discoverySectionNavigation !== [])
         <nav
@@ -271,7 +371,7 @@
                             :reason-labels="$recommendationItem->reasonLabels"
                         />
                         @if ($recommendationItem->canDismiss)
-                            <x-catalog.recommendation-feedback :title-id="$recommendationItem->title->id" action="setFeedback" />
+                            <x-catalog.recommendation-feedback :title-id="$recommendationItem->title->id" action="setFeedback" :feedback-options="$recommendationItem->feedbackOptions" />
                         @endif
                     </li>
                 @endforeach

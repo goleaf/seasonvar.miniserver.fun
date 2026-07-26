@@ -26,15 +26,19 @@ final class CatalogPersonalPreferenceProfileBuilder
     /** @var list<string>|null */
     private ?array $stateColumns = null;
 
-    public function __construct(private readonly CatalogPersonalNegativePreferenceBuilder $negativePreferences) {}
+    public function __construct(
+        private readonly CatalogPersonalNegativePreferenceBuilder $negativePreferences,
+        private readonly CatalogRecommendationPreferenceQuery $preferences,
+    ) {}
 
     public function forUser(User $user): CatalogPersonalPreferenceProfile
     {
         $limit = max(10, min(500, (int) config('recommendations.personalized_v2.history_limit', 120)));
-        $progress = $this->progressRows($user, $limit);
+        $resetAt = $this->preferences->forUser($user)->profileResetAt;
+        $progress = $this->progressRows($user, $limit, $resetAt);
         $states = $this->stateRows($user, $limit);
-        $collections = $this->collectionRows($user, $limit);
-        $personalTags = $this->personalTagRows($user, $limit);
+        $collections = $this->collectionRows($user, $limit, $resetAt);
+        $personalTags = $this->personalTagRows($user, $limit, $resetAt);
         $publishedEpisodes = $this->publishedEpisodeCounts(
             $user,
             $progress->pluck('catalog_title_id')->map(static fn (mixed $id): int => (int) $id)->all(),
@@ -56,6 +60,7 @@ final class CatalogPersonalPreferenceProfileBuilder
                 CatalogRecommendationReason::BecauseHistory,
                 60 + (int) round(100 * $depth),
                 $activity,
+                $resetAt,
             );
 
             if ($publishedCount > 0) {
@@ -69,6 +74,7 @@ final class CatalogPersonalPreferenceProfileBuilder
                         CatalogRecommendationReason::BecauseHistory,
                         140,
                         $activity,
+                        $resetAt,
                     );
                 }
             }
@@ -79,7 +85,10 @@ final class CatalogPersonalPreferenceProfileBuilder
             $status = $this->watchStatus($state);
             $feedback = $this->recommendationFeedback($state);
 
-            if ($feedback?->isNegative() === true || $status === CatalogWatchStatus::Dropped) {
+            $negativeActivity = $this->negativeActivity($state, $feedback, $status);
+
+            if (($feedback?->isNegative() === true || $status === CatalogWatchStatus::Dropped)
+                && $this->activityIsCurrent($negativeActivity, $resetAt)) {
                 $negativeTitleIds[$titleId] = true;
 
                 continue;
@@ -93,6 +102,7 @@ final class CatalogPersonalPreferenceProfileBuilder
                     CatalogRecommendationReason::BecausePositiveFeedback,
                     max(1, (int) config('recommendations.personalized_v2.feedback_weight', 180)),
                     $this->stateActivity($state, 'recommendation_feedback_updated_at'),
+                    $resetAt,
                 );
             }
 
@@ -104,6 +114,7 @@ final class CatalogPersonalPreferenceProfileBuilder
                     CatalogRecommendationReason::BecauseWatchlist,
                     60,
                     $this->stateActivity($state, 'watchlist_updated_at'),
+                    $resetAt,
                 );
             }
 
@@ -117,6 +128,7 @@ final class CatalogPersonalPreferenceProfileBuilder
                     CatalogRecommendationReason::BecauseRating,
                     ($rating - 6) * 35,
                     $this->stateActivity($state, 'rating_updated_at'),
+                    $resetAt,
                 );
             }
 
@@ -135,6 +147,7 @@ final class CatalogPersonalPreferenceProfileBuilder
                     CatalogRecommendationReason::BecauseStatus,
                     $statusEvidence[1],
                     $this->stateActivity($state, 'watch_status_updated_at'),
+                    $resetAt,
                 );
             }
         }
@@ -147,6 +160,7 @@ final class CatalogPersonalPreferenceProfileBuilder
                 CatalogRecommendationReason::BecauseCollection,
                 45,
                 $this->activity($row->last_activity_at),
+                $resetAt,
             );
         }
 
@@ -158,6 +172,7 @@ final class CatalogPersonalPreferenceProfileBuilder
                 CatalogRecommendationReason::BecausePersonalTags,
                 35,
                 $this->activity($row->last_activity_at),
+                $resetAt,
             );
         }
 
@@ -199,14 +214,15 @@ final class CatalogPersonalPreferenceProfileBuilder
         );
     }
 
-    /** @return Collection<int, object> */
-    private function progressRows(User $user, int $limit): Collection
+    /** @return Collection<int, \stdClass> */
+    private function progressRows(User $user, int $limit, ?CarbonImmutable $resetAt): Collection
     {
         $minimumSeconds = max(1, (int) config('recommendations.meaningful_progress_seconds', 180));
         $minimumPercent = max(1, (int) config('recommendations.meaningful_progress_percent', 10));
 
         return DB::table('episode_view_progress')
             ->where('user_id', $user->id)
+            ->when($resetAt !== null, fn ($query) => $query->where('last_watched_at', '>', $resetAt))
             ->where(function ($query) use ($minimumSeconds, $minimumPercent): void {
                 $query
                     ->where('position_seconds', '>=', $minimumSeconds)
@@ -248,13 +264,14 @@ final class CatalogPersonalPreferenceProfileBuilder
             ->get($columns);
     }
 
-    /** @return Collection<int, object> */
-    private function collectionRows(User $user, int $limit): Collection
+    /** @return Collection<int, \stdClass> */
+    private function collectionRows(User $user, int $limit, ?CarbonImmutable $resetAt): Collection
     {
         return DB::table('catalog_collection_items')
             ->join('catalog_collections', 'catalog_collections.id', '=', 'catalog_collection_items.catalog_collection_id')
             ->where('catalog_collections.owner_id', $user->id)
             ->whereNull('catalog_collections.deleted_at')
+            ->when($resetAt !== null, fn ($query) => $query->where('catalog_collection_items.updated_at', '>', $resetAt))
             ->groupBy('catalog_collection_items.catalog_title_id')
             ->selectRaw('catalog_collection_items.catalog_title_id')
             ->selectRaw('MAX(catalog_collection_items.updated_at) AS last_activity_at')
@@ -263,13 +280,14 @@ final class CatalogPersonalPreferenceProfileBuilder
             ->get();
     }
 
-    /** @return Collection<int, object> */
-    private function personalTagRows(User $user, int $limit): Collection
+    /** @return Collection<int, \stdClass> */
+    private function personalTagRows(User $user, int $limit, ?CarbonImmutable $resetAt): Collection
     {
         return DB::table('catalog_title_user_tag')
             ->join('user_tags', 'user_tags.id', '=', 'catalog_title_user_tag.user_tag_id')
             ->where('user_tags.user_id', $user->id)
             ->whereNull('user_tags.deleted_at')
+            ->when($resetAt !== null, fn ($query) => $query->where('catalog_title_user_tag.updated_at', '>', $resetAt))
             ->groupBy('catalog_title_user_tag.catalog_title_id')
             ->selectRaw('catalog_title_user_tag.catalog_title_id')
             ->selectRaw('MAX(catalog_title_user_tag.updated_at) AS last_activity_at')
@@ -310,8 +328,9 @@ final class CatalogPersonalPreferenceProfileBuilder
         CatalogRecommendationReason $reason,
         int $rawWeight,
         ?CarbonImmutable $activity,
+        ?CarbonImmutable $resetAt,
     ): void {
-        if ($titleId < 1 || $rawWeight < 1) {
+        if ($titleId < 1 || $rawWeight < 1 || ! $this->activityIsCurrent($activity, $resetAt)) {
             return;
         }
 
@@ -349,6 +368,34 @@ final class CatalogPersonalPreferenceProfileBuilder
         return in_array($column, $this->stateColumns(), true)
             ? $this->activity($state->getAttribute($column))
             : null;
+    }
+
+    private function negativeActivity(
+        CatalogTitleUserState $state,
+        ?CatalogRecommendationFeedback $feedback,
+        ?CatalogWatchStatus $status,
+    ): ?CarbonImmutable {
+        $activities = [];
+
+        if ($feedback?->isNegative() === true) {
+            $activities[] = $this->stateActivity($state, 'recommendation_feedback_updated_at');
+        }
+
+        if ($status === CatalogWatchStatus::Dropped) {
+            $activities[] = $this->stateActivity($state, 'watch_status_updated_at');
+        }
+
+        $activities = array_values(array_filter($activities));
+        usort($activities, static fn (CarbonImmutable $left, CarbonImmutable $right): int => $right <=> $left);
+
+        return $activities[0] ?? null;
+    }
+
+    private function activityIsCurrent(
+        ?CarbonImmutable $activity,
+        ?CarbonImmutable $resetAt,
+    ): bool {
+        return $resetAt === null || ($activity !== null && $activity->isAfter($resetAt));
     }
 
     private function watchStatus(CatalogTitleUserState $state): ?CatalogWatchStatus

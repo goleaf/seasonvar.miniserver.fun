@@ -29,6 +29,8 @@ use App\Services\Admin\AdminAccessResolver;
 use App\Services\Admin\AdminGateRegistrar;
 use App\Services\Auth\AccountAccessResolver;
 use App\Services\Auth\AccountSettingsSchema;
+use App\Services\Catalog\CatalogRecommendationPreferenceQuery;
+use App\Services\Catalog\CatalogRecommendationPreferenceSchema;
 use App\Services\Catalog\PersonalLibrarySchema;
 use App\Services\Collections\CatalogCollectionSchema;
 use App\Services\Comments\CommentSchema;
@@ -87,6 +89,8 @@ class AppServiceProvider extends ServiceProvider
         $this->app->scopedIf(HelpCenterSchema::class);
         $this->app->scopedIf(PremiumSchema::class);
         $this->app->scopedIf(PersonalLibrarySchema::class);
+        $this->app->scopedIf(CatalogRecommendationPreferenceSchema::class);
+        $this->app->scopedIf(CatalogRecommendationPreferenceQuery::class);
         $this->app->scopedIf(PremiumAccessResolver::class);
         $this->app->singleton(PremiumPaymentGatewayRegistry::class, static fn (): PremiumPaymentGatewayRegistry => new PremiumPaymentGatewayRegistry);
         $this->app->scopedIf(TagSchema::class);

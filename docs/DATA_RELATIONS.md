@@ -485,6 +485,38 @@ reversible заменяет прежний feedback index тем же имене
 и стабильную проекцию title ID без временной сортировки SQLite. `down()`
 возвращает прежний `(user_id,recommendation_feedback,catalog_title_id)`.
 
+Migration
+`2026_07_26_230000_create_catalog_recommendation_feedback_preferences.php`
+additive и reversible создаёт три owner-private current-state таблицы без
+backfill или изменения canonical `catalog_title_user_states`:
+
+- `catalog_recommendation_feedback_details` хранит одну текущую stable reason
+  на `(user_id,catalog_title_id)` и не более одного серверно проверенного
+  `genre_id|country_id|actor_id`. Owner/title удаляются каскадно, taxonomy
+  subject — через `nullOnDelete`; unique
+  `catalog_recommendation_feedback_detail_user_title_unique` исключает
+  дубли, а
+  `catalog_recommendation_feedback_detail_user_activity_idx
+  (user_id,updated_at,id)` обслуживает bounded learned-profile read;
+- `catalog_recommendation_preferences` использует `user_id` как primary/FK,
+  хранит только stable `diversity`, `freshness`, nullable
+  `profile_reset_at` и monotonic `version`. Отсутствующая строка означает
+  balanced defaults;
+- `catalog_recommendation_hidden_genres` хранит owner/genre и
+  `hidden_until`; unique `(user_id,genre_id)` обслуживает idempotent upsert,
+  а `catalog_recommendation_hidden_genre_user_expiry_idx
+  (user_id,hidden_until,id)` — active expiry lookup. Истёкшие строки не
+  влияют на visibility и bounded удаляются при следующей owner mutation.
+
+Reason detail уточняет существующее `not_interested|blacklisted`, но не
+создаёт второй blacklist и не переводит значения в identity. Title merge
+переносит detail согласно победившему canonical feedback; account export
+отдаёт stable codes и безопасные названия subject без внутренних ID, а
+account deletion очищает новые строки по FK. Reset выставляет cutoff,
+удаляет только learned detail и временно скрытые жанры, но сохраняет
+историю, прогресс, оценки, список просмотра, статусы, коллекции, личные теги
+и exact решения по конкретным тайтлам.
+
 `catalog_title_relations` хранит `(source_title_id,target_title_id,relation_type,source)` unique, provider key, bounded manual priority, lock/active flags и timestamps. FK cascade удаляет explicit rows при hard title delete. Service пишет inverse pair и не смешивает editorial/imported identity. Seasonvar title merge переносит incoming/outgoing rows до duplicate force-delete, объединяет priority/lock/active/provenance, удаляет self-relations и сохраняет legacy slugs.
 
 Индексы соответствуют реальным запросам:
@@ -493,6 +525,9 @@ reversible заменяет прежний feedback index тем же имене
 - `(target_title_id,relation_type,is_active)` — inverse/merge/cycle lookup;
 - `(source,provider_key)` — idempotent provider provenance;
 - `(user_id,recommendation_feedback,recommendation_feedback_updated_at,id,catalog_title_id)` — bounded positive source, owner hard exclusions и negative library restore;
+- `(user_id,updated_at,id)` в feedback details — bounded explicit reason evidence после reset cutoff;
+- primary `catalog_recommendation_preferences(user_id)` — один request-scoped preference lookup без второго identity index;
+- unique `(user_id,genre_id)` и `(user_id,hidden_until,id)` — idempotent temporary-hide mutation и indexed active genre exclusion;
 - `(user_id,watch_status,watch_status_updated_at,catalog_title_id)` — bounded personal status source/demotion с truthful signal ordering;
 - `(in_watchlist,watchlist_updated_at,catalog_title_id,user_id)` и progress `(last_watched_at,catalog_title_id,user_id)` — recent public semantic activity; rating personalization читает nullable `rating_updated_at` и stable `id` tie-break без отдельного public aggregate.
 - `(user_id,in_watchlist,watchlist_updated_at,id,catalog_title_id)`, `(user_id,watch_status_updated_at,id,watch_status,catalog_title_id)` и `(user_id,rating_updated_at,id,rating,catalog_title_id)` — covering ordered scans трёх owner-only personalized windows; предикаты status/rating остаются server-side, а nullable semantic activity не превращается в public event.

@@ -5,13 +5,18 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\DTOs\CatalogRecommendationListItem;
+use App\Models\Actor;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRecommendation;
+use App\Models\Country;
 use App\Models\Genre;
 use App\Models\LicensedMedia;
 use App\Models\User;
+use App\Services\Catalog\CatalogRecommendationFeedbackOptionQuery;
 use App\Services\Catalog\CatalogTitlePageBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class CatalogRecommendationListTest extends TestCase
@@ -122,9 +127,29 @@ class CatalogRecommendationListTest extends TestCase
         $user = User::factory()->create();
         $source = CatalogTitle::factory()->create(['title' => 'Источник рекомендаций']);
         $candidate = $this->recommendableTitle('Управляемая рекомендация');
+        $genre = Genre::query()->create(['name' => 'Драма причины', 'slug' => 'feedback-option-drama']);
+        $country = Country::query()->create(['name' => 'Страна причины', 'slug' => 'feedback-option-country']);
+        $actor = Actor::query()->create(['name' => 'Актёр причины', 'slug' => 'feedback-option-actor']);
+        $candidate->genres()->attach($genre);
+        $candidate->countries()->attach($country);
+        $candidate->actors()->attach($actor);
+        $feedbackOptions = app(CatalogRecommendationFeedbackOptionQuery::class)->forTitles([$candidate]);
+        $this->assertSame($genre->id, $feedbackOptions[$candidate->id]['genres'][0]['id'] ?? null);
+        $this->assertSame($country->id, $feedbackOptions[$candidate->id]['countries'][0]['id'] ?? null);
+        $this->assertSame($actor->id, $feedbackOptions[$candidate->id]['actors'][0]['id'] ?? null);
         $this->storeRecommendation($source, $candidate, 1, 900, [
             'genre' => ['count' => 1, 'score' => 300],
         ]);
+        $page = app(CatalogTitlePageBuilder::class)->data($source, $user);
+        $this->assertSame(
+            $genre->id,
+            $page['recommendationItems']->first()?->feedbackOptions['genres'][0]['id'] ?? null,
+        );
+        $componentHtml = Blade::render(
+            '<x-catalog.recommendation-feedback :title-id="$titleId" action="setRecommendationFeedback" :feedback-options="$options" />',
+            ['titleId' => $candidate->id, 'options' => $feedbackOptions[$candidate->id]],
+        );
+        $this->assertStringContainsString('Драма причины', $componentHtml);
 
         $html = $this->actingAs($user)
             ->get(route('titles.show', $source))
@@ -133,12 +158,61 @@ class CatalogRecommendationListTest extends TestCase
 
         $this->assertStringContainsString('Больше похожего', $html);
         $this->assertStringContainsString('Учтём интерес к похожим темам и признакам.', $html);
-        $this->assertStringContainsString('Скроем этот сериал из рекомендаций.', $html);
-        $this->assertStringContainsString('Полностью исключим сериал из рекомендаций и релизных уведомлений.', $html);
+        $this->assertStringContainsString('Почему рекомендация не подходит?', $html);
+        $this->assertStringContainsString('Уже смотрел в другом месте', $html);
         $this->assertStringContainsString(
             "wire:target=\"setRecommendationFeedback({$candidate->id}, 'more_like_this')\"",
             $html,
         );
+        $this->assertStringContainsString('Не нравится жанр', $html);
+        $this->assertStringContainsString('Не нравится страна', $html);
+        $this->assertStringContainsString('Не нравится актёр', $html);
+        $this->assertStringContainsString('Слишком много серий', $html);
+        $this->assertStringContainsString('Сериал не закончен', $html);
+        $this->assertStringContainsString('Слишком старый', $html);
+        $this->assertStringContainsString('Низкий рейтинг', $html);
+        $this->assertStringContainsString('Не хочу такое настроение', $html);
+        $this->assertStringContainsString('Не предлагать этот сериал', $html);
+        $this->assertStringContainsString('Не предлагать похожие', $html);
+        $this->assertStringContainsString('Драма причины', $html);
+        $this->assertStringContainsString('Страна причины', $html);
+        $this->assertStringContainsString('Актёр причины', $html);
+        $this->assertStringContainsString(
+            "wire:target=\"setRecommendationFeedback({$candidate->id}, 'more_like_this')\"",
+            $html,
+        );
+        $this->assertStringContainsString(
+            "setRecommendationFeedbackReason({$candidate->id}, 'dislike_genre', {$genre->id})",
+            $html,
+        );
+    }
+
+    public function test_feedback_subject_options_use_three_queries_and_cap_the_title_batch(): void
+    {
+        $titles = CatalogTitle::factory()->count(50)->create();
+        $genre = Genre::query()->create(['name' => 'Batch жанр', 'slug' => 'batch-genre']);
+        $country = Country::query()->create(['name' => 'Batch страна', 'slug' => 'batch-country']);
+        $actor = Actor::query()->create(['name' => 'Batch актёр', 'slug' => 'batch-actor']);
+
+        foreach ($titles as $title) {
+            $title->genres()->attach($genre);
+            $title->countries()->attach($country);
+            $title->actors()->attach($actor);
+        }
+
+        DB::enableQueryLog();
+        DB::flushQueryLog();
+        app(CatalogRecommendationFeedbackOptionQuery::class)->forTitles($titles->take(1));
+        $singleTitleQueries = DB::getQueryLog();
+
+        DB::flushQueryLog();
+        $options = app(CatalogRecommendationFeedbackOptionQuery::class)->forTitles($titles);
+        $maximumBatchQueries = DB::getQueryLog();
+        DB::disableQueryLog();
+
+        $this->assertCount(3, $singleTitleQueries);
+        $this->assertCount(3, $maximumBatchQueries);
+        $this->assertCount(48, $options);
     }
 
     /**

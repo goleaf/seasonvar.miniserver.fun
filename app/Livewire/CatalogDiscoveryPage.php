@@ -7,17 +7,25 @@ namespace App\Livewire;
 use App\DTOs\CatalogRecommendationContext;
 use App\DTOs\CatalogRecommendationItem;
 use App\DTOs\CatalogRecommendationListItem;
+use App\DTOs\CatalogRecommendationPreferenceData;
 use App\DTOs\CatalogRecommendationResult;
 use App\Enums\CatalogPopularityPeriod;
+use App\Enums\CatalogRecommendationDiversityPreference;
 use App\Enums\CatalogRecommendationFeedback;
+use App\Enums\CatalogRecommendationFeedbackReason;
+use App\Enums\CatalogRecommendationFreshnessPreference;
 use App\Enums\CatalogRecommendationType;
+use App\Models\Genre;
 use App\Models\User;
 use App\Services\Catalog\CatalogFacetQuery;
+use App\Services\Catalog\CatalogRecommendationFeedbackOptionQuery;
+use App\Services\Catalog\CatalogRecommendationFeedbackService;
+use App\Services\Catalog\CatalogRecommendationPreferenceQuery;
+use App\Services\Catalog\CatalogRecommendationPreferenceService;
 use App\Services\Catalog\CatalogRecommendationPresenter;
 use App\Services\Catalog\CatalogRecommendationService;
 use App\Services\Catalog\CatalogSeoBuilder;
 use App\Services\Catalog\CatalogTitleQuery;
-use App\Services\Catalog\CatalogUserStateService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -88,17 +96,29 @@ final class CatalogDiscoveryPage extends Component
 
     public ?string $notice = null;
 
+    #[Locked]
+    public string $diversityPreference = 'balanced';
+
+    #[Locked]
+    public string $freshnessPreference = 'balanced';
+
     protected CatalogRecommendationService $recommendations;
 
     protected CatalogRecommendationPresenter $presenter;
 
     protected CatalogTitleQuery $titles;
 
-    protected CatalogUserStateService $userStates;
-
     protected CatalogFacetQuery $facets;
 
     protected CatalogSeoBuilder $seo;
+
+    protected CatalogRecommendationFeedbackService $feedback;
+
+    protected CatalogRecommendationPreferenceService $preferenceService;
+
+    protected CatalogRecommendationPreferenceQuery $preferenceQuery;
+
+    protected CatalogRecommendationFeedbackOptionQuery $feedbackOptions;
 
     protected ?CatalogRecommendationResult $resolvedResult = null;
 
@@ -108,16 +128,22 @@ final class CatalogDiscoveryPage extends Component
         CatalogRecommendationService $recommendations,
         CatalogRecommendationPresenter $presenter,
         CatalogTitleQuery $titles,
-        CatalogUserStateService $userStates,
         CatalogFacetQuery $facets,
         CatalogSeoBuilder $seo,
+        CatalogRecommendationFeedbackService $feedback,
+        CatalogRecommendationPreferenceService $preferenceService,
+        CatalogRecommendationPreferenceQuery $preferenceQuery,
+        CatalogRecommendationFeedbackOptionQuery $feedbackOptions,
     ): void {
         $this->recommendations = $recommendations;
         $this->presenter = $presenter;
         $this->titles = $titles;
-        $this->userStates = $userStates;
         $this->facets = $facets;
         $this->seo = $seo;
+        $this->feedback = $feedback;
+        $this->preferenceService = $preferenceService;
+        $this->preferenceQuery = $preferenceQuery;
+        $this->feedbackOptions = $feedbackOptions;
     }
 
     public function mount(string $type): void
@@ -132,6 +158,7 @@ final class CatalogDiscoveryPage extends Component
             CatalogRecommendationType::Personalized,
         ], true) ? bin2hex(random_bytes(16)) : '';
         $this->normalizeState();
+        $this->loadRecommendationPreferences();
     }
 
     public function updated(string $property): void
@@ -204,16 +231,77 @@ final class CatalogDiscoveryPage extends Component
             return;
         }
 
+        if ($feedback === CatalogRecommendationFeedback::NotInterested) {
+            $this->addError('recommendationFeedback', __('recommendations.feedback.reason_required'));
+
+            return;
+        }
+
         try {
             $title = $this->titles->visibleTo($user)->findOrFail($titleId);
-            $this->userStates->setRecommendationFeedback($user, $title, $feedback);
+
+            if ($feedback === CatalogRecommendationFeedback::MoreLikeThis) {
+                $this->feedback->savePositive($user, $title);
+                $this->notice = __('recommendations.feedback.saved_more_like_this');
+            } else {
+                $this->feedback->save($user, $title, CatalogRecommendationFeedbackReason::NotThisTitle);
+                $this->notice = __('recommendations.feedback.saved_reason');
+            }
+
             $this->lastFeedbackTitleId = $title->id;
-            $this->notice = __("recommendations.feedback.saved_{$feedback->value}");
             $this->resetErrorBag();
         } catch (ValidationException $exception) {
             $this->addError(
                 'recommendationFeedback',
                 (string) ($exception->errors()['recommendationFeedback'][0] ?? __('recommendations.feedback.error')),
+            );
+        } catch (Throwable $exception) {
+            report($exception);
+            $this->addError('recommendationFeedback', __('recommendations.feedback.error'));
+        }
+    }
+
+    public function setFeedbackReason(
+        mixed $catalogTitleId,
+        mixed $reason,
+        mixed $subjectId = null,
+    ): void {
+        $user = $this->user();
+
+        if (! $user instanceof User) {
+            $this->redirectRoute('login', navigate: true);
+
+            return;
+        }
+
+        $titleId = filter_var($catalogTitleId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $reason = is_string($reason) ? CatalogRecommendationFeedbackReason::tryFrom($reason) : null;
+        $subjectId = $subjectId === null
+            ? null
+            : filter_var($subjectId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+
+        if (! is_int($titleId)
+            || ! $reason instanceof CatalogRecommendationFeedbackReason
+            || ($subjectId !== null && ! is_int($subjectId))) {
+            $this->addError('recommendationFeedback', __('recommendations.feedback.invalid_reason'));
+
+            return;
+        }
+
+        try {
+            $title = $this->titles->visibleTo($user)->findOrFail($titleId);
+            $this->feedback->save($user, $title, $reason, $subjectId);
+            $this->lastFeedbackTitleId = $title->id;
+            $this->notice = __('recommendations.feedback.saved_reason');
+            $this->resetErrorBag();
+        } catch (ValidationException $exception) {
+            $this->addError(
+                'recommendationFeedback',
+                (string) (
+                    $exception->errors()['recommendationFeedbackSubject'][0]
+                    ?? $exception->errors()['recommendationFeedback'][0]
+                    ?? __('recommendations.feedback.error')
+                ),
             );
         } catch (Throwable $exception) {
             report($exception);
@@ -231,7 +319,7 @@ final class CatalogDiscoveryPage extends Component
 
         try {
             $title = $this->titles->visibleTo($user)->findOrFail($this->lastFeedbackTitleId);
-            $this->userStates->undoRecommendationFeedback($user, $title);
+            $this->feedback->undo($user, $title);
             $this->lastFeedbackTitleId = null;
             $this->notice = __('recommendations.feedback.undone');
             $this->resetErrorBag();
@@ -243,6 +331,84 @@ final class CatalogDiscoveryPage extends Component
         } catch (Throwable $exception) {
             report($exception);
             $this->addError('recommendationFeedback', __('recommendations.feedback.error'));
+        }
+    }
+
+    public function updateRecommendationPreferences(mixed $diversity, mixed $freshness): void
+    {
+        $user = $this->user();
+
+        if (! $user instanceof User) {
+            $this->redirectRoute('login', navigate: true);
+
+            return;
+        }
+
+        $diversity = is_string($diversity)
+            ? CatalogRecommendationDiversityPreference::tryFrom($diversity)
+            : null;
+        $freshness = is_string($freshness)
+            ? CatalogRecommendationFreshnessPreference::tryFrom($freshness)
+            : null;
+
+        if (! $diversity instanceof CatalogRecommendationDiversityPreference
+            || ! $freshness instanceof CatalogRecommendationFreshnessPreference) {
+            $this->addError('recommendationPreferences', __('recommendations.preferences.invalid'));
+
+            return;
+        }
+
+        try {
+            $data = $this->preferenceService->update($user, $diversity, $freshness);
+            $this->applyRecommendationPreferences($data);
+            $this->notice = __('recommendations.preferences.saved');
+            $this->refreshAfterPreferenceMutation();
+            $this->resetErrorBag();
+        } catch (ValidationException $exception) {
+            $this->addError(
+                'recommendationPreferences',
+                (string) ($exception->errors()['recommendationPreferences'][0] ?? __('recommendations.feedback.error')),
+            );
+        } catch (Throwable $exception) {
+            report($exception);
+            $this->addError('recommendationPreferences', __('recommendations.feedback.error'));
+        }
+    }
+
+    public function hideRecommendationGenre(mixed $genreId): void
+    {
+        $this->mutateRecommendationGenre($genreId, hide: true);
+    }
+
+    public function restoreRecommendationGenre(mixed $genreId): void
+    {
+        $this->mutateRecommendationGenre($genreId, hide: false);
+    }
+
+    public function resetRecommendationProfile(): void
+    {
+        $user = $this->user();
+
+        if (! $user instanceof User) {
+            $this->redirectRoute('login', navigate: true);
+
+            return;
+        }
+
+        try {
+            $this->applyRecommendationPreferences($this->preferenceService->reset($user));
+            $this->notice = __('recommendations.preferences.reset_done');
+            $this->lastFeedbackTitleId = null;
+            $this->refreshAfterPreferenceMutation();
+            $this->resetErrorBag();
+        } catch (ValidationException $exception) {
+            $this->addError(
+                'recommendationPreferences',
+                (string) ($exception->errors()['recommendationPreferences'][0] ?? __('recommendations.feedback.error')),
+            );
+        } catch (Throwable $exception) {
+            report($exception);
+            $this->addError('recommendationPreferences', __('recommendations.feedback.error'));
         }
     }
 
@@ -269,6 +435,9 @@ final class CatalogDiscoveryPage extends Component
             ['genre' => 60, 'country' => 60, 'tag' => 40, 'actor' => 40, 'director' => 40, 'translation' => 60, 'studio' => 40],
             $this->user(),
         );
+        $feedbackOptions = $this->user() !== null
+            ? $this->feedbackOptions->forTitles($result->items->pluck('title'))
+            : [];
         $viewItems = $result->items->map(fn (CatalogRecommendationItem $item): CatalogRecommendationListItem => new CatalogRecommendationListItem(
             title: $item->title,
             rank: $item->rank,
@@ -278,6 +447,7 @@ final class CatalogDiscoveryPage extends Component
             source: $item->source,
             relationType: $item->relationType,
             canDismiss: $this->user() !== null,
+            feedbackOptions: $feedbackOptions[$item->title->id] ?? [],
         ));
         $hasFilters = $this->hasFilters();
         $collectionStatefulVariant = request()->hasAny([
@@ -305,6 +475,10 @@ final class CatalogDiscoveryPage extends Component
             'maximumYear' => now()->year + 5,
             'hasFilters' => $hasFilters,
             'isAuthenticated' => $this->user() !== null,
+            'showRecommendationPreferences' => $type === CatalogRecommendationType::Personalized && $this->user() !== null,
+            'hiddenRecommendationGenres' => $this->user() !== null
+                ? $this->feedbackOptions->activeHiddenGenres($this->user())
+                : collect(),
             'popularUrl' => $this->discoveryUrl(CatalogRecommendationType::Popular),
             'discoverySectionNavigation' => $type === CatalogRecommendationType::Popular
                 ? [
@@ -373,6 +547,62 @@ final class CatalogDiscoveryPage extends Component
         $user = Auth::user();
 
         return $user instanceof User ? $user : null;
+    }
+
+    private function loadRecommendationPreferences(): void
+    {
+        $user = $this->user();
+
+        if ($user instanceof User) {
+            $this->applyRecommendationPreferences($this->preferenceQuery->forUser($user));
+        }
+    }
+
+    private function applyRecommendationPreferences(
+        CatalogRecommendationPreferenceData $data,
+    ): void {
+        $this->diversityPreference = $data->diversity->value;
+        $this->freshnessPreference = $data->freshness->value;
+    }
+
+    private function mutateRecommendationGenre(mixed $genreId, bool $hide): void
+    {
+        $user = $this->user();
+        $genreId = filter_var($genreId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+
+        if (! $user instanceof User || ! is_int($genreId)) {
+            $this->addError('recommendationPreferences', __('recommendations.preferences.invalid'));
+
+            return;
+        }
+
+        try {
+            $genre = Genre::query()->findOrFail($genreId);
+            $data = $hide
+                ? $this->preferenceService->hideGenre($user, $genre)
+                : $this->preferenceService->restoreGenre($user, $genre);
+            $this->applyRecommendationPreferences($data);
+            $this->notice = __($hide
+                ? 'recommendations.preferences.genre_hidden'
+                : 'recommendations.preferences.genre_restored');
+            $this->refreshAfterPreferenceMutation();
+            $this->resetErrorBag();
+        } catch (ValidationException $exception) {
+            $this->addError(
+                'recommendationPreferences',
+                (string) ($exception->errors()['recommendationPreferences'][0] ?? __('recommendations.feedback.error')),
+            );
+        } catch (Throwable $exception) {
+            report($exception);
+            $this->addError('recommendationPreferences', __('recommendations.feedback.error'));
+        }
+    }
+
+    private function refreshAfterPreferenceMutation(): void
+    {
+        $this->resolvedResult = null;
+        $this->resolvedResultPrepared = false;
+        $this->page = 1;
     }
 
     private function normalizeState(): void

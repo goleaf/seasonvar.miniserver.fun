@@ -200,6 +200,20 @@ Task 27 verified account lifecycle against every SQLite FK to `users`. Един�
   tracking система не добавлена, fingerprinting и scroll telemetry
   отсутствуют.
 - `watchlist_updated_at`, `rating_updated_at` и `watch_status_updated_at` — internal server-side provenance: они отсутствуют в URL, Livewire public state, API resources, export, explanation, HTML и shared cache. Legacy technical `updated_at` не backfill-ится и не считается новым public event. Trending полностью пропускает watchlist contribution при rolling schema без semantic column, а не ослабляет privacy/accuracy fallback-ом.
+- Structured negative feedback принимает только 11 stable enum codes.
+  Genre/country/actor subject обязан быть positive ID существующей связи
+  exact visible title; client не задаёт user, feature key, weight, canonical
+  feedback mapping, timestamp или arbitrary text. Domain service повторно
+  использует `CatalogTitlePolicy::interact`, rate limit и transaction
+  canonical state/detail, поэтому hidden UI и переданный чужой ID не являются
+  authorization.
+- Diversity/freshness, reset cutoff и temporary hidden genre — только
+  owner-private state. Write service повторно authorizes
+  `update-account-settings`, allowlist-ит enum, ограничивает expiry server
+  config и rate-limit-ит mutation. Livewire публично хранит только locked
+  stable codes; reason subject options подготовлены server-side. Данные
+  отсутствуют в public API/SEO/shared cache/logs, а account export заменяет
+  internal IDs безопасными title/taxonomy names.
 - Personalized v2 хранит profile, confidence, source IDs и feature demotions только в request-local DTO. Stable rollout bucket использует internal user key лишь внутри server-side SHA-256 и не попадает в URL/cache/output. Public explanation ограничен broad reason codes; `new_for_you` ставится только выбранному relevance-bounded explore row. Negative genre/tag/theme keys, confidence weights, source-title IDs и min/median/p95 не сериализуются клиенту. При выключенном флаге или несовместимой active v6 scale выполняется прежний fallback/legacy path.
 - Relation writes reject self/deleted pair and invalid sequel/prequel cycle, write inverse transactionally and keep editorial/imported identity separate. Provider import не перезаписывает locked editorial row; title merge removes collapsed self-relations before FK cascade.
 - Title merge сохраняет deterministic feedback strength (`blacklisted > not_interested > more_like_this`) и watch-status strength (`dropped > completed > watching > planned`), поэтому duplicate merge не может случайно открыть скрытый title или заменить отрицательный intent положительным. Versions и trustworthy timestamps объединяются server-side; client не задаёт precedence/timestamp.

@@ -7,6 +7,7 @@ namespace App\Services\Catalog;
 use App\Enums\CatalogRecommendationFeedback;
 use App\Enums\CatalogWatchStatus;
 use App\Enums\PlaybackCompletionSource;
+use App\Models\CatalogRecommendationFeedbackDetail;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleUpdateState;
 use App\Models\CatalogTitleUserState;
@@ -126,6 +127,8 @@ final class CatalogTitleUserDataMerger
                 $incoming->delete();
             });
 
+        $this->mergeRecommendationFeedbackDetails($duplicate, $canonical);
+
         EpisodeViewProgress::query()
             ->where('catalog_title_id', $duplicate->id)
             ->update([
@@ -172,6 +175,77 @@ final class CatalogTitleUserDataMerger
 
                     $incoming->delete();
                 });
+        }
+    }
+
+    private function mergeRecommendationFeedbackDetails(
+        CatalogTitle $duplicate,
+        CatalogTitle $canonical,
+    ): void {
+        if (! Schema::hasTable('catalog_recommendation_feedback_details')) {
+            return;
+        }
+
+        $incomingDetails = CatalogRecommendationFeedbackDetail::query()
+            ->whereBelongsTo($duplicate)
+            ->get();
+
+        if ($incomingDetails->isEmpty()) {
+            return;
+        }
+
+        $userIds = $incomingDetails->pluck('user_id')->unique()->values();
+        $canonicalDetails = CatalogRecommendationFeedbackDetail::query()
+            ->whereBelongsTo($canonical)
+            ->whereIn('user_id', $userIds)
+            ->get()
+            ->keyBy('user_id');
+        $canonicalStates = CatalogTitleUserState::query()
+            ->whereBelongsTo($canonical)
+            ->whereIn('user_id', $userIds)
+            ->get()
+            ->keyBy('user_id');
+
+        foreach ($incomingDetails as $incoming) {
+            $existing = $canonicalDetails->get($incoming->user_id);
+            $canonicalState = $canonicalStates->get($incoming->user_id);
+            $feedback = $canonicalState instanceof CatalogTitleUserState
+                ? $this->recommendationFeedback($canonicalState)
+                : null;
+            $incomingMatches = $feedback instanceof CatalogRecommendationFeedback
+                && $incoming->reason->feedback() === $feedback;
+            $existingMatches = $existing instanceof CatalogRecommendationFeedbackDetail
+                && $feedback instanceof CatalogRecommendationFeedback
+                && $existing->reason->feedback() === $feedback;
+
+            if (! $incomingMatches && ! $existingMatches) {
+                $existing?->delete();
+                $incoming->delete();
+
+                continue;
+            }
+
+            $useIncoming = $incomingMatches
+                && (! $existingMatches
+                    || $incoming->updated_at?->isAfter($existing->updated_at) === true);
+
+            if ($useIncoming) {
+                $target = $existing ?? $incoming;
+                $target->timestamps = false;
+                $target->forceFill([
+                    'catalog_title_id' => $canonical->id,
+                    'reason' => $incoming->reason,
+                    'genre_id' => $incoming->genre_id,
+                    'country_id' => $incoming->country_id,
+                    'actor_id' => $incoming->actor_id,
+                    'created_at' => $target->created_at ?? $incoming->created_at,
+                    'updated_at' => $incoming->updated_at,
+                ])->save();
+            }
+
+            if ($existing instanceof CatalogRecommendationFeedbackDetail) {
+                $incoming->delete();
+            }
         }
     }
 
@@ -390,6 +464,16 @@ final class CatalogTitleUserDataMerger
         $timestamp = $state->getAttribute($column);
 
         return $timestamp instanceof CarbonInterface ? $timestamp : null;
+    }
+
+    private function recommendationFeedback(
+        CatalogTitleUserState $state,
+    ): ?CatalogRecommendationFeedback {
+        $feedback = $state->getAttribute('recommendation_feedback');
+
+        return $feedback instanceof CatalogRecommendationFeedback
+            ? $feedback
+            : CatalogRecommendationFeedback::tryFrom((string) $feedback);
     }
 
     private function comparisonTimestamp(

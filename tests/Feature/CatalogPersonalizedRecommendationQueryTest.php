@@ -19,6 +19,7 @@ use App\Models\LicensedMedia;
 use App\Models\User;
 use App\Services\Catalog\CatalogPersonalizedRecommendationQuery;
 use App\Services\Catalog\CatalogPersonalPreferenceProfileBuilder;
+use App\Services\Catalog\CatalogRecommendationPreferenceService;
 use App\Services\Catalog\CatalogRecommendationScoreNormalizer;
 use App\Services\Catalog\CatalogRecommendationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -151,6 +152,31 @@ final class CatalogPersonalizedRecommendationQueryTest extends TestCase
         $v2 = app(CatalogRecommendationService::class)->discover($this->context($user, perPage: 4));
 
         $this->assertSame(CatalogPersonalizationConfidence::Low, $v2->personalizationConfidence);
+    }
+
+    public function test_profile_reset_cutoff_is_honored_by_the_legacy_query_path(): void
+    {
+        config(['recommendations.personalized_v2.rollout_percent' => 0]);
+        $user = User::factory()->create();
+        $source = CatalogTitle::factory()->create();
+        $candidate = $this->watchableTitle();
+        CatalogTitleUserState::query()->create([
+            'user_id' => $user->id,
+            'catalog_title_id' => $source->id,
+            'rating' => 10,
+            'rating_updated_at' => now()->subMinute(),
+        ]);
+        $this->recommend($source, $candidate, 1_400);
+        $query = app(CatalogPersonalizedRecommendationQuery::class);
+
+        $this->assertSame(
+            [$candidate->id],
+            array_column($query->candidates($this->context($user), []), 'id'),
+        );
+
+        app(CatalogRecommendationPreferenceService::class)->reset($user);
+
+        $this->assertSame([], $query->candidates($this->context($user), []));
     }
 
     public function test_explicit_feedback_and_dropped_titles_are_never_returned_by_v2_or_its_fallback(): void

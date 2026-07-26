@@ -15,6 +15,7 @@ use App\Models\CatalogTitleRecommendation;
 use App\Models\CatalogTitleUserState;
 use App\Models\EpisodeViewProgress;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -27,6 +28,7 @@ final class CatalogPersonalizedRecommendationQuery
         private readonly CatalogRecommendationScoreNormalizer $normalizer,
         private readonly CatalogPersonalizedCandidateScorer $scorer,
         private readonly CatalogRecommendationFeatureExtractor $features,
+        private readonly CatalogRecommendationPreferenceQuery $preferences,
     ) {}
 
     /** @param list<int> $excludedIds */
@@ -185,11 +187,12 @@ final class CatalogPersonalizedRecommendationQuery
     {
         $signals = [];
         $historyLimit = max(10, min(500, (int) config('recommendations.history_title_limit', 120)));
+        $resetAt = $this->preferences->forUser($user)->profileResetAt;
 
         if (Schema::hasColumn('catalog_title_user_states', 'recommendation_feedback')) {
             $feedbackTitleIds = $this->orderBySignalActivity(CatalogTitleUserState::query()
                 ->whereBelongsTo($user)
-                ->where('recommendation_feedback', CatalogRecommendationFeedback::MoreLikeThis->value), 'recommendation_feedback_updated_at')
+                ->where('recommendation_feedback', CatalogRecommendationFeedback::MoreLikeThis->value), 'recommendation_feedback_updated_at', $resetAt)
                 ->limit(80)
                 ->pluck('catalog_title_id');
 
@@ -204,6 +207,7 @@ final class CatalogPersonalizedRecommendationQuery
 
         $progress = EpisodeViewProgress::query()
             ->whereBelongsTo($user)
+            ->when($resetAt !== null, fn (Builder $query): Builder => $query->where('last_watched_at', '>', $resetAt))
             ->where(function ($query): void {
                 $query
                     ->where('position_seconds', '>=', max(1, (int) config('recommendations.meaningful_progress_seconds', 180)))
@@ -230,7 +234,7 @@ final class CatalogPersonalizedRecommendationQuery
 
         $watchlistTitleIds = $this->orderBySignalActivity(CatalogTitleUserState::query()
             ->whereBelongsTo($user)
-            ->where('in_watchlist', true), 'watchlist_updated_at')
+            ->where('in_watchlist', true), 'watchlist_updated_at', $resetAt)
             ->limit(80)
             ->pluck('catalog_title_id');
 
@@ -249,7 +253,7 @@ final class CatalogPersonalizedRecommendationQuery
                     CatalogWatchStatus::Planned->value,
                     CatalogWatchStatus::Watching->value,
                     CatalogWatchStatus::Paused->value,
-                ]), 'watch_status_updated_at')
+                ]), 'watch_status_updated_at', $resetAt)
                 ->limit(80)
                 ->pluck('catalog_title_id');
 
@@ -265,7 +269,7 @@ final class CatalogPersonalizedRecommendationQuery
         $ratingThreshold = max(1, (int) ceil((int) config('catalog.user_rating.maximum', 10) * 0.7));
         $ratedTitleIds = $this->orderBySignalActivity(CatalogTitleUserState::query()
             ->whereBelongsTo($user)
-            ->where('rating', '>=', $ratingThreshold), 'rating_updated_at')
+            ->where('rating', '>=', $ratingThreshold), 'rating_updated_at', $resetAt)
             ->limit(80)
             ->pluck('catalog_title_id');
 
@@ -281,6 +285,7 @@ final class CatalogPersonalizedRecommendationQuery
             ->join('catalog_collections', 'catalog_collections.id', '=', 'catalog_collection_items.catalog_collection_id')
             ->where('catalog_collections.owner_id', $user->id)
             ->whereNull('catalog_collections.deleted_at')
+            ->when($resetAt !== null, fn ($query) => $query->where('catalog_collection_items.updated_at', '>', $resetAt))
             ->latest('catalog_collection_items.updated_at')
             ->limit(120)
             ->pluck('catalog_collection_items.catalog_title_id');
@@ -297,6 +302,7 @@ final class CatalogPersonalizedRecommendationQuery
             ->join('user_tags', 'user_tags.id', '=', 'catalog_title_user_tag.user_tag_id')
             ->where('user_tags.user_id', $user->id)
             ->whereNull('user_tags.deleted_at')
+            ->when($resetAt !== null, fn ($query) => $query->where('catalog_title_user_tag.updated_at', '>', $resetAt))
             ->latest('catalog_title_user_tag.updated_at')
             ->limit(120)
             ->pluck('catalog_title_user_tag.catalog_title_id');
@@ -309,15 +315,18 @@ final class CatalogPersonalizedRecommendationQuery
             ]);
         }
 
-        return array_slice($this->withoutNegativeSignals($signals, $user), 0, $historyLimit, true);
+        return array_slice($this->withoutNegativeSignals($signals, $user, $resetAt), 0, $historyLimit, true);
     }
 
     /**
      * @param  array<int, array{weight: int, source: CatalogRecommendationSource, reason: CatalogRecommendationReason}>  $signals
      * @return array<int, array{weight: int, source: CatalogRecommendationSource, reason: CatalogRecommendationReason}>
      */
-    private function withoutNegativeSignals(array $signals, User $user): array
-    {
+    private function withoutNegativeSignals(
+        array $signals,
+        User $user,
+        ?CarbonImmutable $resetAt,
+    ): array {
         if ($signals === []) {
             return [];
         }
@@ -334,21 +343,39 @@ final class CatalogPersonalizedRecommendationQuery
             ->whereIn('catalog_title_id', array_keys($signals));
 
         if ($feedbackAvailable && $statusAvailable) {
-            $negativeStates->where(function (Builder $query): void {
-                $query
-                    ->whereIn(
+            $negativeStates->where(function (Builder $query) use ($resetAt): void {
+                $query->where(function (Builder $query) use ($resetAt): void {
+                    $query->whereIn(
                         'recommendation_feedback',
                         CatalogRecommendationFeedback::negativeValues(),
-                    )
-                    ->orWhere('watch_status', CatalogWatchStatus::Dropped->value);
+                    );
+
+                    if ($resetAt !== null) {
+                        $query->where('recommendation_feedback_updated_at', '>', $resetAt);
+                    }
+                })->orWhere(function (Builder $query) use ($resetAt): void {
+                    $query->where('watch_status', CatalogWatchStatus::Dropped->value);
+
+                    if ($resetAt !== null) {
+                        $query->where('watch_status_updated_at', '>', $resetAt);
+                    }
+                });
             });
         } elseif ($feedbackAvailable) {
             $negativeStates->whereIn(
                 'recommendation_feedback',
                 CatalogRecommendationFeedback::negativeValues(),
             );
+
+            if ($resetAt !== null) {
+                $negativeStates->where('recommendation_feedback_updated_at', '>', $resetAt);
+            }
         } else {
             $negativeStates->where('watch_status', CatalogWatchStatus::Dropped->value);
+
+            if ($resetAt !== null) {
+                $negativeStates->where('watch_status_updated_at', '>', $resetAt);
+            }
         }
 
         $negativeIds = $negativeStates
@@ -363,12 +390,21 @@ final class CatalogPersonalizedRecommendationQuery
      * @param  Builder<CatalogTitleUserState>  $query
      * @return Builder<CatalogTitleUserState>
      */
-    private function orderBySignalActivity(Builder $query, string $column): Builder
-    {
+    private function orderBySignalActivity(
+        Builder $query,
+        string $column,
+        ?CarbonImmutable $resetAt,
+    ): Builder {
         return $query
             ->when(
                 Schema::hasColumn('catalog_title_user_states', $column),
-                fn (Builder $query): Builder => $query->orderByDesc($column),
+                fn (Builder $query): Builder => $query
+                    ->when($resetAt !== null, fn (Builder $query): Builder => $query->where($column, '>', $resetAt))
+                    ->orderByDesc($column),
+            )
+            ->when(
+                $resetAt !== null && ! Schema::hasColumn('catalog_title_user_states', $column),
+                fn (Builder $query): Builder => $query->whereRaw('1 = 0'),
             )
             ->orderByDesc('id');
     }
