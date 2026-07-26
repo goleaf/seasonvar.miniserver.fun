@@ -1,7 +1,7 @@
 # План реализации UX-редизайна `/titles`
 
 Дата: 26.07.2026
-Статус: in_progress
+Статус: completed
 
 Статусы: `pending`, `in_progress`, `completed`, `skipped`, `unresolved`.
 
@@ -57,9 +57,9 @@
 | medium | completed | Удалить legacy duplicate controls/dead markup/debug imports и проверить naming/types/PSR-12 | touched scope | unrelated refactor | repository scan, Pint, PHPStan и Rector |
 | high | completed | Обновить canonical docs, README visitor history и русский CHANGELOG | docs/README/CHANGELOG | conflicting foreign hunks | task-specific documentation подготовлена |
 | critical | completed | Выполнить focused tests, Pint, relevant wider/full tests, static analysis, build and browser QA; исправлять причины | test/build tooling | false green from skipped command | 218 + 2 scoped PHPUnit GREEN; PHPStan 0; Rector 0; Pint/build/6 browser GREEN; полный suite имеет отдельно классифицированные foreign failures |
-| critical | in_progress | Повторно прочитать requirements/spec/plan; проверить diff/stat/status/untracked/staged/secrets/debug/mass formatting | repository + isolated index | foreign scope in commit | выполняется перед path/hunk-limited staging |
-| critical | pending | Commit разрешённых Task files только в existing `main` | Git hooks | dirty shared tree | branch/status/cached diff/hash |
-| critical | pending | Обычный push текущего `main`; внешний auth отказ записать `unresolved` | configured `origin` | auth/protected branch | factual command/output |
+| critical | completed | Повторно прочитать requirements/spec/plan; проверить diff/stat/status/untracked/staged/secrets/debug/mass formatting | repository + isolated index | foreign scope in commit | task-only 41-file index проверен без секретов/debug/unrelated paths |
+| critical | completed | Commit разрешённых Task files только в existing `main` | Git hooks | dirty shared tree | `6660dac7f27b1cc22b31ffc1d87436811274c409` |
+| critical | unresolved | Обычный push текущего `main`; внешний auth отказ записать `unresolved` | configured `origin` | auth/protected branch | exit 128: GitHub HTTPS username unavailable; передача не началась |
 
 ## Cross-feature impact
 
@@ -96,5 +96,5 @@
 | Database migration/index | not_applicable | no new query predicate or schema needed |
 | Browser/accessibility matrix | completed | 6/6 финальных desktop/mobile/tablet сценариев; без overflow/console/page/asset и серьёзных Axe ошибок |
 | Canonical docs/README/CHANGELOG | completed | task-specific canonical и visitor/technical history обновлены |
-| Final requirements/legacy scan | in_progress | выполняется перед delivery |
-| Commit/push `main` | pending | exact task scope; no force |
+| Final requirements/legacy scan | completed | requirements/spec/plan reread; task-only diff/secret/debug/legacy scan выполнен |
+| Commit/push `main` | unresolved | commit `6660dac7f27b1cc22b31ffc1d87436811274c409`; ordinary push exit 128 из-за отсутствующей GitHub HTTPS-аутентификации |

@@ -12200,7 +12200,7 @@ config и environment change не планируются.
 
 ## Task 98 — полный UX-редизайн каталога `/titles`
 
-Статус: `in_progress`.
+Статус: `implementation_committed_push_unresolved_authentication`.
 
 Канонический design и безлимитный живой checklist:
 [`2026-07-26-catalog-titles-ux-redesign-design.md`](../superpowers/specs/2026-07-26-catalog-titles-ux-redesign-design.md)
@@ -12233,4 +12233,4 @@ config и environment change не планируются.
 | Verification | `unresolved` | 218 + 2 scoped PHPUnit GREEN, Pint/PHPStan/Rector/build GREEN; полный suite имеет foreign PWA/offline/session/importer failures, повторный монолит прерван `SIGTERM 143` |
 | Docs/README/CHANGELOG | `completed` | Канонические UI/frontend/views/catalog/architecture/performance docs и visitor/technical history обновлены |
 | Final audit | `completed` | Requirements/spec/plan reread; legacy/debug/secret/diff scan выполнен |
-| Git delivery | `pending` | Exact task hunks on existing `main`; ordinary push |
+| Git delivery | `unresolved` | Commit `6660dac7f27b1cc22b31ffc1d87436811274c409` создан в `main`; ordinary push exited 128 до передачи данных: GitHub HTTPS username unavailable |
