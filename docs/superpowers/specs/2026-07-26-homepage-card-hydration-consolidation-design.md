@@ -9,29 +9,32 @@
 
 После Task 70 web-проекция больше не строит API-only секции, но
 `CatalogHomePageBuilder` по-прежнему независимо выполняет одинаковую
-гидратацию `CatalogTitle` и пяти card taxonomy relations для каждой
-включённой секции:
+гидратацию `CatalogTitle` и canonical card relations для каждой включённой
+секции:
 
 - web: `latestTitles` и `videoTitles`;
 - full/API: `latestTitles`, `featuredTitles` и `videoTitles`.
 
-Read-only профиль текущего production-shaped SQLite snapshot подтвердил:
+Проверка зафиксированного `main` подтвердила canonical card contract из пяти
+taxonomy relations (`genres`, `countries`, `ageRatings`, `translations`,
+`tags`) и отдельный `latestSeason` только для latest-секции. Read-only
+профиль текущего production-shaped SQLite snapshot подтвердил:
 
-- `webData()` — 42 SQL statements, два одинаковых root title hydration и
-  десять section taxonomy queries; семь последовательных samples дали
-  медиану `106,70 ms` при диапазоне `92,77–176,28 ms`;
-- `data()` — 45 SQL statements, три одинаковых root title hydration и
-  пятнадцать section taxonomy queries; медиана семи samples `193,98 ms` при
-  диапазоне `149,45–256,32 ms`;
-- ещё пять taxonomy queries в каждом пути принадлежат самостоятельному
-  recommendation loader и не входят в scope этой задачи;
+- `webData()` — два одинаковых root title hydration и по две section-группы
+  каждой taxonomy relation; семь последовательных samples дали медиану
+  `106,70 ms`;
+- `data()` — три одинаковых root title hydration и по три section-группы
+  каждой taxonomy relation; медиана семи samples `193,98 ms`;
+- ещё одна taxonomy group в каждом пути принадлежит самостоятельному
+  recommendation loader и не входит в scope этой задачи;
 - full snapshot содержит 48 latest, 12 featured и 8 video IDs, но только 60
   уникальных IDs; все восемь video IDs одновременно входят в featured.
 
 Следовательно, текущий full path создаёт отдельные Eloquent instances и
 повторно читает одни и те же taxonomy pivots для пересекающихся карточек.
-После объединения целевой выигрыш составляет шесть SQL statements для web и
-двенадцать для full/API path.
+Целевой структурный выигрыш составляет шесть SQL statements для web и
+двенадцать для full/API path: один/два root queries и пять/десять повторных
+taxonomy queries.
 
 ## Рассмотренные варианты
 
@@ -59,23 +62,23 @@ cache outage и прямой builder/API вызов сохранят доказ�
 - `content_added_at` устанавливается только на latest instance;
 - card counts и authenticated personal state присваиваются каждой секции
   так же, как до оптимизации;
-- `latestSeason` загружается отдельным bounded eager-load только на
-  latest collection, поэтому video/featured не получают новую relation и
-  HTML не меняется.
+- `latestSeason` повторно загружается одним bounded relation query только
+  для latest clones; featured/video остаются без этой relation, как в
+  зафиксированном `main`.
 
 ## Архитектура и поток данных
 
 1. `CatalogHomeSnapshotCache` возвращает прежние ordered scalar ID lists.
 2. `buildData()` формирует три группы: latest, optional featured и video.
-3. Новый private helper объединяет IDs, нормализует их в положительные
-   integers, удаляет дубли и выполняет один существующий
-   visibility-aware `titleSummaryQuery()` с одним набором
-   `cardSummaryLoads()`.
+3. Новый private helper объединяет IDs, нормализует их в positive integers,
+   удаляет дубли и выполняет один существующий visibility-aware
+   `titleSummaryQuery()` с одним canonical набором `cardSummaryLoads()`.
 4. Hydrated models индексируются по primary key.
 5. Для каждой исходной ID list helper строит
    `Eloquent\Collection<CatalogTitle>` в прежнем порядке, пропускает
    недоступные/отсутствующие IDs и клонирует найденную модель.
-6. Только latest collection получает прежний eager-load `latestSeason`.
+6. Latest collection одним bounded relation query получает
+   `latestSeason`; featured/video clones не получают relation.
 7. Существующие content-addition, count, personal-state, recommendation,
    SEO и serialization этапы получают те же section collections.
 
@@ -109,8 +112,9 @@ client request не добавляется.
 - Union query содержит больше IDs, чем каждая прежняя секция отдельно, но
   остаётся bounded максимумом snapshot и устраняет больше round trips и
   повторных pivot scans, чем добавляет данных.
-- `latestSeason` нельзя eager-load на union: shared title card component
-  проверяет `relationLoaded()` и это могло бы изменить video HTML.
+- `latestSeason` нельзя eager-load в общий union: это расширило бы relation
+  state featured/video и читало бы сезоны для большего набора IDs. Отдельный
+  collection load сохраняет прежнюю latest-only границу.
 - Recommendation hydration не объединяется: у неё отдельный ranking,
   presentation и ownership contract.
 
@@ -126,10 +130,11 @@ cleanup и asset rollback не нужны.
 
 ## Проверка
 
-- TDD RED требует один root title hydration и один запрос каждой taxonomy
-  relation для web и full section groups;
+- TDD RED требует один root title hydration, один запрос каждой canonical
+  card relation и один latest-only `latestSeason` query для web и full;
 - overlap regression подтверждает разные model instances, отсутствие
-  `content_added_at` и `latestSeason` вне latest section;
+  `content_added_at` вне latest section, loaded `latestSeason` у latest и
+  unloaded relation у video;
 - full/API semantic tests сохраняют counts, order и JSON shape;
 - focused homepage/recommendation/cache/eager-load tests проверяют соседние
   contracts;

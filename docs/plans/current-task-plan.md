@@ -9855,3 +9855,111 @@ worktree changes remain compatible.
   `(catalog_title_id,id)` merge index, его schema/merger matrix прошла
   5/5 tests с 48 assertions; disposable SQLite подтвердил
   migrate/rollback/remigrate.
+
+## Task 74 — консолидация hydration карточек главной
+
+Статус: `implementation_and_verification_complete_commit_pending`.
+
+Дата начала: 26.07.2026.
+
+Approved design:
+[`2026-07-26-homepage-card-hydration-consolidation-design.md`](../superpowers/specs/2026-07-26-homepage-card-hydration-consolidation-design.md).
+
+Detailed implementation plan:
+[`2026-07-26-homepage-card-hydration-consolidation.md`](../superpowers/plans/2026-07-26-homepage-card-hydration-consolidation.md).
+
+### Цель и measured root cause
+
+После Task 70 web-проекция правильно пропускает API-only sections, но
+`CatalogHomePageBuilder` отдельно выполняет одинаковый root title query и
+пять canonical taxonomy eager-loads для latest/video в web path и
+latest/featured/video в full/API path.
+
+Read-only baseline зафиксированного `main` на production-shaped snapshot:
+
+- web: два card roots и две section groups каждой из пяти taxonomy
+  relations, медиана семи builder samples `106,70 ms`;
+- full: три card roots и три section groups каждой taxonomy relation,
+  медиана `193,98 ms`;
+- full lists 48/12/8 содержат только 60 уникальных IDs; восемь video IDs
+  одновременно находятся в featured.
+
+Выбран один visibility-aware union hydration с canonical
+`cardSummaryLoads()`, ordered cloned projection обратно в три секции и
+отдельным latest-only `latestSeason` load. Цель — исключить 6 web и 12 full
+SQL statements без изменения HTML, API, cache или visibility contracts.
+
+### Expected changed files
+
+- `app/Services/Catalog/CatalogHomePageBuilder.php`;
+- `tests/Feature/CatalogHomeWebProjectionTest.php`;
+- linked Task 74 design и detailed plan;
+- task-specific hunks `docs/performance.md` и этого current plan;
+- task-specific hunks `README.md` и `CHANGELOG.md`.
+
+### Protected files и public contracts
+
+- named/localized homepage routes, Livewire/Blade/HTML and SEO;
+- `/api/v1/home`, Resource shape, IDs/order and section counts 48/12/8/12;
+- web latest/video counts 12/8 and release groups;
+- scalar snapshot and response cache keys/schema/version/TTL/invalidation;
+- recommendation loader/candidates/exclusions/ranking/shown-state;
+- taxonomy projections/localized labels, card counts and personal state;
+- publication/availability/audience/Premium/region/legal/authorization;
+- routes, translations, migrations/schema/indexes, dependencies,
+  config/environment, importer, queues and production data;
+- Task 72, Task 73 and every foreign shared-worktree change.
+
+### Cross-feature и risk matrix
+
+| Domain | Статус | Решение / gate |
+| --- | --- | --- |
+| Homepage cold/bypass path | `critical_affected` | One bounded card hydration group; exact query regression |
+| API/mobile clients | `protected_critical` | Full keys/counts/order and Resource test |
+| Model mutation isolation | `protected_critical` | Clone per section; overlap attribute and unloaded-relation assertions |
+| Recommendations | `already_compliant` | Independent loader and exclusion contract unchanged |
+| Cache | `already_compliant` | No key/version/TTL/invalidation/flush |
+| Database | `affected_read_only` | Fewer SELECT round trips; no schema/index/DML |
+| Auth/privacy/legal | `already_compliant_with_regression_gate` | Same canonical visibility query/scopes |
+| Translations/mobile/a11y | `already_compliant` | No string, markup, CSS or JS change |
+| Import/queue/admin/search | `not_applicable` | No boundary or behavior change |
+| Production/rollback | `affected_low` | Code/docs revert only; no restore/cache cleanup |
+| Shared Git state | `critical_risk_recorded` | Exact Task 74 hunks only on existing `main` |
+
+### Task-specific requirement-compliance matrix
+
+| Requirement/domain | Статус | Evidence / следующий gate |
+| --- | --- | --- |
+| Root/index/canonical requirements fresh read | `completed` | 26.07.2026 before production edits |
+| Applicable architecture/performance/cache/frontend/ops/maintenance docs | `completed` | Canonical homepage owners and Task 70 contract traced |
+| Installed versions/database | `completed` | PHP 8.5.8, Laravel 13.22.0, Boost 2.4.13, Livewire 4.3.3, PHPUnit 12.5.32, SQLite |
+| Official framework behavior | `completed` | Laravel 13 eager loading, Eloquent collections and DB query testing via Boost |
+| Existing implementation first | `completed` | Builder, snapshot, taxonomy/count/state loaders, Blade/API consumers and focused tests traced |
+| Read-only root-cause profile | `completed` | Committed-main roots/five relation groups, overlap and seven-sample before/after wall profiles |
+| Alternatives/user authorization | `completed` | TTL/web-only/union compared; repeated explicit preapproval applies |
+| Design/plan/files/contracts/risks | `completed` | Linked approved design and unlimited plan |
+| Migration/routes/translations/cache/env/dependencies/DML | `not_applicable` | Explicitly excluded |
+| TDD RED | `completed` | Semantic isolation passed; two query-shape tests failed exactly on the former 2/3 root hydration groups |
+| Implementation | `completed` | One union hydration plus ordered clone projections; latest-only `latestSeason` preserved |
+| Focused/full/static/profile verification | `completed_with_unrelated_full_suite_failures` | Committed-contract 38/319 focused, 174/1013 broad, Pint/production PHPStan/Rector/Vite green; full 1G 1 897/1 914 passed, 11 skipped, six foreign Task 73/account/importer failures/errors; final managed-doc check is `unresolved_shared_worktree` on foreign `docs/MAINTENANCE_LOG.md` |
+| Browser/API verification | `completed` | Desktop/mobile `/` and `/ru`, API 200; 12/8 and 48/12/8/12, no overflow/errors |
+| README/CHANGELOG/final requirement reread | `completed` | Owners updated for committed-main contract; canonical reread and builder/consumer/cache/TODO scan completed |
+| Commit/push in `main` | `pending` | Exact Task 74 scope only |
+
+### Безлимитный execution order
+
+1. `[completed]` Fresh requirements, skills, versions and Git/shared-tree audit.
+2. `[completed]` Builder/consumer/mutation/query trace and production baseline.
+3. `[completed]` Alternatives, approved design, contracts and rollback.
+4. `[completed]` Detailed TDD implementation plan and compliance matrix.
+5. `[completed]` RED for current web/full one-group SQL and overlap isolation.
+6. `[completed]` One union query plus ordered cloned section projection.
+7. `[completed]` Preserve latest-only `latestSeason` relation and exact focused GREEN.
+8. `[completed_with_unrelated_full_suite_failures]` Focused/broad/static/full/build/docs verification.
+9. `[completed]` Seven-sample after profile and exact output/API parity.
+10. `[completed]` Desktop/mobile/localized/API browser verification.
+11. `[completed]` Performance/README/CHANGELOG documentation.
+12. `[completed]` Final canonical reread and repository legacy/debug scan.
+13. `[pending]` Exact isolated Task 74 implementation commit on `main`.
+14. `[pending]` Configured non-force push; external failure remains
+    `unresolved`.

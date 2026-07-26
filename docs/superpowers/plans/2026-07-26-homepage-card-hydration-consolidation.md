@@ -10,9 +10,9 @@ bounded Eloquent query group, сохранив HTML, API, ordering, relation-loa
 
 **Architecture:** `CatalogHomePageBuilder` строит ordered ID groups из
 существующего scalar snapshot, одним visibility-aware query загружает union
-моделей и card taxonomy relations, затем проецирует отдельные cloned
-`Eloquent\Collection` для каждой секции. `latestSeason` остаётся отдельным
-eager-load только latest collection.
+моделей и canonical `cardSummaryLoads()`, затем проецирует отдельные cloned
+`Eloquent\Collection` для каждой секции. `latestSeason` загружается отдельным
+bounded relation query только для latest collection.
 
 **Tech Stack:** PHP 8.5.8, Laravel 13.22.0, Laravel Boost 2.4.13, Livewire
 4.3.3, SQLite, PHPUnit 12.5.32, Pint 1.29.3, Tailwind CSS 4.3.2, Vite 8.1.4.
@@ -27,7 +27,8 @@ eager-load только latest collection.
   keys, section order и limits.
 - Сохранять отдельные Eloquent model instances между пересекающимися
   sections.
-- Не загружать `latestSeason` на featured/video и не менять card HTML.
+- Сохранять `latestSeason` loaded только в latest section и не расширять
+  relation state featured/video.
 - Не объединять recommendation loader с snapshot card hydration.
 - Не ослаблять publication, availability, audience, Premium, region, legal
   или authorization boundaries.
@@ -58,7 +59,8 @@ eager-load только latest collection.
 - `/api/v1/home`, `CatalogHomeResource` and 48/12/8/12 full section counts.
 - Existing 12-row web latest and 8-row video projection.
 - Snapshot schema/order/key/TTL/stale/invalidation and response cache v2.
-- Card taxonomy projection, tag localization and no-query Blade.
+- Canonical card taxonomy projection, latest-only `latestSeason` и no-query
+  Blade.
 - Recommendation candidates/exclusions/ranking/shown-state.
 - Card counts, personal state, release groups and SEO.
 - Visibility, audience, Premium, region, legal and authorization scopes.
@@ -74,7 +76,7 @@ eager-load только latest collection.
   scalar snapshot.
 - Produces: exact one-group SQL expectation and preserved section isolation.
 
-- [ ] **Step 1: Preserve overlap semantics**
+- [x] **Step 1: Preserve overlap semantics**
 
 In the existing full-versus-web test, find a title shared by latest and video
 and assert:
@@ -89,19 +91,19 @@ $this->assertFalse($videoTitle->relationLoaded('latestSeason'));
 
 Keep current full/web counts, ordering, link and API assertions.
 
-- [ ] **Step 2: Tighten web query group expectation**
+- [x] **Step 2: Tighten web query group expectation**
 
 Keep the existing SQL normalization and exact root matcher, but change web
 expectations from two card roots/taxonomy groups to one.
 
-- [ ] **Step 3: Add full query group expectation**
+- [x] **Step 3: Add full query group expectation**
 
 Refresh the same fixture snapshot before attaching `DB::listen()`, call
 `data()` and assert one card root plus one query for every canonical card
 taxonomy. The fixture excludes every available title from recommendations,
 so no independent recommendation taxonomy group is present.
 
-- [ ] **Step 4: Run RED**
+- [x] **Step 4: Run RED**
 
 ```bash
 php artisan test tests/Feature/CatalogHomeWebProjectionTest.php
@@ -110,6 +112,9 @@ php artisan test tests/Feature/CatalogHomeWebProjectionTest.php
 Expected: semantic overlap assertions pass against current separate
 instances; web/full SQL assertions fail only because current builder emits
 2/3 roots and 2/3 taxonomy groups.
+
+Observed: semantic/model-isolation assertions passed, while web/full
+query-shape assertions failed exactly on the expected 2/3 root groups.
 
 ### Task 2: Implement one bounded hydration group
 
@@ -121,12 +126,12 @@ instances; web/full SQL assertions fail only because current builder emits
   `Builder<CatalogTitle>`.
 - Produces: named `Eloquent\Collection<int, CatalogTitle>` groups.
 
-- [ ] **Step 1: Build named ID groups**
+- [x] **Step 1: Build named ID groups**
 
 Inside `buildData()` create latest, conditional featured and video ID lists
 without changing snapshot values or web projection limits.
 
-- [ ] **Step 2: Add ordered group helper**
+- [x] **Step 2: Add ordered group helper**
 
 Add a typed private helper that:
 
@@ -137,29 +142,34 @@ Add a typed private helper that:
 5. clones every projected model;
 6. returns an empty Eloquent collection for empty/missing groups.
 
-- [ ] **Step 3: Use one card taxonomy eager-load**
+- [x] **Step 3: Use one canonical card eager-load**
 
 Pass a single `titleSummaryQuery($user)->with(
 $this->taxonomies->cardSummaryLoads())` to the helper and assign its
-`latest`, `featured` and `video` results.
+`latest`, `featured` and `video` results. Production code remains dynamic and
+does not hardcode relation names.
 
-- [ ] **Step 4: Load latest season only for latest**
+- [x] **Step 4: Preserve latest-only relation boundary**
 
-Call `load()` on the latest Eloquent collection with the exact current
-`latestSeason` projection. Empty latest groups must not emit a query.
+Load `latestSeason` once on the projected latest collection. Assert that the
+latest clone has the relation loaded while a shared video clone remains
+unloaded.
 
-- [ ] **Step 5: Keep downstream code unchanged**
+- [x] **Step 5: Keep downstream code unchanged**
 
 Do not change content timestamps, count/state loaders, release groups,
 recommendations, SEO or return shape.
 
-- [ ] **Step 6: Run GREEN**
+- [x] **Step 6: Run GREEN**
 
 ```bash
 php artisan test tests/Feature/CatalogHomeWebProjectionTest.php
 ```
 
 Expected: all semantic and SQL-shape assertions pass.
+
+Observed after final compatibility adaptation: exact file passed 3 tests
+with 43 assertions.
 
 ### Task 3: Verify contracts and measure result
 
@@ -169,7 +179,7 @@ Expected: all semantic and SQL-shape assertions pass.
 - Modify only if a regression is found:
   `tests/Feature/CatalogHomePerformanceTest.php`
 
-- [ ] **Step 1: Run focused homepage/API matrix**
+- [x] **Step 1: Run focused homepage/API matrix**
 
 ```bash
 php artisan test \
@@ -182,28 +192,41 @@ php artisan test \
   tests/Unit/PublicPageCachePolicyTest.php
 ```
 
-- [ ] **Step 2: Run broad related filter**
+- [x] **Step 2: Run broad related filter**
 
 ```bash
 php artisan test \
   --filter='CatalogHome|CatalogRecommendation|CatalogDiscovery|PublicPageCache|EagerLoadProjection'
 ```
 
-- [ ] **Step 3: Repeat matched builder profile**
+- [x] **Step 3: Repeat matched builder profile**
 
 On the same snapshot, record seven web/full wall samples and one SQL trace.
-Expected structural result:
+Expected structural result against the committed `main` baseline:
 
-- web root groups `2 → 1`, section taxonomy `10 → 5`, total SQL `42 → 36`;
-- full root groups `3 → 1`, section taxonomy `15 → 5`, total SQL `45 → 33`.
+- web root groups `2 → 1` and five section taxonomy groups `2 → 1`: six
+  fewer SQL statements;
+- full root groups `3 → 1` and five section taxonomy groups `3 → 1`: twelve
+  fewer SQL statements;
+- one latest-only `latestSeason` query remains in both paths.
 
-Wall time is diagnostic and must not become a PHPUnit assertion.
+Total query count may include independently warmed cache/metrics work; the
+matched structural counts are authoritative. Wall time is diagnostic and
+must not become a PHPUnit assertion.
 
-- [ ] **Step 4: Verify exact output parity**
+- [x] **Step 4: Verify exact output parity**
 
 Compare pre/post section IDs/order/counts and serialized API keys/counts.
 Confirm latest and video overlap still consists of different model
 instances with section-local mutable attributes/relations.
+
+Observed before the final compatibility adaptation: focused matrix passed
+38/311 and broad matrix 174/1005. After adaptation the same matrices passed
+38/319 and 174/1013. Final committed-contract profile reached
+one section root, one query per each of five taxonomy relations and one
+latest-only season query. Against the original committed-contract baseline,
+seven-sample medians changed `106,70→95,66 ms` and `193,98→139,48 ms`;
+snapshot counts remained `48/12/8/12` and `12/0/8/0`.
 
 ### Task 4: Static, full, browser and documentation gates
 
@@ -213,7 +236,7 @@ instances with section-local mutable attributes/relations.
 - Modify: `README.md`
 - Modify: `CHANGELOG.md`
 
-- [ ] **Step 1: Format and statically analyze exact PHP scope**
+- [x] **Step 1: Format and statically analyze exact PHP scope**
 
 ```bash
 ./vendor/bin/pint \
@@ -227,7 +250,7 @@ instances with section-local mutable attributes/relations.
   tests/Feature/CatalogHomeWebProjectionTest.php
 ```
 
-- [ ] **Step 2: Run full/build/docs/diff gates**
+- [x] **Step 2: Run full/build/docs/diff gates**
 
 ```bash
 php artisan test
@@ -239,24 +262,42 @@ git diff --check
 Document exact unrelated shared-tree failures or known full-process memory
 ceiling honestly; do not rewrite foreign managed-doc drift.
 
-- [ ] **Step 3: Browser and live HTTP verification**
+Observed before the final compatibility adaptation: exact
+Pint/PHPStan/Rector, Vite and managed-doc check passed. The
+default full process reproduced the known cumulative `256M` ceiling. A
+temporary 1 ГБ config executed 1 914 tests: 1 897 passed, 11 skipped; five
+failures and one error are in concurrent compact-card, account-session and
+import-batcher work. After final committed-contract adaptation, Task 74 exact
+matrix remained green at 38/319.
+
+- [x] **Step 3: Browser and live HTTP verification**
 
 Check desktop `1440×1200`, mobile `390×844`, `/`, localized homepage and
 `/api/v1/home`: status, response-cache state, section counts/order, DOM,
 overflow, console/page/request errors and response timing. Do not clear
 cache or modify production data.
 
-- [ ] **Step 4: Update documentation**
+- [x] **Step 4: Update documentation**
 
 Record measured result in `docs/performance.md`, one visitor-facing README
 history bullet and one Russian CHANGELOG bullet. Complete Task 74 compliance
 statuses with evidence or honest `unresolved`/`not_applicable`.
 
-- [ ] **Step 5: Final requirement and legacy scan**
+- [x] **Step 5: Final requirement and legacy scan**
 
 Re-read applicable canonical requirements and Task 74. Search all
 `orderedTitles`, homepage section consumers, duplicate hydration services,
 stale cache paths, TODO/FIXME/debug output and unintended relation loading.
+
+Observed browser: managed Chromium fallback passed desktop/mobile `/` and
+`/ru` with `200`, cache `HIT`, 12 latest, 8 video cards, zero horizontal
+overflow and no console/page/request/local-HTTP errors; API remained
+`48/12/8/12`. Performance owner, visitor README history and Russian
+CHANGELOG were updated. Final canonical reread and consumer/duplicate/
+cache/TODO scan found one homepage builder path and no stale helper or debug
+output. The final managed-doc check is `unresolved_shared_worktree` only
+because foreign changes require an update to `docs/MAINTENANCE_LOG.md`;
+Task 74 does not own or rewrite that drift.
 
 ### Task 5: Commit and push exact Task 74 scope
 

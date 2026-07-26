@@ -9,6 +9,7 @@ use App\Models\CatalogTitle;
 use App\Models\LicensedMedia;
 use App\Services\Catalog\CatalogHomePageBuilder;
 use App\Services\Catalog\CatalogHomeSnapshotCache;
+use App\Services\Catalog\CatalogTaxonomyRegistry;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -31,6 +32,8 @@ final class CatalogHomeWebProjectionTest extends TestCase
         $this->assertCount(16, $full['latestTitles']);
         $this->assertCount(12, $web['latestTitles']);
         $this->assertCount(12, $full['featuredTitles']);
+        $this->assertCount(8, $full['videoTitles']);
+        $this->assertCount(8, $web['videoTitles']);
         $this->assertCount(12, $full['latestMedia']);
         $this->assertEmpty($web['featuredTitles']);
         $this->assertEmpty($web['latestMedia']);
@@ -44,6 +47,22 @@ final class CatalogHomeWebProjectionTest extends TestCase
             $web['recentlyUpdatedUrl'],
         );
         $this->assertEmpty($web['homeRecommendationItems']);
+
+        $sharedTitleId = collect($full['latestTitles'])
+            ->pluck('id')
+            ->intersect(collect($full['videoTitles'])->pluck('id'))
+            ->first();
+        $latestTitle = collect($full['latestTitles'])->firstWhere('id', $sharedTitleId);
+        $videoTitle = collect($full['videoTitles'])->firstWhere('id', $sharedTitleId);
+
+        $this->assertIsInt($sharedTitleId);
+        $this->assertInstanceOf(CatalogTitle::class, $latestTitle);
+        $this->assertInstanceOf(CatalogTitle::class, $videoTitle);
+        $this->assertNotSame($latestTitle, $videoTitle);
+        $this->assertTrue($latestTitle->hasAttribute('content_added_at'));
+        $this->assertFalse($videoTitle->hasAttribute('content_added_at'));
+        $this->assertTrue($latestTitle->relationLoaded('latestSeason'));
+        $this->assertFalse($videoTitle->relationLoaded('latestSeason'));
 
         $webResponse = $this->get(route('home'))->assertOk();
         $webHtml = $webResponse->getContent();
@@ -59,7 +78,7 @@ final class CatalogHomeWebProjectionTest extends TestCase
             ->assertJsonCount(16, 'data.latest_titles');
     }
 
-    public function test_web_projection_does_not_run_api_only_hydration_queries(): void
+    public function test_web_projection_hydrates_shared_card_sections_in_one_query_group(): void
     {
         $this->seedHomeProjectionTitles();
         app(CatalogHomeSnapshotCache::class)->refresh();
@@ -87,25 +106,97 @@ final class CatalogHomeWebProjectionTest extends TestCase
         );
         $this->assertEmpty($web['featuredTitles']);
         $this->assertEmpty($web['latestMedia']);
-        $this->assertCount(2, $cardTitleHydrations, implode("\n", $queries));
+        $this->assertCount(1, $cardTitleHydrations, implode("\n", $queries));
         $this->assertEmpty($latestMediaHydrations, implode("\n", $latestMediaHydrations->all()));
 
-        foreach ([
-            'genres' => 'catalog_title_genre',
-            'countries' => 'catalog_title_country',
-            'age_ratings' => 'age_rating_catalog_title',
-            'translations' => 'catalog_title_translation',
-            'tags' => 'catalog_title_tag',
-        ] as $table => $pivotTable) {
-            $taxonomyHydrations = collect($queries)->filter(
-                fn (string $sql): bool => str_contains(
-                    $sql,
-                    "from {$table} inner join {$pivotTable}",
-                ),
-            );
+        foreach ($this->cardRelationQueryMatchers() as $relation => $matches) {
+            $relationHydrations = collect($queries)->filter($matches);
 
-            $this->assertCount(2, $taxonomyHydrations, implode("\n", $taxonomyHydrations->all()));
+            $this->assertCount(
+                1,
+                $relationHydrations,
+                "{$relation}:\n".implode("\n", $relationHydrations->all()),
+            );
         }
+    }
+
+    public function test_full_projection_hydrates_shared_card_sections_in_one_query_group(): void
+    {
+        $this->seedHomeProjectionTitles();
+        app(CatalogHomeSnapshotCache::class)->refresh();
+        $queries = [];
+        DB::listen(function (QueryExecuted $query) use (&$queries): void {
+            $queries[] = str($query->sql)
+                ->replace(['`', '"'], '')
+                ->lower()
+                ->squish()
+                ->toString();
+        });
+
+        $full = app(CatalogHomePageBuilder::class)->data();
+        $cardTitleHydrations = collect($queries)->filter(
+            fn (string $sql): bool => str_starts_with(
+                $sql,
+                'select id, slug, title, original_title, type, year, description, poster_url, indexed_at from catalog_titles where',
+            ),
+        );
+        $this->assertCount(16, $full['latestTitles']);
+        $this->assertCount(12, $full['featuredTitles']);
+        $this->assertCount(8, $full['videoTitles']);
+        $this->assertEmpty($full['homeRecommendationItems']);
+        $this->assertCount(1, $cardTitleHydrations, implode("\n", $queries));
+
+        foreach ($this->cardRelationQueryMatchers() as $relation => $matches) {
+            $relationHydrations = collect($queries)->filter($matches);
+
+            $this->assertCount(
+                1,
+                $relationHydrations,
+                "{$relation}:\n".implode("\n", $relationHydrations->all()),
+            );
+        }
+    }
+
+    /**
+     * @return array<string, \Closure(string): bool>
+     */
+    private function cardRelationQueryMatchers(): array
+    {
+        $matchers = [
+            'genres' => fn (string $sql): bool => str_contains(
+                $sql,
+                'from genres inner join catalog_title_genre',
+            ),
+            'countries' => fn (string $sql): bool => str_contains(
+                $sql,
+                'from countries inner join catalog_title_country',
+            ),
+            'ageRatings' => fn (string $sql): bool => str_contains(
+                $sql,
+                'from age_ratings inner join age_rating_catalog_title',
+            ),
+            'translations' => fn (string $sql): bool => str_contains(
+                $sql,
+                'from translations inner join catalog_title_translation',
+            ),
+            'tags' => fn (string $sql): bool => str_contains(
+                $sql,
+                'from tags inner join catalog_title_tag',
+            ),
+            'ratings' => fn (string $sql): bool => str_starts_with(
+                $sql,
+                'select catalog_title_ratings.catalog_title_id, catalog_title_ratings.provider, catalog_title_ratings.rating from catalog_title_ratings where',
+            ),
+            'latestSeason' => fn (string $sql): bool => str_starts_with(
+                $sql,
+                'select seasons.id, seasons.catalog_title_id, seasons.number from seasons ',
+            ),
+        ];
+
+        return collect(array_keys(app(CatalogTaxonomyRegistry::class)->cardSummaryLoads()))
+            ->push('latestSeason')
+            ->mapWithKeys(fn (string $relation): array => [$relation => $matchers[$relation]])
+            ->all();
     }
 
     private function seedHomeProjectionTitles(): void

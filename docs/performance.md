@@ -661,6 +661,54 @@ translation, dependency, environment, queue, production DML или cache
 generation не добавлены; rollback — обычный revert PHP-кода без очистки
 данных или кеша.
 
+## Консолидация hydration карточек главной
+
+Следующий follow-up 26.07.2026 проверил оставшиеся повторные запросы
+`latestTitles`, `featuredTitles` и `videoTitles`. Зафиксированный `main`
+использует пять canonical card relations (`genres`, `countries`,
+`ageRatings`, `translations`, `tags`) и отдельный `latestSeason` для latest.
+На актуальном snapshot `webData()` выполнял по две section-группы root и
+каждой taxonomy relation, а полный `data()` — по три; одна дополнительная
+taxonomy group в обоих режимах принадлежала независимому recommendation
+loader.
+
+`CatalogHomePageBuilder` теперь один раз загружает visibility-aware union
+уникальных section IDs с текущим `cardSummaryLoads()`, индексирует модели по
+primary key и восстанавливает каждую коллекцию в исходном snapshot order.
+Каждая проекция получает clone модели: пересекающиеся featured/video
+карточки сохраняют отдельные mutable attributes, `content_added_at`
+остаётся только в latest. Один bounded collection load восстанавливает
+`latestSeason` только для latest clones, не расширяя relation state
+featured/video. Snapshot, counts/state loaders, recommendation exclusions,
+Resource и downstream data shape не менялись.
+
+Структурный SQL-профиль с контрактом зафиксированного `main` подтвердил один
+root, по одному запросу каждой из пяти taxonomy relations и один latest-only
+season query: web path устранил 6 statements, full/API path — 12. На
+последовательных сериях из семи samples медиана `webData()` изменилась с
+`106,70` до `95,66 ms` (`−10,3%`), full `data()` — со `193,98` до
+`139,48 ms` (`−28,1%`). Это локальное диагностическое сравнение под текущей
+SQLite-нагрузкой, не p95/SLA. ID/order полностью совпали со scalar snapshot,
+а full/web counts сохранились `48/12/8/12` и `12/0/8/0`.
+
+TDD RED дал 1 пройденный и 2 ожидаемо упавших теста только на прежних 2/3
+hydration groups; финальный compatibility GREEN — 3/43. Focused matrix прошла
+38/319, broad homepage/discovery/cache/recommendation matrix — 174/1013;
+Pint, production PHPStan, Rector и Vite завершились успешно. Предыдущий
+`project:docs-refresh --check` прошёл, а финальный повтор честно заблокирован
+посторонним drift `docs/MAINTENANCE_LOG.md` в общей рабочей директории.
+Полный запуск с временным test-only лимитом 1 ГБ выполнил 1 914
+тестов: 1 897 passed, 11 skipped; пять failures и одна error принадлежат
+параллельным незавершённым compact-card, account-session и import-batcher
+изменениям, тогда как exact Task 74 matrix повторно прошла 38/319.
+
+Managed Chromium для desktop/mobile `/` и `/ru` вернул `200` и cache `HIT`,
+12 latest и 8 video cards, нулевой horizontal overflow и ни одной
+console/page/request/local-HTTP ошибки; API сохранил `48/12/8/12`. Migration,
+route, translation, cache key/version/TTL/invalidation, dependency, queue,
+environment или production DML не добавлены. Rollback — обычный revert
+PHP-кода без schema/data/cache cleanup.
+
 ## Производительность onboarding вкусов Task 71
 
 Autocomplete ограничен существующим suggestion query и не гидратирует полный

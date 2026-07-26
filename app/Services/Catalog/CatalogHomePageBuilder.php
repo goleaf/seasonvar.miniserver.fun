@@ -18,6 +18,7 @@ use App\Services\Auth\AuthenticationRedirectService;
 use App\Services\Collections\CatalogCollectionQuery;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 
@@ -91,10 +92,18 @@ class CatalogHomePageBuilder
             'genres' => $genres->count(),
             'countries' => $countries->count(),
         ];
-        $latestTitles = $this->orderedTitles($latestTitleIds, $this->titleSummaryQuery($user)
-            ->with(array_merge([
-                'latestSeason' => fn ($query) => $query->select(['seasons.id', 'seasons.catalog_title_id', 'seasons.number']),
-            ], $this->taxonomies->cardSummaryLoads())));
+        $titleGroups = $this->orderedTitleGroups([
+            'latest' => $latestTitleIds,
+            'featured' => $includeApiOnlySections ? $snapshot['featured_title_ids'] : [],
+            'video' => $snapshot['video_title_ids'],
+        ], $this->titleSummaryQuery($user)->with($this->taxonomies->cardSummaryLoads()));
+        $latestTitles = $titleGroups['latest'];
+        $featuredTitles = $titleGroups['featured'];
+        $videoTitles = $titleGroups['video'];
+        $latestTitles->load([
+            'latestSeason' => fn ($query) => $query
+                ->select(['seasons.id', 'seasons.catalog_title_id', 'seasons.number']),
+        ]);
         $latestTitleUpdates = collect($snapshot['latest_title_updates']);
         $latestUpdateTimes = $latestTitleUpdates
             ->mapWithKeys(fn (array $update): array => [
@@ -106,16 +115,6 @@ class CatalogHomePageBuilder
                 $latestUpdateTimes->get((int) $catalogTitle->id),
             );
         });
-        $featuredTitles = $includeApiOnlySections
-            ? $this->orderedTitles(
-                $snapshot['featured_title_ids'],
-                $this->titleSummaryQuery($user)->with($this->taxonomies->cardSummaryLoads()),
-            )
-            : collect();
-        $videoTitles = $this->orderedTitles(
-            $snapshot['video_title_ids'],
-            $this->titleSummaryQuery($user)->with($this->taxonomies->cardSummaryLoads()),
-        );
         $latestMedia = $includeApiOnlySections
             ? $this->orderedMedia(LicensedMedia::query()
                 ->published()
@@ -263,23 +262,48 @@ class CatalogHomePageBuilder
     }
 
     /**
-     * @param  list<int>  $ids
+     * @param  array{latest: list<int>, featured: list<int>, video: list<int>}  $groups
      * @param  Builder<CatalogTitle>  $query
-     * @return Collection<int, CatalogTitle>
+     * @return array{
+     *     latest: EloquentCollection<int, CatalogTitle>,
+     *     featured: EloquentCollection<int, CatalogTitle>,
+     *     video: EloquentCollection<int, CatalogTitle>
+     * }
      */
-    private function orderedTitles(array $ids, Builder $query): Collection
+    private function orderedTitleGroups(array $groups, Builder $query): array
     {
-        if ($ids === []) {
-            return collect();
-        }
+        $titleIds = collect($groups)
+            ->flatten()
+            ->map(fn (mixed $id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+        $titlesById = $titleIds === []
+            ? new EloquentCollection
+            : $query
+                ->whereKey($titleIds)
+                ->get()
+                ->keyBy(fn (CatalogTitle $title): int => (int) $title->getKey());
+        $ordered = function (array $ids) use ($titlesById): EloquentCollection {
+            $titles = collect($ids)
+                ->map(function (mixed $id) use ($titlesById): ?CatalogTitle {
+                    $title = $titlesById->get((int) $id);
 
-        $positions = array_flip($ids);
+                    return $title instanceof CatalogTitle ? clone $title : null;
+                })
+                ->filter(fn (?CatalogTitle $title): bool => $title instanceof CatalogTitle)
+                ->values()
+                ->all();
 
-        return $query
-            ->whereKey($ids)
-            ->get()
-            ->sortBy(fn (CatalogTitle $model): int => (int) ($positions[(int) $model->getKey()] ?? PHP_INT_MAX))
-            ->values();
+            return new EloquentCollection($titles);
+        };
+
+        return [
+            'latest' => $ordered($groups['latest']),
+            'featured' => $ordered($groups['featured']),
+            'video' => $ordered($groups['video']),
+        ];
     }
 
     /**
