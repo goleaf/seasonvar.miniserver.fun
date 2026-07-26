@@ -267,3 +267,27 @@ query state в Blade нет.
 - `CatalogTitlesViewModel` готовит labels/options/query links и раскрытие
   primary/selected filter groups; Blade не вызывает enum cases и не
   дублирует URL normalization.
+## Player страницы тайтла
+
+`resources/views/livewire/catalog-title-player.blade.php` содержит один
+standalone player workspace:
+
+1. компактную context-bar с текущим сезоном, серией и реальными source
+   controls;
+2. один keyed `wire:ignore` shell с video;
+3. morph-owned status/recovery controls;
+4. descriptive previous/current/next navigation с обычными `href`;
+5. компактные primary actions и существующий dialog hotkeys;
+6. один responsive menu сезонов/серий/переводов и section списка сезонов.
+
+`catalog-title-detail.blade.php` предоставляет только layout markers для
+theatre: sidebar, primary column и player workspace. Theatre CSS скрывает
+secondary siblings, не дублирует markup и не превращает страницу в nested
+scroll.
+
+В Blade не строятся queries и не вычисляется availability. Все labels/options
+готовятся component/view-model boundaries и выводятся через escaped `{{ }}`.
+Raw source URL не попадает в option markup; обычный fallback использует
+канонический публичный query, а бесшовный переход — opaque media ID.
+Короткоживущий signed playback grant по-прежнему получает только существующий
+player lifecycle после server resolution.

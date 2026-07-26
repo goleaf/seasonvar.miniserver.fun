@@ -103,6 +103,14 @@ const waitForPlayer = async (page) => {
     return currentVideo(page).getAttribute('data-player-session');
 };
 
+const selectPlayerMediaFormat = async (page, format) => {
+    const option = page.locator(`[data-player-media-format="${format}"]`);
+
+    await page.locator('[data-player-context-control="quality"] > summary').click();
+    await expect(option).toBeVisible();
+    await option.click();
+};
+
 const setAutoplayPreference = async (page, enabled) => {
     const toggle = page.locator('[data-player-autoplay-toggle]');
     const desired = enabled ? 'true' : 'false';
@@ -204,9 +212,7 @@ for (const locale of [
         await page.goBack();
         await waitForPlayer(page);
 
-        const mp4Option = page.locator('[data-player-media-format="mp4"]');
-
-        await mp4Option.click();
+        await selectPlayerMediaFormat(page, 'mp4');
         await expect(page).toHaveURL(/format=mp4/);
         await expect(currentVideo(page)).not.toHaveAttribute('data-player-session', initialSession);
         const mp4Session = await waitForPlayer(page);
@@ -1061,7 +1067,7 @@ test('desktop player uses deterministic HLS recovery, MP4 ranges, and WebVTT sta
     expect(recoveredSegments.map(({ bodyVariant }) => bodyVariant)).toEqual(['corrupt', 'valid']);
     await expect(page.locator('[data-player-shell]')).toHaveAttribute('data-player-state', 'ready');
 
-    await page.locator('[data-player-media-format="mp4"]').click();
+    await selectPlayerMediaFormat(page, 'mp4');
     await waitForPlayer(page);
     await expect.poll(() => fixtures.observations.some((observation) => (
         observation.path.endsWith('/direct.mp4')

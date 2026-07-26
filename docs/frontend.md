@@ -531,3 +531,63 @@ Public card и detail получают готовый current score из
 состояния. Browser не вычисляет score, match, duplicate или verification и
 не передаёт их обратно как trusted state; дополнительных JavaScript package,
 route или client store нет.
+## Player workspace и theatre lifecycle
+
+`CatalogTitlePlayer` остаётся единственным владельцем player state. Blade
+рендерит одну context-bar, один keyed `wire:ignore` media shell, одну recovery
+area, одну previous/current/next navigation и существующее меню
+`Сезон → Серия → Перевод`. `player.js` продолжает владеть Plyr/HLS/media
+lifecycle и in-place transitions; `player-menu.js` — dialog, focus и
+responsive bottom sheet; `player-navigation.js` — Livewire/history bridge и
+новое временное theatre-состояние. Новый global store или frontend framework
+не вводится.
+
+Theatre controller ставит scoped data/class markers на title-detail root и
+`body`, сохраняет trigger для возврата focus, скрывает только вторичные
+siblings и sidebar через CSS и очищается при Livewire navigation/component
+cleanup. Он не клонирует и не перемещает video DOM, не вызывает новый
+playback grant, не создаёт fixed overlay, не использует storage. `Escape`
+сначала уважает открытый dialog и fullscreen; затем закрывает theatre.
+
+Context-bar использует server-prepared labels и real source variants. In-place
+transition обновляет сезон, серию, перевод, качество, subtitle status и
+`aria-current` без пересоздания player. `has_subtitles` или
+`subtitle_language` описывают только доступность импортированного media
+variant: портал не рисует fake subtitle track/language без реального source
+option.
+
+Runtime отражает состояние одновременно на player root и ignored shell.
+Loading/retrying/fallback показывают skeleton/status; ready/playing не держат
+лишний status в потоке; terminal error открывает recovery controls. Retry
+переиспользует bounded retry, «Выбрать другой источник» открывает существующий
+translation level, а report переиспользует server-authorized technical-issue
+flow. Raw provider URL и grant в DOM/status/report не выводятся.
+
+Previous/next остаются обычными links с каноническим query fallback; JS лишь
+перехватывает их для бесшовного перехода. На mobile menu визуально становится
+bottom sheet, все targets не меньше 44 px, player остаётся 16:9 и корректно
+пересчитывается в landscape без orientation lock.
+
+## PWA frontend lifecycle Task 100
+
+`resources/js/pwa.js` регистрирует ровно `/service-worker.js` в secure
+context, обновляет public help и owner library snapshots и управляет
+добровольной Push API subscription. `pwa-storage.js` владеет versioned
+IndexedDB schema, opaque account scope, limits/TTL и allowlisted
+`watchlist.set`/`rating.set` queue. DOM обновляется только через text/content
+attributes; HTML из snapshot не вставляется.
+
+Публичная `/offline` остаётся server-rendered без Livewire/session/CSRF и
+показывает сохранённую библиотеку/справку, timestamp и явное сообщение
+«Видео без сети недоступно». Local optimistic state помечается как ожидающее
+синхронизации и не считается server truth. При возврате сети client отправляет
+bounded batch с idempotency UUID и optimistic version, после чего удаляет
+только подтверждённые записи; validation/authorization/conflict остаются
+видимыми для владельца.
+
+Poster prefetch ограничен 12 URL и concurrency 3; redirects запрещены.
+Service worker update не вызывает `skipWaiting()` или forced reload. Logout
+сначала очищает private browser scope, затем повторяет canonical Livewire
+logout; account switch и подтверждённый `401/403` делают ту же очистку.
+Install, offline shell, queue, push states, accessibility и отсутствие
+private/media cache проверяются Playwright на desktop/mobile/tablet.

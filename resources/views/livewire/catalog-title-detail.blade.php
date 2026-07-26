@@ -7,9 +7,10 @@
     @endif
     class="space-y-5"
     data-livewire-catalog-title-detail
+    data-title-detail-workspace
 >
-    <section class="grid min-w-0 gap-5 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)]">
-        <aside class="order-2 space-y-4 lg:order-1">
+    <section data-title-detail-layout class="grid min-w-0 gap-5 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)]">
+        <aside data-title-detail-sidebar class="order-2 space-y-4 lg:order-1">
             <section class="h-full overflow-hidden rounded-panel border border-slate-200 bg-white">
                 <div class="border-b border-slate-200 bg-white px-4 py-3">
                     <div class="flex items-center gap-2">
@@ -82,7 +83,7 @@
             </section>
         </aside>
 
-        <div class="order-1 min-w-0 space-y-5 lg:order-2">
+        <div data-title-detail-primary class="order-1 min-w-0 space-y-5 lg:order-2">
             <x-ui.panel data-title-hero :pad="false" class="overflow-hidden">
                 <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-3">
                     <a href="{{ route('titles.index') }}" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800">
@@ -186,11 +187,13 @@
                 </article>
             </x-ui.panel>
 
-            <livewire:catalog-title-player
-                :catalog-title-id="$title->id"
-                wire:ref="player"
-                :wire:key="'catalog-title-player-'.$title->id"
-            />
+            <div data-player-workspace-region>
+                <livewire:catalog-title-player
+                    :catalog-title-id="$title->id"
+                    wire:ref="player"
+                    :wire:key="'catalog-title-player-'.$title->id"
+                />
+            </div>
 
             <x-ui.panel id="data-title-reference" data-title-reference :title="__('catalog.title.about')" icon="fa-solid fa-circle-info" class="scroll-mt-40 sm:scroll-mt-44 lg:scroll-mt-48">
                 <div>

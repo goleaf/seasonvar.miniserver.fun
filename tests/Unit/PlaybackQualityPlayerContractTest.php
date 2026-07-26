@@ -32,7 +32,7 @@ final class PlaybackQualityPlayerContractTest extends TestCase
         $this->assertStringContainsString('data-playback-network-test-url=', $view);
         $this->assertStringContainsString('data-player-quality-report', $view);
         $this->assertStringContainsString("__('issues.video_not_working')", $view);
-        $this->assertSame('Источник 1 не ответил.', trans('catalog.player.runtime.source_failed', locale: 'ru'));
-        $this->assertSame('Переключаю на источник 2…', trans('catalog.player.runtime.source_fallback', locale: 'ru'));
+        $this->assertSame('Основной источник не ответил.', trans('catalog.player.runtime.source_failed', locale: 'ru'));
+        $this->assertSame('Открываем резервный источник…', trans('catalog.player.runtime.source_fallback', locale: 'ru'));
     }
 }

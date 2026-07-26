@@ -124,15 +124,84 @@ const restoreSelectionFromLocation = async (root) => {
     window.history.replaceState({}, '', targetUrl);
 };
 
+const theatreTriggerFor = (root) => root.querySelector('[data-player-theatre-toggle]');
+
+const syncTheatreUi = (root, active) => {
+    const theatreTrigger = theatreTriggerFor(root);
+    const theatreLabel = theatreTrigger?.querySelector('[data-player-theatre-label]');
+    const titleWorkspace = root.closest('[data-title-detail-workspace]');
+
+    document.body.classList.toggle('player-theatre-active', active);
+    root.toggleAttribute('data-player-theatre-active', active);
+    titleWorkspace?.toggleAttribute('data-player-theatre-active', active);
+    theatreTrigger?.setAttribute('aria-pressed', active ? 'true' : 'false');
+
+    if (theatreLabel instanceof HTMLElement && theatreTrigger instanceof HTMLElement) {
+        theatreLabel.textContent = active
+            ? theatreTrigger.dataset.labelCollapse || ''
+            : theatreTrigger.dataset.labelExpand || '';
+    }
+};
+
 const bindRoot = (root) => {
-    if (!(root instanceof HTMLElement) || boundRoots.has(root)) {
+    if (!(root instanceof HTMLElement)) {
+        return;
+    }
+
+    if (boundRoots.has(root)) {
+        syncTheatreUi(
+            root,
+            document.body.classList.contains('player-theatre-active')
+                || root.hasAttribute('data-player-theatre-active'),
+        );
+
         return;
     }
 
     const controller = new AbortController();
     const { signal } = controller;
+    let theatreActive = document.body.classList.contains('player-theatre-active')
+        || root.hasAttribute('data-player-theatre-active');
+
+    const setTheatre = (active) => {
+        theatreActive = active === true;
+        syncTheatreUi(root, theatreActive);
+    };
+    const cleanupTheatre = () => setTheatre(false);
 
     boundRoots.set(root, controller);
+    setTheatre(theatreActive);
+    root.addEventListener('click', (event) => {
+        const target = event.target instanceof Element ? event.target : null;
+
+        if (target?.closest('[data-player-theatre-toggle]')) {
+            setTheatre(!theatreActive);
+        }
+    }, { signal });
+    document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape' || document.fullscreenElement || root.querySelector('dialog[open]')) {
+            return;
+        }
+
+        const openContextControl = root.querySelector('[data-player-context-control][open]');
+
+        if (openContextControl instanceof HTMLDetailsElement) {
+            event.preventDefault();
+            openContextControl.open = false;
+            openContextControl.querySelector('summary')?.focus();
+
+            return;
+        }
+
+        if (!theatreActive) {
+            return;
+        }
+
+        event.preventDefault();
+        cleanupTheatre();
+        theatreTriggerFor(root)?.focus();
+    }, { signal });
+    signal.addEventListener('abort', cleanupTheatre, { once: true });
     root.addEventListener('catalog-player-menu-page-request', (event) => {
         const detail = event.detail;
 

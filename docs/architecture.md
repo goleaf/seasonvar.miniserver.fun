@@ -660,3 +660,28 @@ Resource shape не меняются. Search, taxonomy/year route binding,
 authorization, visibility, SEO, cache, importer, player и notification
 границы остаются прежними. Rollback — обычный code/docs revert без migration,
 backfill, reindex или cache flush.
+
+## Player workspace boundary
+
+Redesign player workspace не создаёт нового application boundary. Один
+`CatalogTitlePlayer` получает подготовленный `CatalogShowViewModel`,
+`CatalogTitlePlaybackQuery` выбирает только нужные поля selected media, а
+`CatalogPlayerTransitionFactory` формирует opaque/safe transition payload.
+Blade не выполняет database query.
+
+Theatre mode — presentation-only state в существующих Vite modules. Он не
+меняет route, Livewire public methods, signed playback contract, media
+authorization, progress ownership, fallback policy, cache keys или database
+schema. Media element не переносится между owners и остаётся внутри одного
+keyed `wire:ignore`.
+
+Compact context controls выбирают только реально разрешённые media rows.
+`subtitle_language` может входить в узкую projection и presenter label, но не
+является subtitle body/URL и не раскрывает provider details. Translation,
+quality, format и subtitle availability остаются свойствами server-resolved
+source; client не считается источником entitlement или availability.
+
+Failure UI вызывает существующие bounded retry/fallback/report boundaries.
+Ни theatre, ни recovery controls не записывают global source health, не
+создают второй report service и не логируют raw URL/grant. PWA/service worker
+по-прежнему исключает video, HLS, playback и download requests из cache.

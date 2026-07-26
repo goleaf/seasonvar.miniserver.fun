@@ -493,6 +493,7 @@ class CatalogTitlePlayer extends Component
     /**
      * @return array{
      *     selectedEpisode: Episode|null,
+     *     activeSeason: Season|null,
      *     episodeNavigation: CatalogEpisodeNavigation,
      *     previousUrl: string|null,
      *     nextUrl: string|null
@@ -519,6 +520,7 @@ class CatalogTitlePlayer extends Component
             $title,
             $selectedEpisode,
             $navigation,
+            $selectedEpisode?->season,
         );
     }
 
@@ -749,6 +751,7 @@ class CatalogTitlePlayer extends Component
             $title,
             $selectedEpisode,
             $episodeNavigation,
+            $activeSeason,
         );
         $mediaItems = $selectedEpisode !== null && $activeSeason !== null
             ? $this->playback->mediaForEpisode($title, $activeSeason, $selectedEpisode, $user)
@@ -888,7 +891,7 @@ class CatalogTitlePlayer extends Component
         $playbackMarker = $user !== null && $selectedEpisode !== null
             ? ($requestedMarker ?? $this->manualPlayback->markerFor($user, $title, $selectedEpisode->id))
             : null;
-        $progressResumePosition = $requestedMarker?->position_seconds
+        $progressResumePosition = $requestedMarker->position_seconds
             ?? ($primaryAction->episodeId === $selectedEpisode?->id ? $primaryAction->positionSeconds : 0);
         $playerMenuBootstrap = [
             'seasons' => $seasons
@@ -907,7 +910,7 @@ class CatalogTitlePlayer extends Component
                 'mediaId' => $selectedMedia?->id,
             ],
             'translations' => $selectedMedia !== null
-                ? $this->playerTransitions->translationOptions($mediaItems->take(100), $selectedMedia->id)
+                ? $this->playerTransitions->translationOptions($mediaItems, $selectedMedia->id)
                 : [],
         ];
 
@@ -1094,6 +1097,7 @@ class CatalogTitlePlayer extends Component
     /**
      * @return array{
      *     selectedEpisode: Episode|null,
+     *     activeSeason: Season|null,
      *     episodeNavigation: CatalogEpisodeNavigation,
      *     previousUrl: string|null,
      *     nextUrl: string|null
@@ -1103,9 +1107,11 @@ class CatalogTitlePlayer extends Component
         CatalogTitle $title,
         ?Episode $selectedEpisode,
         CatalogEpisodeNavigation $navigation,
+        ?Season $activeSeason,
     ): array {
         return [
             'selectedEpisode' => $selectedEpisode,
+            'activeSeason' => $activeSeason,
             'episodeNavigation' => $navigation,
             'previousUrl' => $this->navigationEpisodeUrl($title, $navigation->previous),
             'nextUrl' => $this->navigationEpisodeUrl($title, $navigation->next),

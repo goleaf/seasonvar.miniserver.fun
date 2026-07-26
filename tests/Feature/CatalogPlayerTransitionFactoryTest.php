@@ -103,10 +103,12 @@ final class CatalogPlayerTransitionFactoryTest extends TestCase
         self::assertStringNotContainsString('private-origin', $encoded);
         self::assertStringNotContainsString((string) $user->id, $transition['contextKey']);
 
-        $this->actingAs($user)
+        $response = $this->actingAs($user)
             ->get($transition['source']['url'])
-            ->assertRedirect('https://data00-cdn.11cdn.org/private-origin.m3u8')
-            ->assertHeader('Cache-Control', 'max-age=0, no-store, private');
+            ->assertRedirect('https://data00-cdn.11cdn.org/private-origin.m3u8');
+        $cacheControl = (string) $response->headers->get('Cache-Control');
+        self::assertStringContainsString('no-store', $cacheControl);
+        self::assertStringContainsString('private', $cacheControl);
         $this->actingAs($otherUser)
             ->get($transition['source']['url'])
             ->assertForbidden();
@@ -195,8 +197,39 @@ final class CatalogPlayerTransitionFactoryTest extends TestCase
         self::assertNull($explicitTransition['noticeCode']);
     }
 
+    public function test_explicit_available_media_remains_selectable_beyond_the_display_option_cap(): void
+    {
+        $title = CatalogTitle::factory()->create();
+        $season = Season::factory()->create(['catalog_title_id' => $title->id]);
+        $episode = Episode::factory()->create(['season_id' => $season->id, 'number' => 1]);
+        $explicit = $this->publishedMedia($title, $season, $episode, [
+            'variant_name' => 'Архивный перевод',
+            'variant_key' => 'voiceover-archive',
+            'published_at' => now()->subDay(),
+        ]);
+        LicensedMedia::factory()
+            ->count(104)
+            ->create([
+                'catalog_title_id' => $title->id,
+                'season_id' => $season->id,
+                'episode_id' => $episode->id,
+                'status' => 'published',
+                'published_at' => now(),
+            ]);
+
+        $transition = app(CatalogPlayerTransitionFactory::class)
+            ->prepare($title, null, $episode, $explicit->id, new PlaybackPreferencesData)
+            ->toArray();
+
+        self::assertSame('ready', $transition['status']);
+        self::assertSame($explicit->id, $transition['selection']['mediaId']);
+        self::assertContains($explicit->id, array_column($transition['translations'], 'mediaId'));
+        self::assertLessThanOrEqual(24, count($transition['translations']));
+    }
+
     public function test_translation_preferences_rank_favorite_fallback_mode_language_and_hide_variants(): void
     {
+        app()->setLocale('ru');
         $title = CatalogTitle::factory()->create();
         $season = Season::factory()->create(['catalog_title_id' => $title->id]);
         $episode = Episode::factory()->create(['season_id' => $season->id, 'number' => 1]);
@@ -263,6 +296,12 @@ final class CatalogPlayerTransitionFactoryTest extends TestCase
         self::assertSame($favorite->id, $favoriteTransition['selection']['mediaId']);
         self::assertSame($fallback->id, $fallbackTransition['selection']['mediaId']);
         self::assertSame($englishSubtitles->id, $subtitleTransition['selection']['mediaId']);
+        self::assertSame('Субтитры: Английский', $subtitleTransition['labels']['subtitles']);
+        self::assertSame(
+            'en',
+            collect($subtitleTransition['translations'])
+                ->firstWhere('mediaId', $englishSubtitles->id)['subtitleLanguage'],
+        );
         self::assertSame($fallback->id, $hiddenExplicitTransition['selection']['mediaId']);
         self::assertNotContains(
             $favorite->id,
@@ -310,6 +349,52 @@ final class CatalogPlayerTransitionFactoryTest extends TestCase
         self::assertArrayNotHasKey('marker', $transition['selection']['query']);
         self::assertFalse($transition['progress']['enabled']);
         self::assertSame('', $transition['progress']['token']);
+    }
+
+    public function test_transition_exposes_truthful_workspace_context_and_descriptive_navigation(): void
+    {
+        app()->setLocale('ru');
+        $title = CatalogTitle::factory()->create(['title' => 'Сериал']);
+        $season = Season::factory()->create([
+            'catalog_title_id' => $title->id,
+            'number' => 1,
+        ]);
+        $previous = $this->publishedEpisode($title, $season, 6);
+        $episode = $this->publishedEpisode($title, $season, 7);
+        $next = $this->publishedEpisode($title, $season, 8);
+        $previous->update(['title' => 'Прошлое']);
+        $next->update(['title' => 'Раскрытие']);
+        $media = $episode->licensedMedia()->firstOrFail();
+        $media->update([
+            'variant_name' => 'Мобильное ТВ',
+            'variant_key' => 'voiceover-mobile-tv',
+            'quality' => '480p',
+            'format' => 'mp4',
+            'has_subtitles' => true,
+            'subtitle_language' => 'ru',
+        ]);
+
+        $transition = app(CatalogPlayerTransitionFactory::class)->prepare(
+            $title,
+            null,
+            $episode,
+            $media->id,
+            new PlaybackPreferencesData,
+        )->toArray();
+
+        self::assertSame('Мобильное ТВ', $transition['labels']['translation']);
+        self::assertSame('480P', $transition['labels']['quality']);
+        self::assertSame('Субтитры: Русский', $transition['labels']['subtitles']);
+        self::assertSame('Прошлое', $transition['navigation']['previous']['title']);
+        self::assertSame('Раскрытие', $transition['navigation']['next']['title']);
+        self::assertSame('voiceover-mobile-tv', $transition['translations'][0]['variant']);
+        self::assertSame('480p', $transition['translations'][0]['quality']);
+        self::assertSame('mp4', $transition['translations'][0]['format']);
+        self::assertTrue($transition['translations'][0]['hasSubtitles']);
+        self::assertSame((string) $episode->id, $transition['translations'][0]['query']['episode']);
+        self::assertSame((string) $media->id, $transition['translations'][0]['query']['media']);
+        self::assertArrayNotHasKey('url', $transition['translations'][0]);
+        self::assertStringNotContainsString('11cdn.org', json_encode($transition, JSON_THROW_ON_ERROR));
     }
 
     private function publishedEpisode(

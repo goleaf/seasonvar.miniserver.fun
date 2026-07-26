@@ -278,6 +278,46 @@ class CatalogTitlePlaybackQueryTest extends TestCase
         }
     }
 
+    public function test_player_media_projection_includes_subtitle_language_without_loading_extra_relations(): void
+    {
+        [$title, $season, $episode, $media] = $this->playableHierarchy();
+        $media->update([
+            'has_subtitles' => true,
+            'subtitle_language' => 'ru',
+        ]);
+
+        $selected = app(CatalogTitlePlaybackQuery::class)
+            ->mediaForEpisode($title, $season, $episode, null)
+            ->sole();
+
+        self::assertTrue((bool) $selected->has_subtitles);
+        self::assertSame('ru', $selected->subtitle_language);
+        self::assertSame([
+            'catalogTitle',
+            'season',
+            'episode',
+        ], array_keys($selected->getRelations()));
+    }
+
+    public function test_player_media_workspace_does_not_drop_available_source_variants(): void
+    {
+        [$title, $season, $episode] = $this->playableHierarchy();
+        LicensedMedia::factory()
+            ->count(104)
+            ->create([
+                'catalog_title_id' => $title->id,
+                'season_id' => $season->id,
+                'episode_id' => $episode->id,
+                'status' => 'published',
+                'published_at' => now(),
+            ]);
+
+        $mediaItems = app(CatalogTitlePlaybackQuery::class)
+            ->mediaForEpisode($title, $season, $episode, null);
+
+        self::assertCount(105, $mediaItems);
+    }
+
     public function test_episode_page_fails_closed_before_querying_for_invalid_hierarchy_or_bounds(): void
     {
         $title = CatalogTitle::factory()->create();

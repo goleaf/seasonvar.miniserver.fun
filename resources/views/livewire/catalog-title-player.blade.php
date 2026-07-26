@@ -2,12 +2,98 @@
     id="player"
     class="scroll-mt-40 space-y-5 sm:scroll-mt-44 lg:scroll-mt-48"
     data-active-player-session="{{ $playerSessionKey }}"
+    data-player-workspace
+    data-player-runtime-state="loading"
 >
     <x-ui.panel :title="__('catalog.player.watch')" icon="fa-solid fa-circle-play">
-        <div class="flex flex-col gap-3 rounded-lg bg-emerald-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div data-player-context-bar class="-mx-4 -mt-4 mb-4 border-b border-slate-200 bg-slate-100 px-4 py-3 sm:-mx-5 sm:-mt-5 sm:px-5">
+            <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold text-slate-700">
+                    @if ($activeSeason)
+                        <span data-player-context-season>{{ $this->seasonDisplayLabel($activeSeason) }}</span>
+                    @endif
+                    @if ($activeSeason && $selectedEpisode)
+                        <span aria-hidden="true">·</span>
+                    @endif
+                    @if ($selectedEpisode)
+                        <span data-player-context-episode>{{ $this->episodeDisplayLabel($selectedEpisode) }}</span>
+                    @endif
+                    @if ($selectedMedia)
+                        <span aria-hidden="true">·</span>
+                        <span data-player-context-translation>{{ $showView->selectedTranslationLabel }}</span>
+                        <span aria-hidden="true">·</span>
+                        <span data-player-context-quality>{{ $showView->selectedQualityLabel }}</span>
+                    @endif
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                    @foreach ($showView->playerContextControls as $contextControl)
+                        <details
+                            wire:key="player-context-{{ $contextControl['key'] }}"
+                            data-player-context-control="{{ $contextControl['key'] }}"
+                            @if ($contextControl['options'] === []) data-player-context-empty @endif
+                            class="group relative"
+                        >
+                            <summary
+                                @if ($contextControl['options'] === []) tabindex="-1" aria-disabled="true" @endif
+                                class="inline-flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-control border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-emerald-300 hover:text-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+                            >
+                                <x-ui.icon name="{{ $contextControl['icon'] }}" />
+                                <span class="sr-only">{{ $contextControl['label'] }}:</span>
+                                <span @if ($contextControl['key'] === 'subtitles') data-player-context-subtitles @endif>{{ $contextControl['current'] }}</span>
+                                @if ($contextControl['options'] !== [])
+                                    <span data-player-context-chevron>
+                                        <x-ui.icon name="fa-solid fa-chevron-down text-xs" />
+                                    </span>
+                                @endif
+                            </summary>
+                            @if ($contextControl['options'] !== [])
+                                <div data-player-context-options class="absolute right-0 z-30 mt-2 grid min-w-56 max-w-[min(22rem,calc(100vw-2rem))] gap-1 rounded-control border border-slate-200 bg-white p-2 shadow-elevated">
+                                    @foreach ($contextControl['options'] as $option)
+                                        <a
+                                            href="{{ $option['url'] }}"
+                                            wire:key="player-context-option-{{ $contextControl['key'] }}-{{ $option['mediaId'] }}"
+                                            wire:click.prevent="selectMedia({{ $option['mediaId'] }})"
+                                            data-catalog-history
+                                            data-player-media-option="{{ $option['mediaId'] }}"
+                                            data-player-media-format="{{ $option['format'] }}"
+                                            data-player-transition-episode="{{ $selectedEpisode?->id }}"
+                                            data-player-transition-media="{{ $option['mediaId'] }}"
+                                            data-player-context-option="{{ $contextControl['key'] }}"
+                                            @if ($option['active']) aria-current="true" @endif
+                                            @class([
+                                                'flex min-h-11 items-center gap-2 rounded-control px-3 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700',
+                                                'bg-emerald-700 text-white' => $option['active'],
+                                                'text-slate-700 hover:bg-emerald-50 hover:text-emerald-800' => ! $option['active'],
+                                            ])
+                                        >
+                                            <span class="min-w-0 break-words">{{ $option['label'] }}</span>
+                                        </a>
+                                    @endforeach
+                                </div>
+                            @endif
+                        </details>
+                    @endforeach
+
+                    <button
+                        type="button"
+                        data-player-theatre-toggle
+                        aria-pressed="false"
+                        data-label-expand="{{ __('catalog.player.theatre_expand') }}"
+                        data-label-collapse="{{ __('catalog.player.theatre_collapse') }}"
+                        class="inline-flex min-h-11 items-center gap-2 rounded-control border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-emerald-300 hover:text-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+                    >
+                        <x-ui.icon name="fa-solid fa-expand" />
+                        <span data-player-theatre-label>{{ __('catalog.player.theatre_expand') }}</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
             <div class="min-w-0">
                 <div class="text-xs font-semibold text-emerald-700">{{ __('catalog.player.continue') }}</div>
-                <div class="mt-1 text-lg font-black text-slate-800">{{ $primaryAction->label }}</div>
+                <div class="mt-1 text-lg font-semibold text-slate-900">{{ $primaryAction->label }}</div>
             </div>
             <button
                 type="button"
@@ -23,37 +109,6 @@
 
         <div class="mt-4 space-y-4">
             <div data-player-primary class="min-w-0">
-                <h3 class="mb-2 flex items-center gap-2 text-sm font-bold text-slate-700">
-                    <x-ui.icon name="fa-solid fa-circle-play" class="text-emerald-700" />
-                    <span>{{ __('catalog.player.current') }}</span>
-                </h3>
-                <div class="flex flex-wrap items-center gap-2 text-xs font-bold text-slate-600">
-                    @if ($selectedEpisode)
-                        <x-ui.status-pill icon="fa-solid fa-circle-play" variant="success">
-                            {{ $this->selectedEpisodeLabel($selectedEpisode) }}
-                        </x-ui.status-pill>
-                        @if ($selectedEpisode->title && $selectedEpisode->title !== $this->episodeDisplayLabel($selectedEpisode))
-                            <x-ui.status-pill icon="fa-solid fa-file-lines">{{ $selectedEpisode->title }}</x-ui.status-pill>
-                        @endif
-                    @else
-                        <x-ui.status-pill icon="fa-solid fa-circle-info">{{ __('catalog.player.episode_not_selected') }}</x-ui.status-pill>
-                    @endif
-                </div>
-                @if ($selectedEpisode)
-                    <div class="mt-2 flex flex-wrap gap-2">
-                        <x-content-requests.correction-link
-                            :url="$episodeCorrectionUrls[$selectedEpisode->id]"
-                            field="episode"
-                        />
-                        @if ($subtitleCorrectionUrl)
-                            <x-content-requests.correction-link
-                                :url="$subtitleCorrectionUrl"
-                                field="subtitles"
-                            />
-                        @endif
-                    </div>
-                @endif
-
                 <div class="relative">
                     <div
                         wire:loading.delay.flex
@@ -76,24 +131,27 @@
                             data-player-copy="{{ \Illuminate\Support\Js::encode($playerCopy) }}"
                             data-player-menu-bootstrap="{{ \Illuminate\Support\Js::encode($playerMenuBootstrap) }}"
                             @if ($episodeNavigation->next) data-player-next-title="{{ $this->episodeDisplayLabel($episodeNavigation->next) }}" @endif
-                            class="mt-3 overflow-hidden rounded-lg border border-emerald-200 bg-emerald-50"
+                            class="relative mt-3 overflow-hidden rounded-lg border border-slate-800 bg-black"
                         >
+                            <div data-player-loading-skeleton aria-hidden="true" class="absolute inset-0 z-10 grid animate-pulse place-items-center bg-slate-950 text-slate-200">
+                                <x-ui.icon name="fa-solid fa-circle-play text-4xl" />
+                            </div>
                             <div
                                 id="catalog-player-status-{{ $selectedMedia->id }}"
                                 data-player-status
                                 hidden
                                 aria-live="polite"
-                                class="flex min-h-11 flex-wrap items-center justify-between gap-2 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800"
+                                class="flex min-h-11 flex-wrap items-center justify-between gap-2 bg-slate-950 px-3 py-2 text-sm font-semibold text-white"
                             >
                                 <span class="inline-flex items-center gap-2">
-                                    <x-ui.icon name="fa-solid fa-circle-notch fa-spin text-emerald-700" data-player-status-icon />
+                                    <x-ui.icon name="fa-solid fa-circle-notch fa-spin text-sky-400" data-player-status-icon />
                                     <span data-player-status-text>{{ __('catalog.player.preparing') }}</span>
                                 </span>
                                 <button
                                     type="button"
                                     data-player-retry
                                     hidden
-                                    class="inline-flex min-h-11 items-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100"
+                                    class="inline-flex min-h-11 items-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100"
                                 >
                                     <x-ui.icon name="fa-solid fa-rotate-right" />
                                     <span>{{ __('catalog.player.retry') }}</span>
@@ -105,7 +163,7 @@
                                 preload="metadata"
                                 poster="{{ $title->poster_url }}"
                                 aria-describedby="catalog-player-status-{{ $selectedMedia->id }}"
-                                class="js-catalog-player aspect-video w-full bg-slate-100"
+                                class="js-catalog-player aspect-video w-full bg-black"
                                 data-player-session="{{ $playerSessionKey }}"
                                 data-player-media-id="{{ $selectedMedia->id }}"
                                 data-player-authorization-version="{{ $authorizationVersion }}"
@@ -188,6 +246,34 @@
                     @endif
                 </div>
 
+                <div
+                    data-player-recovery
+                    hidden
+                    class="mt-3 flex flex-wrap gap-2 rounded-control border border-red-200 bg-red-50 p-3"
+                    role="alert"
+                    aria-live="assertive"
+                >
+                    <button type="button" data-player-retry class="inline-flex min-h-11 items-center gap-2 rounded-control bg-red-700 px-3 py-2 text-sm font-semibold text-white hover:bg-red-800">
+                        <x-ui.icon name="fa-solid fa-rotate-right" />
+                        <span>{{ __('catalog.player.retry') }}</span>
+                    </button>
+                    <button type="button" data-player-choose-source class="inline-flex min-h-11 items-center gap-2 rounded-control border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-800 hover:bg-red-100">
+                        <x-ui.icon name="fa-solid fa-list" />
+                        <span>{{ __('catalog.player.choose_source') }}</span>
+                    </button>
+                    @if ($technicalIssueUrl)
+                        <a
+                            href="{{ $technicalIssueUrl }}"
+                            data-player-issue-link
+                            @if ($playbackQualityContext) data-player-quality-report @endif
+                            class="inline-flex min-h-11 items-center gap-2 rounded-control border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-800 hover:bg-red-100"
+                        >
+                            <x-ui.icon name="fa-solid fa-triangle-exclamation" />
+                            <span>{{ __('issues.video_not_working') }}</span>
+                        </a>
+                    @endif
+                </div>
+
                 @error('playback')
                     <p class="mt-3 rounded-control bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800" role="alert">{{ $message }}</p>
                 @enderror
@@ -221,12 +307,24 @@
                             class="inline-flex min-h-11 items-center gap-2 rounded-control bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
                         >
                             <x-ui.icon name="fa-regular fa-keyboard" />
-                            <span>{{ __('catalog.player.keyboard_shortcuts') }}</span>
+                            <span>{{ __('catalog.player.hotkeys_compact') }}</span>
                         </button>
                     </div>
                 @endif
 
-                <div class="mt-3 flex flex-wrap gap-2">
+                <div data-player-theatre-secondary class="mt-3 flex flex-wrap gap-2">
+                    @if ($selectedEpisode)
+                        <x-content-requests.correction-link
+                            :url="$episodeCorrectionUrls[$selectedEpisode->id]"
+                            field="episode"
+                        />
+                        @if ($subtitleCorrectionUrl)
+                            <x-content-requests.correction-link
+                                :url="$subtitleCorrectionUrl"
+                                field="subtitles"
+                            />
+                        @endif
+                    @endif
                     <livewire:help-center.contextual-help-link
                         :feature="$playerHelpFeature"
                         :context="$playerHelpContext"
@@ -247,7 +345,7 @@
                 </div>
 
                 @if ($selectedMedia)
-                    <div class="mt-3 flex flex-wrap gap-2">
+                    <div data-player-theatre-secondary class="mt-3 flex flex-wrap gap-2">
                         <x-ui.status-pill icon="fa-solid fa-file-video" variant="success" size="md">
                             {{ $showView->mediaDetailsLabel($selectedMedia) }}
                         </x-ui.status-pill>
@@ -303,7 +401,7 @@
 
                 @island(name: 'catalog-player-navigation', always: true, with: $this->playerNavigationIslandPage)
                 @if ($selectedEpisode && ($episodeNavigation->previous || $episodeNavigation->next))
-                    <nav class="mt-3 grid gap-2 sm:grid-cols-2" aria-label="{{ __('catalog.player.episode_navigation') }}">
+                    <nav class="mt-3 grid items-stretch gap-2 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]" aria-label="{{ __('catalog.player.episode_navigation') }}">
                         @if ($episodeNavigation->previous)
                             <a
                                 href="{{ $previousUrl }}"
@@ -311,15 +409,30 @@
                                 data-catalog-history
                                 data-player-previous-episode
                                 data-player-transition-episode="{{ $episodeNavigation->previous->id }}"
-                                class="flex min-h-11 items-center gap-3 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-800"
+                                class="flex min-h-11 items-center gap-3 rounded-control bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
                             >
-                                <x-ui.icon name="fa-solid fa-arrow-left" />
-                                <span class="min-w-0">
-                                    <span class="block text-xs font-semibold text-slate-600">{{ __('catalog.player.previous') }}</span>
-                                    <span class="block break-words">{{ $this->episodeDisplayLabel($episodeNavigation->previous) }}</span>
+                                <span class="min-w-0 break-words">
+                                    {{ __(
+                                        $episodeNavigation->previous->title
+                                            ? 'catalog.player.previous_episode_context_titled'
+                                            : 'catalog.player.previous_episode_context',
+                                        [
+                                            'episode' => $this->episodeDisplayLabel($episodeNavigation->previous),
+                                            'title' => $episodeNavigation->previous->title,
+                                        ],
+                                    ) }}
                                 </span>
                             </a>
                         @endif
+
+                        <div class="flex min-h-11 items-center justify-center px-3 py-2 text-center text-sm font-semibold text-slate-600 sm:col-start-2" data-player-current-episode>
+                            @if ($selectedEpisode)
+                                {{ __('catalog.player.current_episode_context', [
+                                    'season' => $activeSeason ? $this->seasonDisplayLabel($activeSeason) : '',
+                                    'episode' => $this->episodeDisplayLabel($selectedEpisode),
+                                ]) }}
+                            @endif
+                        </div>
 
                         @if ($episodeNavigation->next)
                             <a
@@ -328,13 +441,19 @@
                                 data-catalog-history
                                 data-player-next-episode
                                 data-player-transition-episode="{{ $episodeNavigation->next->id }}"
-                                class="flex min-h-11 items-center justify-end gap-3 rounded-control bg-slate-50 px-3 py-2 text-right text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-800 sm:col-start-2"
+                                class="flex min-h-11 items-center justify-end gap-3 rounded-control bg-emerald-700 px-3 py-2 text-right text-sm font-semibold text-white hover:bg-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 sm:col-start-3"
                             >
-                                <span class="min-w-0">
-                                    <span class="block text-xs font-semibold text-slate-600">{{ __('catalog.player.next_short') }}</span>
-                                    <span class="block break-words">{{ $this->episodeDisplayLabel($episodeNavigation->next) }}</span>
+                                <span class="min-w-0 break-words">
+                                    {{ __(
+                                        $episodeNavigation->next->title
+                                            ? 'catalog.player.next_episode_context_titled'
+                                            : 'catalog.player.next_episode_context',
+                                        [
+                                            'episode' => $this->episodeDisplayLabel($episodeNavigation->next),
+                                            'title' => $episodeNavigation->next->title,
+                                        ],
+                                    ) }}
                                 </span>
-                                <x-ui.icon name="fa-solid fa-arrow-right" />
                             </a>
                         @endif
                     </nav>
@@ -342,7 +461,7 @@
                 @endisland
             </div>
 
-            <section data-player-personal class="rounded-lg bg-slate-50 p-4" aria-label="{{ __('catalog.player.personal_state') }}">
+            <section data-player-personal data-player-theatre-secondary class="border-t border-slate-200 pt-4" aria-label="{{ __('catalog.player.personal_state') }}">
                 <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
                     <x-ui.icon name="fa-solid fa-user-check text-emerald-700" />
                     <span>{{ __('catalog.player.your_series') }}</span>
@@ -466,63 +585,6 @@
             </section>
         </div>
 
-        @if ($selectedEpisode && $showView->playbackOptionGroups !== [])
-            <div class="mt-4">
-                <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                    <x-ui.icon name="fa-solid fa-sliders" class="text-emerald-700" />
-                    <span>{{ __('catalog.player.settings') }}</span>
-                </div>
-                <div
-                    wire:loading.class="pointer-events-none opacity-60"
-                    wire:target="selectMedia"
-                    class="mt-3 space-y-4"
-                >
-                    @foreach ($showView->playbackOptionGroups as $optionGroup)
-                        <section wire:key="playback-option-group-{{ $optionGroup['key'] }}" aria-labelledby="playback-option-group-label-{{ $optionGroup['key'] }}">
-                            <h4 id="playback-option-group-label-{{ $optionGroup['key'] }}" class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                                <x-ui.icon name="{{ $optionGroup['icon'] }}" class="text-emerald-700" />
-                                <span>{{ $optionGroup['label'] }}</span>
-                            </h4>
-                            <div class="mt-2 flex flex-wrap gap-2">
-                                @foreach ($optionGroup['options'] as $option)
-                                    <a
-                                        href="{{ $option['url'] }}"
-                                        wire:key="playback-option-{{ $optionGroup['key'] }}-{{ $option['mediaId'] }}"
-                                        wire:click.prevent="selectMedia({{ $option['mediaId'] }})"
-                                        wire:loading.attr="aria-disabled"
-                                        wire:target="selectMedia({{ $option['mediaId'] }})"
-                                        data-catalog-history
-                                        data-player-media-option="{{ $option['mediaId'] }}"
-                                        data-player-media-format="{{ $option['format'] }}"
-                                        data-player-transition-episode="{{ $selectedEpisode->id }}"
-                                        data-player-transition-media="{{ $option['mediaId'] }}"
-                                        @if ($option['active']) aria-current="true" @endif
-                                        @class([
-                                            'inline-flex min-h-11 max-w-full items-center gap-2 rounded-control px-3 py-2 text-left text-sm font-bold leading-5 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 data-loading:pointer-events-none data-loading:opacity-60',
-                                            'bg-emerald-700 text-white' => $option['active'],
-                                            'bg-slate-100 text-slate-700 hover:bg-emerald-50 hover:text-emerald-800' => ! $option['active'],
-                                        ])
-                                    >
-                                        <span class="min-w-0">
-                                            <span class="block break-words">{{ $option['label'] }}</span>
-                                            @if ($option['detail'] && $option['detail'] !== $option['label'])
-                                                <span @class(['block break-words text-xs', 'text-emerald-100' => $option['active'], 'text-slate-600' => ! $option['active']])>{{ $option['detail'] }}</span>
-                                            @endif
-                                        </span>
-                                        <x-ui.icon
-                                            name="fa-solid fa-spinner fa-spin"
-                                            class="hidden shrink-0"
-                                            wire:loading.inline-flex
-                                            wire:target="selectMedia({{ $option['mediaId'] }})"
-                                        />
-                                    </a>
-                                @endforeach
-                            </div>
-                        </section>
-                    @endforeach
-                </div>
-            </div>
-        @endif
     </x-ui.panel>
 
     <x-ui.panel id="seasons" :title="__('catalog.player.seasons_and_episodes')" icon="fa-solid fa-layer-group" :pad="false" class="scroll-mt-40 sm:scroll-mt-44 lg:scroll-mt-48">

@@ -302,3 +302,25 @@ Task 20 от 24.07.2026 добавил regression для порядка global k
 Task 21 от 24.07.2026 зафиксировал правильную RED boundary: независимая проверка pre-change `HEAD` подтвердила отсутствие всех пяти новых JS-контрактов, а сохранённые Desktop/Mobile/Tablet Chromium artifacts показали прежние цели размером только `26.5..34 px` при требовании не меньше `56 px`. После минимального GREEN focused static contract прошёл `6` тестов и `335` утверждений; геометрический/action regression прошёл `3/3` проекта и подтвердил один ряд, side targets не меньше `56×56`, center не меньше `68×68`, точное центрирование, отсутствие horizontal overflow, переходы `50→40→50` и динамический play/pause label. Связанный PHPUnit-набор прошёл `42` теста и `764` утверждения, полный `player-lifecycle.spec.js` завершился `18` успешными сценариями и `12` ожидаемыми platform-specific skips, а Vite собрал `24` модуля. Реальное устройство iOS и OS-owned native fullscreen по-прежнему остаются `unresolved_device`.
 
 Task 22 от 24.07.2026 устранил зависимость чёрного media background от порядка CSS стороннего Plyr: shell, `.plyr`, `.plyr__video-wrapper` и `video.js-catalog-player` теперь явно чёрные в обычном состоянии, standard/WebKit fullscreen, Plyr active/fallback fullscreen и CSS-управляемом backdrop. Player-only functional palette содержит `#1877f2`, `#166fe5`, `#e7f3ff`, `#f0f2f5`, `#e4e6eb`, `#ccd0d5`, `#1c1e21`, `#65676b`, `#42b72a`, `#f7b928`, `#fa383e`, `#ffffff` и `#000000`; она не изменяет цвета остального портала. Static RED получил ожидаемое отсутствие `--catalog-player-primary`, browser RED — transparent/slate normal layers. После CSS GREEN focused contract прошёл `6` тестов и `353` утверждения, связанный PHPUnit-набор — `45` тестов и `801` утверждение, полный `player-lifecycle.spec.js` — `18` успешных сценариев при `12` ожидаемых skips, Vite собрал `24` модуля; свежий полный PHPUnit после отдельного успешного повтора случайно столкнувшегося factory-теста прошёл `1572` теста, `1561` успешно, `11` пропущено и `123934` утверждения. В standard Fullscreen API до входа, внутри fullscreen и после in-place episode transition все три слоя вычислены как `rgb(0, 0, 0)`; screenshots `1440×1200`, `768×1024` и `390×844` подтвердили читаемые controls и отсутствие overflow. Реальный OS-owned fullscreen iOS остаётся `unresolved_device`; production продолжает требовать matching manifest/assets и в рамках этой локальной задачи не активирован.
+
+## Task 104 — player workspace redesign
+
+Task 104 сохраняет один `CatalogTitlePlayer`, один keyed `wire:ignore`, текущий
+Plyr/HLS stack, signed playback, server-authorized fallback и progress/report
+boundaries. Изменяется только presentation и подготовленный безопасный context:
+компактная context-bar, descriptive episode navigation, scoped theatre mode,
+responsive source menu entry points, skeleton/recovery states и компактный
+hotkeys dialog trigger.
+
+Theatre не является fullscreen или второй темой: он не перемещает video DOM,
+не создаёт новый player, не запоминается и закрывается `Escape` после
+dialog/fullscreen. В нём остаются player, previous/next, seasons/episodes и
+primary controls; sidebar и вторичные title sections временно скрыты в одном
+document flow.
+
+Subtitle control честно отражает только реально импортированный
+`has_subtitles`/`subtitle_language` source variant. Track body/URL в текущем
+schema отсутствует, поэтому Task 104 не обещает WebVTT language switching и не
+рисует фиктивные options. Ошибка показывает bounded retry, существующий source
+menu и существующий report flow; raw URL/grant и global health mutation
+запрещены.

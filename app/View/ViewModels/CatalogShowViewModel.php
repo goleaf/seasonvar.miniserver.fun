@@ -119,6 +119,12 @@ class CatalogShowViewModel
 
     public string $selectedPlaybackLabel;
 
+    public string $selectedTranslationLabel;
+
+    public string $selectedQualityLabel;
+
+    public string $selectedSubtitleLabel;
+
     public ?string $selectedMediaFileSizeLabel;
 
     public bool $selectedMediaIsDirectFile;
@@ -139,9 +145,9 @@ class CatalogShowViewModel
     public Collection $selectedMediaBadges;
 
     /**
-     * @var array<int, array{key: string, label: string, icon: string, options: list<array{mediaId: int, label: string, detail: string|null, icon: string, url: string, active: bool}>}>
+     * @var array<int, array{key: string, label: string, current: string, icon: string, options: list<array{mediaId: int, format: string|null, label: string, detail: string|null, icon: string, url: string, active: bool}>}>
      */
-    public array $playbackOptionGroups;
+    public array $playerContextControls;
 
     public ?int $selectedSeasonId;
 
@@ -231,6 +237,15 @@ class CatalogShowViewModel
         $this->selectedQuality = $this->selectedMedia ? $this->mediaQuality($this->selectedMedia) : null;
         $this->selectedFormat = $this->selectedMedia ? $this->mediaFormat($this->selectedMedia) : null;
         $this->selectedPlaybackLabel = $this->selectedMedia ? $this->playbackLabel($this->selectedMedia) : __('catalog.player.variant_not_selected');
+        $this->selectedTranslationLabel = $this->selectedMedia
+            ? $this->variantDisplayLabel($this->selectedMedia)
+            : __('catalog.player.variant_not_selected');
+        $this->selectedQualityLabel = $this->selectedQuality !== null
+            ? Str::upper($this->selectedQuality)
+            : __('catalog.player.automatic_quality');
+        $this->selectedSubtitleLabel = $this->selectedMedia !== null
+            ? $this->subtitleLabel($this->selectedMedia)
+            : __('catalog.player.subtitles_unavailable');
         $this->selectedMediaFileSizeLabel = $selectedMediaFileSizeLabel;
         $this->selectedMediaIsDirectFile = $selectedMediaIsDirectFile;
         $this->selectedMediaDownloadUrl = $selectedMediaDownloadUrl;
@@ -242,7 +257,7 @@ class CatalogShowViewModel
             $this->selectedFormat ? Str::upper($this->selectedFormat) : null,
         ])->filter()->implode(' · ') ?: null;
         $this->selectedMediaBadges = $this->buildSelectedMediaBadges();
-        $this->playbackOptionGroups = $this->buildPlaybackOptionGroups();
+        $this->playerContextControls = $this->buildPlayerContextControls();
         $this->selectedSeasonId = $this->selectedEpisode !== null
             ? $this->selectedEpisode->season_id
             : $this->selectedMedia?->season_id;
@@ -414,21 +429,24 @@ class CatalogShowViewModel
     }
 
     /**
-     * @return array<int, array{key: string, label: string, icon: string, options: list<array{mediaId: int, label: string, detail: string|null, icon: string, url: string, active: bool}>}>
+     * @return array<int, array{key: string, label: string, current: string, icon: string, options: list<array{mediaId: int, format: string|null, label: string, detail: string|null, icon: string, url: string, active: bool}>}>
      */
-    private function buildPlaybackOptionGroups(): array
+    private function buildPlayerContextControls(): array
     {
         if ($this->selectedEpisodeMediaItems->isEmpty()) {
             return [];
         }
 
         $variantMediaItems = $this->selectedVariantMediaItems();
-        $qualityMediaItems = $this->selectedQualityMediaItems($variantMediaItems);
+        $subtitleMediaItems = $this->selectedEpisodeMediaItems
+            ->filter(fn (LicensedMedia $media): bool => $this->mediaHasSubtitles($media))
+            ->values();
 
-        return collect([
+        return [
             [
-                'key' => 'variant',
-                'label' => __('catalog.player.translation_variants'),
+                'key' => 'translation',
+                'label' => __('catalog.player.translation'),
+                'current' => $this->selectedTranslationLabel,
                 'icon' => 'fa-solid fa-language',
                 'options' => $this->playbackOptions(
                     $this->selectedEpisodeMediaItems,
@@ -441,37 +459,32 @@ class CatalogShowViewModel
             [
                 'key' => 'quality',
                 'label' => __('catalog.player.quality'),
+                'current' => $this->selectedQualityLabel,
                 'icon' => 'fa-solid fa-display',
                 'options' => $this->playbackOptions(
                     $variantMediaItems,
                     'quality',
                     fn (LicensedMedia $media): ?string => $this->mediaQuality($media),
-                    fn (LicensedMedia $media): string => $this->mediaQuality($media) ? Str::upper($this->mediaQuality($media)) : __('catalog.player.quality_missing'),
+                    fn (LicensedMedia $media): string => $this->mediaQuality($media)
+                        ? Str::upper($this->mediaQuality($media))
+                        : __('catalog.player.quality_missing'),
                     'fa-solid fa-display',
                 ),
             ],
             [
-                'key' => 'format',
-                'label' => __('catalog.player.format'),
-                'icon' => 'fa-solid fa-file-video',
+                'key' => 'subtitles',
+                'label' => __('catalog.player.subtitles'),
+                'current' => $this->selectedSubtitleLabel,
+                'icon' => 'fa-solid fa-closed-captioning',
                 'options' => $this->playbackOptions(
-                    $qualityMediaItems,
-                    'format',
-                    fn (LicensedMedia $media): ?string => $this->mediaFormat($media),
-                    fn (LicensedMedia $media): string => $this->mediaFormat($media) ? Str::upper($this->mediaFormat($media)) : __('catalog.player.stream'),
-                    'fa-solid fa-file-video',
+                    $subtitleMediaItems,
+                    'variant',
+                    fn (LicensedMedia $media): string => $this->mediaVariantKey($media),
+                    fn (LicensedMedia $media): string => $this->subtitleLabel($media),
+                    'fa-solid fa-closed-captioning',
                 ),
             ],
-        ])
-            ->map(fn (array $group): array => [
-                'key' => $group['key'],
-                'label' => $group['label'],
-                'icon' => $group['icon'],
-                'options' => $group['options'],
-            ])
-            ->filter(fn (array $group): bool => count($group['options']) > 1)
-            ->values()
-            ->all();
+        ];
     }
 
     /**
@@ -504,6 +517,7 @@ class CatalogShowViewModel
             ->filter()
             ->sortBy(fn (array $option): string => ($option['active'] ? '0' : '1').$option['label'])
             ->unique(fn (array $option): string => $option['label'])
+            ->take(24)
             ->values()
             ->all();
     }
@@ -522,23 +536,6 @@ class CatalogShowViewModel
             ->values();
 
         return $matches->isNotEmpty() ? $matches : $this->selectedEpisodeMediaItems;
-    }
-
-    /**
-     * @param  Collection<int, LicensedMedia>  $mediaItems
-     * @return Collection<int, LicensedMedia>
-     */
-    private function selectedQualityMediaItems(Collection $mediaItems): Collection
-    {
-        if ($this->selectedQuality === null) {
-            return $mediaItems;
-        }
-
-        $matches = $mediaItems
-            ->filter(fn (LicensedMedia $media): bool => $this->sameNormalizedValue($this->mediaQuality($media), $this->selectedQuality))
-            ->values();
-
-        return $matches->isNotEmpty() ? $matches : $mediaItems;
     }
 
     /**
@@ -646,6 +643,26 @@ class CatalogShowViewModel
     private function mediaHasSubtitles(LicensedMedia $media): bool
     {
         return $this->mediaVariant($media)['has_subtitles'];
+    }
+
+    private function subtitleLabel(LicensedMedia $media): string
+    {
+        if (! $this->mediaHasSubtitles($media)) {
+            return __('catalog.player.subtitles_unavailable');
+        }
+
+        $language = Str::lower(trim((string) $media->subtitle_language));
+
+        if (preg_match('/^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/D', $language) !== 1) {
+            return __('catalog.player.subtitles_available');
+        }
+
+        $translationKey = 'settings.playback.subtitle_languages.'.$language;
+        $languageLabel = __($translationKey);
+
+        return __('catalog.player.subtitles_language', [
+            'language' => $languageLabel !== $translationKey ? $languageLabel : Str::upper($language),
+        ]);
     }
 
     private function mediaUrl(LicensedMedia $media): ?string

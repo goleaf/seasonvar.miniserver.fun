@@ -120,8 +120,7 @@ final readonly class CatalogPlayerTransitionFactory
                 (string) $media->variant_key,
                 $preferences->hiddenVariantKeys,
                 true,
-            ))
-            ->take(100);
+            ));
         $selectedMedia = $mediaItems->firstWhere('id', $selectedMedia->id);
 
         if (! $selectedMedia instanceof LicensedMedia) {
@@ -168,6 +167,11 @@ final readonly class CatalogPlayerTransitionFactory
                 'season' => $seasonLabel,
                 'episode' => $episodeLabel,
                 'media' => $this->mediaLabel($selectedMedia),
+                'translation' => $this->translationLabel($selectedMedia),
+                'quality' => $profile['quality'] !== ''
+                    ? Str::upper($profile['quality'])
+                    : __('catalog.player.automatic_quality'),
+                'subtitles' => $this->subtitleLabel($selectedMedia),
             ],
             translations: $this->translationOptions($mediaItems, $selectedMedia->id),
             navigation: [
@@ -218,17 +222,37 @@ final readonly class CatalogPlayerTransitionFactory
 
     /**
      * @param  Collection<int, LicensedMedia>  $mediaItems
-     * @return list<array{mediaId: int, label: string, detail: string|null, active: bool}>
+     * @return list<array{mediaId: int, label: string, detail: string|null, active: bool, variant: string, quality: string, format: string, hasSubtitles: bool, subtitleLanguage: string|null, subtitles: string, query: array<string, string>}>
      */
     public function translationOptions(Collection $mediaItems, int $selectedMediaId): array
     {
         return $mediaItems
-            ->map(fn (LicensedMedia $media): array => [
-                'mediaId' => $media->id,
-                'label' => $this->translationLabel($media),
-                'detail' => $this->mediaDetail($media),
-                'active' => $media->id === $selectedMediaId,
-            ])
+            ->map(function (LicensedMedia $media) use ($selectedMediaId): array {
+                $profile = $this->playback->mediaProfile($media);
+
+                return [
+                    'mediaId' => $media->id,
+                    'label' => $this->translationLabel($media),
+                    'detail' => $this->mediaDetail($media),
+                    'active' => $media->id === $selectedMediaId,
+                    'variant' => $profile['variant'],
+                    'quality' => $profile['quality'],
+                    'format' => $profile['format'],
+                    'hasSubtitles' => (bool) $media->has_subtitles,
+                    'subtitleLanguage' => $this->subtitleLanguage($media),
+                    'subtitles' => $this->subtitleLabel($media),
+                    'query' => collect([
+                        'season' => (string) $media->season_id,
+                        'episode' => (string) $media->episode_id,
+                        'media' => (string) $media->id,
+                        'variant' => $profile['variant'],
+                        'quality' => $profile['quality'],
+                        'format' => $profile['format'],
+                    ])
+                        ->filter(fn (string $value): bool => $value !== '')
+                        ->all(),
+                ];
+            })
             ->sortBy(fn (array $option): string => implode('|', [
                 $option['active'] ? '0' : '1',
                 Str::lower($option['label']),
@@ -239,11 +263,15 @@ final readonly class CatalogPlayerTransitionFactory
             ->all();
     }
 
-    /** @return array{id: int, label: string}|null */
+    /** @return array{id: int, label: string, title: string|null}|null */
     private function navigationItem(?Episode $episode): ?array
     {
         return $episode instanceof Episode
-            ? ['id' => $episode->id, 'label' => $this->episodeLabel($episode)]
+            ? [
+                'id' => $episode->id,
+                'label' => $this->episodeLabel($episode),
+                'title' => filled($episode->title) ? (string) $episode->title : null,
+            ]
             : null;
     }
 
@@ -287,6 +315,35 @@ final readonly class CatalogPlayerTransitionFactory
                     ? (string) $media->translation_name
                     : __('catalog.player.voiceover')),
         };
+    }
+
+    private function subtitleLabel(LicensedMedia $media): string
+    {
+        if (! (bool) $media->has_subtitles) {
+            return __('catalog.player.subtitles_unavailable');
+        }
+
+        $language = $this->subtitleLanguage($media);
+
+        if ($language === null) {
+            return __('catalog.player.subtitles_available');
+        }
+
+        $translationKey = 'settings.playback.subtitle_languages.'.$language;
+        $languageLabel = __($translationKey);
+
+        return __('catalog.player.subtitles_language', [
+            'language' => $languageLabel !== $translationKey ? $languageLabel : Str::upper($language),
+        ]);
+    }
+
+    private function subtitleLanguage(LicensedMedia $media): ?string
+    {
+        $language = Str::lower(trim((string) $media->subtitle_language));
+
+        return preg_match('/^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/D', $language) === 1
+            ? $language
+            : null;
     }
 
     private function mediaDetail(LicensedMedia $media): ?string

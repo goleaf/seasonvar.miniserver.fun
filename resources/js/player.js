@@ -23,6 +23,15 @@ const AUTO_NEXT_PREFETCH_SECONDS = 60;
 const TRANSIENT_RESUME_PREFIX = 'seasonvar.player-resume.v1:';
 const SUPPORTED_PLAYBACK_SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 const PLAYBACK_QUALITY_NETWORK_TIMEOUT_MS = 5_000;
+const PLAYER_WORKSPACE_QUERY_KEYS = [
+    'season',
+    'episode',
+    'media',
+    'variant',
+    'quality',
+    'format',
+    'marker',
+];
 
 const playerSessions = new WeakMap();
 
@@ -130,6 +139,24 @@ const playerMenuBootstrapFor = (shell) => {
     } catch {
         return null;
     }
+};
+
+const playerWorkspaceUrl = (query) => {
+    const url = new URL(window.location.href);
+
+    PLAYER_WORKSPACE_QUERY_KEYS.forEach((key) => url.searchParams.delete(key));
+    Object.entries(query || {}).forEach(([key, value]) => {
+        if (
+            PLAYER_WORKSPACE_QUERY_KEYS.includes(key)
+            && typeof value === 'string'
+            && value.trim() !== ''
+        ) {
+            url.searchParams.set(key, value);
+        }
+    });
+    url.hash = '#player';
+
+    return url.href;
 };
 
 const noInternalRetryPolicy = (maxLoadTimeMs) => ({
@@ -287,15 +314,21 @@ const takeTransientResume = (episodeId) => {
 
 const showFatalPlayerState = (video) => {
     const copy = playerCopyFor(video);
+    const root = video.closest('[data-active-player-session]');
     const shell = video.closest('[data-player-shell]');
     const status = shell?.querySelector('[data-player-status]');
     const statusIcon = shell?.querySelector('[data-player-status-icon]');
     const statusText = shell?.querySelector('[data-player-status-text]');
-    const retryButton = shell?.querySelector('[data-player-retry]');
+    const retryButtons = root?.querySelectorAll('[data-player-retry]') || [];
+    const recovery = root?.querySelector('[data-player-recovery]');
 
     clearPlayerMarkers(video);
     video.dataset.playerFailed = '1';
     shell?.setAttribute('data-player-state', 'fatal');
+
+    if (root instanceof HTMLElement) {
+        root.dataset.playerRuntimeState = 'fatal';
+    }
 
     if (status) {
         status.hidden = false;
@@ -311,10 +344,14 @@ const showFatalPlayerState = (video) => {
         statusIcon.className = playerStatusIcons.fatal;
     }
 
-    if (retryButton) {
+    if (recovery instanceof HTMLElement) {
+        recovery.hidden = false;
+    }
+
+    retryButtons.forEach((retryButton) => {
         retryButton.hidden = false;
         retryButton.onclick = () => window.location.reload();
-    }
+    });
 };
 
 class CatalogPlayerSession {
@@ -333,7 +370,9 @@ class CatalogPlayerSession {
         this.status = this.shell?.querySelector('[data-player-status]') || null;
         this.statusIcon = this.shell?.querySelector('[data-player-status-icon]') || null;
         this.statusText = this.shell?.querySelector('[data-player-status-text]') || null;
-        this.retryButton = this.shell?.querySelector('[data-player-retry]') || null;
+        this.retryButtons = [...(this.root?.querySelectorAll('[data-player-retry]') || [])];
+        this.recovery = this.root?.querySelector('[data-player-recovery]') || null;
+        this.chooseSourceButton = this.root?.querySelector('[data-player-choose-source]') || null;
         this.captionStatus = this.shell?.querySelector('[data-player-caption-status]') || null;
         this.notice = this.shell?.querySelector('[data-player-notice]') || null;
         this.autoplayToggle = this.root?.querySelector('[data-player-autoplay-toggle]') || null;
@@ -431,7 +470,14 @@ class CatalogPlayerSession {
         window.addEventListener('online', () => this.handleConnectionChange(), { signal });
         window.addEventListener('offline', () => this.handleConnectionChange(), { signal });
         this.connection?.addEventListener?.('change', this.connectionChangeHandler);
-        this.retryButton?.addEventListener('click', () => this.retry(), { signal });
+        this.retryButtons.forEach((button) => {
+            button.addEventListener('click', () => this.retry(), { signal });
+        });
+        this.chooseSourceButton?.addEventListener(
+            'click',
+            () => this.menu?.open('translations'),
+            { signal },
+        );
         this.autoplayToggle?.addEventListener('click', () => this.toggleAutoplayPreference(), { signal });
         this.restartButton?.addEventListener('click', () => this.requestRestart(), { signal });
         this.saveMarkerButton?.addEventListener('click', () => this.requestSaveMarker(), { signal });
@@ -638,6 +684,186 @@ class CatalogPlayerSession {
             loadEpisodePage: (seasonId, page) => this.requestMenuPage(seasonId, page),
             selectEpisode: (episodeId) => this.requestPlayerTransition(episodeId, null),
             selectTranslation: (episodeId, mediaId) => this.requestPlayerTransition(episodeId, mediaId),
+        });
+    }
+
+    workspaceOptions(transition, key) {
+        const translations = Array.isArray(transition.translations)
+            ? transition.translations
+            : [];
+        const selectedVariant = typeof transition.selection?.variant === 'string'
+            ? transition.selection.variant
+            : '';
+        const seen = new Set();
+
+        return translations
+            .filter((option) => (
+                option
+                && Number.isInteger(Number(option.mediaId))
+                && option.query
+                && typeof option.query === 'object'
+                && (
+                    key === 'translation'
+                    || (key === 'quality' && option.variant === selectedVariant)
+                    || (key === 'subtitles' && option.hasSubtitles === true)
+                )
+            ))
+            .map((option) => {
+                const label = key === 'quality'
+                    ? String(option.quality || '').toUpperCase()
+                    : (
+                        key === 'subtitles'
+                            ? [option.subtitles, option.label].filter(Boolean).join(' · ')
+                            : String(option.label || '')
+                    );
+
+                return {
+                    ...option,
+                    label,
+                };
+            })
+            .filter((option) => {
+                if (option.label === '' || seen.has(option.label)) {
+                    return false;
+                }
+
+                seen.add(option.label);
+
+                return true;
+            });
+    }
+
+    syncWorkspaceOptions(transition) {
+        if (!(this.root instanceof HTMLElement)) {
+            return;
+        }
+
+        this.root.querySelectorAll('[data-player-context-control]').forEach((control) => {
+            if (!(control instanceof HTMLDetailsElement)) {
+                return;
+            }
+
+            const key = control.dataset.playerContextControl;
+            const options = this.workspaceOptions(transition, key);
+            let menu = control.querySelector(':scope > [data-player-context-options]');
+            const summary = control.querySelector(':scope > summary');
+            let chevron = summary?.querySelector('[data-player-context-chevron]');
+
+            if (options.length === 0) {
+                control.removeAttribute('open');
+                control.dataset.playerContextEmpty = '';
+                summary?.setAttribute('tabindex', '-1');
+                summary?.setAttribute('aria-disabled', 'true');
+                menu?.remove();
+                chevron?.remove();
+
+                return;
+            }
+
+            delete control.dataset.playerContextEmpty;
+            summary?.removeAttribute('tabindex');
+            summary?.removeAttribute('aria-disabled');
+
+            if (!(menu instanceof HTMLElement)) {
+                menu = document.createElement('div');
+                menu.dataset.playerContextOptions = '';
+                menu.className = 'absolute right-0 z-30 mt-2 grid min-w-56 max-w-[min(22rem,calc(100vw-2rem))] gap-1 rounded-control border border-slate-200 bg-white p-2 shadow-elevated';
+                control.append(menu);
+            }
+
+            if (!(chevron instanceof HTMLElement) && summary instanceof HTMLElement) {
+                chevron = document.createElement('span');
+                chevron.dataset.playerContextChevron = '';
+                chevron.className = 'fa-solid fa-chevron-down text-xs';
+                chevron.setAttribute('aria-hidden', 'true');
+                summary.append(chevron);
+            }
+
+            menu.replaceChildren(...options.map((option) => {
+                const link = document.createElement('a');
+                const label = document.createElement('span');
+                const mediaId = String(option.mediaId);
+                const active = Number(option.mediaId) === this.mediaId;
+
+                link.href = playerWorkspaceUrl(option.query);
+                link.className = active
+                    ? 'flex min-h-11 items-center gap-2 rounded-control bg-emerald-700 px-3 py-2 text-sm font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700'
+                    : 'flex min-h-11 items-center gap-2 rounded-control px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700';
+                link.dataset.catalogHistory = '';
+                link.dataset.playerMediaOption = mediaId;
+                link.dataset.playerMediaFormat = String(option.format || '');
+                link.dataset.playerTransitionEpisode = String(transition.selection?.episodeId || '');
+                link.dataset.playerTransitionMedia = mediaId;
+                link.dataset.playerContextOption = key;
+
+                if (active) {
+                    link.setAttribute('aria-current', 'true');
+                }
+
+                label.className = 'min-w-0 break-words';
+                label.textContent = option.label;
+                link.append(label);
+
+                return link;
+            }));
+        });
+    }
+
+    syncWorkspaceIssueLinks() {
+        if (!(this.root instanceof HTMLElement)) {
+            return;
+        }
+
+        this.root.querySelectorAll('[data-player-issue-link]').forEach((link) => {
+            if (!(link instanceof HTMLAnchorElement)) {
+                return;
+            }
+
+            const fallbackUrl = new URL(link.href, window.location.href);
+
+            if (fallbackUrl.origin !== window.location.origin) {
+                return;
+            }
+
+            fallbackUrl.searchParams.delete('context');
+            fallbackUrl.searchParams.delete('position');
+            link.href = fallbackUrl.toString();
+        });
+    }
+
+    syncWorkspaceContext(transition) {
+        if (!(this.root instanceof HTMLElement)) {
+            return;
+        }
+
+        const setText = (selector, value) => {
+            const target = this.root.querySelector(selector);
+
+            if (target instanceof HTMLElement && typeof value === 'string' && value !== '') {
+                target.textContent = value;
+            }
+        };
+
+        setText('[data-player-context-season]', transition.labels?.season);
+        setText('[data-player-context-episode]', transition.labels?.episode);
+        setText('[data-player-context-translation]', transition.labels?.translation);
+        setText('[data-player-context-quality]', transition.labels?.quality);
+        setText('[data-player-context-subtitles]', transition.labels?.subtitles);
+        setText(
+            '[data-player-current-episode]',
+            [transition.labels?.season, transition.labels?.episode].filter(Boolean).join(' · '),
+        );
+        this.syncWorkspaceOptions(transition);
+        this.syncWorkspaceIssueLinks();
+
+        this.root.querySelectorAll('[data-player-transition-media]').forEach((option) => {
+            const active = Number(option.getAttribute('data-player-transition-media')) === this.mediaId;
+
+            if (active) {
+                option.setAttribute('aria-current', 'true');
+            } else {
+                option.removeAttribute('aria-current');
+            }
         });
     }
 
@@ -893,6 +1119,7 @@ class CatalogPlayerSession {
         this.applyMediaSessionMetadata(transition.mediaSession);
         this.refreshMediaSessionNavigation();
         this.menu?.updateCurrent(transition);
+        this.syncWorkspaceContext(transition);
 
         void this.dispatchPlayerRequest('catalog-player-transition-commit', {
             generation,
@@ -1407,10 +1634,25 @@ class CatalogPlayerSession {
             if (episodeId !== null) {
                 event.preventDefault();
                 event.stopImmediatePropagation();
+                transition.closest('details')?.removeAttribute('open');
                 void this.requestPlayerTransition(episodeId, mediaId);
 
                 return;
             }
+        }
+
+        if (
+            mediaOption instanceof HTMLAnchorElement
+            && mediaOption.getAttribute('aria-current') === 'true'
+            && event.button === 0
+            && !event.altKey
+            && !event.ctrlKey
+            && !event.metaKey
+            && !event.shiftKey
+        ) {
+            event.preventDefault();
+
+            return;
         }
 
         if (mediaOption instanceof HTMLAnchorElement && mediaOption.getAttribute('aria-current') !== 'true') {
@@ -2410,13 +2652,28 @@ class CatalogPlayerSession {
     }
 
     setStatus(state, copyKey, canRetry = false) {
-        if (this.destroyed || !this.status) {
+        if (this.destroyed) {
+            return;
+        }
+
+        if (this.root instanceof HTMLElement) {
+            this.root.dataset.playerRuntimeState = state;
+        }
+
+        const failed = ['error', 'fatal', 'expired'].includes(state);
+
+        if (this.recovery instanceof HTMLElement) {
+            this.recovery.hidden = !failed;
+        }
+
+        if (!this.status) {
             return;
         }
 
         this.status.dataset.playerState = state;
         this.shell?.setAttribute('data-player-state', state);
-        this.status.hidden = false;
+        this.status.hidden = ['ready', 'playing', 'paused', 'ended'].includes(state);
+        this.status.setAttribute('role', failed ? 'alert' : 'status');
 
         const text = this.copy.runtime[copyKey] || '';
 
@@ -2428,9 +2685,9 @@ class CatalogPlayerSession {
             this.statusIcon.className = playerStatusIcons[state] || 'fa-solid fa-circle-info text-emerald-700';
         }
 
-        if (this.retryButton) {
-            this.retryButton.hidden = !canRetry;
-        }
+        this.retryButtons.forEach((button) => {
+            button.hidden = !canRetry && button.closest('[data-player-shell]') !== null;
+        });
     }
 
     retry() {

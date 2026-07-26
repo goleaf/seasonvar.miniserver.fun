@@ -677,8 +677,21 @@
     }
 
     @media (max-width: 47.999rem) {
+        .catalog-player-menu {
+            display: flex;
+            align-items: flex-end;
+            padding-block-start: max(3rem, var(--app-safe-top));
+            padding-inline-end: 0;
+            padding-block-end: 0;
+            padding-inline-start: 0;
+        }
+
         .catalog-player-menu__panel {
             inline-size: 100%;
+            max-block-size: calc(var(--app-visual-viewport-height) - max(3rem, var(--app-safe-top)));
+            margin-block-end: 0;
+            border-radius: var(--radius-panel) var(--radius-panel) 0 0;
+            padding-block-end: max(1rem, var(--app-safe-bottom));
         }
 
         .catalog-player-menu__columns {
@@ -729,6 +742,7 @@
 .catalog-player-menu__opener {
     min-block-size: 2.75rem;
     min-inline-size: 2.75rem;
+    scroll-margin-block: 5rem;
 }
 
 [data-site-header] {
@@ -912,14 +926,116 @@ dialog {
 }
 
 [data-player-shell] {
+    position: relative;
     border-color: var(--catalog-player-border);
     background: var(--catalog-player-fullscreen);
 }
 
+[data-player-loading-skeleton] {
+    display: none;
+    pointer-events: none;
+}
+
+[data-player-shell][data-player-state='loading'] [data-player-loading-skeleton],
+[data-player-shell][data-player-state='buffering'] [data-player-loading-skeleton],
+[data-player-shell][data-player-state='retrying'] [data-player-loading-skeleton] {
+    display: grid;
+}
+
 [data-player-shell] [data-player-status] {
+    position: relative;
+    z-index: 20;
     border-block-end: 1px solid var(--catalog-player-border);
     background: var(--catalog-player-surface);
     color: var(--catalog-player-text);
+}
+
+[data-player-recovery][hidden] {
+    display: none;
+}
+
+[data-player-context-empty] > summary {
+    cursor: default;
+    pointer-events: none;
+}
+
+body.player-theatre-active {
+    background: var(--color-slate-950);
+}
+
+body.player-theatre-active [data-title-detail-sidebar] {
+    display: none;
+}
+
+body.player-theatre-active [data-title-detail-layout] {
+    display: block;
+}
+
+body.player-theatre-active [data-title-detail-primary] > :not([data-player-workspace-region]) {
+    display: none;
+}
+
+body.player-theatre-active [data-player-workspace-region] {
+    width: 100vw;
+    margin-inline: calc(50% - 50vw);
+    background: var(--color-slate-950);
+    padding: clamp(0.75rem, 2vw, 2rem) max(0.75rem, calc((100vw - 96rem) / 2));
+    color: var(--color-slate-100);
+}
+
+body.player-theatre-active [data-player-workspace] > [data-ui-panel]:first-child {
+    border-color: var(--color-slate-700);
+    background: var(--color-slate-900);
+}
+
+body.player-theatre-active [data-player-workspace] > [data-ui-panel]:first-child > :where(div:first-child) {
+    border-color: var(--color-slate-700);
+    background: var(--color-slate-900);
+}
+
+body.player-theatre-active [data-player-workspace] > [data-ui-panel]:first-child :where(h2, h3, [data-player-current-episode]) {
+    color: var(--color-slate-100);
+}
+
+body.player-theatre-active [data-player-workspace] > [data-ui-panel]:first-child [data-player-context-bar] {
+    border-color: var(--color-slate-700);
+    background: var(--color-slate-800);
+}
+
+body.player-theatre-active [data-player-workspace] > [data-ui-panel]:first-child [data-player-context-bar] > div > div:first-child {
+    color: var(--color-slate-200);
+}
+
+body.player-theatre-active [data-player-theatre-secondary] {
+    display: none;
+}
+
+@media (max-width: 47.999rem) {
+    [data-player-context-control][open]::before {
+        position: fixed;
+        z-index: 39;
+        inset: 0;
+        background: rgb(2 6 23 / 0.72);
+        content: '';
+    }
+
+    [data-player-context-control][open] > div {
+        position: fixed;
+        z-index: 40;
+        inset-inline: 0;
+        inset-block-end: 0;
+        width: 100%;
+        max-width: none;
+        max-height: min(70vh, calc(var(--app-visual-viewport-height) - 3rem));
+        margin: 0;
+        overflow-y: auto;
+        border-radius: var(--radius-panel) var(--radius-panel) 0 0;
+        padding: 1rem max(1rem, var(--app-safe-right)) max(1rem, var(--app-safe-bottom)) max(1rem, var(--app-safe-left));
+    }
+
+    body.player-theatre-active [data-player-workspace-region] {
+        padding-inline: max(0.5rem, var(--app-safe-left), var(--app-safe-right));
+    }
 }
 
 [data-player-shell] [data-player-retry] {

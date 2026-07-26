@@ -17,11 +17,11 @@ final readonly class PlaybackTransitionData
      *     format: string,
      *     query: array<string, string>
      * }|null  $selection
-     * @param  array{title: string, season: string, episode: string, media: string}|null  $labels
-     * @param  list<array{mediaId: int, label: string, detail: string|null, active: bool}>|null  $translations
+     * @param  array{title: string, season: string, episode: string, media: string, translation: string, quality: string, subtitles: string}|null  $labels
+     * @param  list<array{mediaId: int, label: string, detail: string|null, active: bool, variant: string, quality: string, format: string, hasSubtitles: bool, subtitleLanguage: string|null, subtitles: string, query: array<string, string>}>|null  $translations
      * @param  array{
-     *     previous: array{id: int, label: string}|null,
-     *     next: array{id: int, label: string}|null
+     *     previous: array{id: int, label: string, title: string|null}|null,
+     *     next: array{id: int, label: string, title: string|null}|null
      * }|null  $navigation
      * @param  array{title: string, artist: string, album: string, artwork: string|null}|null  $mediaSession
      * @param  array{enabled: bool, token: string, sequence: int}|null  $progress
@@ -51,11 +51,11 @@ final readonly class PlaybackTransitionData
      *     format: string,
      *     query: array<string, string>
      * }  $selection
-     * @param  array{title: string, season: string, episode: string, media: string}  $labels
-     * @param  list<array{mediaId: int, label: string, detail: string|null, active: bool}>  $translations
+     * @param  array{title: string, season: string, episode: string, media: string, translation: string, quality: string, subtitles: string}  $labels
+     * @param  list<array{mediaId: int, label: string, detail: string|null, active: bool, variant: string, quality: string, format: string, hasSubtitles: bool, subtitleLanguage: string|null, subtitles: string, query: array<string, string>}>  $translations
      * @param  array{
-     *     previous: array{id: int, label: string}|null,
-     *     next: array{id: int, label: string}|null
+     *     previous: array{id: int, label: string, title: string|null}|null,
+     *     next: array{id: int, label: string, title: string|null}|null
      * }  $navigation
      * @param  array{title: string, artist: string, album: string, artwork: string|null}  $mediaSession
      * @param  array{enabled: bool, token: string, sequence: int}  $progress
@@ -112,11 +112,11 @@ final readonly class PlaybackTransitionData
      *         format: string,
      *         query: array<string, string>
      *     },
-     *     labels: array{title: string, season: string, episode: string, media: string},
-     *     translations: list<array{mediaId: int, label: string, detail: string|null, active: bool}>,
+     *     labels: array{title: string, season: string, episode: string, media: string, translation: string, quality: string, subtitles: string},
+     *     translations: list<array{mediaId: int, label: string, detail: string|null, active: bool, variant: string, quality: string, format: string, hasSubtitles: bool, subtitleLanguage: string|null, subtitles: string, query: array<string, string>}>,
      *     navigation: array{
-     *         previous: array{id: int, label: string}|null,
-     *         next: array{id: int, label: string}|null
+     *         previous: array{id: int, label: string, title: string|null}|null,
+     *         next: array{id: int, label: string, title: string|null}|null
      *     },
      *     mediaSession: array{title: string, artist: string, album: string, artwork: string|null},
      *     progress: array{enabled: bool, token: string, sequence: int},

@@ -494,11 +494,14 @@ export class CatalogPlayerMenu {
         }[this.activeLevel];
     }
 
-    open() {
+    open(initialLevel = 'seasons') {
         if (this.destroyed || this.isOpen()) {
             return;
         }
 
+        const level = initialLevel === 'translations'
+            ? 'translations'
+            : (initialLevel === 'episodes' ? 'episodes' : 'seasons');
         this.lastOpener = document.activeElement instanceof HTMLElement
             ? document.activeElement
             : this.opener;
@@ -517,10 +520,14 @@ export class CatalogPlayerMenu {
         }
 
         this.opener.setAttribute('aria-expanded', 'true');
-        this.showLevel('seasons');
+        this.showLevel(level);
         this.closeButton.focus();
 
-        if (positiveInteger(this.current.seasonId) !== null && this.episodes.length === 0) {
+        if (
+            level !== 'translations'
+            && positiveInteger(this.current.seasonId) !== null
+            && this.episodes.length === 0
+        ) {
             void this.chooseSeason(
                 this.seasons.find((season) => Number(season.id) === Number(this.current.seasonId))
                 || { id: this.current.seasonId },
