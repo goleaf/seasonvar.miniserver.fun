@@ -11612,7 +11612,7 @@ Detailed implementation plan:
 
 ## Task 93 — глобальные предпочтения переводов и субтитров
 
-Статус: `verification_completed_delivery_in_progress`.
+Статус: `implementation_verified_commit_complete_push_unresolved_authentication`.
 
 Дата начала: 26.07.2026.
 
@@ -11717,7 +11717,7 @@ Discovery, меняющее этот вывод, немедленно обнов
 | Docs/README/CHANGELOG | `completed` | Canonical owners, docs map, visitor sections and dated Russian entry updated |
 | Focused/full/static/build checks | `completed_with_unrelated_failures` | Related suite 52/367 green; Pint/PHPStan/scoped Rector/Composer/routes/build/browser green; full suite retains foreign session/importer failures |
 | Final requirement/legacy/secret audit | `completed` | Fresh canonical reread; isolated index has no foreign path, secret, debug, TODO or duplicate implementation |
-| Commit/push main | `pending` | Exact isolated commit and ordinary push |
+| Commit/push main | `completed_with_unresolved_push` | Exact Task 93 commit `f97339a1a9493d796afef8c038879f239c949a39` создан в `main`; `GIT_TERMINAL_PROMPT=0 git push origin main` отклонён до передачи данных: `could not read Username for 'https://github.com': terminal prompts disabled` |
 
 ### Execution order
 
@@ -11737,8 +11737,11 @@ Discovery, меняющее этот вывод, немедленно обнов
 14. `[completed_with_unrelated_failures]` Full/static/docs/build/browser verification; all Task 93 checks green, foreign global failures recorded.
 15. `[completed]` Canonical docs, README, Russian CHANGELOG and final matrix.
 16. `[completed]` Exact diff/secret/debug/shared-tree audit.
-17. `[pending]` Exact Task 93 commit on `main`.
-18. `[pending]` Ordinary configured push; external failure recorded honestly.
+17. `[completed]` Exact Task 93 commit
+    `f97339a1a9493d796afef8c038879f239c949a39` создан в `main`.
+18. `[completed_unresolved_authentication]` Ordinary configured non-force
+    push отклонён до передачи данных из-за отсутствующей GitHub HTTPS
+    аутентификации; remote, history и force-настройки не изменялись.
 
 ---
 ## Task 94 — новая персонализированная главная
