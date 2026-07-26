@@ -11114,7 +11114,7 @@ derived backfill выполняется bounded command/schedule, не migration
 
 Дата начала: 26.07.2026.
 
-Статус: `delivery_in_progress`.
+Статус: `completed_with_unresolved_push_authentication`.
 
 Design:
 [`2026-07-26-portal-header-global-search-design.md`](../superpowers/specs/2026-07-26-portal-header-global-search-design.md).
@@ -11182,7 +11182,7 @@ request CTA при нулевом результате.
 | Static/build/browser QA | `completed` | Exact Pint/PHPStan/Rector/build plus 18/18 Playwright; split broad suites classified |
 | Docs/README/CHANGELOG | `completed` | Canonical/themed/visitor/changelog owners updated |
 | Final reread/legacy/debug/secret audit | `completed` | Canonical reread and stale two-row/debug/selector scan completed |
-| Exact commit/push in `main` | `pending` | External failure honest |
+| Exact commit/push in `main` | `completed_with_unresolved_push` | Hook-enabled commit `d36b6a6`; `GIT_TERMINAL_PROMPT=0 git push origin main` failed with code 128 before transfer because GitHub HTTPS credentials are unavailable |
 
 ### Living execution order
 
@@ -11200,6 +11200,7 @@ request CTA при нулевом результате.
     foreign shared-tree failures and monolithic-process limits documented.
 11. `[completed]` Managed Playwright matrix and manual screenshot inspection.
 12. `[completed]` Final docs/README/CHANGELOG/compliance/legacy audit.
-13. `[pending]` Exact hook-enabled Task 88 commit in `main`.
-14. `[pending]` Normal non-force configured push; external failure remains
-    `unresolved`.
+13. `[completed]` Exact hook-enabled Task 88 commit `d36b6a6` in `main`.
+14. `[completed_unresolved_authentication]` Normal non-force configured push
+    failed with code 128 before transfer; force/remote/history were not
+    changed.

@@ -446,7 +446,7 @@ Documentation:
 
 ## Этап 10 — commit and push
 
-### 10.1 `[pending] [critical]` Exact pre-commit review
+### 10.1 `[completed] [critical]` Exact pre-commit review
 
 - Что: branch/status/remotes, unstaged/staged/untracked, diff/stat,
   secret/debug/mass-format/unrelated checks and cached diff.
@@ -457,7 +457,7 @@ Documentation:
 - Проверка: alternate index from current HEAD and path/hunk-limited Task 88
   content; never `git add .`.
 
-### 10.2 `[pending] [critical]` Commit
+### 10.2 `[completed] [critical]` Commit
 
 - Что: create one logical implementation/docs commit unless evidence must be
   split for exact isolation.
@@ -472,7 +472,7 @@ Planned message:
 
 `feat: redesign portal header and global search`
 
-### 10.3 `[pending] [critical]` Push
+### 10.3 `[completed_unresolved_authentication] [critical]` Push
 
 - Что: run normal non-force push to configured current `main`.
 - Почему: explicit user/project delivery requirement.
@@ -503,8 +503,8 @@ Planned message:
 | RU/EN translations | `completed` | Translation parity: 3 tests, 76 989 assertions |
 | Accessibility/responsive/browser | `completed` | 18 focused header/auth Playwright cases across desktop/mobile/tablet plus manual PNG review |
 | Documentation/README/CHANGELOG | `completed` | Canonical owners, themed docs and visitor/product history updated |
-| Final legacy/secret/diff audit | `completed` | Old two-row selectors/docs, debug sinks and task files scanned; exact Git review continues in 10.1 |
-| Commit/push `main` | `pending` | Stage 10 |
+| Final legacy/secret/diff audit | `completed` | Old two-row selectors/docs, debug sinks and exact 45-file staged scope scanned |
+| Commit/push `main` | `completed_with_unresolved_push` | Commit `d36b6a6`; normal `GIT_TERMINAL_PROMPT=0 git push origin main` failed with code 128 before transfer because GitHub HTTPS credentials are unavailable |
 
 ## Verification evidence
 
@@ -537,3 +537,9 @@ Planned message:
 - SQLite `EXPLAIN`: existing covering
   `sqlite_autoindex_catalog_title_country_1` plus country integer PK; no
   migration/index.
+- Exact hook-enabled implementation/docs commit:
+  `d36b6a6` (`feat: redesign portal header and global search`), 45 files.
+- Normal non-force `GIT_TERMINAL_PROMPT=0 git push origin main` reached the
+  configured GitHub HTTPS remote and failed before transfer with code 128:
+  `fatal: could not read Username for 'https://github.com': terminal prompts disabled`.
+  Force push, remote changes and history rewriting were not performed.
