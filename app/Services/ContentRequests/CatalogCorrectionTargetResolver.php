@@ -68,7 +68,7 @@ final readonly class CatalogCorrectionTargetResolver
     public function assertInput(ContentRequestInput $input): void
     {
         if ($input->correctionTargetKey === null) {
-            return;
+            throw new ContentRequestActionException('requests.errors.invalid_target');
         }
 
         $parsed = $this->keys->parse($input->correctionTargetKey);

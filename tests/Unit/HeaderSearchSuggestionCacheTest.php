@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace Tests\Unit;
 
 use App\Services\Catalog\Search\HeaderSearchSuggestionCache;
+use App\Support\Cache\CacheDomain;
+use App\Support\Cache\CacheTtlPolicy;
+use App\Support\Cache\TieredCache;
 use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
 
@@ -62,12 +65,41 @@ final class HeaderSearchSuggestionCacheTest extends TestCase
         $this->assertSame(['group' => 'portal'], $portal);
     }
 
-    public function test_header_payload_uses_format_version_two(): void
+    public function test_header_payload_uses_format_version_three(): void
     {
         $format = (new \ReflectionClass(HeaderSearchSuggestionCache::class))
             ->getReflectionConstant('FORMAT_VERSION');
 
         $this->assertNotFalse($format);
-        $this->assertSame(2, $format->getValue());
+        $this->assertSame(3, $format->getValue());
+    }
+
+    public function test_header_payload_does_not_reuse_a_pre_admin_boundary_cache_entry(): void
+    {
+        app()->setLocale('ru');
+        $query = 'исправление';
+        $scope = 'header_portal';
+        $legacy = [['type' => 'content_request', 'label' => 'Старое публичное исправление']];
+        app(TieredCache::class)->remember(
+            CacheDomain::SearchSuggestions,
+            'header-autocomplete',
+            [
+                'format' => 2,
+                'locale' => 'ru',
+                'audience' => 'public',
+                'scope' => $scope,
+                'query' => hash('sha256', $query),
+            ],
+            app(CacheTtlPolicy::class)->for(CacheDomain::SearchSuggestions),
+            fn (): array => $legacy,
+        );
+
+        $rebuilt = app(HeaderSearchSuggestionCache::class)->remember(
+            $query,
+            fn (): array => [['type' => 'section', 'label' => 'Безопасный результат']],
+            $scope,
+        );
+
+        $this->assertSame([['type' => 'section', 'label' => 'Безопасный результат']], $rebuilt);
     }
 }

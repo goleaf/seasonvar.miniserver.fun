@@ -14,6 +14,11 @@ use Symfony\Component\HttpFoundation\Response;
 
 final class PublicHttpCacheHeaders
 {
+    private const RESPONSE_CONTRACTS = [
+        'api' => 2,
+        'documents' => 2,
+    ];
+
     public function __construct(private readonly CacheVersionRegistry $versions) {}
 
     public function handle(Request $request, Closure $next, string $profile = 'api'): Response
@@ -54,6 +59,7 @@ final class PublicHttpCacheHeaders
             $response->setEtag(hash('sha256', implode('|', [
                 $domain->value,
                 (string) $this->versions->version($domain),
+                (string) (self::RESPONSE_CONTRACTS[$profile] ?? 1),
                 Str::lower($request->getSchemeAndHttpHost()),
                 $request->getRequestUri(),
                 (string) $request->headers->get('Accept'),

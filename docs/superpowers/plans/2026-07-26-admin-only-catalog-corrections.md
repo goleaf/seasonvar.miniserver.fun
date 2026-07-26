@@ -56,9 +56,14 @@
 | 48 | medium | completed | Проверить routes/docs/config/translations/stale references. | Artisan/rg | Dead contract. | Exact outputs. |
 | 49 | high | completed | Обновить docs, README visitor history и русский CHANGELOG. | Documentation | Behavior undocumented. | Doc hooks/checks. |
 | 50 | critical | completed | Перечитать requirements и закрыть matrix честно. | Requirements/matrix | False completed. | Evidence/unresolved. |
-| 51 | critical | pending | Проверить diff/status/untracked/secrets/debug/format/foreign paths. | Git/rg | Утечка/foreign commit. | Scoped diff review. |
+| 51 | critical | completed | Проверить diff/status/untracked/secrets/debug/format/foreign paths. | Git/rg | Утечка/foreign commit. | 20 declared paths; debug/secret/diff checks passed. |
 | 52 | critical | pending | Изолированный exact index, updater, manifest, approve/verify snapshot. | Lease/hooks | Dirty-tree contamination. | Path/hash equality. |
-| 53 | critical | pending | Commit логическим `feat` commit в `main`. | Git | Mixed/incomplete commit. | HEAD/cached diff. |
-| 54 | high | pending | Read-only senior review; исправить Critical/Important. | Reviewer skill | Boundary regression. | Report + reverify. |
+| 53 | critical | pending | Commit логическими task/restoration и evidence commit в `main`. | Git | Mixed/incomplete commit. | HEAD/cached diff. |
+| 54 | high | completed | Read-only senior review; исправить Critical/Important. | Reviewer skill | Boundary regression. | Нет Critical; две Important добавлены ниже и исправлены через TDD. |
 | 55 | critical | pending | Обычный push `main`; при отказе сохранить точную ошибку. | Remote | Auth/protection. | Push output. |
 | 56 | critical | pending | Освободить lease после evidence и push attempt. | Lease | Зависший owner. | Empty lease status. |
+| 57 | critical | completed | Потребовать server-derived `correction_target_key` для каждой административной correction-заявки. | Resolver/action/test | Unbound запись с произвольным current value. | Missing-key action regression. |
+| 58 | high | completed | Отделить legacy header suggestion payload новым format. | Search suggestion cache/test | Старый публичный correction остаётся в Redis/Memcached. | Pre-change entry не читается; rebuild возвращает новый payload. |
+| 59 | high | completed | Добавить response contracts к API/sitemap `ETag`. | HTTP cache middleware/test | Старый validator отвечает `304`. | Legacy API/document `ETag` получает `200` и новый validator. |
+| 60 | high | completed | Повторить focused security/cache matrix после исправлений ревью. | PHPUnit | Непредвиденная regression. | 33/33, 135 assertions. |
+| 61 | critical | completed | Восстановить удалённые смешанным commit версионируемые hooks/CI без отката foreign PWA history. | `.githooks`, workflow, managed docs | Нельзя доказать безопасный commit/push. | Exact baseline SHA-256, `bash -n`, 120-test policy matrix. |

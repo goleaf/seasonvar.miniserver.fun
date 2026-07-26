@@ -6,6 +6,8 @@ namespace Tests\Feature;
 
 use App\Models\CatalogTitle;
 use App\Models\User;
+use App\Support\Cache\CacheDomain;
+use App\Support\Cache\CacheVersionRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -40,6 +42,18 @@ final class PublicHttpCacheHeadersTest extends TestCase
         $this->assertSame('', $response->getContent());
     }
 
+    public function test_pre_admin_boundary_api_etag_cannot_revalidate_the_current_response(): void
+    {
+        CatalogTitle::factory()->create();
+        $path = route('api.titles.index', absolute: false);
+        $legacyEtag = $this->legacyEtag(CacheDomain::Api, $path, 'application/json');
+
+        $this->withHeader('If-None-Match', $legacyEtag)
+            ->getJson($path)
+            ->assertOk()
+            ->assertHeader('ETag');
+    }
+
     public function test_public_api_head_response_uses_the_same_entity_tag_as_get(): void
     {
         CatalogTitle::factory()->create();
@@ -70,6 +84,21 @@ final class PublicHttpCacheHeadersTest extends TestCase
             ->assertHeader('Last-Modified');
         $this->assertStringContainsString('s-maxage=1800', (string) $response->headers->get('Cache-Control'));
         $this->assertFalse($response->headers->has('Set-Cookie'));
+    }
+
+    public function test_pre_admin_boundary_sitemap_etag_cannot_revalidate_the_current_document(): void
+    {
+        $path = route('sitemap.index', absolute: false);
+        $legacyEtag = $this->legacyEtag(
+            CacheDomain::Sitemap,
+            $path,
+            'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        );
+
+        $this->withHeader('If-None-Match', $legacyEtag)
+            ->get($path)
+            ->assertOk()
+            ->assertHeader('ETag');
     }
 
     public function test_public_response_fails_closed_to_no_store_when_version_registry_is_unavailable(): void
@@ -117,5 +146,16 @@ final class PublicHttpCacheHeadersTest extends TestCase
         $this->assertStringContainsString('no-store', (string) $authorized->headers->get('Cache-Control'));
         $this->assertFalse($authorized->headers->has('ETag'));
         $this->assertFalse($authorized->headers->has('Last-Modified'));
+    }
+
+    private function legacyEtag(CacheDomain $domain, string $path, string $accept): string
+    {
+        return '"'.hash('sha256', implode('|', [
+            $domain->value,
+            (string) app(CacheVersionRegistry::class)->version($domain),
+            strtolower(rtrim((string) config('app.url'), '/')),
+            $path,
+            $accept,
+        ])).'"';
     }
 }

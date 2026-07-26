@@ -107,6 +107,12 @@ Primary cross-store invalidation использует versioned namespace, по�
 
 HTTP API policy: browser `max-age=60`, shared `s-maxage=300`, SWR 60 s, stale-if-error 600 s. Public documents: 300/1800/300/3600 s. Anonymous public v1 GET/HEAD получает validators и может ответить `304`; любой `Authorization` header до и после optional Sanctum resolution принудительно даёт `private, no-store` без `ETag`/`Last-Modified`. Ошибки, redirects, private и cookie-bearing responses middleware не кэширует.
 
+После закрытия публичных catalog corrections автодополнение шапки использует
+format `3`, а профили `api` и `documents` — response contract `2` внутри
+`ETag`. Это отделяет ранее сохранённые correction payload/URL от нового
+публичного ответа без store-wide flush; тесты сначала создают entry или
+validator прежнего контракта и требуют authoritative rebuild/`200`.
+
 ## Инвентарь доменов
 
 | Данные | Реализация | Invalidation/failure | Security |

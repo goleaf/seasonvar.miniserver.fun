@@ -1,8 +1,10 @@
 # Task 105 — evidence удаления публичных исправлений каталога
 
 Дата проверки: 26.07.2026. Ветка: `main`. Baseline перед Task 105:
-`6d7d30ed`. Workspace содержит отдельный уже staged PWA-scope; он не является
-частью Task 105 и должен быть исключён exact alternate index.
+`6d7d30ed`. Во время работы внешний процесс создал и отправил смешанный commit
+`2ed775b0`, затем task hardening commit `1807d92e`; история PWA не
+переписывалась. Смешанный commit также удалил tracked hooks/CI, поэтому они
+восстанавливаются exact follow-up из baseline.
 
 ## Проанализированный contract
 
@@ -38,7 +40,8 @@
   fail closed по type даже для historical `is_public = 1`.
 - Admin queue/detail и approved/rejected moderation сохраняются. Resolver
   заново проверяет title/relation/episode ancestry и server-derived current
-  value; poster URL не попадает в request context.
+  value; отсутствующий `correction_target_key` теперь всегда отклоняется до
+  записи, а poster URL не попадает в request context.
 - `CatalogTitlePageBuilder`, `CatalogTitlePlayer` и обе public Blade views
   больше не готовят и не выводят correction URLs/controls.
   `CatalogCorrectionLinkBuilder` и
@@ -47,8 +50,10 @@
 - Public help allowlist исключает correction types, stored legacy subtype
   fail closed, demo rows private и notification sync их исключает.
 - `PublicPageCachePolicy` использует title `response_contract = 3` и requests
-  `response_contract = 2`, поэтому старый visitor HTML недостижим без
-  store-wide flush.
+  `response_contract = 2`; `HeaderSearchSuggestionCache` использует format
+  `3`, а API/document validators — HTTP response contract `2`. Поэтому
+  старые visitor HTML, suggestion payload и `ETag` недостижимы без store-wide
+  flush.
 
 ## База данных и rollback
 
@@ -88,7 +93,8 @@ write amplification, нет; exact correction identity уже используе
   submission boundary; revoked permission повторно проверяется на idempotent
   lookup.
 - IDOR/authorization: query string и Livewire state не являются правом;
-  title/target ancestry и type проверяются до resolver и в action.
+  title/target ancestry, type, обязательный stable target key и
+  server-derived current value проверяются до записи.
 - Privacy: public route/query/cache/SEO/sitemap/My Requests/notifications
   блокируют административный type независимо от mutable public flag.
 - Mass assignment: action собирает явный normalized DTO; requester, status,
@@ -106,15 +112,23 @@ write amplification, нет; exact correction identity уже используе
 | Expanded focused/cache/help/demo | 22/22, 667 assertions |
 | Related + translation parity | 59/59, 81 414 assertions |
 | Final security/plan focused matrix | 43/43, 729 assertions |
+| Reviewer RED: target/search cache | 33 tests: 30 passed, 3 expected failures |
+| Reviewer RED: API/sitemap legacy validators | 2/2 expected `304` вместо требуемого `200` |
+| Reviewer GREEN: target/search/API/sitemap | 33/33, 135 assertions |
+| Final related/security/cache/hooks/docs matrix | 120/120, 621 assertions |
 | Scoped `Pint --format agent` | passed |
 | `COMPOSER_ALLOW_SUPERUSER=1 composer analyse -- --no-progress` | passed, PHPStan errors `0` |
+| `composer validate --strict --no-check-publish` | valid; non-interactive root warning, exit `0` |
 | `COMPOSER_ALLOW_SUPERUSER=1 composer rector:check` | Task 105 files clean; global dry-run exit `2` only из-за foreign `void → never` в двух collection files |
-| `npm run build` | passed; Vite 8.1.4, 28 modules; player release ready, 29 sources/19 assets |
+| Final `npm run build` | passed; Vite 8.1.4, 28 modules; player release ready, 29 sources/19 assets |
 | Playwright correction spec | после замены хрупкого текста `403` на accessible H1: 3/3 passed — Desktop, Mobile, Tablet Chromium |
 | Migration fresh/down/forward | passed; versions/escalations/aliases/priority проверены выше |
 | `php artisan route:list --name=requests --except-vendor` | 10 existing request/admin/localized/sitemap routes |
 | RU/EN request catalogs | `php -l` passed; parity включена в related suite |
-| `php artisan project:docs-refresh --check` | exit `1`: требует foreign staged PWA update `docs/MAINTENANCE_LOG.md`; Task 105 его не переписывает |
+| `php artisan project:docs-refresh --check` | passed после штатного обновления managed `docs/MAINTENANCE_LOG.md` |
+| README/CHANGELOG/current-plan policies + `git diff --check` | passed |
+| Restored hooks `bash -n` + baseline SHA-256 | passed; все пять файлов побайтно совпадают с `6d7d30ed` |
+| `composer git:doctor -- --remote` | hooks/main/origin/snapshot зелёные; единственный failure — у HTTPS remote не обнаружен credential helper |
 
 Default full suite завершился раньше assertion summary из-за XML-enforced
 `memory_limit=256M` в foreign `DemoRasterAsset`. Эквивалентный временный
@@ -138,6 +152,18 @@ deploy возвращается совместимый code; historical correcti
 и `is_public` вручную не меняется. Guarded `down()` пропускает редакторски
 изменённые статьи; предпочтителен roll-forward с сохранением evidence.
 
-Git exact index, reviewer, commit и обычный push выполняются после последней
-проверки diff. Remote/auth или clean-tree отказ должен остаться
-`unresolved`, а не выдаваться за успешную доставку.
+## Senior review и Git delivery
+
+Read-only reviewer не нашёл Critical и выделил две Important проблемы:
+nullable target key и возможность повторного использования legacy
+search/API/sitemap cache. Обе воспроизведены RED-тестами и исправлены
+server-side. Остаточные generic notification rows без ссылки не раскрывают
+закрытый detail; guarded help rollback по-прежнему предполагает соблюдение
+content/revision version contract.
+
+`2ed775b0` и `1807d92e` подтверждены на `origin/main`. Exact restoration
+`.githooks/{pre-commit,pre-push,post-commit,lib/git-guard.sh}` и
+`.github/workflows/ci.yml` совпадает SHA-256 с `6d7d30ed`; final policy
+verification, index approval, follow-up commit и обычный push выполняются
+после обновления этого evidence. Remote/auth или clean-tree отказ должен
+остаться `unresolved`, а не выдаваться за успешную доставку.

@@ -411,6 +411,15 @@ final class CatalogFieldCorrectionTest extends TestCase
         $this->assertThrows(
             fn () => app(CreateContentRequest::class)->handle($administrator, $factory->from([
                 ...$base,
+                'correction_target_key' => null,
+                'correction_reason' => ContentCorrectionReason::NotRelated->value,
+                'submission_token' => (string) Str::uuid(),
+            ])),
+            ContentRequestActionException::class,
+        );
+        $this->assertThrows(
+            fn () => app(CreateContentRequest::class)->handle($administrator, $factory->from([
+                ...$base,
                 'correction_reason' => ContentCorrectionReason::NotRelated->value,
                 'current_value' => 'Подменённое значение',
                 'submission_token' => (string) Str::uuid(),
