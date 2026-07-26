@@ -41,25 +41,25 @@ SQLite 3.46.1, Laravel Eloquent/Query Builder.
 - Consumes: `CatalogTopListQuery::hasItems(CatalogTopListCategory): bool`.
 - Preserves: ordered `Collection<int, CatalogTopListItem>`.
 
-- [ ] **Step 1: Обновить query-shape regression**
+- [x] **Step 1: Обновить query-shape regression**
 
 Потребовать season-owned join с public episode subquery,
 `GROUP BY seasons.catalog_title_id`, `COUNT(*)`, отсутствие
 `COUNT(DISTINCT episodes.id)` и отдельного
 `seasons.id IN (SELECT seasons.id ...)`.
 
-- [ ] **Step 2: Добавить existence-path regression**
+- [x] **Step 2: Добавить existence-path regression**
 
 Захватить SQL `hasItems()` и потребовать `SELECT EXISTS` без
 `top_weighted_score` и weighted `ORDER BY`.
 
-- [ ] **Step 3: Добавить exact availability fixture**
+- [x] **Step 3: Добавить exact availability fixture**
 
 Проверить one-vs-many classification через несколько seasons; private,
 future, expired и soft-deleted seasons/episodes не должны менять public
 category.
 
-- [ ] **Step 4: Запустить RED**
+- [x] **Step 4: Запустить RED**
 
 ```bash
 php artisan test tests/Feature/CatalogTopListPageTest.php
@@ -67,6 +67,11 @@ php artisan test tests/Feature/CatalogTopListPageTest.php
 
 Expected: прежние semantic assertions проходят, новые SQL-shape assertions
 падают на duplicate season list/distinct и ranked `hasItems()`.
+
+Observed: exact filter запустил `3` tests и `9` assertions. Availability
+fixture прошёл, SQL-shape test упал на отсутствии flattened episode
+subquery, а sitemap probe — на отсутствии `SELECT EXISTS`. Это требуемый
+двойной RED до production edit.
 
 ### Task 2: Реализовать canonical base query и flattened aggregate
 

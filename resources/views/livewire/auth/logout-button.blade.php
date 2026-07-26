@@ -1,5 +1,6 @@
 <button
     type="button"
+    data-pwa-logout
     wire:click="logout"
     wire:loading.attr="disabled"
     wire:target="logout"

@@ -6,6 +6,7 @@ namespace App\Services\Auth;
 
 use App\Enums\AuthenticationEvent;
 use App\Models\User;
+use App\Services\Pwa\WebPushSubscriptionService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 
@@ -15,6 +16,7 @@ final class WebAuthenticationService
         private readonly AccountSettingsService $settings,
         private readonly AuthenticationAuditService $audit,
         private readonly AccountAccessResolver $accountAccess,
+        private readonly WebPushSubscriptionService $pushSubscriptions,
     ) {}
 
     public function attempt(
@@ -65,6 +67,7 @@ final class WebAuthenticationService
         $user = Auth::guard('web')->user();
 
         if ($user instanceof User) {
+            $this->pushSubscriptions->revokeCurrent($user);
             $this->audit->record(AuthenticationEvent::LoggedOut, $user, $user->email);
         }
 

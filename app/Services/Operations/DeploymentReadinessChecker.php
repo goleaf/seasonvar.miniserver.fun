@@ -31,6 +31,7 @@ final class DeploymentReadinessChecker
         private readonly CatalogSearchIndexer $searchIndexer,
         private readonly FailedJobSummaryBuilder $failedJobs,
         private readonly SeasonvarImportProcessInspector $processInspector,
+        private readonly PwaProductionReadiness $pwa,
     ) {}
 
     /** @return list<DeploymentCheck> */
@@ -45,6 +46,7 @@ final class DeploymentReadinessChecker
             $this->timed(fn (): DeploymentCheck => $this->requiredIndexesCheck()),
             $this->timed(fn (): DeploymentCheck => $this->searchIndexCheck()),
             $this->timed(fn (): DeploymentCheck => $this->cacheTransportsCheck()),
+            $this->timed(fn (): DeploymentCheck => $this->pwa->check()),
             $this->timed(fn (): DeploymentCheck => $this->failedJobsCheck()),
             $this->timed(fn (): DeploymentCheck => $this->importerProcessCheck()),
         ];

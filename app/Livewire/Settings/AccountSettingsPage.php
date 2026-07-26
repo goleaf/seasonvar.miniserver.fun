@@ -29,6 +29,7 @@ use App\Services\HelpCenter\HelpContextualLinkService;
 use App\Services\Premium\PremiumAccountQuery;
 use App\Services\Premium\PremiumPaymentGatewayRegistry;
 use App\Services\Premium\PremiumPromotionService;
+use App\Services\Pwa\WebPushSubscriptionService;
 use App\Services\ReleaseCalendar\ReleaseCalendarSchema;
 use App\Services\Reviews\ReviewSchema;
 use App\ValueObjects\AccountTimezone;
@@ -518,6 +519,7 @@ final class AccountSettingsPage extends Component
         PremiumAccountQuery $premium,
         PremiumPaymentGatewayRegistry $premiumGateways,
         HelpContextualLinkService $helpLinks,
+        WebPushSubscriptionService $pushSubscriptions,
     ): View {
         $active = AccountSettingsSection::from($this->section);
         $navigation = collect(AccountSettingsSection::cases())->map(fn (AccountSettingsSection $section): array => [
@@ -584,6 +586,7 @@ final class AccountSettingsPage extends Component
             'reviewNotificationsAvailable' => $reviewSchema->notificationsAvailable(),
             'contentRequestNotificationsAvailable' => $contentRequestSchema->ready(),
             'releaseCalendarNotificationsAvailable' => $releaseCalendarSchema->ready(),
+            'pushNotificationsAvailable' => $pushSubscriptions->configured(),
             'databaseSessionsAvailable' => config('session.driver') === 'database',
             'anonymousStorageKey' => (string) config('account-settings.anonymous_storage_key'),
             'premiumOverview' => $premiumOverview,

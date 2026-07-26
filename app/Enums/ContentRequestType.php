@@ -31,4 +31,33 @@ enum ContentRequestType: string
     {
         return $this !== self::Serial && $this !== self::Other;
     }
+
+    public function isAdministrativeOnly(): bool
+    {
+        return in_array($this, [
+            self::MetadataCorrection,
+            self::EpisodeListCorrection,
+        ], true);
+    }
+
+    /** @return list<self> */
+    public static function publicCases(): array
+    {
+        return array_values(array_filter(
+            self::cases(),
+            static fn (self $type): bool => ! $type->isAdministrativeOnly(),
+        ));
+    }
+
+    /** @return list<string> */
+    public static function administrativeOnlyValues(): array
+    {
+        return array_map(
+            static fn (self $type): string => $type->value,
+            array_values(array_filter(
+                self::cases(),
+                static fn (self $type): bool => $type->isAdministrativeOnly(),
+            )),
+        );
+    }
 }

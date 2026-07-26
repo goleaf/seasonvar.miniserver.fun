@@ -120,6 +120,14 @@ final class PublicPageCachePolicy
             $dimensions['response_contract'] = 2;
         }
 
+        if ($profile === 'title') {
+            $dimensions['response_contract'] = 3;
+        }
+
+        if ($profile === 'requests') {
+            $dimensions['response_contract'] = 2;
+        }
+
         return match ($profile) {
             'homepage' => $this->homepageParametersAreValid($parameters) && $query === []
                 ? new PublicPageCacheContext(CacheDomain::Homepage, $dimensions)
@@ -150,13 +158,16 @@ final class PublicPageCachePolicy
             return null;
         }
 
-        return $this->titleContextFor($title, $this->dimensions(
+        $dimensions = $this->dimensions(
             $canonicalOrigin,
             'titles.show',
             ['catalogTitle' => $slug],
             [],
             (string) config('cache-architecture.page_cache.canonical_locale', 'ru'),
-        ));
+        );
+        $dimensions['response_contract'] = 3;
+
+        return $this->titleContextFor($title, $dimensions);
     }
 
     /**

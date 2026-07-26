@@ -26,7 +26,14 @@
 - [ ] Premium, region, legal, advertiser ad-free exclusion и admin permission resolve server-side и fail closed.
 - [ ] Payment browser return не выдаёт entitlement; webhook route/signature/config state проверены без реального charge.
 - [ ] Private ticket/legal/profile files недоступны по public path; uploads не исполняются.
-- [ ] Admin/advertiser/private pages noindex и не попадают в service-worker cache (service worker сейчас отсутствует).
+- [ ] Admin/advertiser/private страницы остаются noindex и отсутствуют в
+  service-worker Cache Storage; отдельно проверить отсутствие Livewire/API,
+  playback/download, HLS/video/audio и push subscription responses.
+- [ ] Manifest, local icons, worker scope/version, offline shell, owner logout
+  cleanup и previous-worker rollback проверены по
+  [`service-worker-deployment.md`](service-worker-deployment.md).
+- [ ] Web Push включён только при успешных HTTPS/VAPID/schema/async-queue
+  readiness checks; subscription provider получает payloadless POST.
 - [ ] Public canonical/`hreflang`/sitemap/robots/structured data не содержат localhost/staging/private host/source URL.
 
 ## Operations

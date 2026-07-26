@@ -24,7 +24,11 @@
 - Installed application: Laravel `13.20.0`, Livewire `4.3.3`, Tailwind CSS `4.3.2`, Vite `8.1.4`; Composer project constraint remains PHP `^8.3`, while this host runs PHP 8.5.
 - Runtime state is `APP_ENV=production`, `APP_DEBUG=false`, HTTPS `APP_URL`, configured `APP_KEY`, SQLite database, Redis cache/session/queue/locks, local private uploads and Laravel daily warning logs. Значения и private paths не выводились.
 - Redis реально reachable, но владельца процесса нельзя выводить из отсутствующего `redis.service`: restart выполняется только через verified panel/system owner. Memcached extension/config есть, однако listener/service не обнаружен и health state — `unavailable`; correctness использует documented fallback.
-- Mail использует `log`, active payment/OAuth/object-storage/monitoring providers не подтверждены. Google reporting и HDRezka sync выключены. Service worker не установлен.
+- Mail использует `log`, active payment/OAuth/object-storage/monitoring
+  providers не подтверждены. Google reporting и HDRezka sync выключены. PWA
+  code установлен в repository; production Web Push не считается готовым без
+  отдельной проверки `PWA_PUSH_ENABLED`, VAPID, migration и asynchronous
+  queue.
 - aaPanel/nginx/PHP-FPM и systemd/cron реально используются. Активный queued import profile: 4 import workers, 8 title-refresh workers, 1 cache-warm worker; scheduler, queued dispatcher и queue monitor запускаются cron. Взаимоисключающий `seasonvar-import-forever.service` отключён.
 
 Эта проверка не подтверждает zero downtime, automatic failover, off-host backup, external alert delivery или full restore. Операционные ограничения и runbook’и: [`operations/README.md`](operations/README.md).

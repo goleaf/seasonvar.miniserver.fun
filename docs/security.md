@@ -198,7 +198,7 @@ Task 27 verified account lifecycle against every SQLite FK to `users`. Един�
 - External providers ограничены IMDb/TMDb/TVDB/Kinopoisk/Seasonvar и валидируются по provider-specific format. Source links принимают только bounded HTTP(S) без credentials, localhost/private/reserved literal IP, dangerous executable/archive/torrent/video-playlist extensions и `javascript:`/`data:`. Произвольные ссылки не fetch-ятся, поэтому DNS/redirect SSRF surface отсутствует; в importer может попасть только повторно нормализованный `https://seasonvar.ru/` URL.
 - Source links private by default. Public presenters выбирают только explicitly public evidence; moderator видит private evidence через authorized noncached request. Public DTO исключает email, requester internal ID, private notes, clarification, importer run/error, raw provider/source credentials и follower/voter identities.
 - Completion revalidates published catalog/media visibility и принадлежность исходному title/season/episode. Merge revalidates semantic dimensions, запрещает cross-requester private aggregation, не переносит restricted clarification к другому requester и делает canonical public только при наличии уже public source. Source и canonical records authorizes до redirect, поэтому UUID не обходит private visibility. Normal user не выполняет import, moderation, priority или completion. Account deletion anonymizes ownership/history actor and removes private engagement/preferences/notifications without destroying community-valued request.
-- Field-level shortcut принимает только backed-enum field и положительный target ID. Resolver заново проверяет public title scope и relation/episode ancestry, action сравнивает server-derived target key/current value/season/episode, поэтому Livewire state и query string не создают IDOR или подмену поля. Для постера сохраняется только статус наличия; raw poster/media/source URL в публичную заявку не попадает.
+- Administrative field correction принимает только backed-enum field и положительный target ID после type-aware `ContentRequestPolicy::create` с `manage-content-requests`. Resolver заново проверяет public title scope и relation/episode ancestry, action повторяет type authorization и сравнивает server-derived target key/current value/season/episode, поэтому Livewire state, query string и прямой action call не создают IDOR или подмену поля. Такие строки принудительно private; type-aware route binding, scopes, presenter, SEO и notification query блокируют legacy `is_public = 1`. Для постера сохраняется только статус наличия; raw poster/media/source URL в публичную заявку не попадает.
 - Причина тега хранится только как allowlisted enum, user prose проходит прежний `PlainText` boundary и escaped Blade. Public presenter раскрывает агрегированный vote count, но не identities голосующих, private moderator note или импортные diagnostics.
 
 ## Privacy и security рекомендаций
@@ -296,8 +296,26 @@ Google action передаёт токен только same-origin clipboard и 
   временно недоступная цель не теряется.
 - Share принимает prepared canonical public URL, разрешает только HTTP(S), передаёт public title и имеет explicit write-only clipboard fallback. Clipboard никогда не читается; private ticket/settings/progress/source URL не поддерживает share action.
 - Media Session получает только public title/episode/season/poster и authorized previous/next page URL; source URL, signed grant, user progress и entitlement не попадают в metadata. Action handlers очищаются при destroy/navigation.
-- Manifest/service worker/push subscription/backend отсутствуют. Поэтому браузер не регистрирует worker, не запрашивает install/notification permission и не держит browser cache portal responses. Будущий worker обязан использовать versioned static-asset allowlist, method/response checks и абсолютный denylist authenticated HTML/API, settings, premium/payment/invoice, ticket/attachment, history/progress, personal recommendations/calendar, protected video, signed grants/downloads; logout/account switch требует server reauthorization и удаления user-scoped client data.
-- Online download остаётся session-authenticated server-authorized bounded stream с `private, no-store`; service worker не перехватывает его. Offline-video control/license/DRM/storage и push payload отсутствуют, поэтому продукт не создаёт ложного security contract.
+- Task 100 добавляет manifest, один canonical service worker, owner-scoped
+  IndexedDB и payloadless Web Push. Worker использует versioned static
+  allowlist и абсолютный denylist authenticated HTML/API, Livewire,
+  settings, premium/payment/invoice, ticket/attachment, history/progress,
+  personal recommendations/calendar, protected media, signed grants и
+  downloads. Любой non-GET, `Authorization`, video/audio destination,
+  cross-origin request или media suffix проходит мимо cache. Logout,
+  подтверждённая потеря сессии и смена аккаунта удаляют private scope
+  предыдущего владельца; обычная временная ошибка сети его не стирает.
+- Push endpoint хранится encrypted, сравнивается по hash и проходит
+  HTTPS/host/port/DNS guard. VAPID private key остаётся только в protected
+  environment; provider получает пустой POST без текста уведомления, user ID
+  или route context. Разрешение браузера запрашивается только по явному
+  действию. `404/410` отключает subscription, а redirects, private DNS и
+  непредусмотренные hosts запрещены.
+- Online download остаётся session-authenticated server-authorized bounded
+  stream с `private, no-store`; service worker не перехватывает его.
+  Offline-video control/license/DRM/storage отсутствуют, HLS/progressive bytes
+  не кешируются, поэтому installable PWA не создаёт ложного offline-video
+  contract.
 
 ## Security и PCI boundary Premium
 

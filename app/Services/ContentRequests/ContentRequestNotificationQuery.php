@@ -13,6 +13,7 @@ use App\Services\Auth\AccountDateTimeFormatter;
 use App\Services\Auth\AccountSettingsService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Notifications\DatabaseNotification;
+use Illuminate\Support\Facades\Gate;
 
 final readonly class ContentRequestNotificationQuery
 {
@@ -23,8 +24,16 @@ final readonly class ContentRequestNotificationQuery
     {
         $paginator = $user->notifications()->where('type', 'content-request.activity')
             ->latest('created_at')->latest('id')->paginate(10, pageName: 'requestNotificationPage')->withQueryString();
-        $publicIds = $paginator->getCollection()->pluck('data.request_public_id')->filter(is_string(...))->unique()->values();
-        $requests = ContentRequest::query()->whereIn('public_id', $publicIds)->get(['id', 'public_id', 'requester_id', 'is_public', 'status', 'merged_into_id'])->keyBy('public_id');
+        $publicIds = $paginator->getCollection()
+            ->flatMap(fn (DatabaseNotification $notification): array => array_filter([
+                $notification->data['request_public_id'] ?? null,
+                $notification->data['canonical_public_id'] ?? null,
+            ], is_string(...)))
+            ->unique()
+            ->values();
+        $requests = ContentRequest::query()->whereIn('public_id', $publicIds)
+            ->get(['id', 'public_id', 'requester_id', 'type', 'is_public', 'status', 'merged_into_id'])
+            ->keyBy('public_id');
         $settings = $this->settings->resolve($user);
 
         return $paginator->through(function (DatabaseNotification $notification) use ($requests, $settings, $user): ContentRequestNotificationData {
@@ -35,9 +44,11 @@ final readonly class ContentRequestNotificationQuery
             $canonicalPublicId = is_string($data['canonical_public_id'] ?? null) ? $data['canonical_public_id'] : null;
             $url = null;
 
-            if ($canonicalPublicId !== null) {
-                $url = route('requests.show', ['contentRequest' => $canonicalPublicId]);
-            } elseif ($request instanceof ContentRequest && ($request->is_public || $request->requester_id === $user->id)) {
+            $canonical = $canonicalPublicId !== null ? $requests->get($canonicalPublicId) : null;
+
+            if ($canonical instanceof ContentRequest && Gate::forUser($user)->allows('view', $canonical)) {
+                $url = route('requests.show', $canonical);
+            } elseif ($request instanceof ContentRequest && Gate::forUser($user)->allows('view', $request)) {
                 $url = route('requests.show', $request);
             }
 

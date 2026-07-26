@@ -103,6 +103,8 @@
 - `/stats` не использует `wire:poll`: каждый публичный запрос один раз читает серверный snapshot из `CatalogStatsSnapshotCache`. Профиль production-scale SQLite показал 65,074 s прямого полного rebuild, поэтому measured policy хранит fresh snapshot 30 минут и bounded stale copy 24 часа; importer/admin invalidation и плановый warmer обновляют его после authoritative changes без постоянного цикла запросов посетителя.
 - Прямой exact rebuild `/stats` больше не повторяет одинаковые media/URL/presence counts и не обходит каждый SQLite table/index отдельным `PRAGMA`. Два исходных процесса выполнили по `1 042` SQL за `34 592,84` и `36 403,38 ms`; три независимых процесса после консолидации стабильно выполнили `142` SQL за `28 618,49`, `29 061,53` и `34 990,02 ms`. Медиана после изменения составила `29 061,53 ms`, число statement уменьшилось на `86,4%`, а representative SQL total — с `31 289,22` до медианы `25 933,88 ms`. Exact fixture подтверждает прежние public video/episode и URL filled/distinct/absolute/empty значения. Оставшийся главный cold cost — точный тройной `COUNT(DISTINCT ...)` по `licensed_media` (`8 251,07 ms` в профиле); его нельзя объявлять устранённым без отдельного materialized read model, consistency/invalidation и rollback design. Это последовательные локальные observations под текущей SQLite-нагрузкой, не p95/SLA; visitor path по-прежнему защищён существующим snapshot.
 - После независимого review каждый вызов `CatalogStatsPageBuilder::data()` явно сбрасывает build-local table/presence/URL/index/media caches: повторный `CatalogStatsSnapshotCache` rebuild после version bump не может переиспользовать значения предыдущего snapshot. Integration RED/GREEN подтверждает новые media/table/index/missing-media значения на том же service graph. Дополнительная read-only production parity дала одинаковые hashes для 21 URL-поля (`42c3a13b84059718`), 159 table counts (`90ced17c52a5461f`) и 519 index rows (`a6dddde9e8b091b1`) у прежних и consolidated форм. Один resource sample большого combined URL aggregate показал `72 868 KiB` maximum RSS против `68 968 KiB` у последовательных запросов, одинаковые `573 176` filesystem output units и elapsed `10,15` против `11,71 s`; это не нагрузочный SLA и не доказывает filesystem behavior другой production-конфигурации SQLite.
+- Следующий exact pass не добавил materialized state или широкие URL-индексы. Primary `licensed_media` aggregate теперь считает distinct для `path`/`source_url` и в том же statement доказывает построчную эквивалентность empty/filled `path` и `playback_url`; только при нулевом mismatch exact `path_distinct` переиспользуется для playback, а любое отличие автоматически выполняет прежний отдельный `COUNT(DISTINCT playback_url)`. На 880 611 строках baseline трёх URL B-tree занял `7,55 / 7,57 / 7,66 s` с `573 000` filesystem output units, adaptive форма — `4,93 / 4,95 / 5,17 s` с `295 456`; same-transaction comparison вернул все девять одинаковых scalar metrics и mismatch `0`. Три полных builder-процесса сохранили 142 SQL и заняли `23 800,77 / 24 438,56 / 25 062,60 ms`, медиана `24 438,56 ms` против прежних `29 061,53 ms` (−15,9%); SQL median — `21 151,42` против `25 933,88 ms` (−18,4%). `temp_store=MEMORY` отклонён: один query потребовал `314 796 KiB` RSS, что превышает hard limit worker `256M`. Замеры выполнялись read-only при активном importer, не являются p95/SLA; public snapshot/cache/schema/write contracts не изменились.
+- Следующий code-only pass объединил обычные presence selectors и URL selectors в один authoritative aggregate для `catalog_titles`, `seasons`, `episodes`, `licensed_media` и `source_pages`. На 880 655 media rows два отдельных read-only scan заняли `7,34–7,83 s`, объединённый — `6,02–7,18 s` при примерно одинаковых `10,3 MiB` RSS. Полный builder во всех трёх независимых процессах выполнил `137` SQL вместо `142`; maximum RSS составил `75 980 / 76 460 / 76 620 KiB`. Wall time `33 736,02 / 46 743,82 / 37 481,38 ms` намеренно не сравнивается с прежней спокойной медианой: одновременно работали четыре importer worker, cache warmer и отдельный PHPUnit-процесс, а URL/table/index hashes менялись между observations. Exact same-transaction parity на одном snapshot совпала для всех 42 presence-полей и 21 URL-поля по present/distinct/absolute; Task 75 mismatch fallback сохранился. Schema, index, write, route, translation и cache contracts не изменились; visitor path по-прежнему читает fresh/stale snapshot.
 - `/stats` не рендерит `poster_src` для poster URL, которые `CatalogStatsPosterUrlGuard` не сможет безопасно проксировать; блок последних постеров берет расширенный набор кандидатов и оставляет только реально proxyable изображения, чтобы убрать лишние браузерные 404-запросы к `stats.poster`.
 - У публичных catalog HTTP/action маршрутов limiter counters отсутствуют. Небольшие named counters mobile credential endpoints изолированы от catalog traffic; Redis по-прежнему используется для domain cache, sessions, queues и critical locks.
 
@@ -248,7 +250,7 @@ Static acceptance must inspect generated SQL и SQLite `EXPLAIN QUERY PLAN` agai
 
 - Directory/My/admin hydrate one paginated request query with selected public columns, eager title and `withCount(votes,followers)`; authenticated viewer state uses two correlated `withExists`, not per-card queries. Admin private fields load one grouped page query. Detail eager-loads target/result/history/public evidence/external IDs once; private source/clarification is authorized before selection.
 - Exact creation starts with unique indexed `active_identity_key`. Overlapping external-ID candidates use `(provider,normalized_identifier,request_id)`; probable candidates use type plus target or `(normalized_title_hash,release_year,type)` and configured limit before any PHP comparison. Fuzzy comparison never scans all rows.
-- Field-level links строятся в PHP из уже eager-loaded title taxonomies и prepared episode collection; Blade не выполняет запросов на каждый chip. Resolver делает только bounded lookup одной relation/episode, а target identity хешируется в прежний `active_identity_key`; SQLite выбирает существующий unique index, поэтому отдельный correction index не добавлен.
+- Публичная сборка title/player больше не строит field-level URL из taxonomies или episode collection, поэтому correction boundary не добавляет циклов, запросов или markup в visitor response. Admin resolver выполняет только bounded lookup одной relation/episode, а target identity хешируется в прежний `active_identity_key`. Проверка локальной SQLite-базы (`633` requests, `126` correction rows) показала выбор существующего `content_requests_public_status_idx`; bounded directory page не обосновывает новый индекс и дополнительную стоимость записей.
 - Public filters use allowlisted predicates and deterministic secondary ID; no arbitrary sort column. Vote/follow unique indexes prevent duplicate aggregates. Exact `(requester_id,updated_at,id)`, `(requester_id,status,updated_at,id)` and `(status,created_at,id)` indexes cover the default private and moderation queues without temporary sort. Public `most_voted` remains a correlated aggregate against the unique vote prefix and a shared cached page: a denormalized counter was not added because every create/merge/account-delete/account-merge path would otherwise become a second integrity boundary. Import/merge/account reconciliation uses grouped reads/upsert/updates and targeted cache versions.
 - Index DDL/rationale is in `DATA_RELATIONS.md`. Task 19 verification uses PHP lint, Pint, uncached route inspection, SQLite migration pretend, translation/view/static query inspection and build/browser smoke; the explicit task prohibition means no new or existing automated test runner is used and no invented latency/query budget is claimed.
 
@@ -306,6 +308,26 @@ Read-only cold observations on the current 32.9k-title/13 GiB SQLite database af
 Read-only candidate probe на текущих 32 938 visible titles вернул 180 rows за 605,71 мс и первые IDs `34987,34986,34985,34984,34983` с монотонным `created_at`. `EXPLAIN QUERY PLAN` выбрал `catalog_titles_publication_lookup_idx`, `licensed_media_publication_lookup_idx` и exact season/episode primary-key probes; SQLite использовал temporary B-tree для финального порядка. Это bounded сортировка небольшого visible catalogue перед `LIMIT 180`, не N+1 и не p95/SLA. Отдельный широкий индекс не добавлен: canonical visibility содержит audience/publication/deletion и временные окна, поэтому новый composite не доказал устранение сортировки, но гарантированно увеличил бы write cost активного importer. План нужно пересмотреть по измерениям при существенном росте каталога.
 
 Follow-up candidate-only profiling isolated the former full-history update aggregate: trending 5.945s, popular 3.629s, top-rated 2.787s, recently-added 1.143s and recently-updated 9.623s before hardening. The canonical updated query now reads at most 11,520 latest media events and 11,520 latest episode events with current defaults, deterministically merges them and bulk-checks canonical visibility in 500-ID chunks. A fresh repeat returned 180 ordered unique eligible IDs in 1.748s at 42 MiB peak memory (−81.8% against that candidate-only observation), retained the `content_update`/`recently_updated` codes, excluded the supplied ten IDs and produced only genre-valid rows under a genre filter. No `catalog_titles.updated_at`, catalogue-wide PHP scoring or new aggregate table is involved. OS cache and concurrent database load affect these one-off values; they remain diagnostics rather than p95/SLA.
+
+Повторный профиль 26.07.2026 нашёл уже внутри bounded path лишние два
+PHP-буфера, PHP-sort до `23 040` событий и второй SQL round trip. Каждый из
+двух прежних source windows теперь остаётся отдельным ограниченным
+подзапросом одного `UNION ALL`; общий SQL сохраняет порядок
+`event_at DESC`, `event_source ASC`, `event_id DESC`, а `cursor()` удерживает
+только первое появление положительного `catalog_title_id`. На неизменном
+между двумя отдельными диагностическими процессами snapshot event stage
+сохранил hash `c4f462cf3abd5a63` для `668` unique IDs, сократился с двух SQL
+до одного, с `84,54` до `37,94 ms` wall time и с `42` до `30 MiB` PHP peak
+memory. После начала параллельного импорта same-transaction legacy/new
+проверка уже на `669` unique events и `180` eligible titles снова совпала
+полностью; три новых candidate process сохранили один hash, выполняли два SQL
+всего (event union + eligibility) за `92,26–106,96 ms` и достигали `32 MiB`.
+Эти значения получены под меняющейся конкурентной нагрузкой и не являются
+p95/SLA. `EXPLAIN QUERY PLAN` выбрал существующие
+`licensed_media_home_feed_idx`,
+`episodes_recommendation_release_events_idx` и season primary-key probe.
+Schema, data, cache, route, source/reason, filters и access contracts не
+изменились.
 
 The next read-only profile isolated `top_rated`: the former correlated rating/vote query measured 1.412s for the truthful empty portal result, 1.807s for Kinopoisk and 1.721s for IMDb. Source-first grouped portal ratings and direct unique provider joins returned the same ordered public hashes in 57ms, 1.349s and 954ms respectively (−96.0%, −25.3% and −44.6% for these samples). Kinopoisk/IMDb select `catalog_ratings_provider_score_votes_title_idx` as a covering index; portal uses one grouped co-routine before the title/media visibility lookup. Default, genre-filtered and top-ten-exclusion sets preserved exact hashes, 180/180 uniqueness where non-empty, `rating`/`top_rated` codes and zero exclusion overlap. No stored summary, schema, cache key or ranking formula changed; values remain local diagnostics rather than p95/SLA.
 
@@ -481,20 +503,6 @@ latest/featured/video/latest-media `48/12/8/12` и `60` уникальных т�
 первый `MISS` занял `0,414 s`, четыре `HIT` — `0,093–0,109 s`. Это
 read-only diagnostic evidence текущего снимка, не p95/SLA; migration, index,
 cache key/version/TTL, route, translation, queue или dependency не добавлены.
-
-Следующий cache/import contention audit показал, что рабочий homepage уже
-даёт `MISS` за `1,32 s` и повторные `HIT` за `0,07–0,08 s`, но background
-metrics фиксировали средний `CatalogStats` rebuild `54,16 s`, homepage
-rebuild `4,14 s` и 2 722 title-detail rebuilds при активном полном импорте.
-Регулярный critical schedule поэтому больше не форсирует `--refresh`, exact
-home metrics используют 30-минутное fresh/24-часовое stale окно stats, а
-`WarmCatalogCaches` сохраняет intent и откладывает работу до terminal import.
-Title groups полного run выполняют scoped invalidation без proactive HTTP
-warm и без повторного collection-derived bump `Homepage`; terminal global
-finalizer обновляет dependent public domains один раз. Targeted visitor run
-сохраняет немедленные collection scopes и warm. Routes, cache keys, schema и
-visitor visibility не меняются. Эти значения являются read-only operational
-observations, а не p95/SLA.
 
 Следующий cache/import contention audit показал, что рабочий homepage уже
 даёт `MISS` за `1,32 s` и повторные `HIT` за `0,07–0,08 s`, но background
@@ -709,8 +717,8 @@ generation не добавлены; rollback — обычный revert PHP-ко�
 ## Консолидация hydration карточек главной
 
 Следующий follow-up 26.07.2026 проверил оставшиеся повторные запросы
-`latestTitles`, `featuredTitles` и `videoTitles`. Исходный baseline этой задачи
-использует пять canonical card relations (`genres`, `countries`,
+`latestTitles`, `featuredTitles` и `videoTitles`. Исходный baseline этой
+задачи использовал пять canonical card relations (`genres`, `countries`,
 `ageRatings`, `translations`, `tags`) и отдельный `latestSeason` для latest.
 На актуальном snapshot `webData()` выполнял по две section-группы root и
 каждой taxonomy relation, а полный `data()` — по три; одна дополнительная

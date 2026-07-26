@@ -34,7 +34,7 @@
 - Consumes: `lang/ru/*.php`, `lang/en/*.php`, `config('catalog-collections.supported_locales')`.
 - Produces: один repository-wide contract для file/key/order/type/placeholder/source-format parity.
 
-- [ ] **Step 1: Создать test class с file и semantic parity**
+- [x] **Step 1: Создать test class с file и semantic parity**
 
 Использовать `Tests\TestCase`, `Illuminate\Support\Facades\File`,
 `PhpParser\Node`, `PhpParser\NodeFinder` и `PhpParser\ParserFactory`.
@@ -85,7 +85,7 @@ array return. `flatten()` сохраняет insertion order и dot paths.
 `placeholders()` извлекает unique sorted
 `/:([A-Za-z_][A-Za-z0-9_]*)/`.
 
-- [ ] **Step 2: Добавить AST duplicate и vertical-source contract**
+- [x] **Step 2: Добавить AST duplicate и vertical-source contract**
 
 Для каждого файла parser должен найти все `Node\Expr\Array_`. Recursive
 duplicate scan принимает только literal `String_`/`Int_` keys и fail-ится,
@@ -108,7 +108,7 @@ self::assertLessThan($array->getEndLine(), max($itemLines), $label);
 
 Это доказывает перенос открывающей/закрывающей скобки и один item на строку.
 
-- [ ] **Step 3: Добавить US English contract**
+- [x] **Step 3: Добавить US English contract**
 
 Flatten все `lang/en` values и fail на обычных UK variants:
 
@@ -126,7 +126,7 @@ private const FORBIDDEN_UK_ENGLISH = [
 
 Проверка использует Unicode-safe word boundary и не проверяет keys.
 
-- [ ] **Step 4: Запустить RED**
+- [x] **Step 4: Запустить RED**
 
 Run:
 
@@ -138,7 +138,7 @@ Expected: semantic/file/placeholder tests проходят, source-format test
 сообщает current horizontal arrays, `en/tags.php` сообщает order drift, US
 English test сообщает перечисленные UK variants.
 
-- [ ] **Step 5: Записать RED evidence в Task 64**
+- [x] **Step 5: Записать RED evidence в Task 64**
 
 Зафиксировать exact tests/assertions/failure categories без вставки полного
 runner log.
@@ -157,7 +157,7 @@ runner log.
 - Consumes: current PHP translation arrays.
 - Produces: source-only formatting with exact semantic equality.
 
-- [ ] **Step 1: Определить exact safe file set**
+- [x] **Step 1: Определить exact safe file set**
 
 Run `git status --short -- lang`. Если foreign recommendation files всё ещё
 изменены, исключить только:
@@ -170,7 +170,7 @@ lang/en/recommendations.php
 Остальные locale files форматируются только если их worktree content не
 принадлежит чужому незавершённому scope.
 
-- [ ] **Step 2: Сохранить semantic snapshot**
+- [x] **Step 2: Сохранить semantic snapshot**
 
 Snapshot содержит для каждого файла/locale ordered recursive entries:
 
@@ -184,7 +184,7 @@ Snapshot содержит для каждого файла/locale ordered recurs
 
 JSON пишется только в `/tmp`, UTF-8 остаётся неэкранированным.
 
-- [ ] **Step 3: Создать temporary AST formatter**
+- [x] **Step 3: Создать temporary AST formatter**
 
 Temporary pretty-printer наследует `PhpParser\PrettyPrinter\Standard` и
 переопределяет только array printing:
@@ -210,18 +210,18 @@ Parser читает только allowlisted safe files; formatter пишет к
 атомарно через sibling temporary file + rename. Это bulk mechanical
 formatting, не application runtime.
 
-- [ ] **Step 4: Выполнить formatter**
+- [x] **Step 4: Выполнить formatter**
 
 Expected: каждый выбранный file остаётся syntactically valid, strings/keys
 не переупорядочиваются printer-ом.
 
-- [ ] **Step 5: Доказать exact semantic equality**
+- [x] **Step 5: Доказать exact semantic equality**
 
 Повторно построить ordered snapshot и сравнить с before snapshot. Любое
 изменение path/type/value останавливает работу; не принимать почти равный
 diff.
 
-- [ ] **Step 6: Выполнить PHP syntax и formatter test**
+- [x] **Step 6: Выполнить PHP syntax и formatter test**
 
 Run:
 
@@ -256,7 +256,7 @@ Expected: syntax проходит; test может оставаться RED то
 - Consumes: stable keys and placeholders.
 - Produces: ordered US English and Russian ordinary prose without avoidable English fragments.
 
-- [ ] **Step 1: Исправить exact nested order `en/tags.php`**
+- [x] **Step 1: Исправить exact nested order `en/tags.php`**
 
 Порядок должен совпасть с `ru/tags.php`:
 
@@ -268,7 +268,7 @@ admin.synonym_saved
 
 Значения не менять в этом step.
 
-- [ ] **Step 2: Стандартизировать US English**
+- [x] **Step 2: Стандартизировать US English**
 
 В обычных values выполнить редакционные замены:
 
@@ -285,7 +285,7 @@ programme       → program
 Сохранять capitalization, placeholders и punctuation. Keys не
 переименовывать.
 
-- [ ] **Step 3: Исправить exact Russian administration prose**
+- [x] **Step 3: Исправить exact Russian administration prose**
 
 Исправить значения следующих keys, сохранив смысл и placeholders:
 
@@ -322,7 +322,7 @@ operations.reindex_impact
 переключатели», «реестр», «платёжный шлюз», «планировщик»,
 «асинхронный драйвер», «полный сброс кеша» и «переиндексация».
 
-- [ ] **Step 4: Исправить остальные подтверждённые Russian prose keys**
+- [x] **Step 4: Исправить остальные подтверждённые Russian prose keys**
 
 ```text
 help.admin.editorial_details:
@@ -339,7 +339,7 @@ tags.validation.imported_creation:
 `HTTPS`, `PNG`, `JPEG`, `WebP`, brands и keyboard shortcuts остаются exact
 technical codes/names.
 
-- [ ] **Step 5: Повторно проверить placeholders и order**
+- [x] **Step 5: Повторно проверить placeholders и order**
 
 Run:
 
@@ -365,32 +365,32 @@ foreign recommendation files.
 - Consumes: завершённые Task 63 values/keys after their owner commits.
 - Produces: same Task 63 semantics in Task 64 vertical source standard.
 
-- [ ] **Step 1: Дождаться стабильного ownership boundary**
+- [x] **Step 1: Дождаться стабильного ownership boundary**
 
 Условие начала: Task 63 recommendation translation changes либо находятся в
 новом `HEAD`, либо их владелец явно завершил запись и exact worktree blobs
 зафиксированы. Не stage/commit чужие незавершённые values.
 
-- [ ] **Step 2: Обновить Task 64 baseline**
+- [x] **Step 2: Обновить Task 64 baseline**
 
 Пересчитать file/key/type/placeholder parity после concurrent additions.
 Новый count заменяет исторические 4 962 в evidence; это не key drift, если
 оба locale получили одинаковые approved Task 63 keys.
 
-- [ ] **Step 3: Сделать exact before snapshot пары recommendation files**
+- [x] **Step 3: Сделать exact before snapshot пары recommendation files**
 
 Snapshot строится после ownership gate.
 
-- [ ] **Step 4: Применить тот же vertical formatter**
+- [x] **Step 4: Применить тот же vertical formatter**
 
 Форматировать только два recommendation files.
 
-- [ ] **Step 5: Доказать exact semantic equality**
+- [x] **Step 5: Доказать exact semantic equality**
 
 Before/after arrays должны быть идентичны. Task 64 не редактирует новые
 recommendation meanings без отдельной обнаруженной linguistic error.
 
-- [ ] **Step 6: Запустить полный global contract**
+- [x] **Step 6: Запустить полный global contract**
 
 Run:
 
@@ -411,14 +411,14 @@ Expected: GREEN, zero horizontal non-empty arrays in both locale trees.
 - Consumes: final Task 64 tree.
 - Produces: syntax/style/static evidence.
 
-- [ ] **Step 1: Выполнить exact PHP syntax**
+- [x] **Step 1: Выполнить exact PHP syntax**
 
 ```bash
 find lang -type f -name '*.php' -print0 | xargs -0 -n1 php -l
 php -l tests/Unit/TranslationCatalogParityTest.php
 ```
 
-- [ ] **Step 2: Выполнить Pint**
+- [x] **Step 2: Выполнить Pint**
 
 ```bash
 ./vendor/bin/pint --dirty --format agent
@@ -428,7 +428,7 @@ php -l tests/Unit/TranslationCatalogParityTest.php
 После Pint global contract обязан остаться GREEN; Pint не должен снова
 сжимать arrays.
 
-- [ ] **Step 3: Выполнить focused translation matrix**
+- [x] **Step 3: Выполнить focused translation matrix**
 
 ```bash
 php artisan test tests/Unit/TranslationCatalogParityTest.php
@@ -437,13 +437,13 @@ php artisan test --filter=CatalogPlayerCopyTest
 php artisan test --filter=BladeTemplateTest
 ```
 
-- [ ] **Step 4: Выполнить relevant wider tests**
+- [x] **Step 4: Выполнить relevant wider tests**
 
 Запустить tests, использующие locale route, fallback, public page cache
 translation fingerprint, notifications/mail и administration. Exact names
 берутся из repository search и записываются в evidence до запуска.
 
-- [ ] **Step 5: Выполнить scoped PHPStan**
+- [x] **Step 5: Выполнить scoped PHPStan**
 
 ```bash
 ./vendor/bin/phpstan analyse tests/Unit/TranslationCatalogParityTest.php --no-progress
@@ -451,7 +451,7 @@ translation fingerprint, notifications/mail и administration. Exact names
 
 Expected: `0 errors`.
 
-- [ ] **Step 6: Проверить structural metrics**
+- [x] **Step 6: Проверить structural metrics**
 
 Read-only report должен показать:
 
@@ -478,13 +478,13 @@ forbidden UK variants: 0
 - Consumes: final RU/EN catalog content.
 - Produces: representative geometry/translation evidence, not a TV platform claim.
 
-- [ ] **Step 1: Build frontend**
+- [x] **Step 1: Build frontend**
 
 ```bash
 npm run build
 ```
 
-- [ ] **Step 2: Prepare isolated browser fixtures**
+- [x] **Step 2: Prepare isolated browser fixtures**
 
 Использовать существующий Playwright database/fixture workflow. Production
 DB/cache/session не изменять.
@@ -543,24 +543,24 @@ Arrow-key support проверяется только там, где компо�
 - Consumes: verified final behavior/evidence.
 - Produces: canonical maintenance guidance, visitor history and exact Git delivery.
 
-- [ ] **Step 1: Обновить development owner**
+- [x] **Step 1: Обновить development owner**
 
 В «Добавление interface translations» записать canonical RU structure,
 vertical-only arrays, US English и global test command. Не копировать весь
 multilingual requirement.
 
-- [ ] **Step 2: Обновить frontend/testing owners**
+- [x] **Step 2: Обновить frontend/testing owners**
 
 Зафиксировать long-label device matrix и global translation contract только
 по фактически выполненной проверке.
 
-- [ ] **Step 3: Проверить README**
+- [x] **Step 3: Проверить README**
 
 Поскольку visitor-visible wording исправляется, добавить короткий русский
 пункт в последнюю секцию «История обновлений для посетителей». Managed block
 не редактировать вручную.
 
-- [ ] **Step 4: Обновить русский CHANGELOG**
+- [x] **Step 4: Обновить русский CHANGELOG**
 
 Отдельная датированная запись перечисляет vertical catalogs, structural
 contract, US English, Russian wording fixes и фактические verification
@@ -601,21 +601,21 @@ credential mutation и новая ветка запрещены.
 
 ## Verification checklist
 
-- [ ] Exact locale file parity.
-- [ ] Recursive key/order/type parity.
-- [ ] Placeholder parity.
-- [ ] Duplicate-key scan.
-- [ ] Non-empty plural branches.
-- [ ] Zero horizontal non-empty arrays.
-- [ ] Zero forbidden approved UK variants.
-- [ ] Reviewed Russian English-prose candidates.
-- [ ] PHP syntax.
-- [ ] Pint.
-- [ ] Focused and wider translation tests.
-- [ ] Scoped PHPStan.
-- [ ] Vite build.
+- [x] Exact locale file parity.
+- [x] Recursive key/order/type parity.
+- [x] Placeholder parity.
+- [x] Duplicate-key scan.
+- [x] Non-empty plural branches.
+- [x] Zero horizontal non-empty arrays.
+- [x] Zero forbidden approved UK variants.
+- [x] Reviewed Russian English-prose candidates.
+- [x] PHP syntax.
+- [x] Pint.
+- [x] Focused and wider translation tests.
+- [x] Scoped PHPStan.
+- [x] Vite build.
 - [ ] RU/EN phone/tablet/desktop/TV-like Chromium evidence.
-- [ ] README/CHANGELOG/canonical docs.
+- [x] README/CHANGELOG/canonical docs.
 - [ ] Final requirement reread and repository scan.
 - [ ] Exact `main` commit and configured push result.
 

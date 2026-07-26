@@ -1071,7 +1071,7 @@ class CatalogStatsPageBuilder
     {
         return collect($this->externalUrlFields())
             ->map(function (array $field): array {
-                $this->loadExternalUrlCounts($field['table']);
+                $this->loadFieldCounts($field['table']);
 
                 $total = $this->tableCount($field['table']);
                 $filled = $this->presentCount($field['table'], $field['column']);
@@ -1605,7 +1605,7 @@ class CatalogStatsPageBuilder
         $key = $table.'.'.$column;
 
         if (! array_key_exists($key, $this->presentCounts)) {
-            $this->loadPresentCounts($table, $column);
+            $this->loadFieldCounts($table, $column);
         }
 
         return $this->presentCounts[$key];
@@ -1616,10 +1616,15 @@ class CatalogStatsPageBuilder
         $key = $table.'.'.$column;
 
         if (! array_key_exists($key, $this->distinctPresentCounts)) {
-            $this->loadExternalUrlCounts($table);
+            $this->loadFieldCounts($table);
         }
 
-        return $this->distinctPresentCounts[$key] ??= (int) DB::table($table)
+        return $this->distinctPresentCounts[$key] ??= $this->queryDistinctPresentCount($table, $column);
+    }
+
+    private function queryDistinctPresentCount(string $table, string $column): int
+    {
+        return (int) DB::table($table)
             ->whereNotNull($column)
             ->where($column, '!=', '')
             ->distinct()
@@ -1631,7 +1636,7 @@ class CatalogStatsPageBuilder
         $key = $table.'.'.$column;
 
         if (! array_key_exists($key, $this->absoluteUrlCounts)) {
-            $this->loadExternalUrlCounts($table);
+            $this->loadFieldCounts($table);
         }
 
         return $this->absoluteUrlCounts[$key] ??= $this->whereCount($table, fn (QueryBuilder $query): QueryBuilder => $query
@@ -1642,83 +1647,110 @@ class CatalogStatsPageBuilder
             }));
     }
 
-    private function loadPresentCounts(string $table, string $requiredColumn): void
-    {
-        $columns = collect(self::PRESENT_COUNT_COLUMNS[$table] ?? [])
-            ->push($requiredColumn)
-            ->unique()
-            ->filter(fn (string $column): bool => ! array_key_exists($table.'.'.$column, $this->presentCounts))
-            ->values();
-
-        if ($columns->isEmpty()) {
-            return;
-        }
-
-        $grammar = DB::connection()->getQueryGrammar();
-        $bindings = [];
-        $selects = $columns
-            ->map(function (string $column, int $index) use ($grammar, &$bindings): string {
-                $wrappedColumn = $grammar->wrap($column);
-                $bindings[] = '';
-
-                return 'SUM(CASE WHEN '.$wrappedColumn.' IS NOT NULL AND '.$wrappedColumn
-                    .' != ? THEN 1 ELSE 0 END) AS '.$grammar->wrap('present_'.$index);
-            });
-        $row = DB::table($table)
-            ->selectRaw($selects->implode(', '), $bindings)
-            ->first();
-
-        foreach ($columns as $index => $column) {
-            $this->presentCounts[$table.'.'.$column] = (int) ($row->{'present_'.$index} ?? 0);
-        }
-    }
-
-    private function loadExternalUrlCounts(string $table): void
+    private function loadFieldCounts(string $table, ?string $requiredColumn = null): void
     {
         $fields = collect($this->externalUrlFields())
             ->where('table', $table)
             ->values();
-
-        if ($fields->isEmpty() || $fields->every(function (array $field): bool {
+        $urlColumns = $fields->pluck('column');
+        $presenceColumns = collect(self::PRESENT_COUNT_COLUMNS[$table] ?? [])
+            ->when($requiredColumn !== null, fn (Collection $columns): Collection => $columns->push($requiredColumn))
+            ->unique()
+            ->reject(fn (string $column): bool => $urlColumns->contains($column))
+            ->filter(fn (string $column): bool => ! array_key_exists($table.'.'.$column, $this->presentCounts))
+            ->values();
+        $needsUrlCounts = $fields->isNotEmpty() && ! $fields->every(function (array $field): bool {
             $key = $field['table'].'.'.$field['column'];
 
             return array_key_exists($key, $this->presentCounts)
                 && array_key_exists($key, $this->distinctPresentCounts)
                 && array_key_exists($key, $this->absoluteUrlCounts);
-        })) {
+        });
+
+        if (! $needsUrlCounts && $presenceColumns->isEmpty()) {
             return;
         }
 
         $grammar = DB::connection()->getQueryGrammar();
+        $reusesPlaybackDistinct = $needsUrlCounts
+            && $table === 'licensed_media'
+            && $fields->contains('column', 'path')
+            && $fields->contains('column', 'playback_url');
         $bindings = [];
-        $selects = $fields
-            ->flatMap(function (array $field) use ($grammar, &$bindings): array {
+        $selects = collect();
+
+        if ($needsUrlCounts) {
+            $selects = $fields->flatMap(function (array $field) use ($grammar, $reusesPlaybackDistinct, &$bindings): array {
                 $column = $field['column'];
                 $wrappedColumn = $grammar->wrap($column);
                 $bindings[] = '';
-                $bindings[] = '';
-                $bindings[] = 'https://%';
-                $bindings[] = 'http://%';
-
-                return [
+                $selects = [
                     'COUNT(CASE WHEN '.$wrappedColumn.' IS NOT NULL AND '.$wrappedColumn
                         .' != ? THEN 1 END) AS '.$grammar->wrap($column.'_present'),
-                    'COUNT(DISTINCT CASE WHEN '.$wrappedColumn.' IS NOT NULL AND '.$wrappedColumn
-                        .' != ? THEN '.$wrappedColumn.' END) AS '.$grammar->wrap($column.'_distinct'),
-                    'COUNT(CASE WHEN '.$wrappedColumn.' LIKE ? OR '.$wrappedColumn
-                        .' LIKE ? THEN 1 END) AS '.$grammar->wrap($column.'_absolute'),
                 ];
+
+                if (! $reusesPlaybackDistinct || $column !== 'playback_url') {
+                    $bindings[] = '';
+                    $selects[] = 'COUNT(DISTINCT CASE WHEN '.$wrappedColumn.' IS NOT NULL AND '.$wrappedColumn
+                        .' != ? THEN '.$wrappedColumn.' END) AS '.$grammar->wrap($column.'_distinct');
+                }
+
+                $bindings[] = 'https://%';
+                $bindings[] = 'http://%';
+                $selects[] = 'COUNT(CASE WHEN '.$wrappedColumn.' LIKE ? OR '.$wrappedColumn
+                    .' LIKE ? THEN 1 END) AS '.$grammar->wrap($column.'_absolute');
+
+                return $selects;
             });
+        }
+
+        if ($reusesPlaybackDistinct) {
+            $path = $grammar->wrap('path');
+            $playbackUrl = $grammar->wrap('playback_url');
+            array_push($bindings, '', '', '', '', '', '');
+            $selects->push(
+                'COUNT(CASE WHEN '
+                .'(('.$path.' IS NULL OR '.$path.' = ?) AND '.$playbackUrl.' IS NOT NULL AND '.$playbackUrl.' != ?) '
+                .'OR (('.$playbackUrl.' IS NULL OR '.$playbackUrl.' = ?) AND '.$path.' IS NOT NULL AND '.$path.' != ?) '
+                .'OR ('.$path.' IS NOT NULL AND '.$path.' != ? AND '.$playbackUrl.' IS NOT NULL '
+                .'AND '.$playbackUrl.' != ? AND '.$path.' != '.$playbackUrl.') '
+                .'THEN 1 END) AS '.$grammar->wrap('playback_url_path_mismatches'),
+            );
+        }
+
+        foreach ($presenceColumns as $index => $column) {
+            $wrappedColumn = $grammar->wrap($column);
+            $bindings[] = '';
+            $selects->push(
+                'SUM(CASE WHEN '.$wrappedColumn.' IS NOT NULL AND '.$wrappedColumn
+                .' != ? THEN 1 ELSE 0 END) AS '.$grammar->wrap('present_'.$index),
+            );
+        }
+
         $row = DB::table($table)
             ->selectRaw($selects->implode(', '), $bindings)
             ->first();
+        $playbackMatchesPath = $reusesPlaybackDistinct
+            && (int) ($row->playback_url_path_mismatches ?? -1) === 0;
 
-        foreach ($fields as $field) {
-            $column = $field['column'];
-            $key = $table.'.'.$column;
-            $this->presentCounts[$key] = (int) ($row->{$column.'_present'} ?? 0);
-            $this->distinctPresentCounts[$key] = (int) ($row->{$column.'_distinct'} ?? 0);
-            $this->absoluteUrlCounts[$key] = (int) ($row->{$column.'_absolute'} ?? 0);
+        if ($needsUrlCounts) {
+            foreach ($fields as $field) {
+                $column = $field['column'];
+                $key = $table.'.'.$column;
+                $this->presentCounts[$key] = (int) ($row->{$column.'_present'} ?? 0);
+                if ($column === 'playback_url' && $playbackMatchesPath) {
+                    $this->distinctPresentCounts[$key] = (int) ($row->path_distinct ?? 0);
+                } elseif ($column === 'playback_url' && $reusesPlaybackDistinct) {
+                    $this->distinctPresentCounts[$key] = $this->queryDistinctPresentCount($table, $column);
+                } else {
+                    $this->distinctPresentCounts[$key] = (int) ($row->{$column.'_distinct'} ?? 0);
+                }
+                $this->absoluteUrlCounts[$key] = (int) ($row->{$column.'_absolute'} ?? 0);
+            }
+        }
+
+        foreach ($presenceColumns as $index => $column) {
+            $this->presentCounts[$table.'.'.$column] = (int) ($row->{'present_'.$index} ?? 0);
         }
     }
 

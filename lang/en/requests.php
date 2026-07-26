@@ -266,8 +266,6 @@ return [
         'save' => 'Save',
         'withdraw' => 'Withdraw request',
         'request_for_title' => 'Request missing content',
-        'correct_data' => 'Correct data',
-        'correct_short' => 'Correct',
     ],
     'states' => [
         'loading' => 'Loading requests…',

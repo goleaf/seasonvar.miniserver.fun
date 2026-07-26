@@ -5,6 +5,7 @@ import '@fortawesome/fontawesome-free/css/brands.min.css';
 import '../css/app.css';
 import { initializeHeaderSearchInterfaces } from './header-search.js';
 import { initializeMobileRuntime } from './mobile-runtime.js';
+import { initializePwa } from './pwa.js';
 
 let catalogPlayerModule = null;
 let catalogPlayerModulePromise = null;
@@ -582,6 +583,7 @@ const loadCatalogInterfaces = () => {
     initializeTitleQuickNavigation();
     initializeHeaderSearchInterfaces();
     initializeMobileRuntime();
+    initializePwa();
     void loadPlayerNavigation();
 
     loadOptionalModule('collections', '[data-collection-dialog], [data-collection-share], [data-collection-dialog-trigger]',

@@ -241,10 +241,7 @@ final class CatalogPublicDiscoveryQuery
                 $limit * max(1, (int) config('recommendations.content_updates.event_window_multiplier', 64)),
             ),
         );
-        $orderedTitleIds = $this->recentContentEvents($eventWindow)
-            ->pluck('catalog_title_id')
-            ->unique()
-            ->values();
+        $orderedTitleIds = $this->recentContentTitleIds($eventWindow);
         $eligibleTitleIds = $this->eligibleOrderedIds($context, $orderedTitleIds, $excludedIds, $limit);
 
         return $eligibleTitleIds
@@ -257,29 +254,23 @@ final class CatalogPublicDiscoveryQuery
             ->all();
     }
 
-    /**
-     * @return Collection<int, array{catalog_title_id: positive-int, event_at: non-empty-string, event_id: int, event_source: string}>
-     */
-    private function recentContentEvents(int $limit): Collection
+    /** @return Collection<int, positive-int> */
+    private function recentContentTitleIds(int $limit): Collection
     {
         $media = DB::table('licensed_media')
-            ->select(['catalog_title_id', 'published_at as event_at', 'id as event_id'])
+            ->selectRaw('catalog_title_id, published_at AS event_at, ? AS event_source, id AS event_id', ['media'])
             ->where('status', 'published')
             ->whereNull('deleted_at')
             ->whereNotNull('published_at')
             ->orderByDesc('published_at')
             ->orderByDesc('id')
-            ->limit($limit)
-            ->get()
-            ->map(fn (object $event): array => [
-                'catalog_title_id' => (int) $event->catalog_title_id,
-                'event_at' => (string) $event->event_at,
-                'event_id' => (int) $event->event_id,
-                'event_source' => 'media',
-            ]);
+            ->limit($limit);
         $episodes = DB::table('episodes')
             ->join('seasons', 'seasons.id', '=', 'episodes.season_id')
-            ->select(['seasons.catalog_title_id', 'episodes.released_at as event_at', 'episodes.id as event_id'])
+            ->selectRaw(
+                'seasons.catalog_title_id, episodes.released_at AS event_at, ? AS event_source, episodes.id AS event_id',
+                ['episode'],
+            )
             ->where('episodes.publication_status', 'published')
             ->whereNull('episodes.deleted_at')
             ->whereNull('seasons.deleted_at')
@@ -287,36 +278,38 @@ final class CatalogPublicDiscoveryQuery
             ->where('episodes.released_at', '<=', now())
             ->orderByDesc('episodes.released_at')
             ->orderByDesc('episodes.id')
-            ->limit($limit)
-            ->get()
-            ->map(fn (object $event): array => [
-                'catalog_title_id' => (int) $event->catalog_title_id,
-                'event_at' => (string) $event->event_at,
-                'event_id' => (int) $event->event_id,
-                'event_source' => 'episode',
-            ]);
+            ->limit($limit);
+        $columns = ['catalog_title_id', 'event_at', 'event_source', 'event_id'];
+        $mediaEvents = DB::query()
+            ->fromSub($media, 'recent_media_events')
+            ->select($columns);
+        $episodeEvents = DB::query()
+            ->fromSub($episodes, 'recent_episode_events')
+            ->select($columns);
+        $events = DB::query()
+            ->fromSub($mediaEvents->unionAll($episodeEvents), 'recent_content_events')
+            ->select($columns)
+            ->orderByDesc('event_at')
+            ->orderBy('event_source')
+            ->orderByDesc('event_id');
+        $orderedTitleIds = [];
 
-        return $media
-            ->concat($episodes)
-            ->filter(fn (array $event): bool => $event['catalog_title_id'] > 0 && $event['event_at'] !== '')
-            ->sort(function (array $left, array $right): int {
-                $dateOrder = strcmp($right['event_at'], $left['event_at']);
+        foreach ($events->cursor() as $event) {
+            $titleId = (int) $event->catalog_title_id;
+            $eventAt = (string) $event->event_at;
 
-                if ($dateOrder !== 0) {
-                    return $dateOrder;
-                }
+            if ($titleId > 0 && $eventAt !== '') {
+                $orderedTitleIds[$titleId] ??= $titleId;
+            }
+        }
 
-                $sourceOrder = strcmp($left['event_source'], $right['event_source']);
-
-                return $sourceOrder !== 0 ? $sourceOrder : $right['event_id'] <=> $left['event_id'];
-            })
-            ->values();
+        return collect(array_values($orderedTitleIds));
     }
 
     /**
-     * @param  Collection<int, int>  $orderedTitleIds
+     * @param  Collection<int, positive-int>  $orderedTitleIds
      * @param  list<int>  $excludedIds
-     * @return Collection<int, int>
+     * @return Collection<int, positive-int>
      */
     private function eligibleOrderedIds(
         CatalogRecommendationContext $context,

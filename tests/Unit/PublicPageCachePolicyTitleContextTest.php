@@ -41,6 +41,7 @@ final class PublicPageCachePolicyTitleContextTest extends TestCase
         $this->assertNotNull($canonicalContext);
         $this->assertEquals($requestContext, $canonicalContext);
         $this->assertNotSame($canonicalContext->dimensions['query'], $variantContext->dimensions['query']);
+        $this->assertSame(3, $canonicalContext->dimensions['response_contract']);
 
         $keys = app(CacheKeyFactory::class);
         $versions = app(CacheVersionRegistry::class);
@@ -78,6 +79,21 @@ final class PublicPageCachePolicyTitleContextTest extends TestCase
         $this->assertNotNull($canonicalContext);
         $this->assertSame('en', $requestContext->dimensions['locale']);
         $this->assertSame('ru', $canonicalContext->dimensions['locale']);
+    }
+
+    public function test_content_request_pages_use_the_admin_only_response_contract(): void
+    {
+        $request = Request::create('/requests');
+        $route = new Route(['GET'], '/requests', fn () => null);
+        $route->name('requests.index');
+        $route->bind($request);
+        $request->setRouteResolver(fn (): Route => $route);
+        $request->setUserResolver(fn (): null => null);
+
+        $context = app(PublicPageCachePolicy::class)->context($request, 'requests');
+
+        $this->assertNotNull($context);
+        $this->assertSame(2, $context->dimensions['response_contract']);
     }
 
     private function request(string $uri, CatalogTitle $title): Request

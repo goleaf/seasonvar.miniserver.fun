@@ -10,6 +10,7 @@ use App\DTOs\DemoData\DemoStageReport;
 use App\DTOs\DemoData\DemoTitleContext;
 use App\Enums\CommentNotificationType;
 use App\Enums\ContentRequestNotificationType;
+use App\Enums\ContentRequestType;
 use App\Enums\ReviewNotificationType;
 use App\Enums\ReviewOrigin;
 use App\Enums\TechnicalIssueNotificationType;
@@ -107,7 +108,12 @@ final readonly class DemoNotificationSyncStage implements DemoDataStage
         $entities = [
             'comments' => Comment::query()->withTrashed()->where('user_id', $user->id)->orderBy('id')->limit(12)->get(['id', 'status']),
             'reviews' => CatalogTitleReview::query()->where('user_id', $user->id)->where('origin', ReviewOrigin::User->value)->orderBy('id')->limit(12)->get(['id', 'status']),
-            'requests' => ContentRequest::query()->where('requester_id', $user->id)->orderBy('id')->limit(10)->get(['id', 'public_id', 'status']),
+            'requests' => ContentRequest::query()
+                ->where('requester_id', $user->id)
+                ->whereNotIn('type', ContentRequestType::administrativeOnlyValues())
+                ->orderBy('id')
+                ->limit(10)
+                ->get(['id', 'public_id', 'status']),
             'issues' => TechnicalIssue::query()->where('requester_id', $user->id)->orderBy('id')->limit(6)->get(['id', 'public_id', 'public_number', 'type', 'status', 'version']),
         ];
 

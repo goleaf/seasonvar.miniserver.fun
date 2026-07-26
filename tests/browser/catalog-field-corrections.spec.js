@@ -1,21 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { installPlayerMediaFixtures } from './support/player-media-fixtures.js';
 
-const correctionFields = [
-    'title',
-    'year',
-    'genre',
-    'tag',
-    'country',
-    'actor',
-    'poster',
-    'description',
-    'translation',
-    'episode',
-    'subtitles',
-];
-
-test('verified users can open a field-specific catalog correction on every viewport', async ({ page, baseURL }, testInfo) => {
+test('catalog corrections are absent from the public frontend and direct access is forbidden', async ({ page, baseURL }, testInfo) => {
     const consoleErrors = [];
     const pageErrors = [];
     const failedRequests = [];
@@ -46,32 +32,18 @@ test('verified users can open a field-specific catalog correction on every viewp
 
     await page.goto('/titles/browser-smoke?episode=1');
     await expect(page.getByRole('heading', { level: 1, name: 'Browser Smoke' })).toBeVisible();
-
-    for (const field of correctionFields) {
-        await expect(page.locator(`[data-correction-field="${field}"]`).first()).toBeVisible();
-    }
-
-    const correctionControls = page.locator('[data-correction-field]');
-    const undersizedControls = await correctionControls.evaluateAll((controls) => controls
-        .filter((control) => control.getClientRects().length > 0)
-        .filter((control) => control.getBoundingClientRect().height < 44)
-        .map((control) => control.getAttribute('data-correction-field')));
-
-    expect(undersizedControls).toEqual([]);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1);
-
-    await page.locator('[data-correction-field="tag"]').first().click();
-    await expect(page).toHaveURL(/\/requests\/create\?.*field=tag.*target=\d+/);
-    await expect(page.locator('#correction-field')).toBeDisabled();
-    await expect(page.locator('#correction-field')).toHaveValue('tag');
-    await expect(page.locator('#current-value')).toHaveValue('Браузерный тег');
-    await expect(page.getByText('Не относится к сериалу', { exact: true })).toBeVisible();
+    await expect(page.locator('[data-correction-field]')).toHaveCount(0);
+    await expect(page.getByText('Исправить данные', { exact: true })).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1);
     await page.screenshot({
-        path: testInfo.outputPath('field-correction-form.png'),
+        path: testInfo.outputPath('catalog-without-correction-controls.png'),
         fullPage: true,
     });
 
+    const response = await page.goto('/requests/create?type=metadata_correction');
+
+    expect(response?.status()).toBe(403);
+    await expect(page.getByText('403')).toBeVisible();
     expect(consoleErrors).toEqual([]);
     expect(pageErrors).toEqual([]);
     expect(failedRequests).toEqual([]);

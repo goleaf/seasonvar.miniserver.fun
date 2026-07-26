@@ -450,11 +450,11 @@ Schema/index/rollback и aggregate definitions принадлежат [`DATA_REL
 
 ## Канонический домен заявок на материалы
 
-`ContentRequest` — единственная aggregate для отсутствующих сериалов, сезонов, серий, переводов, субтитров, улучшения качества, исправления метаданных/списка серий и восстановления недоступного материала. Comments, reviews, reports и importer source pages не являются параллельными заявками. До Task 19 request/ticket/suggestion routes и data отсутствовали, поэтому additive домен не мигрирует и не удаляет legacy rows.
+`ContentRequest` — единственная aggregate для отсутствующих сериалов, сезонов, серий, переводов, субтитров, улучшения качества, административных исправлений метаданных/списка серий и восстановления недоступного материала. Comments, reviews, reports и importer source pages не являются параллельными заявками. До Task 19 request/ticket/suggestion routes и data отсутствовали, поэтому additive домен не мигрирует и не удаляет legacy rows.
 
 - Stable public identity — opaque UUID `public_id`; внутренний numeric ID, название, locale, requester, status, votes и priority не входят в URL identity. `ContentRequestIdentity` предпочитает canonical title/season/episode ID, а для отсутствующего сериала — allowlisted external ID либо normalized original title+year. `active_identity_key` запрещает exact active duplicate; fuzzy/alias similarity лишь показывает bounded candidates.
 - Один typed input/action выполняет server-side normalization, type rules, content-existence check, duplicate check, verified-account policy, per-action/network rate limits, idempotency token и transactional create. Requester server-side получает исходный vote/follow; client никогда не задаёт requester/status/priority/publication/moderation/import state.
-- Контекстное исправление поля остаётся тем же `ContentRequest`: `CatalogCorrectionTargetResolver` повторно разрешает тайтл и принадлежность relation/episode, `correction_target_key` входит в active identity, а backed-enum `correction_reason` обязателен только для тега. Это различает два ошибочных тега или серии, но собирает повторные предложения одной цели в существующий vote/moderation workflow.
+- Исправление поля остаётся тем же `ContentRequest`, но типы `metadata_correction` и `episode_list_correction` являются administrative-only. Их создаёт только пользователь с `manage-content-requests`; `CatalogCorrectionTargetResolver` повторно разрешает тайтл и принадлежность relation/episode, `correction_target_key` входит в active identity, а backed-enum `correction_reason` обязателен только для тега. Action принудительно сохраняет такие строки private, без vote/follow и sitemap/cache side effects. Public query, route binding, SEO, presenter и notifications независимо исключают административный тип, поэтому даже прежняя строка с ошибочным `is_public = 1` остаётся fail-closed.
 - `ContentRequestStatus` владеет transition matrix. Generic status action повторно authorizes moderator, использует optimistic `version`, связывает только реально опубликованный target нужного title/season/episode/media, пишет append-only public/private history и запускает targeted cache/notification changes. `clarification_needed`, `merged`, `duplicate` и `withdrawn` запрещены в generic boundary: вопрос, merge mapping/community migration и requester withdrawal выполняют только dedicated actions. Clarification — закрытый requester/moderator thread, не второй публичный comment domain.
 - Merge допускается только для семантически совместимых type/target/season/episode/language/translation/quality/correction dimensions. Он idempotently переносит votes, followers, private evidence и external IDs, сохраняет обе истории, записывает canonical mapping, наследует public visibility и оставляет старый публичный UUID redirect-ом. Cross-requester merge запрещён, если хотя бы одна заявка private; restricted clarification переносится только при том же requester или при принятии ownership пустым canonical record, иначе остаётся у source history и не раскрывается другому requester. Title/season/episode merge importer-а использует тот же privacy-aware reconciliation boundary и при unsafe collision отмечает probable duplicate для ручной moderation вместо автоматического раскрытия.
 - Read side разделён на public card/detail DTO и viewer overlays. Public directory имеет validated search/type/status/sort, deterministic pagination и grouped counts; My Requests и moderation остаются authenticated/noindex. Blade только отображает DTO/options и не вычисляет identity, priority, duplicate, transition или authorization.
@@ -496,11 +496,9 @@ feature demotion или release-notification suppression, но отмеченн�
 title по-прежнему exact-excluded из нового результата. Карточка явно
 подписывает broad reason как «Почему это показано» и объясняет последствия
 всех трёх обратимых действий до записи, не раскрывая source title, private
-activity или internal weight.
-
-Presentation сохраняет полный ordered evidence list внутри server-side DTO,
-но общая карточка выводит только первую наиболее значимую broad-причину; это
-не меняет ranking, feedback или audit payload.
+activity или internal weight. Presentation сохраняет полный ordered evidence
+list внутри server-side DTO, но общая карточка выводит только первую наиболее
+значимую broad-причину; это не меняет ranking, feedback или audit payload.
 
 `x-catalog.title-card` является единственной query-free presentation boundary
 для `/titles`, главной и recommendation rows. Class component получает только
@@ -562,11 +560,26 @@ Mobile experience является responsive presentation существующ�
 
 `AppLayoutData` — единый navigation/private-page presenter; `app.css` — единая mobile-first design boundary; `mobile-runtime.js` — малый progressive enhancement; `CatalogTitlePlayer`/`player.js` — единственный playback lifecycle. Header menu, filters, forms и player меняют presentation по viewport/capability, не бизнес-логику или route. HTML остаётся содержательным без JavaScript; optional share, Media Session, visual viewport и Network Information деградируют безопасно.
 
-Существующий `/api/v1` mobile sync — versioned Sanctum API для публичного каталога, owner library/progress и encrypted-cursor/idempotent state mutations. Он не является PWA shell или native application, не даёт ticket/payment/push/offline-license API и не кеширует video. Web session/Livewire и mobile bearer boundaries не смешиваются.
+Существующий `/api/v1` mobile sync — versioned Sanctum API для публичного
+каталога, owner library/progress и encrypted-cursor/idempotent state
+mutations. PWA не подменяет его: browser shell использует web session,
+минимальные owner snapshots и только `watchlist.set`/`rating.set`, а mobile
+bearer boundary сохраняет прежние abilities и shapes.
 
-Repository не содержит web-app manifest, canonical service worker, install lifecycle, push-subscription storage/delivery или legal offline-video license/storage. Поэтому Task 23 не добавляет install/push/offline-download controls и не заявляет соответствующие возможности. On-demand `titles.media.download` остаётся online authenticated bounded stream без server/browser persistence; HLS segments не собираются. Реализация PWA/push/offline-video потребует отдельного legal/product/security design и не может быть presentation patch.
+Task 100 добавляет `/manifest.webmanifest`, `/service-worker.js`, публичную
+`/offline`, bounded snapshot responders, один `PwaActionSyncResponder` и
+payloadless Web Push. `PwaBuildAssetResolver` связывает worker cache version с
+Vite manifest; worker precache-ит только shell/icons/build assets и
+отказывается кешировать private/media boundaries. `PwaSessionResponder`
+выдаёт opaque owner scope, а IndexedDB никогда не становится authorization
+или server truth.
 
-Изменений базы Task 23 не требует: viewport, safe areas, disclosure state, network hint и password visibility — ephemeral device presentation. Не создаются device fingerprint, install-dismissal, IndexedDB, push или download-record tables. Existing account preferences, local Plyr-compatible keys, cookie/session names, API cursor/cache identities и routes сохраняются.
+Additive `web_push_subscriptions` хранит owner relation, encrypted endpoint,
+endpoint hash, browser keys, locale, timestamps/failure count и revoke state.
+Она не является device fingerprint, не хранит notification text и удаляется
+каскадно с пользователем. On-demand `titles.media.download` остаётся online
+authenticated bounded stream без server/browser persistence; HLS segments не
+собираются и offline license/storage не добавляются.
 
 ## Канонический Premium-домен
 
@@ -660,7 +673,6 @@ Resource shape не меняются. Search, taxonomy/year route binding,
 authorization, visibility, SEO, cache, importer, player и notification
 границы остаются прежними. Rollback — обычный code/docs revert без migration,
 backfill, reindex или cache flush.
-
 ## Player workspace boundary
 
 Redesign player workspace не создаёт нового application boundary. Один

@@ -313,18 +313,6 @@
                 @endif
 
                 <div data-player-theatre-secondary class="mt-3 flex flex-wrap gap-2">
-                    @if ($selectedEpisode)
-                        <x-content-requests.correction-link
-                            :url="$episodeCorrectionUrls[$selectedEpisode->id]"
-                            field="episode"
-                        />
-                        @if ($subtitleCorrectionUrl)
-                            <x-content-requests.correction-link
-                                :url="$subtitleCorrectionUrl"
-                                field="subtitles"
-                            />
-                        @endif
-                    @endif
                     <livewire:help-center.contextual-help-link
                         :feature="$playerHelpFeature"
                         :context="$playerHelpContext"
@@ -675,11 +663,6 @@
                                     <span class="tabular-nums">{{ trans_choice('catalog.counts.videos', (int) $episodeOption->getAttribute('available_media_count')) }}</span>
                                 </span>
                             </a>
-                            <x-content-requests.correction-link
-                                :url="$episodeCorrectionUrls[$episodeOption->id]"
-                                field="episode"
-                                class="w-full justify-center"
-                            />
                         </div>
                         @if ($loop->last)
                             </div>

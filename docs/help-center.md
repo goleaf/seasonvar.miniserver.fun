@@ -131,6 +131,8 @@ Enum escalation допускает только `none`, `technical_ticket`, `con
 
 Public article body не хранит current ticket/request/user identity. Support contact list содержит только работающие route helpers. Technical issues, screenshots, private correspondence и resolution по-прежнему принадлежат Task 20; missing title/season/episode/translation/subtitle/quality/metadata — Task 19.
 
+`metadata_correction` и `episode_list_correction` больше не входят в публичный allowlist эскалации. Если прежняя опубликованная статья всё ещё хранит такой subtype, `HelpEscalationService` fail closed и не подменяет его общей заявкой. Migration `2026_07_26_235600_restrict_catalog_corrections_to_administrators.php` guarded-переиздаёт две исходные статьи как revision `2`: календарная статья теряет correction escalation, а статья о выборе request/ticket направляет исправления полей редакции. Новых публичных маршрутов, автоматического создания заявки или исправления пользовательских редакций migration не добавляет.
+
 ## Feedback, outdated reports и privacy
 
 Usefulness — только `helpful`/`not_helpful`. Для negative response необязателен один stable reason: проблема не решена, неясно, устарело, пропущены шаги, ошибка перевода или другое. HMAC actor key строится из user ID либо случайной session UUID; одна active response на translation/actor обновляется идемпотентно. Public voter list и fake count отсутствуют. Rate limit — 12 попыток/час; failure не мешает чтению.
@@ -202,6 +204,11 @@ Rollout: backup, обычный `php artisan migrate`, Vite build, route/config/
 - Supported interface/editorial locale сейчас только `ru` и `en`; новый язык требует interface-key parity и editorial review, а не копирования fallback как перевода.
 - Нет trusted article media uploader, поэтому screenshots/images intentionally removed.
 - Нет external link crawler, search-query/view analytics, automatic review reminder, AI search/chatbot или background search index.
-- Smart TV native app, casting, offline playback/PWA, guaranteed browser versions, billing provider, response SLA/live chat не заявляются.
+- Smart TV native app, casting, offline video playback, guaranteed browser
+  versions, billing provider, response SLA/live chat не заявляются.
+- PWA сохраняет только bounded published `everyone` help snapshot с plain
+  title/summary/URL для `ru` или `en`; draft/internal/authenticated/Premium,
+  Markdown body, feedback/report, revisions и escalation context offline не
+  выдаются.
 - Public article editor использует безопасное Markdown textarea, не rich WYSIWYG; это сознательная граница до появления trusted editor package.
 - Help не выполняет private diagnostics и не раскрывает provider/source details; такие данные принадлежат Task 20 и проверяются до отправки.

@@ -28,7 +28,11 @@
 6. Вернуть server-only config только через protected operations. Не менять `APP_KEY`.
 7. Перестроить config/routes/views/events caches только при успешном boot; очистить лишь несовместимые feature caches. Не flush Redis целиком.
 8. Graceful reload фактического PHP-FPM unit и `php artisan queue:restart`; process manager должен вернуть все workers.
-9. Если service worker появится в будущем, активировать предыдущую cache version и сохранить private-route denylist. Сейчас service worker не установлен.
+9. Для PWA отключить `PWA_ENABLED`/`PWA_PUSH_ENABLED`, развернуть cleanup
+   worker по прежнему `/service-worker.js` и сохранить private/media denylist.
+   Не удалять таблицу subscriptions, пока previous code может быть возвращён;
+   точный порядок находится в
+   [`service-worker-deployment.md`](service-worker-deployment.md).
 10. Выполнить [`production-checklist.md`](production-checklist.md), затем вывести из maintenance и наблюдать DB/WAL, disk, logs, queues и provider reconciliation.
 11. Зафиксировать rollback event, причину, affected data, verification и follow-up без secrets.
 

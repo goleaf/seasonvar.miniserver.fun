@@ -57,7 +57,32 @@ Task 14 does not invent follower/profile-activity notifications because no follo
 
 `/settings/notifications` показывает только реально поддержанные category matrix для discussion/review/request/technical issue/release calendar. Stable DB booleans остаются в существующих dedicated tables, а delivery services применяют их до создания уведомления. Отдельный opt-in `notify_preferred_translation` находится в `/settings/playback` рядом с любимой озвучкой: это playback preference, а не календарная или социальная категория.
 
-Отсутствующая preference row означает неперсистентный opt-in default и создаётся только после explicit Apply/Reset. Email, push, quality, collection follow/like, mention, follower и premium reminder controls не показываются, потому что соответствующие event/channel domains отсутствуют. Critical account security mail остаётся mandatory в своих auth workflows и не представляется configurable category.
+Отсутствующая preference row означает неперсистентный opt-in default и
+создаётся только после explicit Apply/Reset. Email, quality, collection
+follow/like, mention, follower и premium reminder controls не показываются,
+потому что соответствующие event/channel domains отсутствуют. Critical
+account security mail остаётся mandatory в своих auth workflows и не
+представляется configurable category. Browser push — отдельный device-level
+opt-in: он доставляет уже созданную database notification и не создаёт новую
+категорию или обход preference.
+
+## Browser Web Push
+
+`QueueWebPushForDatabaseNotification` после database notification ставит
+`FanOutWebPushNotification`, а fan-out читает активные owner subscriptions
+порциями по 100 и ставит отдельную delivery job. Push provider получает
+payloadless VAPID POST: без notification body, user ID, route, email, title
+или private metadata. Service worker показывает статичный локализованный
+текст и открывает `/notifications`, где session и policy повторно разрешают
+содержимое.
+
+Подписка включается/отключается только явными кнопками в
+`/settings/notifications`. Controls скрыты, пока PWA, push feature, корректная
+VAPID-пара и subject не настроены. Endpoint encrypted, lookup выполняется по
+hash; logout отзывает subscription этого browser. Provider redirects
+запрещены, `404/410` отзывают строку, `400` не retry-ится, а connection
+errors, `429` и `5xx` получают только bounded queue retry. Database
+notification не откатывается при отказе push.
 
 ## Export и deletion boundary
 
@@ -93,7 +118,7 @@ php artisan test --filter=ConfigurationEnvironmentTest
 
 `PreferredTranslationAvailableNotification` использует stable type `playback-preference.translation-available` и существующий database channel без обязательной queue. Получатель должен явно включить `notify_preferred_translation`, сохранить совпадающий `preferred_variant` и не скрывать этот же variant. Перед записью `PreferredTranslationNotificationService` повторно проверяет публикацию, playable health, URL boundary и entitlement всей иерархии title/season/episode/media.
 
-Deterministic UUID строится по получателю, тайтлу и стабильному variant key, поэтому повтор observer/import не создаёт дубль. Payload содержит только public slug тайтла, variant key и очищенную короткую подпись; raw media/provider URL, numeric user/media ID, source diagnostics и внутреннее состояние импорта отсутствуют. Delivery выполняется best-effort after commit, блокирует текущего получателя для идемпотентной вставки и не откатывает уже сохранённый media import. Presentation использует существующий private inbox и заново разрешает видимость тайтла. Отдельный email/push/scheduler не заявлен.
+Deterministic UUID строится по получателю, тайтлу и стабильному variant key, поэтому повтор observer/import не создаёт дубль. Payload содержит только public slug тайтла, variant key и очищенную короткую подпись; raw media/provider URL, numeric user/media ID, source diagnostics и внутреннее состояние импорта отсутствуют. Delivery выполняется best-effort after commit, блокирует текущего получателя для идемпотентной вставки и не откатывает уже сохранённый media import. Presentation использует существующий private inbox и заново разрешает видимость тайтла. Отдельный email/scheduler не заявлен. Если browser push включён владельцем, созданная database notification может разбудить общий payloadless channel без передачи названия перевода провайдеру.
 
 ## Уведомления Premium
 

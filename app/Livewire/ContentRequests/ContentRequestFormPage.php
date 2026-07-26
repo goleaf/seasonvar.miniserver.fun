@@ -118,10 +118,12 @@ final class ContentRequestFormPage extends Component
 
     public function mount(?string $locale = null): void
     {
-        Gate::authorize('create', ContentRequest::class);
         $this->submissionToken = (string) Str::uuid();
         $requestedType = request()->query('type');
-        $this->type = ContentRequestType::tryFrom(is_string($requestedType) ? $requestedType : '')?->value ?? ContentRequestType::Serial->value;
+        $type = ContentRequestType::tryFrom(is_string($requestedType) ? $requestedType : '')
+            ?? ContentRequestType::Serial;
+        Gate::authorize('create', [ContentRequest::class, $type]);
+        $this->type = $type->value;
         $titleId = filter_var(request()->query('catalog_title_id'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
 
         if ($titleId !== false) {
@@ -132,6 +134,7 @@ final class ContentRequestFormPage extends Component
         $field = ContentCorrectionField::tryFrom(is_string($requestedField) ? $requestedField : '');
 
         if ($field !== null && $titleId !== false) {
+            Gate::authorize('create', [ContentRequest::class, $field->requestType()]);
             $rawTarget = request()->query('target');
             $targetId = $rawTarget === null
                 ? null
@@ -165,6 +168,7 @@ final class ContentRequestFormPage extends Component
     {
         $this->type = ContentRequestType::tryFrom($this->type)?->value ?? ContentRequestType::Serial->value;
         $type = ContentRequestType::from($this->type);
+        Gate::authorize('create', [ContentRequest::class, $type]);
 
         if (in_array($type, [ContentRequestType::Serial, ContentRequestType::Other], true)) {
             $this->clearCatalogTitle();
@@ -313,7 +317,7 @@ final class ContentRequestFormPage extends Component
             'searchPerformed' => mb_strlen($this->search) >= 2 || $this->catalogTitleId !== '',
             'seasons' => $seasons,
             'episodes' => $episodes,
-            'typeOptions' => collect(ContentRequestType::cases())->map(fn (ContentRequestType $type): array => ['value' => $type->value, 'label' => $type->label(), 'description' => $type->description()])->all(),
+            'typeOptions' => collect($this->availableTypes())->map(fn (ContentRequestType $type): array => ['value' => $type->value, 'label' => $type->label(), 'description' => $type->description()])->all(),
             'providerOptions' => collect(ContentRequestExternalProvider::cases())->map(fn (ContentRequestExternalProvider $provider): array => ['value' => $provider->value, 'label' => $provider->label()])->all(),
             'languageOptions' => collect((array) config('content-requests.language_codes', []))->map(fn (string $code): array => ['value' => $code, 'label' => __('requests.languages.'.$code)])->all(),
             'translationTypeOptions' => collect((array) config('content-requests.translation_types', []))->map(fn (string $value): array => ['value' => $value, 'label' => __('requests.translation_types.'.$value)])->all(),
@@ -403,5 +407,15 @@ final class ContentRequestFormPage extends Component
         $this->correctionContextLocked = false;
         $this->currentValue = '';
         $this->proposedValue = '';
+    }
+
+    /** @return list<ContentRequestType> */
+    private function availableTypes(): array
+    {
+        $user = auth()->user();
+
+        return $user instanceof User && Gate::forUser($user)->allows('manage-content-requests')
+            ? ContentRequestType::cases()
+            : ContentRequestType::publicCases();
     }
 }

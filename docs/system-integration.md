@@ -46,7 +46,15 @@ Public assets, private profile uploads, ticket screenshots, exports и generated
 
 ## 10. Cache model
 
-Public snapshots/facets/stats/search/recommendations и private overlays разделены. Collection category/assignment mutation использует существующие Collections/CatalogPages/API/Sitemap invalidators; отдельного image cache нет. Keys/invalidation принадлежат `App\Support\Cache` и cache-aware services, user-specific payload не входит в shared cache. Гостевой HTML включает hash текущего Vite manifest в key dimensions. Service worker отсутствует, поэтому browser private cache state — `not_installed`.
+Public snapshots/facets/stats/search/recommendations и private overlays
+разделены. Collection category/assignment mutation использует существующие
+Collections/CatalogPages/API/Sitemap invalidators; отдельного server image
+cache нет. Keys/invalidation принадлежат `App\Support\Cache` и cache-aware
+services, user-specific payload не входит в shared cache. Гостевой HTML
+включает hash текущего Vite manifest в key dimensions. Service worker хранит
+только versioned shell/build assets и bounded successful poster responses;
+личная offline-копия находится в owner-scoped IndexedDB, а не в shared HTTP
+cache.
 
 ## 11. Search model
 
@@ -54,7 +62,13 @@ Public catalog/portal/help/profile/collection search использует отд
 
 ## 12. SEO model
 
-Canonical/localized URLs, `hreflang`, robots, structured data и sitemap включают только public resources. Collection JSON-LD/sitemap/API не содержат image URL; deprecated API `cover_url` равен `null`. `/discover/{type}` и localized aliases сохранены, bare `/discover` остаётся 404. Auth/account/admin/ticket/payment-return/signed endpoints не индексируются; legal/advertiser/service-worker routes отсутствуют.
+Canonical/localized URLs, `hreflang`, robots, structured data и sitemap
+включают только public resources. Collection JSON-LD/sitemap/API не содержат
+image URL; deprecated API `cover_url` равен `null`. `/discover/{type}` и
+localized aliases сохранены, bare `/discover` остаётся 404.
+Auth/account/admin/ticket/payment-return/signed endpoints не индексируются;
+`/offline` и PWA snapshot endpoints также получают noindex/private cache
+boundary и не входят в sitemap.
 
 ## 13. Account merge flow
 
@@ -74,7 +88,13 @@ Administration routes используют `auth`, `auth.session`, `account.priv
 
 ## 17. Mobile and PWA behavior
 
-Mobile web использует те же canonical URLs/backend, responsive Tailwind UI, capability detection и bounded lifecycle modules. Mobile JSON API существует для public/account/state/playback flows и использует Sanctum abilities для private writes. Browser manifest/service worker/install/push/offline-download отсутствуют; следовательно, private-route cache exclusion проверен как `not_installed`, а не как якобы работающий PWA.
+Mobile web использует те же canonical URLs/backend, responsive Tailwind UI,
+capability detection и bounded lifecycle modules. Mobile JSON API существует
+для public/account/state/playback flows и использует Sanctum abilities для
+private writes. Browser PWA добавляет installable shell, offline library/help,
+safe action queue и payloadless push, но не создаёт второй каталог, native API
+или offline-download. Private/media exclusions проверяются HTTP/source и
+browser Cache Storage тестами.
 
 ## 18. Security boundaries
 
@@ -88,7 +108,10 @@ Exact progress/history/library/markers/settings/tickets and internal notes are o
 
 - No verified current backup/restore rehearsal, atomic deployment, failover, external monitoring or alert transport.
 - Memcached service unavailable; Redis/database fallbacks preserve documented correctness.
-- No browser service worker/PWA install/push/offline-download implementation.
+- Installable PWA и payloadless Web Push реализованы; production push остаётся
+  выключенным до HTTPS, migration, VAPID и asynchronous queue readiness.
+- Offline HLS/progressive/protected video и offline license/download
+  отсутствуют намеренно.
 - No active payment/OAuth provider, advertiser platform or rights-holder case domain.
 - No full user-account merge workflow; only domain-specific migration hooks and anonymous state reconciliation exist.
 - Legacy `/stats` и `/admin/catalog` остаются русскоязычными operational screens; их большая строковая поверхность не была механически переписана без отдельной UI contract migration. Public 403, episode link и viewing-activity fallback strings в Task 27 переведены через `ru`/`en` catalog.

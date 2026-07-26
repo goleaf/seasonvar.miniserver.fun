@@ -21,6 +21,153 @@ final class CatalogStatsQueryConsolidationTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_stats_builder_reuses_path_distinct_count_only_after_proving_playback_urls_match(): void
+    {
+        $title = CatalogTitle::factory()->create();
+        $season = Season::factory()->for($title)->create();
+        $episode = Episode::factory()->for($season)->create();
+
+        foreach ([
+            [
+                'path' => 'https://media.example.com/shared.mp4',
+                'playback_url' => 'https://media.example.com/shared.mp4',
+            ],
+            [
+                'path' => 'https://media.example.com/shared.mp4',
+                'playback_url' => 'https://media.example.com/shared.mp4',
+            ],
+            [
+                'path' => '',
+                'playback_url' => null,
+            ],
+            [
+                'path' => ' ',
+                'playback_url' => ' ',
+            ],
+        ] as $index => $urls) {
+            LicensedMedia::factory()->create([
+                'catalog_title_id' => $title->id,
+                'season_id' => $season->id,
+                'episode_id' => $episode->id,
+                'path' => $urls['path'],
+                'playback_url' => $urls['playback_url'],
+                'source_url' => 'https://seasonvar.ru/source-'.$index.'.html',
+                'status' => 'published',
+                'published_at' => now(),
+            ]);
+        }
+
+        $queries = [];
+        $primaryBindings = [];
+
+        DB::listen(function (QueryExecuted $query) use (&$primaryBindings, &$queries): void {
+            $queries[] = Str::squish($query->sql);
+
+            if (str_contains($query->sql, 'playback_url_path_mismatches')) {
+                $primaryBindings = $query->bindings;
+            }
+        });
+
+        $data = app(CatalogStatsPageBuilder::class)->data();
+
+        /** @var Collection<int, array{label: string, filled_display: string, unique_display: string, absolute_display: string, empty_display: string}> $externalUrls */
+        $externalUrls = $data['externalUrlFieldRows'];
+        $urlsByLabel = $externalUrls->keyBy('label');
+
+        $expectedValues = [
+            'filled_display' => '3',
+            'unique_display' => '2',
+            'absolute_display' => '2',
+            'empty_display' => '1',
+        ];
+
+        $this->assertSame($expectedValues, $this->urlValues($urlsByLabel, 'Ссылка на видео'));
+        $this->assertSame($expectedValues, $this->urlValues($urlsByLabel, 'Ссылка воспроизведения'));
+        $this->assertSame([
+            '',
+            '',
+            'https://%',
+            'http://%',
+            '',
+            'https://%',
+            'http://%',
+            '',
+            '',
+            'https://%',
+            'http://%',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+        ], $primaryBindings);
+        $this->assertCount(1, $this->queriesContainingAll($queries, [
+            'path_distinct',
+            'source_url_distinct',
+            'playback_url_path_mismatches',
+        ]));
+        $this->assertSame([], $this->queriesContainingAll($queries, [
+            'playback_url_distinct',
+        ]));
+        $this->assertSame([], $this->queriesContainingAll($queries, [
+            'select count(distinct "playback_url") as aggregate',
+            'from "licensed_media"',
+        ]));
+    }
+
+    public function test_stats_builder_falls_back_when_filled_path_and_playback_urls_differ(): void
+    {
+        $title = CatalogTitle::factory()->create();
+        $season = Season::factory()->for($title)->create();
+        $episode = Episode::factory()->for($season)->create();
+
+        foreach ([
+            'https://media.example.com/first.mp4',
+            'https://media.example.com/second.mp4',
+        ] as $playbackUrl) {
+            LicensedMedia::factory()->create([
+                'catalog_title_id' => $title->id,
+                'season_id' => $season->id,
+                'episode_id' => $episode->id,
+                'path' => 'https://media.example.com/shared.mp4',
+                'playback_url' => $playbackUrl,
+                'source_url' => 'https://seasonvar.ru/'.Str::slug($playbackUrl).'.html',
+                'status' => 'published',
+                'published_at' => now(),
+            ]);
+        }
+
+        $queries = [];
+
+        DB::listen(function (QueryExecuted $query) use (&$queries): void {
+            $queries[] = Str::squish($query->sql);
+        });
+
+        $data = app(CatalogStatsPageBuilder::class)->data();
+
+        /** @var Collection<int, array{label: string, filled_display: string, unique_display: string, absolute_display: string, empty_display: string}> $externalUrls */
+        $externalUrls = $data['externalUrlFieldRows'];
+        $urlsByLabel = $externalUrls->keyBy('label');
+
+        $this->assertSame('1', $urlsByLabel->get('Ссылка на видео')['unique_display']);
+        $this->assertSame('2', $urlsByLabel->get('Ссылка воспроизведения')['unique_display']);
+        $this->assertCount(1, $this->queriesContainingAll($queries, [
+            'playback_url_path_mismatches',
+        ]));
+        $this->assertCount(1, $this->queriesContainingAll($queries, [
+            'count(distinct "playback_url")',
+            'from "licensed_media"',
+        ]));
+    }
+
     public function test_invalidated_snapshot_rebuild_resets_request_local_stats(): void
     {
         $title = CatalogTitle::factory()->create();
@@ -76,6 +223,10 @@ final class CatalogStatsQueryConsolidationTest extends TestCase
             'path' => $sharedUrl,
             'playback_url' => $sharedUrl,
             'source_url' => 'https://seasonvar.ru/source-one.html',
+            'quality' => '1080p',
+            'format' => 'mp4',
+            'source_media_key' => 'stats-unified-one',
+            'checked_at' => now(),
             'status' => 'published',
             'published_at' => now(),
         ]);
@@ -86,6 +237,10 @@ final class CatalogStatsQueryConsolidationTest extends TestCase
             'path' => 'https://media.example.com/draft.mp4',
             'playback_url' => 'https://media.example.com/draft.mp4',
             'source_url' => 'https://seasonvar.ru/draft-source.html',
+            'quality' => '720p',
+            'format' => 'mp4',
+            'source_media_key' => 'stats-unified-two',
+            'checked_at' => now(),
             'status' => 'draft',
             'published_at' => null,
         ]);
@@ -96,6 +251,10 @@ final class CatalogStatsQueryConsolidationTest extends TestCase
             'path' => $sharedUrl,
             'playback_url' => $sharedUrl,
             'source_url' => 'https://seasonvar.ru/source-one.html',
+            'quality' => '1080p',
+            'format' => 'mp4',
+            'source_media_key' => 'stats-unified-three',
+            'checked_at' => now(),
             'status' => 'published',
             'published_at' => now(),
         ]);
@@ -106,6 +265,10 @@ final class CatalogStatsQueryConsolidationTest extends TestCase
             'path' => 'licensed/relative.mp4',
             'playback_url' => null,
             'source_url' => 'http://seasonvar.ru/source-two.html',
+            'quality' => '480p',
+            'format' => 'mp4',
+            'source_media_key' => 'stats-unified-four',
+            'checked_at' => now(),
             'status' => 'published',
             'published_at' => now(),
         ]);
@@ -146,6 +309,17 @@ final class CatalogStatsQueryConsolidationTest extends TestCase
             'absolute_display' => '4',
             'empty_display' => '0',
         ], $this->urlValues($urlsByLabel, 'Источник видео'));
+        foreach ([
+            'Связано с сериалом',
+            'Связано с сезоном',
+            'Связано с серией',
+            'С качеством',
+            'С форматом',
+            'С постоянным ключом',
+            'Проверено для просмотра',
+        ] as $label) {
+            $this->assertSame(4, $this->summaryValue($data, 'Видео', $label));
+        }
 
         $this->assertCount(1, $this->queriesContainingAll($queries, [
             'video_count',
@@ -153,8 +327,32 @@ final class CatalogStatsQueryConsolidationTest extends TestCase
         ]));
         $this->assertCount(1, $this->queriesContainingAll($queries, [
             'path_distinct',
-            'playback_url_distinct',
             'source_url_distinct',
+            'playback_url_path_mismatches',
+        ]));
+        foreach ([
+            ['catalog_titles', '"year"', 'poster_url_distinct'],
+            ['seasons', '"episodes_total"', 'source_url_distinct'],
+            ['episodes', '"released_at"', 'source_url_distinct'],
+            ['licensed_media', '"catalog_title_id"', 'path_distinct'],
+            ['source_pages', '"content_hash"', 'url_distinct'],
+        ] as [$table, $presenceColumn, $urlDistinctAlias]) {
+            $this->assertCount(1, $this->queriesContainingAll($queries, [
+                'from "'.$table.'"',
+                $presenceColumn,
+                $urlDistinctAlias,
+            ]));
+            $this->assertSame([], array_values(array_filter(
+                $queries,
+                fn (string $sql): bool => str_contains($sql, 'from "'.$table.'"')
+                    && str_contains(Str::lower($sql), 'sum(case when')
+                    && str_contains($sql, $presenceColumn)
+                    && ! str_contains($sql, $urlDistinctAlias),
+            )));
+        }
+        $this->assertCount(1, $this->queriesContainingAll($queries, [
+            'count(distinct "playback_url")',
+            'from "licensed_media"',
         ]));
         $this->assertCount(1, $this->queriesContainingAll($queries, [
             'from sqlite_schema as schema',

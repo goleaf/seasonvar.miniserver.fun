@@ -56,9 +56,15 @@ final class ContentRequest extends Model
 
         return parent::resolveRouteBindingQuery($query, $value, $field)
             ->where(function (Builder $visibility) use ($user): void {
-                $visibility->where('is_public', true)
+                $visibility->where(function (Builder $public): void {
+                    $public->where('is_public', true)
+                        ->whereNotIn('type', ContentRequestType::administrativeOnlyValues());
+                })
                     ->when($user instanceof User, function (Builder $visibility) use ($user): void {
-                        $visibility->orWhere('requester_id', $user->id);
+                        $visibility->orWhere(function (Builder $owned) use ($user): void {
+                            $owned->where('requester_id', $user->id)
+                                ->whereNotIn('type', ContentRequestType::administrativeOnlyValues());
+                        });
 
                         if (Gate::forUser($user)->allows('manage-content-requests')) {
                             $visibility->orWhereNotNull('id');
@@ -161,6 +167,7 @@ final class ContentRequest extends Model
     public function scopePubliclyVisible(Builder $query): void
     {
         $query->where('is_public', true)
+            ->whereNotIn('type', ContentRequestType::administrativeOnlyValues())
             ->whereNotIn('status', [ContentRequestStatus::Merged->value, ContentRequestStatus::Duplicate->value]);
     }
 

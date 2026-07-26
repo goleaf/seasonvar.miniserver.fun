@@ -51,7 +51,10 @@ final readonly class ContentRequestQuery
                 'followed' => $query->whereHas('followers', fn (Builder $followers): Builder => $followers->where('user_id', $viewer->id)),
                 default => $query->where('requester_id', $viewer->id),
             };
-        });
+        })->when(
+            Gate::forUser($viewer)->denies('manage-content-requests'),
+            fn (Builder $query): Builder => $query->whereNotIn('type', ContentRequestType::administrativeOnlyValues()),
+        );
         $this->applyFilters($query, '', null, $status);
 
         return $this->paginate($this->base($query, $viewer), $viewer, $sort, 'myRequestsPage');

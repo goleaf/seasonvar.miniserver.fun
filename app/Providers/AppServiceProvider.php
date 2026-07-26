@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Http\Middleware\EnsureAccountAccess;
 use App\Http\Middleware\EnsureAdministrator;
+use App\Listeners\QueueWebPushForDatabaseNotification;
 use App\Models\CatalogCollection;
 use App\Models\CatalogTitleReview;
 use App\Models\CatalogTitleUpdateState;
@@ -57,6 +58,7 @@ use Illuminate\Cache\Events\KeyWritten;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Notifications\Events\NotificationSent;
 use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -224,6 +226,7 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(KeyWritten::class, fn (KeyWritten $event) => app(CacheEventReporter::class)->record($event, 'write'));
         Event::listen(KeyForgotten::class, fn (KeyForgotten $event) => app(CacheEventReporter::class)->record($event, 'forget'));
         Event::listen(CacheFailedOver::class, fn (CacheFailedOver $event) => app(CacheEventReporter::class)->failedOver($event));
+        Event::listen(NotificationSent::class, QueueWebPushForDatabaseNotification::class);
 
         app(AdminGateRegistrar::class)->register();
         Gate::policy(TechnicalIssue::class, TechnicalIssuePolicy::class);

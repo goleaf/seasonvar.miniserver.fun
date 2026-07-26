@@ -12,6 +12,7 @@ use App\Services\Admin\AdminNavigationQuery;
 use App\Services\Auth\AuthenticationRedirectService;
 use App\Services\Catalog\CatalogDirectoryRegistry;
 use App\Services\Localization\LocalizedRouteResolver;
+use App\Services\Pwa\WebPushSubscriptionService;
 use App\Services\TechnicalIssues\TechnicalIssueContext;
 use App\Support\PlainText;
 use App\View\ViewModels\LayoutNavigationItem;
@@ -39,6 +40,7 @@ final class AppLayoutData
         private readonly Translator $translator,
         private readonly TechnicalIssueContext $technicalIssues,
         private readonly LocalizedRouteResolver $localizedRoutes,
+        private readonly WebPushSubscriptionService $pushSubscriptions,
     ) {}
 
     /**
@@ -437,6 +439,29 @@ final class AppLayoutData
         $seoImageAlt = $this->nullableString($seo['image_alt'] ?? null) ?? $fullTitle;
         $jsonLdScripts = $this->encodeJsonLdScripts($seo['jsonLd'] ?? []);
         $alternateUrls = $this->alternateUrls($seo, $htmlLang, $canonicalUrl);
+        $pwaEnabled = (bool) config('pwa.enabled')
+            && $this->router->has('pwa.manifest')
+            && $this->router->has('pwa.worker');
+        $pwaManifestUrl = $pwaEnabled ? $this->route('pwa.manifest') : null;
+        $pwaServiceWorkerUrl = $pwaEnabled ? $this->route('pwa.worker') : null;
+        $pwaHelpSnapshotUrl = $pwaEnabled
+            ? $this->route('pwa.help-snapshot', ['locale' => $this->translator->getLocale()])
+            : null;
+        $pwaSessionUrl = $pwaEnabled && $this->router->has('pwa.session')
+            ? $this->route('pwa.session')
+            : null;
+        $pwaLibrarySnapshotUrl = $pwaEnabled && $authenticatedUser !== null
+            ? $this->route('pwa.library-snapshot')
+            : null;
+        $pwaActionUrl = $pwaEnabled && $authenticatedUser !== null
+            ? $this->route('pwa.actions.store')
+            : null;
+        $pwaPushSubscriptionUrl = $pwaEnabled && $authenticatedUser !== null
+            ? $this->route('pwa.push-subscriptions.store')
+            : null;
+        $pwaPushPublicKey = $pwaEnabled && $this->pushSubscriptions->configured()
+            ? $this->nullableString(config('pwa.push.public_key'))
+            : null;
 
         return compact(
             'siteName',
@@ -467,6 +492,15 @@ final class AppLayoutData
             'alternateUrls',
             'breadcrumbs',
             'showBreadcrumbs',
+            'pwaEnabled',
+            'pwaManifestUrl',
+            'pwaServiceWorkerUrl',
+            'pwaHelpSnapshotUrl',
+            'pwaSessionUrl',
+            'pwaLibrarySnapshotUrl',
+            'pwaActionUrl',
+            'pwaPushSubscriptionUrl',
+            'pwaPushPublicKey',
         );
     }
 

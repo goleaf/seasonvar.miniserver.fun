@@ -794,7 +794,12 @@ npx playwright test tests/browser/discovery-sections.spec.js --project=\"Desktop
 - Modify: `docs/performance.md`
 
 - [ ] Lock `top_rated` candidate query to existing indexed provider path; no projection dependency.
-- [ ] Lock `recently_updated` to bounded event windows and unique order; no rewrite unless measured regression exceeds gate.
+- [x] Lock `recently_updated` to bounded event windows and unique order.
+  Task 80 сохранила оба source limits и exact legacy order, но после нового
+  measured profile объединила источники одним `UNION ALL` и заменила
+  materialized PHP merge/sort на ленивый unique-ID stream. Same-snapshot
+  legacy/new parity, один event statement и existing-index plan проверены;
+  schema/cache/routes не менялись.
 - [ ] Cover `recently_added` index/order and ensure projection changes do not alter it.
 - [ ] Cache outage test: authoritative result or truthful empty/error response, never private leakage or 500.
 - [ ] Projection stale/missing test: authoritative fallback and one allowlisted diagnostic.

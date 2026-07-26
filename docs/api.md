@@ -188,6 +188,14 @@ Responsive web portal не вызывает отдельный device API для
 
 Manifest в sync API — API change manifest, не Web App Manifest. `offline mutations` означают отложенную отправку idempotent library/progress state клиентом, а не offline HTML/video playback. API не выдаёт source/signed download URL, PWA install metadata, push subscription, payment, invoice, ticket attachment или offline license. Deep links остаются canonical web URLs и проходят обычную authorization/locale boundary.
 
+Task 100 PWA использует отдельные web-session routes `/pwa/session`,
+`/pwa/library-snapshot`, `/pwa/help-snapshot`, `/pwa/posters/{title}` и
+`/pwa/actions`; они не входят в `/api/v1` и не меняют OpenAPI/mobile response
+shapes. Private responses остаются `private, no-store`, а публичная справка
+возвращает только published `everyone` plain projection. Push subscription
+write endpoints также session/CSRF/auth-bound и никогда не раскрывают endpoint
+обратно. Ни один PWA endpoint не выдаёт media/source/grant/offline license.
+
 ## Help suggestions API
 
 `GET /api/v1/help/suggestions` — единственный JSON endpoint центра помощи. Валидируются bounded query и supported locale; controller всегда использует guest/public visibility и возвращает не более семи `HelpSuggestionResource` с stable UUID, plain localized title/category и canonical URL. Draft/internal/authenticated/premium content, body, revision, feedback, report, search query history и escalation state не выдаются. Response — `private, no-store`; route не заменяет полноэкранный noindex search и не является external/AI index. Полный contract: [`help-center.md`](help-center.md).

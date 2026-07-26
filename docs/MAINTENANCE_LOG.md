@@ -484,6 +484,7 @@
 - `2026_07_26_233000_create_playback_quality_telemetry.php`
 - `2026_07_26_234000_add_playback_translation_preferences.php`
 - `2026_07_26_235500_add_field_corrections_to_content_requests.php`
+- `2026_07_26_235900_create_web_push_subscriptions.php`
 <!-- project-docs:end -->
 
 ## 2026-07-16 — recommendation/discovery task 18

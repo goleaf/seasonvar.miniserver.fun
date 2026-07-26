@@ -43,7 +43,7 @@ final readonly class CreateContentRequest
 
     public function handle(User $user, ContentRequestInput $input): ContentRequest
     {
-        Gate::forUser($user)->authorize('create', ContentRequest::class);
+        Gate::forUser($user)->authorize('create', [ContentRequest::class, $input->type]);
 
         if (! Str::isUuid($input->submissionToken)) {
             throw new ContentRequestActionException('requests.errors.invalid_submission');
@@ -90,7 +90,10 @@ final readonly class CreateContentRequest
 
         $exactHash = $duplicate->exactIdentityHash ?? $this->identity->exactHash($input, $externalIds);
         $this->rateLimiter->hit('create', $user, $exactHash);
-        $isReviewOnly = $links !== [] && $user->created_at?->isAfter(now()->subMinutes(30));
+        $isAdministrativeOnly = $input->type->isAdministrativeOnly();
+        $isReviewOnly = ! $isAdministrativeOnly
+            && $links !== []
+            && $user->created_at?->isAfter(now()->subMinutes(30));
 
         $created = false;
         $request = DB::transaction(function () use (
@@ -102,6 +105,7 @@ final readonly class CreateContentRequest
             $exactHash,
             $duplicate,
             $isReviewOnly,
+            $isAdministrativeOnly,
             &$created,
         ): ContentRequest {
             User::query()->whereKey($user->id)->lockForUpdate()->firstOrFail();
@@ -154,7 +158,7 @@ final readonly class CreateContentRequest
                 'active_identity_key' => $exactHash,
                 'submission_key' => $submissionKey,
                 'probable_duplicate' => $duplicate->confidence === ContentRequestDuplicateConfidence::Probable,
-                'is_public' => ! $isReviewOnly,
+                'is_public' => ! $isReviewOnly && ! $isAdministrativeOnly,
             ]);
             $created = true;
 
@@ -165,8 +169,10 @@ final readonly class CreateContentRequest
                 'public_reason' => null,
                 'idempotency_key' => hash('sha256', 'create:'.$request->id),
             ]);
-            ContentRequestVote::query()->firstOrCreate(['content_request_id' => $request->id, 'user_id' => $user->id]);
-            ContentRequestFollower::query()->firstOrCreate(['content_request_id' => $request->id, 'user_id' => $user->id]);
+            if (! $isAdministrativeOnly) {
+                ContentRequestVote::query()->firstOrCreate(['content_request_id' => $request->id, 'user_id' => $user->id]);
+                ContentRequestFollower::query()->firstOrCreate(['content_request_id' => $request->id, 'user_id' => $user->id]);
+            }
 
             foreach ($links as $link) {
                 $request->sourceLinks()->create([...$link, 'added_by_id' => $user->id, 'is_public' => false]);
@@ -183,12 +189,12 @@ final readonly class CreateContentRequest
             throw new ContentRequestActionException('requests.errors.exact_duplicate');
         }
 
-        if (! $created) {
+        if (! $created && ! $request->type->isAdministrativeOnly()) {
             ContentRequestVote::query()->firstOrCreate(['content_request_id' => $request->id, 'user_id' => $user->id]);
             ContentRequestFollower::query()->firstOrCreate(['content_request_id' => $request->id, 'user_id' => $user->id]);
         }
 
-        $this->cache->changed($request->public_id, sitemap: true);
+        $this->cache->changed($request->public_id, sitemap: ! $request->type->isAdministrativeOnly());
 
         if ($created) {
             $this->notifications->submitted($request);

@@ -573,6 +573,14 @@ Rollback performance-only изменения безопасно удаляет `
 5. Проверьте repeated importer run: request получает real run ID, public page не показывает raw error/progress, completion не меняется без moderator verification. Account export/delete и controlled title merge должны сохранять/anonymize request data по contract.
 6. Rollback до writes удаляет новые tables в migration `down`. После user submissions сначала export/backup и roll-forward plan: удаление domain потеряет requests/history/votes/follows/preferences, а delivered notifications и accepted importer source pages уже являются отдельными существующими records.
 
+### Rollout административных исправлений каталога
+
+1. Перед выпуском создать проверяемую SQLite backup и остановить writers на обычное короткое migration window. `2026_07_26_235600_restrict_catalog_corrections_to_administrators.php` — guarded data-only migration без DDL: она меняет только две неизменённые исходные help-статьи/aliases/revisions и пропускает редакторские расхождения.
+2. Развернуть PHP/Blade/lang и migration одним совместимым выпуском, выполнить `php artisan migrate --force`, затем штатно пересобрать config/route/view caches и graceful reload PHP-FPM/workers. Для HTML достаточно новых `response_contract` title/request; `cache:clear`, wildcard scan, новая queue или environment variable не нужны.
+3. Smoke guest и normal user: title/player не содержат «Исправить данные» или correction attributes; request form не предлагает административные типы, прямой URL/action получает `403`, legacy public correction получает `404` и отсутствует в directory/My Requests/sitemap/notifications. Admin с `manage-content-requests` создаёт private correction без vote/follow и видит её в moderation queue.
+4. При stale HTML повторить штатную сборку view/config/route cache и reload; старый full-response cache недостижим по новой contract dimension. При partial deploy вернуть совместимый code/assets, не менять `is_public` вручную и не удалять historical requests.
+5. `down()` откатывает только собственное неизменённое состояние help-статей. Если редакция уже создала revision после rollout, guarded rollback её не перезапишет; сохранить backup/evidence и выполнить roll-forward. Сами correction rows/schema rollback не затрагивает.
+
 ## Rollout рекомендаций task 18
 
 1. Deploy code and apply pending migrations only inside the common stopped-writer/verified-backup SQLite boundary: `2026_07_16_120000_add_canonical_recommendation_discovery.php`, `2026_07_16_220000_add_recommendation_release_event_index.php`, `2026_07_16_230000_add_recommendation_signal_timestamps.php`, `2026_07_16_230100_add_recommendation_signal_owner_indexes.php`, `2026_07_16_240000_create_catalog_recommendation_shadow_builds.php`, `2026_07_16_240100_create_catalog_recommendation_dirty_titles.php` and `2026_07_26_120000_replace_recommendation_feedback_index_for_activity_order.php` as applicable. The last migration rebuilds an existing SQLite index and is not declared online: verify free space, no importer/queue/web writer and a restorable backup before `migrate --force`, then inspect `catalog_user_state_recommendation_feedback_idx` in `PRAGMA index_info`. It changes no rows and `down()` restores the previous three-column index. Migrations `240000/240100` do not rewrite or delete active similarity. Never rebuild/wipe existing similarity or user data.
@@ -633,9 +641,19 @@ Task 23 не добавляет migration, package, environment variable, queue,
 
 Post-deploy smoke проверяет один canonical URL на 320/390 px, tablet portrait/landscape и desktop: header menu/search, catalog filter Apply/Cancel/back, title/player, auth forms/password visibility, settings/tickets/help/premium presentation и admin local table overflow. Проверить отсутствие page horizontal overflow, console errors и unexpected player/Plyr/HLS downloads на non-player route. iOS Safari/Android Chromium capability checks выполняются на реальных устройствах отдельно; Chromium emulation не является их заменой.
 
-PWA deployment отсутствует намеренно: `public` не содержит зарегистрированного worker/manifest/install UI, поэтому scope, service-worker HTTP cache/update, icons/maskable, standalone OAuth/payment return и Web Push production keys не настраиваются. Если capability будет спроектирована позднее, до UI обязательны HTTPS, stable manifest identity/icons, one canonical worker, versioned static allowlist/private denylist, offline noindex response, logout/account-switch cleanup, backend subscription storage/delivery/revocation и verified install/update flows.
+Task 100 добавляет устанавливаемую PWA и payloadless Web Push отдельным
+production boundary. Rollout требует согласованной публикации manifest,
+локальных icons, server-generated worker, offline shell и Vite assets,
+additive `web_push_subscriptions`, HTTPS, VAPID и асинхронной очереди.
+Worker сохраняет strict private/media denylist, а текущую вкладку не
+перезагружает принудительно. Полный порядок, smoke, failure recovery и cleanup
+rollback находятся в
+[`operations/service-worker-deployment.md`](operations/service-worker-deployment.md).
 
-Rollback — вернуть PHP/Blade/JS/CSS commit и восстановить соответствующий Vite manifest/assets; DB rollback не нужен. Поскольку worker отсутствует, клиент не остаётся trapped на obsolete shell. Во время active playback не требуется forced page reload; новый asset hash применяется при следующей normal navigation/reload.
+Откат обычного mobile presentation по-прежнему возвращает согласованный
+PHP/Blade/JS/CSS и Vite manifest. Откат PWA выполняется отдельно через feature
+flags и cleanup worker; таблица subscriptions не удаляется до подтверждения
+совместимости старого code snapshot.
 
 ## Rollout Premium Task 22
 

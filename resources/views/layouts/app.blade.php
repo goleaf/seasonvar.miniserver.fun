@@ -7,6 +7,13 @@
         <meta name="description" content="{{ $seoDescription }}">
         <meta name="application-name" content="{{ $siteName }}">
         <meta name="theme-color" content="#ecfdf5">
+        @if ($pwaEnabled)
+            <link rel="manifest" href="{{ $pwaManifestUrl }}">
+            <link rel="apple-touch-icon" href="/icons/pwa-192.png">
+            <meta name="apple-mobile-web-app-capable" content="yes">
+            <meta name="apple-mobile-web-app-status-bar-style" content="default">
+            <meta name="apple-mobile-web-app-title" content="{{ $siteName }}">
+        @endif
         @if ($seoSection !== null)
             <meta property="article:section" content="{{ $seoSection }}">
         @endif
@@ -73,7 +80,7 @@
     <body @class([
         'app-shell bg-slate-50 text-slate-700 antialiased',
         'account-reduced-motion' => $accountReducedMotion ?? false,
-    ]) data-account-settings-version="{{ $accountSettingsVersion ?? 1 }}" data-account-storage-key="{{ $accountAnonymousStorageKey ?? '' }}" data-account-progress-migration-enabled="{{ ($accountPlaybackProgressMigrationEnabled ?? false) ? '1' : '0' }}" @if ($isPrivatePage) data-private-page="1" @endif @if (($accountPreferenceMigrationUrl ?? null) !== null) data-account-migration-url="{{ $accountPreferenceMigrationUrl }}" data-account-migration-scope="{{ $accountPreferenceMigrationScope }}" @endif>
+    ]) data-account-settings-version="{{ $accountSettingsVersion ?? 1 }}" data-account-storage-key="{{ $accountAnonymousStorageKey ?? '' }}" data-account-progress-migration-enabled="{{ ($accountPlaybackProgressMigrationEnabled ?? false) ? '1' : '0' }}" @if ($isPrivatePage) data-private-page="1" @endif @if (($accountPreferenceMigrationUrl ?? null) !== null) data-account-migration-url="{{ $accountPreferenceMigrationUrl }}" data-account-migration-scope="{{ $accountPreferenceMigrationScope }}" @endif @if ($pwaEnabled) data-pwa-enabled="1" data-pwa-service-worker-url="{{ $pwaServiceWorkerUrl }}" data-pwa-help-snapshot-url="{{ $pwaHelpSnapshotUrl }}" data-pwa-session-url="{{ $pwaSessionUrl }}" @endif @if (($accountPreferenceMigrationScope ?? null) !== null) data-pwa-account-scope="{{ $accountPreferenceMigrationScope }}" data-pwa-library-snapshot-url="{{ $pwaLibrarySnapshotUrl }}" data-pwa-action-url="{{ $pwaActionUrl }}" data-pwa-push-subscription-url="{{ $pwaPushSubscriptionUrl }}" @endif @if ($pwaPushPublicKey !== null) data-pwa-vapid-public-key="{{ $pwaPushPublicKey }}" @endif>
         <a href="#main-content" data-skip-link class="fixed z-[100] -translate-y-24 rounded-control bg-emerald-700 px-4 py-3 font-bold text-white shadow-elevated transition hover:bg-emerald-800 focus:translate-y-0">
             {{ __('catalog.layout.skip_to_content') }}
         </a>

@@ -501,6 +501,8 @@ Additive reversible migration `2026_07_17_160000_add_content_request_queue_index
 
 Additive reversible migration `2026_07_26_235500_add_field_corrections_to_content_requests.php` добавляет только nullable `correction_target_key varchar(191)` и `correction_reason varchar(32)` без backfill. Новый индекс не создаётся: exact open duplicate по-прежнему хешируется в `active_identity_key`, а `EXPLAIN QUERY PLAN` выбирает существующий unique index `content_requests_active_identity_key_unique`. `down()` удаляет только эти две колонки после возврата старого кода; существующие заявки предварительно требуют backup assessment.
 
+Data-only migration `2026_07_26_235600_restrict_catalog_corrections_to_administrators.php` не меняет schema или `content_requests`: она переводит две исходные help-статьи с публичной эскалации исправлений на безопасный административный contract, удаляет два legacy alias и добавляет revision `2`. Запись выполняется только при точном ожидаемом `content_version = 1`, тексте исходного перевода и максимальной revision `1`, поэтому редакторские изменения не перезаписываются. `down()` так же guarded и восстанавливает только собственное неизменённое состояние. Исторические correction rows сохраняются; приватность определяется type-aware policy/query независимо от старого `is_public`.
+
 Migration `2026_07_16_180000_create_content_request_domain.php` ничего не backfill-ит: audit не нашёл legacy request/ticket/suggestion data. Rollback `160000` удаляет только три queue index; rollback `180000` безопасно удаляет восемь tables только до появления production writes. После появления заявок сначала нужен export/backup, а importer source pages и уже доставленные notifications не откатываются.
 
 ## Recommendation relations и user state
@@ -616,11 +618,24 @@ Additive migration `2026_07_16_190000_add_file_size_metadata_to_licensed_media.p
 
 Migration `2026_07_16_190100_add_media_file_size_counters_to_seasonvar_import_runs.php` добавляет safe-default unsigned counters `media_sizes_checked|known|unknown|unsupported`, `media_size_checks_failed` и `media_size_known_bytes`. `SeasonvarImportRunRecorder` увеличивает их атомарно на terminal progress event, поэтому parallel page jobs не выполняют read-modify-write race. `down()` обеих migrations удаляет только введённые columns/index.
 
-## Mobile web persistence Task 23
+## PWA persistence Task 100
 
-Task 23 не добавляет таблиц, колонок, индексов или device identity. Push subscription, offline license, PWA dismissal и download record отсутствуют, поскольку соответствующие delivery/backend contracts не реализованы. Не создаётся general device table или fingerprint.
+Migration `2026_07_26_235900_create_web_push_subscriptions.php` создаёт одну
+owner-owned таблицу `web_push_subscriptions`. `user_id` каскадно удаляется с
+аккаунтом; `endpoint_hash` unique предотвращает дубликаты capability endpoint,
+а индекс `(user_id, revoked_at, last_seen_at)` обслуживает owner revoke/list и
+fan-out. Сам endpoint зашифрован application key, browser `p256dh`/`auth`
+хранятся только для protocol delivery, payload notification не сохраняется.
+Failure counters и timestamps позволяют bounded retry/revoke без generic
+device table или fingerprint.
 
-Existing watch progress/history/library/bookmark/collection/comment/review/profile/settings/calendar/request/ticket/premium relationships остаются источником истины и не дублируются в mobile schema. Browser хранит только существующие device player preferences/anonymous progress where already supported; translated labels, source URL, password/token/payment/ticket diagnostic не сохраняются. Mobile v1 sync использует existing canonical user-state relations, server version/conflict/idempotency и не делает local record authorization.
+Existing watch progress/history/library/bookmark/collection/comment/review/
+profile/settings/calendar/request/ticket/premium relationships остаются
+server source of truth и не дублируются в schema. Browser IndexedDB содержит
+opaque owner scope, bounded минимальные snapshots и allowlisted action UUID/
+version/TTL; source URL, password/token/payment/ticket diagnostic, HLS/video и
+push endpoint туда не попадают. Offline license, PWA dismissal и download
+record не создаются.
 
 ## Premium relations и integrity
 

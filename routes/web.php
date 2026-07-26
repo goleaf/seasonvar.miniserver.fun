@@ -6,6 +6,10 @@ use App\Enums\CatalogRecommendationType;
 use App\Enums\CatalogTopListCategory;
 use App\Http\Middleware\SetSignedAuthenticationLocale;
 use App\Http\Requests\MigrateAnonymousPreferencesRequest;
+use App\Http\Requests\Pwa\DestroyWebPushSubscriptionRequest;
+use App\Http\Requests\Pwa\PwaActionSyncRequest;
+use App\Http\Requests\Pwa\PwaHelpSnapshotRequest;
+use App\Http\Requests\Pwa\StoreWebPushSubscriptionRequest;
 use App\Http\Requests\StorePlaybackQualitySampleRequest;
 use App\Livewire\Administration\AdminAccessManagementPage;
 use App\Livewire\Administration\AdminAuditPage;
@@ -53,6 +57,7 @@ use App\Livewire\Profile\PublicProfilePage;
 use App\Livewire\Profile\ReviewHistoryPage;
 use App\Livewire\Profile\SecurityPage;
 use App\Livewire\Profile\UserProfileAdministrationManager;
+use App\Livewire\PwaOfflinePage;
 use App\Livewire\ReleaseCalendar\ReleaseCalendarAdministrationManager;
 use App\Livewire\ReleaseCalendar\ReleaseCalendarPage;
 use App\Livewire\Reviews\ReviewModerationManager;
@@ -83,6 +88,14 @@ use App\Services\Media\LicensedMediaDownloadResponder;
 use App\Services\Operations\InfrastructureHealthResponder;
 use App\Services\Premium\PremiumWebhookResponder;
 use App\Services\Profiles\UserProfileMediaResponder;
+use App\Services\Pwa\PwaActionSyncResponder;
+use App\Services\Pwa\PwaHelpSnapshotResponder;
+use App\Services\Pwa\PwaLibrarySnapshotResponder;
+use App\Services\Pwa\PwaManifestResponder;
+use App\Services\Pwa\PwaPosterResponder;
+use App\Services\Pwa\PwaServiceWorkerResponder;
+use App\Services\Pwa\PwaSessionResponder;
+use App\Services\Pwa\WebPushSubscriptionResponder;
 use App\Services\ReleaseCalendar\ReleaseCalendarFeedResponder;
 use App\Services\Reviews\ReviewDirectLinkResponder;
 use App\Services\TechnicalIssues\TechnicalIssueAttachmentResponder;
@@ -101,6 +114,56 @@ $discoveryRouteTypes = collect(CatalogRecommendationType::values())
     ], true))
     ->values()
     ->all();
+
+$publicDocumentMiddleware = [
+    EncryptCookies::class,
+    AddQueuedCookiesToResponse::class,
+    StartSession::class,
+    ShareErrorsFromSession::class,
+    PreventRequestForgery::class,
+];
+
+Route::get('/manifest.webmanifest', fn (PwaManifestResponder $manifest) => $manifest->response())
+    ->withoutMiddleware($publicDocumentMiddleware)
+    ->name('pwa.manifest');
+Route::get('/service-worker.js', fn (PwaServiceWorkerResponder $worker) => $worker->response())
+    ->withoutMiddleware($publicDocumentMiddleware)
+    ->name('pwa.worker');
+Route::get('/offline', PwaOfflinePage::class)
+    ->withoutMiddleware($publicDocumentMiddleware)
+    ->name('pwa.offline');
+Route::get(
+    '/pwa/help-snapshot',
+    fn (PwaHelpSnapshotRequest $request, PwaHelpSnapshotResponder $snapshot) => $snapshot->response($request),
+)
+    ->middleware('throttle:60,1')
+    ->withoutMiddleware($publicDocumentMiddleware)
+    ->name('pwa.help-snapshot');
+
+Route::middleware(['auth', 'auth.session', 'account.active'])
+    ->prefix('pwa')
+    ->name('pwa.')
+    ->group(function (): void {
+        Route::get('/session', fn (Request $request, PwaSessionResponder $session) => $session->response($request))
+            ->middleware(['account.private', 'throttle:60,1'])
+            ->name('session');
+        Route::get('/library-snapshot', fn (Request $request, PwaLibrarySnapshotResponder $snapshot) => $snapshot->response($request))
+            ->middleware(['account.private', 'throttle:60,1'])
+            ->name('library-snapshot');
+        Route::get('/posters/{titleSlug}', fn (Request $request, string $titleSlug, PwaPosterResponder $posters) => $posters->response($request, $titleSlug))
+            ->where('titleSlug', '[A-Za-z0-9][A-Za-z0-9-]*')
+            ->middleware('throttle:120,1')
+            ->name('posters.show');
+        Route::post('/actions', fn (PwaActionSyncRequest $request, PwaActionSyncResponder $actions) => $actions->response($request))
+            ->middleware(['account.private', 'throttle:60,1'])
+            ->name('actions.store');
+        Route::post('/push-subscriptions', fn (StoreWebPushSubscriptionRequest $request, WebPushSubscriptionResponder $subscriptions) => $subscriptions->store($request))
+            ->middleware(['account.private', 'throttle:12,1'])
+            ->name('push-subscriptions.store');
+        Route::delete('/push-subscriptions', fn (DestroyWebPushSubscriptionRequest $request, WebPushSubscriptionResponder $subscriptions) => $subscriptions->destroy($request))
+            ->middleware(['account.private', 'throttle:12,1'])
+            ->name('push-subscriptions.destroy');
+    });
 
 Route::get('/', CatalogHomePage::class)
     ->middleware('public.page:homepage')
@@ -307,14 +370,6 @@ Route::middleware(['auth', 'auth.session', 'account.private', 'account.active'])
         ->name('viewing-activity');
 });
 
-$publicDocumentMiddleware = [
-    EncryptCookies::class,
-    AddQueuedCookiesToResponse::class,
-    StartSession::class,
-    ShareErrorsFromSession::class,
-    PreventRequestForgery::class,
-];
-
 Route::get(
     '/calendar/feed/{privateToken}.ics',
     fn (string $privateToken, ReleaseCalendarFeedResponder $feeds) => $feeds->response($privateToken),
@@ -516,6 +571,7 @@ Route::prefix('admin')
         Route::get('/operations', AdminOperationsPage::class)->middleware('can:operations.view')->name('operations');
         Route::get('/imports', SeasonvarImportManager::class)->middleware('can:imports.execute')->name('imports');
         Route::get('/catalog', CatalogAdministrationPage::class)->middleware('can:content.view')->name('catalog');
+        Route::get('/catalog/quality', CatalogQualityCenterPage::class)->middleware('can:content.view')->name('quality');
         Route::get('/comments', CommentAdministrationManager::class)->middleware('can:moderation.comments')->name('comments');
         Route::get('/reviews', ReviewModerationManager::class)->middleware('can:moderation.reviews')->name('reviews');
         Route::get('/profiles', UserProfileAdministrationManager::class)->middleware('can:moderation.profiles')->name('profiles');
@@ -525,7 +581,6 @@ Route::prefix('admin')
         Route::get('/calendar', ReleaseCalendarAdministrationManager::class)->middleware('can:calendar.manage')->name('calendar');
         Route::get('/premium', PremiumAdministrationManager::class)->middleware('can:premium.view')->name('premium');
         Route::get('/help', HelpCenterAdministrationPage::class)->middleware('can:help.manage')->name('help');
-        Route::get('/catalog/quality', CatalogQualityCenterPage::class)->middleware('can:content.view')->name('quality');
         Route::get('/help/articles/{helpArticle}/preview/{locale}', HelpArticlePreviewPage::class)
             ->whereUuid('helpArticle')
             ->whereIn('locale', config('help-center.supported_locales', ['ru']))

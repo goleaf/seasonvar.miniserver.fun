@@ -118,7 +118,7 @@ Tests:
 - Produces:
   `CatalogCollectionCategorySuggestionRules::definitions(): array`.
 
-- [ ] **Step 1: Write enum/DTO/rule RED assertions**
+- [x] **Step 1: Write enum/DTO/rule RED assertions**
 
 Create the unit test with exact stable-state assertions:
 
@@ -143,7 +143,7 @@ public function test_rules_only_reference_supported_default_category_slugs(): vo
 }
 ```
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run:
 
@@ -153,7 +153,7 @@ php artisan test --filter=CatalogCollectionCategorySuggestionServiceTest
 
 Expected: FAIL because enum/rules classes do not exist.
 
-- [ ] **Step 3: Implement enum and immutable DTOs**
+- [x] **Step 3: Implement enum and immutable DTOs**
 
 Enum behavior:
 
@@ -177,7 +177,7 @@ status-pill palette is not introduced.
 DTO constructors use promoted `public readonly` typed properties. Clamp is
 performed by the service, not silently in DTO constructors.
 
-- [ ] **Step 4: Implement exact rule registry**
+- [x] **Step 4: Implement exact rule registry**
 
 Each definition contains:
 
@@ -198,7 +198,7 @@ Add similarly explicit entries for every supported child listed in the
 design. Terms are lowercase normalized evidence only; mood and `other-*`
 slugs are absent.
 
-- [ ] **Step 5: Run GREEN and style**
+- [x] **Step 5: Run GREEN and style**
 
 ```bash
 php artisan test --filter=CatalogCollectionCategorySuggestionServiceTest
@@ -233,7 +233,7 @@ Expected: enum/rule assertions PASS and diff check silent.
   `items.catalogTitle.studios`.
 - Reads synthetic model attribute `total_items_count`.
 
-- [ ] **Step 1: Add RED for strong, dominant and conflicting evidence**
+- [x] **Step 1: Add RED for strong, dominant and conflicting evidence**
 
 Use unsaved models with explicitly loaded relations:
 
@@ -288,7 +288,7 @@ public function test_close_competing_candidates_return_no_suggestion(): void
 }
 ```
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```bash
 php artisan test --filter=CatalogCollectionCategorySuggestionServiceTest
@@ -296,7 +296,7 @@ php artisan test --filter=CatalogCollectionCategorySuggestionServiceTest
 
 Expected: FAIL because scorer class does not exist.
 
-- [ ] **Step 3: Implement normalized scoring**
+- [x] **Step 3: Implement normalized scoring**
 
 Implementation rules:
 
@@ -324,7 +324,7 @@ Reasons are stable codes only:
 `dominant_genre`, `dominant_country`, `dominant_platform`,
 `dominant_type`, `conflict`, `insufficient_evidence`; keep at most three.
 
-- [ ] **Step 4: Add RU/EN reason and confidence keys**
+- [x] **Step 4: Add RU/EN reason and confidence keys**
 
 Add exact parallel arrays:
 
@@ -343,7 +343,7 @@ Add exact parallel arrays:
 ],
 ```
 
-- [ ] **Step 5: Run GREEN and parity**
+- [x] **Step 5: Run GREEN and parity**
 
 ```bash
 php artisan test --filter=CatalogCollectionCategorySuggestionServiceTest
@@ -374,7 +374,7 @@ Expected: scoring tests PASS; translation command exits 0.
   `CatalogCollectionSchema`,
   `CatalogCollectionCategorySuggestionService`.
 
-- [ ] **Step 1: Write summary/filter RED**
+- [x] **Step 1: Write summary/filter RED**
 
 ```php
 public function test_summary_and_queue_use_authoritative_uncategorized_state(): void
@@ -413,7 +413,7 @@ public function test_summary_and_queue_use_authoritative_uncategorized_state(): 
 }
 ```
 
-- [ ] **Step 2: Write bounded evidence/query-budget RED**
+- [x] **Step 2: Write bounded evidence/query-budget RED**
 
 Create two collections with 80 items each, clear the query log after
 fixtures, paginate, compute suggestions and assert:
@@ -426,7 +426,7 @@ $this->assertLessThanOrEqual(14, count(DB::getQueryLog()));
 Also assert an empty page performs no query containing
 `catalog_collection_items`.
 
-- [ ] **Step 3: Run RED**
+- [x] **Step 3: Run RED**
 
 ```bash
 php artisan test --filter=CatalogCollectionClassificationQueryTest
@@ -434,7 +434,7 @@ php artisan test --filter=CatalogCollectionClassificationQueryTest
 
 Expected: FAIL because query class does not exist.
 
-- [ ] **Step 4: Implement summary and normalized pagination**
+- [x] **Step 4: Implement summary and normalized pagination**
 
 Summary uses one statement with conditional aggregates:
 
@@ -451,7 +451,7 @@ existing `CatalogSearchNormalizer`, selects explicit collection projection,
 applies `whereNull(category_id)`, and uses named paginator
 `collectionCategoryClassificationPage`.
 
-- [ ] **Step 5: Implement current-page evidence loading**
+- [x] **Step 5: Implement current-page evidence loading**
 
 For non-empty page:
 
@@ -478,7 +478,7 @@ $collections->load([
 Load total item counts for page IDs in one grouped query and set
 `total_items_count`. Do not lazy-load anything in scorer.
 
-- [ ] **Step 6: Run GREEN, EXPLAIN and style**
+- [x] **Step 6: Run GREEN, EXPLAIN and style**
 
 ```bash
 php artisan test --filter=CatalogCollectionClassificationQueryTest
@@ -515,7 +515,7 @@ existing index path.
 - Consumes:
   `CatalogCollectionCacheInvalidator::changedMany(Collection $collections)`.
 
-- [ ] **Step 1: Write authorization/validation RED**
+- [x] **Step 1: Write authorization/validation RED**
 
 ```php
 public function test_confirmation_requires_content_manage_and_rejects_invalid_batch(): void
@@ -536,7 +536,7 @@ Add cases for empty, 101 rows, duplicate collection UUID, malformed UUID,
 unknown collection, unknown/inactive category. Unknown/malformed input must
 produce `ValidationException` and zero writes.
 
-- [ ] **Step 2: Write optimistic/atomic RED**
+- [x] **Step 2: Write optimistic/atomic RED**
 
 Create three uncategorized collections:
 
@@ -548,7 +548,7 @@ Assert result `changed=1`, `skipped=2`; changed row has only category FK and
 `content_version + 1`; visibility/moderation/owner unchanged. Add a test that
 one inactive category rejects the entire batch and leaves all rows unchanged.
 
-- [ ] **Step 3: Run RED**
+- [x] **Step 3: Run RED**
 
 ```bash
 php artisan test --filter=CatalogCollectionClassificationAdministrationTest
@@ -556,7 +556,7 @@ php artisan test --filter=CatalogCollectionClassificationAdministrationTest
 
 Expected: FAIL because `confirmAssignments()` is undefined.
 
-- [ ] **Step 4: Implement normalized transaction**
+- [x] **Step 4: Implement normalized transaction**
 
 Validation sequence:
 
@@ -582,7 +582,7 @@ event. Audit therefore groups changed rows by category and records one event
 for each changed category rather than attaching a misleading batch to the
 first category.
 
-- [ ] **Step 5: Run GREEN and regress existing bulk assignment**
+- [x] **Step 5: Run GREEN and regress existing bulk assignment**
 
 ```bash
 php artisan test --filter=CatalogCollectionClassificationAdministrationTest
@@ -623,7 +623,7 @@ Expected: both suites PASS.
   `cancelClassificationPreview()`,
   `confirmClassificationAssignments()`.
 
-- [ ] **Step 1: Write hydration/filter RED**
+- [x] **Step 1: Write hydration/filter RED**
 
 Assert non-manager does not receive queue/suggestion payload. Manager sees
 summary/page. Updating search/visibility/type/per-page:
@@ -633,7 +633,7 @@ summary/page. Updating search/visibility/type/per-page:
 - resets only `collectionCategoryClassificationPage`;
 - does not reset pagination owned by surrounding components.
 
-- [ ] **Step 2: Write no-write selection/preview RED**
+- [x] **Step 2: Write no-write selection/preview RED**
 
 ```php
 Livewire::actingAs($admin)
@@ -650,13 +650,13 @@ $this->assertDatabaseMissing('catalog_collections', [
 Then select, call `prepareClassificationPreview`, assert preview is open and
 DB remains unchanged.
 
-- [ ] **Step 3: Write final confirm/stale RED**
+- [x] **Step 3: Write final confirm/stale RED**
 
 Select one suggestion and one manual override, prepare preview, then mutate
 one collection version directly. Confirm and assert one changed/one skipped,
 selection cleared, preview closed, translated notice shown.
 
-- [ ] **Step 4: Run RED**
+- [x] **Step 4: Run RED**
 
 ```bash
 php artisan test --filter=CatalogCollectionClassificationAdministrationTest
@@ -664,7 +664,7 @@ php artisan test --filter=CatalogCollectionClassificationAdministrationTest
 
 Expected: FAIL on missing properties/actions.
 
-- [ ] **Step 5: Implement URL state and server-derived render data**
+- [x] **Step 5: Implement URL state and server-derived render data**
 
 Render:
 
@@ -681,7 +681,7 @@ Only perform these calls when `$canManage`. Build active category options in
 PHP, not Blade. On every render prune selected UUID/override/version maps to
 current page authoritative UUIDs.
 
-- [ ] **Step 6: Implement actions**
+- [x] **Step 6: Implement actions**
 
 `selectHighConfidence()` derives current suggestions server-side and selects
 only `High` rows with non-null category UUID.
@@ -699,7 +699,7 @@ Implementation hardening: preview creates a separate `#[Locked]`
 that exact reviewed snapshot, so a category selector change cancels preview
 and browser hydration cannot silently alter what the administrator reviewed.
 
-- [ ] **Step 7: Run GREEN and style**
+- [x] **Step 7: Run GREEN and style**
 
 ```bash
 php artisan test --filter=CatalogCollectionClassificationAdministrationTest
@@ -734,7 +734,7 @@ Expected: Livewire and prior category manager tests PASS.
   `data-classification-preview`,
   `data-classification-confirm`.
 
-- [ ] **Step 1: Add RED markup/accessibility assertions**
+- [x] **Step 1: Add RED markup/accessibility assertions**
 
 Assert:
 
@@ -747,7 +747,7 @@ Assert:
 - no inline style/script/`@php`;
 - manager without permission does not render classification DOM.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```bash
 php artisan test --filter=CatalogCollectionClassificationAdministrationTest
@@ -756,13 +756,13 @@ php artisan test --filter=FrontendAssetContractTest
 
 Expected: classification DOM assertions FAIL.
 
-- [ ] **Step 3: Implement summary and filters**
+- [x] **Step 3: Implement summary and filters**
 
 Use existing `x-ui.panel`, `x-ui.status-pill`, `x-form.field`,
 `x-form.input-error`, `x-ui.pagination-region` and named island patterns.
 Use a responsive grid, no local horizontal scroll.
 
-- [ ] **Step 4: Implement rows and two-step preview**
+- [x] **Step 4: Implement rows and two-step preview**
 
 Each row uses text-only vertical layout on mobile and a grid at `lg`.
 Category `<select>` is bound by collection UUID key. Reasons are rendered by
@@ -773,13 +773,13 @@ Preview is an in-page panel with `role="region"`, labelled heading, summary,
 cancel and explicit primary confirm button. It is not a JavaScript modal and
 remains meaningful without custom JS or modal focus management.
 
-- [ ] **Step 5: Complete exact RU/EN parity**
+- [x] **Step 5: Complete exact RU/EN parity**
 
 Add all visible labels, empty states, notices, validation and a11y text to
 both locale files. Validate recursively using the project translation parity
 test, not only top-level keys.
 
-- [ ] **Step 6: Run GREEN, build and browser QA**
+- [x] **Step 6: Run GREEN, build and browser QA**
 
 ```bash
 php artisan test --filter=CatalogCollectionClassificationAdministrationTest
@@ -812,7 +812,7 @@ auth.
   `CatalogCollectionCategoryQuery` immediately consume confirmed FK.
 - Confirms existing cache invalidator is called after commit.
 
-- [ ] **Step 1: Add RED/contract test for public reflection**
+- [x] **Step 1: Add RED/contract test for public reflection**
 
 Start with a public approved uncategorized collection. Confirm assignment via
 service, then assert:
@@ -829,13 +829,13 @@ $this->assertTrue($directory->contains('public_id', $collection->public_id));
 Also assert the grouped category count increments and the uncategorized count
 decrements.
 
-- [ ] **Step 2: Add cache after-commit assertion**
+- [x] **Step 2: Add cache after-commit assertion**
 
 Use `Cache::spy()` or existing collection invalidator test pattern. Verify no
 public invalidation occurs for rolled-back transaction and relevant versions
 change only after successful confirmation.
 
-- [ ] **Step 3: Run focused regression**
+- [x] **Step 3: Run focused regression**
 
 ```bash
 php artisan test --filter='CatalogCollectionClassification|CatalogCollectionCategory|CatalogCollectionDirectory|UnifiedDiscoveryCollections'
@@ -843,7 +843,7 @@ php artisan test --filter='CatalogCollectionClassification|CatalogCollectionCate
 
 Expected: all Task 51/52 collection tests PASS.
 
-- [ ] **Step 4: Inspect routes/schema/query plans and forbidden legacy**
+- [x] **Step 4: Inspect routes/schema/query plans and forbidden legacy**
 
 ```bash
 php artisan route:list --path=collections
@@ -855,7 +855,7 @@ rg -n "collection.*cover|cover.*collection" app routes resources/views config re
 Expected: no new routes; no collection cover behavior; existing category
 index present.
 
-- [ ] **Step 5: Run style/build gate**
+- [x] **Step 5: Run style/build gate**
 
 ```bash
 ./vendor/bin/pint --dirty --format agent
@@ -889,7 +889,7 @@ git diff --check -- app/DTOs app/Enums app/Livewire/Collections app/Services/Col
 - Preserves `README.md` managed block and keeps visitor history as final H2.
 - Adds one dated Russian `CHANGELOG.md` entry without altering history.
 
-- [ ] **Step 1: Update domain owners**
+- [x] **Step 1: Update domain owners**
 
 Record:
 
@@ -901,19 +901,19 @@ Record:
 - no schema/provider/queue/cache;
 - rollout and rollback.
 
-- [ ] **Step 2: Update README and CHANGELOG**
+- [x] **Step 2: Update README and CHANGELOG**
 
 README visitor history describes the visible administrative/product result
 without internal class names. CHANGELOG records domain/query/UI/tests/docs
 facts in Russian.
 
-- [ ] **Step 3: Complete Task 52 compliance matrix**
+- [x] **Step 3: Complete Task 52 compliance matrix**
 
 Change only evidence-backed statuses to `completed` or
 `already_compliant`. Preserve honest `unresolved` for external test/browser/
 Git delivery blockers.
 
-- [ ] **Step 4: Refresh/check managed docs**
+- [x] **Step 4: Refresh/check managed docs**
 
 ```bash
 php artisan project:docs-refresh
@@ -936,12 +936,12 @@ Expected: check silent; policy tests PASS.
 
 - Completion requires exact evidence in current plan.
 
-- [ ] **Step 1: Re-read applicable requirements and spec**
+- [x] **Step 1: Re-read applicable requirements and spec**
 
 Read root `AGENTS.md`, requirement index, all Task 52 owners, canonical design
 and this implementation plan. Record any conflict before continuing.
 
-- [ ] **Step 2: Run focused and broad tests**
+- [x] **Step 2: Run focused and broad tests**
 
 ```bash
 php artisan test --filter='CatalogCollectionClassification|CatalogCollectionCategory|CatalogCollectionDirectory|UnifiedDiscoveryCollections|CatalogDiscovery'
@@ -953,7 +953,7 @@ If the known foreign
 only blocker, reproduce it separately and record exact evidence without
 claiming full-suite success.
 
-- [ ] **Step 3: Run final static/frontend gates**
+- [x] **Step 3: Run final static/frontend gates**
 
 ```bash
 ./vendor/bin/pint --dirty --test --format agent
@@ -963,21 +963,21 @@ git diff --check
 git diff --cached --check
 ```
 
-- [ ] **Step 4: Run browser QA**
+- [x] **Step 4: Run browser QA**
 
 Run focused admin classification spec when truthful auth fixture exists and
 public `discovery-collections.spec.js` regression on Desktop/Mobile/Tablet.
 Inspect final screenshots visually for wrapping, labels, preview hierarchy
 and absence of images/overflow.
 
-- [ ] **Step 5: Repository-wide relevant legacy scan**
+- [x] **Step 5: Repository-wide relevant legacy scan**
 
 Search duplicate suggestion services, automatic category writes, stale
 confidence filters, collection images, unbounded membership scans, hardcoded
 translations and unused controls. Inspect dependencies before removing any
 match.
 
-- [ ] **Step 6: Attempt safe main commit/push**
+- [x] **Step 6: Attempt safe main commit/push**
 
 ```bash
 git status --short --branch

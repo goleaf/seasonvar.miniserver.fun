@@ -162,7 +162,7 @@ Username, display name и public UUID разрешают профиль, но н
 | Действие | Guest | Verified requester/participant | `manage-content-requests` |
 | --- | --- | --- | --- |
 | Public directory/detail | только `is_public`; merged UUID redirect | то же плюс own hidden request | любой request для moderation |
-| Create | нет | да; requester/status/priority назначаются server-side | по тем же create rules |
+| Create | нет | да только для public request types; requester/status/priority назначаются server-side | public types и administrative-only field corrections |
 | Edit/withdraw/clarify | нет | только owner и разрешённый status; community-supported withdrawal anonymizes | clarification/moderation через отдельные actions |
 | Vote/follow | нет | только public open request, desired state idempotent | без обхода terminal rule |
 | Status/priority/reject/merge/complete/import | нет | нет | private session middleware + gate + повторная policy/action authorization; dedicated states нельзя выставить generic action |
@@ -170,7 +170,7 @@ Username, display name и public UUID разрешают профиль, но н
 
 `ContentRequestPolicy` и action boundaries повторно разрешают persisted request/target, не доверяют ID/type/status/priority/provider/language/quality/merge/completion values из Livewire. `/admin/requests` требует `auth`, `auth.session`, `account.private` и `manage-content-requests`, поэтому initial page и Livewire lifecycle остаются `private, no-store`. Generic status action отклоняет `clarification_needed`, `duplicate`, `merged` и `withdrawn`: эти состояния требуют dedicated clarification/merge/withdraw invariants. Public binding допускает merged public UUID только до authorized canonical redirect; hidden чужая заявка возвращает 404, а private merge между разными requester запрещён. Email/internal user ID/voter/follower list никогда не являются route или DTO полем. Все mutations идут через CSRF-protected Livewire POST, GET только читает или выполняет canonical merged redirect.
 
-Ссылка «Исправить данные» общедоступна как navigation, но форма по-прежнему требует authenticated verified account. `field`, `catalog_title_id` и необязательный target ID из query string не являются правом доступа: resolver и action повторно проверяют public title scope, принадлежность taxonomy/episode и server-derived current value. Поддержать открытую заявку может только verified user через unique vote; принять или отклонить — только `moderation.requests`/`manage-content-requests`.
+Типы `metadata_correction` и `episode_list_correction` требуют `manage-content-requests` уже при выборе типа, разборе query string, Livewire hydration и вызове create action. Обычный пользователь не получает эти варианты и не может подставить `type`, `field`, `catalog_title_id` или target ID напрямую. Resolver и action всё равно повторно проверяют public title scope, принадлежность taxonomy/episode и server-derived current value. Persisted administrative-only request доступен только moderator policy: public binding, directory, My Requests, vote/follow/withdraw/clarify и пользовательские notifications fail closed независимо от `is_public`.
 
 ## Матрица рекомендаций
 
@@ -285,3 +285,21 @@ Current schema не назначает source Premium/region-country/age rule; �
 | View public/unlisted collection | public according to policy | same + owner overlay | deny-as-not-found для private/hidden; private state never enters public DTO |
 
 Ни один mutation не принимает user ID. Marker/update/title/episode/collection identifiers повторно разрешаются через owner relation и policy; destructive actions остаются POST/Livewire с CSRF. Private library pages noindex/no-store, отсутствуют в sitemap и не раскрываются через numeric-ID probing. Administrator role не позволяет менять личное состояние другого пользователя через библиотечные controls.
+
+## Матрица PWA и Web Push Task 100
+
+| Действие | Guest | Authenticated owner | Server boundary |
+| --- | --- | --- | --- |
+| Manifest, worker, offline shell | да | да | public, no session, strict cache headers |
+| Public help snapshot | да | да | published `everyone`, supported locale, bounded plain projection |
+| Library/session snapshot | нет | да | `auth`, `auth.session`, `account.private`, current owner |
+| Queue `watchlist.set`/`rating.set` | нет | verified owner | CSRF, Form Request, title policy, optimistic version, transaction |
+| Poster proxy | нет | да | authenticated visible title, local image response only |
+| Create/revoke push subscription | нет | verified owner | explicit browser gesture, CSRF, endpoint guard, current user |
+
+Client owner scope, action UUID/version, push endpoint и browser permission не
+дают access сами по себе. Server заново разрешает owner/title и отклоняет
+unknown action/extra fields/stale version. Другой пользователь не может
+прочитать snapshot или изменить/revoke чужую subscription; endpoint не
+возвращается в response. Offline UI не меняет Premium/region/publication/media
+policy и не разрешает playback/download.

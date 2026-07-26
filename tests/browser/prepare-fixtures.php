@@ -8,6 +8,12 @@ use App\Enums\CatalogCollectionModerationStatus;
 use App\Enums\CatalogCollectionSort;
 use App\Enums\CatalogCollectionType;
 use App\Enums\CatalogCollectionVisibility;
+use App\Enums\HelpArticleType;
+use App\Enums\HelpAudience;
+use App\Enums\HelpEscalationType;
+use App\Enums\HelpFeature;
+use App\Enums\HelpOwnerTeam;
+use App\Enums\HelpPublicationStatus;
 use App\Enums\ReleaseDatePrecision;
 use App\Enums\ReleaseScheduleEntryType;
 use App\Enums\ReleaseScheduleSource;
@@ -27,6 +33,10 @@ use App\Models\Country;
 use App\Models\Episode;
 use App\Models\EpisodeViewProgress;
 use App\Models\Genre;
+use App\Models\HelpArticle;
+use App\Models\HelpArticleTranslation;
+use App\Models\HelpCategory;
+use App\Models\HelpCategoryTranslation;
 use App\Models\LicensedMedia;
 use App\Models\ReleaseScheduleEntry;
 use App\Models\Season;
@@ -414,6 +424,50 @@ $user = User::factory()->create([
     'email' => 'browser@example.com',
     'email_verified_at' => now()->subDay(),
     'password' => Hash::make('Browser-Strong-Password-42!'),
+]);
+
+$pwaHelpCategory = HelpCategory::query()->create([
+    'public_id' => (string) Str::uuid(),
+    'code' => 'browser_pwa_offline',
+    'position' => 999,
+    'is_visible' => true,
+    'content_version' => 1,
+]);
+HelpCategoryTranslation::query()->create([
+    'help_category_id' => $pwaHelpCategory->id,
+    'locale' => 'ru',
+    'slug' => 'browser-pwa-offline',
+    'title' => 'Помощь PWA',
+    'description' => 'Публичная справка для browser QA.',
+]);
+$pwaHelpArticle = HelpArticle::query()->create([
+    'public_id' => (string) Str::uuid(),
+    'code' => 'browser-pwa-offline-library',
+    'help_category_id' => $pwaHelpCategory->id,
+    'type' => HelpArticleType::HowTo,
+    'audience' => HelpAudience::Everyone,
+    'status' => HelpPublicationStatus::Published,
+    'owner_team' => HelpOwnerTeam::Support,
+    'feature_code' => HelpFeature::General,
+    'primary_escalation' => HelpEscalationType::None,
+    'secondary_escalation' => HelpEscalationType::None,
+    'position' => 1,
+    'editorial_priority' => 1,
+    'is_featured' => false,
+    'is_indexable' => true,
+    'content_version' => 1,
+    'published_at' => now(),
+]);
+HelpArticleTranslation::query()->create([
+    'help_article_id' => $pwaHelpArticle->id,
+    'locale' => 'ru',
+    'slug' => 'browser-pwa-offline-library',
+    'title' => 'Как работает сохранённая библиотека',
+    'summary' => 'Без сети доступны только сохранённые метаданные и публичная справка.',
+    'body_markdown' => 'Видео, HLS и защищённые источники без сети не сохраняются.',
+    'search_text' => 'сохранённая библиотека offline PWA',
+    'is_published' => true,
+    'published_at' => now(),
 ]);
 
 $englishUser = User::factory()->create([

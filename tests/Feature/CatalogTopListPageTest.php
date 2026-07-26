@@ -121,7 +121,7 @@ final class CatalogTopListPageTest extends TestCase
         $this->assertNotSame($trusted->id, $kinopoiskWins->id);
     }
 
-    public function test_movie_classification_groups_episode_counts_once_instead_of_correlating_each_title(): void
+    public function test_movie_classification_uses_one_flattened_episode_aggregate_without_distinct_or_season_list(): void
     {
         $this->rankableTitle('Быстрый фильм', CatalogTopListCategory::Movies);
 
@@ -135,8 +135,101 @@ final class CatalogTopListPageTest extends TestCase
             ->first(fn (string $query): bool => str_contains($query, 'top_weighted_score'));
 
         $this->assertIsString($rankingSql);
+        $this->assertStringContainsString(
+            'inner join (select "episodes"."id", "episodes"."season_id" from "episodes"',
+            $rankingSql,
+        );
         $this->assertStringContainsString('group by "seasons"."catalog_title_id"', $rankingSql);
+        $this->assertStringContainsString('having COUNT(*) = 1', $rankingSql);
+        $this->assertStringNotContainsString('COUNT(DISTINCT episodes.id)', $rankingSql);
+        $this->assertStringNotContainsString('"seasons"."id" in (select "seasons"."id"', $rankingSql);
         $this->assertStringNotContainsString('(select count(*) from "episodes"', $rankingSql);
+    }
+
+    public function test_sitemap_availability_probe_uses_exists_without_weighted_ranking(): void
+    {
+        $this->rankableTitle('Фильм для карты сайта', CatalogTopListCategory::Movies);
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        $this->assertTrue(
+            app(CatalogTopListQuery::class)->hasItems(CatalogTopListCategory::Movies),
+        );
+
+        $availabilitySql = collect(DB::getQueryLog())
+            ->pluck('query')
+            ->first(fn (string $query): bool => str_contains($query, 'catalog_title_ratings'));
+
+        $this->assertIsString($availabilitySql);
+        $this->assertStringContainsString('select exists(', $availabilitySql);
+        $this->assertStringNotContainsString('top_weighted_score', $availabilitySql);
+        $this->assertStringNotContainsString('order by ((CASE', $availabilitySql);
+    }
+
+    public function test_movie_and_series_classification_counts_only_publicly_available_episodes_across_seasons(): void
+    {
+        $seriesAcrossSeasons = $this->rankableTitle(
+            'Две серии в разных сезонах',
+            CatalogTopListCategory::Movies,
+        );
+        $secondPublicSeason = Season::factory()->create([
+            'catalog_title_id' => $seriesAcrossSeasons->id,
+            'number' => 2,
+        ]);
+        Episode::factory()->create([
+            'season_id' => $secondPublicSeason->id,
+            'number' => 1,
+        ]);
+
+        $movieWithUnavailableEpisodes = $this->rankableTitle(
+            'Один доступный эпизод',
+            CatalogTopListCategory::Movies,
+        );
+        $movieSeason = $movieWithUnavailableEpisodes->seasons()->firstOrFail();
+        Episode::factory()->create([
+            'season_id' => $movieSeason->id,
+            'number' => 2,
+            'audience' => ContentAudience::Authenticated,
+        ]);
+        Episode::factory()->create([
+            'season_id' => $movieSeason->id,
+            'number' => 3,
+            'available_from' => now()->addDay(),
+        ]);
+        Episode::factory()->create([
+            'season_id' => $movieSeason->id,
+            'number' => 4,
+            'available_until' => now()->subDay(),
+        ]);
+        $deletedEpisode = Episode::factory()->create([
+            'season_id' => $movieSeason->id,
+            'number' => 5,
+        ]);
+        $deletedEpisode->delete();
+        $privateSeason = Season::factory()->create([
+            'catalog_title_id' => $movieWithUnavailableEpisodes->id,
+            'number' => 2,
+            'audience' => ContentAudience::Authenticated,
+        ]);
+        Episode::factory()->create([
+            'season_id' => $privateSeason->id,
+            'number' => 1,
+        ]);
+
+        $movieIds = app(CatalogTopListQuery::class)
+            ->items(CatalogTopListCategory::Movies, null)
+            ->map(fn ($item): int => (int) $item->title->id)
+            ->all();
+        $seriesIds = app(CatalogTopListQuery::class)
+            ->items(CatalogTopListCategory::Series, null)
+            ->map(fn ($item): int => (int) $item->title->id)
+            ->all();
+
+        $this->assertContains($movieWithUnavailableEpisodes->id, $movieIds);
+        $this->assertNotContains($movieWithUnavailableEpisodes->id, $seriesIds);
+        $this->assertContains($seriesAcrossSeasons->id, $seriesIds);
+        $this->assertNotContains($seriesAcrossSeasons->id, $movieIds);
     }
 
     public function test_top_list_filters_by_country_and_year_range_before_ranking(): void

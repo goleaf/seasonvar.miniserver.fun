@@ -412,6 +412,8 @@ TTL policy определена в существующем `config/cache-archit
 
 Public card DTO содержит только public target, status, dates и grouped vote/follower counts. `hasVoted`, `isFollowing`, owner/can-* permissions, hidden source links, clarifications, private notes, notification preferences, rate state и importer details вычисляются только в authenticated overlay и никогда не входят в guest cache. Create/edit/vote/follow/status/clarification/withdraw/merge/completion after commit bump domain и affected detail; public eligibility changes additionally bump existing Sitemap domain. Safe merge наследует public eligibility source record и bump-ит оба UUID, поэтому cached legacy detail не переживает canonical redirect; private cross-requester merge отсутствует. Title/season/episode merge bump-ит affected request scopes. Global cache flush, key scan и второй request cache отсутствуют.
 
+Administrative-only corrections не входят в public cache даже при legacy `is_public = 1`: query и binding исключают их до presenter. Удаление correction controls меняет visitor HTML contract, поэтому `PublicPageCachePolicy` использует `response_contract = 3` для title routes и `response_contract = 2` для request routes. Старые envelopes становятся недостижимыми без global flush или key scan; private admin form/moderation остаются `no-store`.
+
 ## Cache lifecycle рекомендаций
 
 `CatalogRecommendationCache` переиспользует `TieredCache`, `CacheDomain::Recommendations`, существующие TTL/version/telemetry и хранит только bounded scalar candidate arrays. Public dimensions: stable type, interface locale, `audience=public`, trending period, one rating source, normalized filter hash, current/exclusion hash только когда контекст требует, и ranking version `task18-v6-r2`. Версия `v6-r2` наследует ужесточённую семантику trending/upcoming и отдельно изолирует `recently_added`, который теперь использует стабильный `catalog_titles.created_at`, от старого `indexed_at`-порядка без scan, flush или удаления чужих namespace. Page/per-page применяются после общего pool и не размножают keys. Full models, media URLs и translations graph не кэшируются.
@@ -510,6 +512,23 @@ Server autocomplete продолжает использовать только p
 `sessionStorage` текущей вкладки с in-memory fallback. Они не отправляются в
 профиль, session Laravel, shared cache, логи или аналитику и удаляются
 явной кнопкой либо завершением browser session.
+
+## Browser cache и offline-копии PWA Task 100
+
+Service worker использует versioned `seasonvar-*` cache names, связанные с
+Vite manifest. Precache включает только публичную offline-оболочку, Web App
+Manifest, локальные icons и build assets. Runtime poster cache принимает
+только успешные same-origin image responses через allowlisted proxy, хранит
+не более 80 записей и прогревает не более 12 постеров с concurrency 3.
+
+Authenticated HTML/API/Livewire, private account state, push subscriptions,
+playback grants, downloads, HLS/video/audio и любые cross-origin/non-GET/
+Authorization requests никогда не Cache Storage-ятся. Личная библиотека и
+safe action queue находятся в owner-scoped IndexedDB с явными limit/TTL;
+публичная справка хранится отдельно и переживает logout. Logout/account switch
+удаляют private scope, а временная network error без подтверждённого `401/403`
+его не стирает. Cache/IndexedDB failure безопасно деградирует до online portal
+и не требует store-wide flush.
 
 ## Инвалидация качества подборок Task 101
 

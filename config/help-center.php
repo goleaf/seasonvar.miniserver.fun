@@ -34,8 +34,7 @@ return [
     ],
     'allowed_request_types' => [
         'serial', 'season', 'episode', 'translation', 'subtitles', 'quality_upgrade',
-        'metadata_correction', 'episode_list_correction', 'broken_content_restoration',
-        'other_content_request',
+        'broken_content_restoration', 'other_content_request',
     ],
     'allowed_route_names' => [
         'home', 'titles.index', 'search.index', 'calendar.upcoming', 'requests.index',

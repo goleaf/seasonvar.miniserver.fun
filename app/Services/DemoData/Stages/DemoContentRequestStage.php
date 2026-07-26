@@ -131,10 +131,12 @@ final readonly class DemoContentRequestStage implements DemoDataStage
                     'active_identity_key' => $status->isOpen() ? $exactHash : null,
                     'submission_key' => $submissionKey,
                     'probable_duplicate' => in_array($status, [ContentRequestStatus::Duplicate, ContentRequestStatus::Merged], true),
-                    'is_public' => $globalOrdinal % 5 !== 0,
+                    'is_public' => ! $type->isAdministrativeOnly() && $globalOrdinal % 5 !== 0,
                     'rejection_reason' => $status === ContentRequestStatus::Rejected
                         ? $this->rejectionReason($globalOrdinal)->value : null,
-                    'public_note' => 'Заявка создана посетителем и доступна для предметного обсуждения.',
+                    'public_note' => $type->isAdministrativeOnly()
+                        ? null
+                        : 'Заявка создана посетителем и доступна для предметного обсуждения.',
                     'private_moderator_note' => 'Проверить связи с карточкой и приложенные источники перед следующим переходом.',
                     'merged_into_id' => null,
                     'completed_catalog_title_id' => $status === ContentRequestStatus::Completed ? $context->titleId : null,
@@ -170,8 +172,17 @@ final readonly class DemoContentRequestStage implements DemoDataStage
 
         $requests = ContentRequest::query()
             ->whereIn('submission_key', array_keys($specs))
-            ->get(['id', 'submission_key', 'requester_id', 'status'])
+            ->get(['id', 'submission_key', 'requester_id', 'type', 'status'])
             ->keyBy('submission_key');
+        $administrativeRequestIds = $requests
+            ->filter(fn (ContentRequest $request): bool => $request->type->isAdministrativeOnly())
+            ->pluck('id');
+
+        if ($administrativeRequestIds->isNotEmpty()) {
+            ContentRequestVote::query()->whereIn('content_request_id', $administrativeRequestIds)->delete();
+            ContentRequestFollower::query()->whereIn('content_request_id', $administrativeRequestIds)->delete();
+        }
+
         $childRows = $this->childRows($requests, $specs, $users);
 
         $writer->upsert((new ContentRequestVote)->getTable(), $childRows['votes'], ['content_request_id', 'user_id'], ['updated_at']);
@@ -217,19 +228,21 @@ final readonly class DemoContentRequestStage implements DemoDataStage
             $secondParticipant = $users->get((((int) $requesterIndex + 1) % $users->count()) + 1) ?? $users->last();
             $createdAt = $spec['created_at'];
 
-            foreach ([$firstParticipant, $secondParticipant] as $offset => $participant) {
-                if (! $participant instanceof User || (int) $participant->id === (int) $request->requester_id) {
-                    continue;
-                }
+            if (! $request->type->isAdministrativeOnly()) {
+                foreach ([$firstParticipant, $secondParticipant] as $offset => $participant) {
+                    if (! $participant instanceof User || (int) $participant->id === (int) $request->requester_id) {
+                        continue;
+                    }
 
-                $row = [
-                    'content_request_id' => $request->id,
-                    'user_id' => $participant->id,
-                    'created_at' => $createdAt->addHours($offset + 1),
-                    'updated_at' => $createdAt->addHours($offset + 1),
-                ];
-                $rows['votes'][] = $row;
-                $rows['followers'][] = $row;
+                    $row = [
+                        'content_request_id' => $request->id,
+                        'user_id' => $participant->id,
+                        'created_at' => $createdAt->addHours($offset + 1),
+                        'updated_at' => $createdAt->addHours($offset + 1),
+                    ];
+                    $rows['votes'][] = $row;
+                    $rows['followers'][] = $row;
+                }
             }
 
             $rows['histories'][] = $this->historyRow($request, $ordinal, null, ContentRequestStatus::Submitted, 0, $createdAt);
@@ -250,7 +263,7 @@ final readonly class DemoContentRequestStage implements DemoDataStage
                     'url' => $url,
                     'url_hash' => hash('sha256', $url),
                     'provider' => $provider->value,
-                    'is_public' => $linkOrdinal !== 2,
+                    'is_public' => ! $request->type->isAdministrativeOnly() && $linkOrdinal !== 2,
                     'verified_at' => $createdAt->addDays(2),
                     'created_at' => $createdAt->addMinutes($linkOrdinal),
                     'updated_at' => $createdAt->addDays(2),
@@ -301,7 +314,9 @@ final readonly class DemoContentRequestStage implements DemoDataStage
             'actor_id' => $step === 0 ? $request->requester_id : null,
             'from_status' => $from?->value,
             'to_status' => $to->value,
-            'public_reason' => $step === 0 ? 'Заявка отправлена на рассмотрение.' : 'Статус изменён после проверки сведений и приложенных источников.',
+            'public_reason' => $request->type->isAdministrativeOnly()
+                ? null
+                : ($step === 0 ? 'Заявка отправлена на рассмотрение.' : 'Статус изменён после проверки сведений и приложенных источников.'),
             'private_note' => $step === 0 ? null : 'Демонстрационная запись истории рабочего процесса.',
             'idempotency_key' => $this->stable->hash("requests:{$ordinal}:history:{$step}"),
             'created_at' => $createdAt,

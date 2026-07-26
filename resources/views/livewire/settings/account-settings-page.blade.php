@@ -348,6 +348,34 @@
                                 <button type="button" wire:click="resetNotifications" wire:confirm="{{ __('settings.confirm.reset_notifications') }}" wire:loading.attr="disabled" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-amber-50 px-4 py-2.5 text-sm font-bold text-amber-800 hover:bg-amber-100"><x-ui.icon name="fa-solid fa-rotate-left" />{{ __('settings.actions.reset_defaults') }}</button>
                             </div>
                         @endif
+
+                        @if ($pushNotificationsAvailable)
+                            <section class="mt-6 rounded-control border border-sky-200 bg-sky-50 p-4 sm:p-5" aria-labelledby="settings-push-title" data-pwa-push-controls>
+                                <h3 id="settings-push-title" class="text-lg font-black text-sky-950">{{ __('settings.notifications.push_title') }}</h3>
+                                <p class="mt-1 text-sm leading-6 text-sky-900">{{ __('settings.notifications.push_hint') }}</p>
+                                <p
+                                    data-pwa-push-status
+                                    data-pwa-push-enabled="{{ __('settings.notifications.push_enabled') }}"
+                                    data-pwa-push-disabled="{{ __('settings.notifications.push_disabled') }}"
+                                    data-pwa-push-denied="{{ __('settings.notifications.push_denied') }}"
+                                    data-pwa-push-unsupported="{{ __('settings.notifications.push_unsupported') }}"
+                                    data-pwa-push-error="{{ __('settings.notifications.push_error') }}"
+                                    class="mt-3 text-sm font-bold text-sky-950"
+                                    role="status"
+                                    aria-live="polite"
+                                >{{ __('settings.notifications.push_initial') }}</p>
+                                <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                                    <button type="button" data-pwa-push-enable class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-sky-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-sky-800 disabled:cursor-wait disabled:opacity-60"><x-ui.icon name="fa-solid fa-bell" />{{ __('settings.notifications.push_enable') }}</button>
+                                    <button type="button" data-pwa-push-disable class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-white px-4 py-2.5 text-sm font-bold text-sky-900 hover:bg-sky-100 disabled:cursor-wait disabled:opacity-60"><x-ui.icon name="fa-regular fa-bell-slash" />{{ __('settings.notifications.push_disable') }}</button>
+                                </div>
+                                <p class="mt-3 text-xs font-semibold leading-5 text-sky-900">{{ __('settings.notifications.push_privacy') }}</p>
+                            </section>
+                        @else
+                            <section class="mt-6 rounded-control border border-slate-200 bg-slate-50 p-4 sm:p-5" aria-labelledby="settings-push-unavailable-title">
+                                <h3 id="settings-push-unavailable-title" class="text-lg font-black text-slate-900">{{ __('settings.notifications.push_title') }}</h3>
+                                <p class="mt-1 text-sm leading-6 text-slate-600">{{ __('settings.notifications.push_unavailable') }}</p>
+                            </section>
+                        @endif
                     </form>
                     @break
 

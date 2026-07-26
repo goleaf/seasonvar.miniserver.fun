@@ -101,8 +101,16 @@ final class DemoContentRequestStageTest extends TestCase
             $this->assertGreaterThanOrEqual(1, $request->externalIdentifiers()->count());
             $this->assertGreaterThanOrEqual(1, $request->statusHistory()->count());
             $this->assertGreaterThanOrEqual(2, $request->clarifications()->count());
-            $this->assertGreaterThanOrEqual(1, $request->votes()->count());
-            $this->assertGreaterThanOrEqual(1, $request->followers()->count());
+
+            if ($request->type->isAdministrativeOnly()) {
+                $this->assertFalse($request->is_public);
+                $this->assertSame(0, $request->votes()->count());
+                $this->assertSame(0, $request->followers()->count());
+                $this->assertFalse($request->sourceLinks()->where('is_public', true)->exists());
+            } else {
+                $this->assertGreaterThanOrEqual(1, $request->votes()->count());
+                $this->assertGreaterThanOrEqual(1, $request->followers()->count());
+            }
         }
 
         $this->assertFalse(DB::table('content_request_votes')

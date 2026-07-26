@@ -127,11 +127,6 @@
                             loading="eager"
                             class="mx-auto aspect-[2/3] w-44 max-w-full rounded-panel sm:w-52 md:w-full"
                         />
-                        <x-content-requests.correction-link
-                            :url="$correctionUrls['poster']"
-                            field="poster"
-                            class="w-full justify-center"
-                        />
                     </div>
 
                     <div class="min-w-0">
@@ -140,7 +135,6 @@
                                 <x-ui.icon name="fa-solid fa-clapperboard text-emerald-700" align="start" />
                                 <span class="min-w-0 break-words">{{ $showView->displayTitle }}</span>
                             </h1>
-                            <x-content-requests.correction-link :url="$correctionUrls['title']" field="title" />
                         </div>
                         @if ($showView->displayOriginalTitle !== '')
                             <div class="mt-2 break-words text-sm font-semibold text-slate-600">{{ $showView->displayOriginalTitle }}</div>
@@ -150,7 +144,6 @@
                             @if ($title->year)
                                 <x-ui.taxonomy-chip :href="route('titles.year', ['year' => $title->year])" active icon="fa-solid fa-calendar-days">{{ $title->year }}</x-ui.taxonomy-chip>
                             @endif
-                            <x-content-requests.correction-link :url="$correctionUrls['year']" field="year" />
                             @foreach ($ageRatings as $ageRating)
                                 <x-ui.taxonomy-chip :taxonomy="$ageRating" active />
                             @endforeach
@@ -165,7 +158,6 @@
                                     <x-ui.icon name="fa-solid fa-book-open text-slate-400" />
                                     <span>{{ __('catalog.title.description') }}</span>
                                 </h2>
-                                <x-content-requests.correction-link :url="$correctionUrls['description']" field="description" />
                             </div>
                             <p class="mt-2 text-base leading-7 text-slate-700">{{ $showView->displayDescription !== '' ? $showView->displayDescription : __('catalog.title.description_missing') }}</p>
                         </section>
@@ -202,20 +194,12 @@
                             <x-ui.icon name="fa-solid fa-user-group text-slate-400" />
                             <span>{{ __('catalog.title.cast') }}</span>
                         </div>
-                        @if ($actors->isEmpty())
-                            <x-content-requests.correction-link :url="$correctionUrls['actor']" field="actor" />
-                        @endif
                     </div>
                     @if ($actors->isNotEmpty())
                         <div class="mt-2 flex flex-wrap gap-2">
                             @foreach ($actors->take(12) as $actor)
                                 <span class="inline-flex flex-wrap items-center gap-1">
                                     <x-ui.taxonomy-chip :taxonomy="$actor" />
-                                    <x-content-requests.correction-link
-                                        :url="$taxonomyCorrectionUrls['actor'][$actor->id]"
-                                        field="actor"
-                                        :label="__('requests.actions.correct_short')"
-                                    />
                                 </span>
                             @endforeach
                         </div>
@@ -234,20 +218,9 @@
                                     @forelse ($row['items'] as $taxonomy)
                                         <span class="inline-flex flex-wrap items-center gap-1">
                                             <x-ui.taxonomy-chip :taxonomy="$taxonomy" />
-                                            @if (isset($taxonomyCorrectionUrls[$row['type']][$taxonomy->id]))
-                                                <x-content-requests.correction-link
-                                                    :url="$taxonomyCorrectionUrls[$row['type']][$taxonomy->id]"
-                                                    :field="$row['type']"
-                                                    :label="__('requests.actions.correct_short')"
-                                                />
-                                            @endif
                                         </span>
                                     @empty
                                         <span class="inline-flex min-h-11 items-center text-slate-500">{{ __('requests.corrections.value_missing') }}</span>
-                                        <x-content-requests.correction-link
-                                            :url="$correctionUrls[$row['type']]"
-                                            :field="$row['type']"
-                                        />
                                     @endforelse
                                 </dd>
                             </div>

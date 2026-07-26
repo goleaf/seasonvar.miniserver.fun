@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">Seasonvar</title>
+  <rect width="512" height="512" rx="112" fill="#ecfdf5"/>
+  <circle cx="256" cy="256" r="176" fill="#047857"/>
+  <path d="M214 164c0-17 19-27 33-18l123 78c14 9 14 29 0 38l-123 78c-14 9-33-1-33-18V164Z" fill="#fff"/>
+  <path d="M146 172h46v168h-46z" fill="#a7f3d0"/>
+</svg>

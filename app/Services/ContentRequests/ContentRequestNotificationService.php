@@ -15,6 +15,7 @@ use App\Services\Admin\AdminEligibleUserQuery;
 use App\Support\DeterministicUuid;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Throwable;
 
 final class ContentRequestNotificationService
@@ -25,11 +26,14 @@ final class ContentRequestNotificationService
     {
         $this->safely(function () use ($request): void {
             $request->loadMissing('requester:id,name');
-            $recipients = $this->eligibleAdministrators
+            $administrators = $this->eligibleAdministrators
                 ->forPermission(AdminPermission::RequestsModerate)
-                ->get(['id', 'name'])
-                ->when($request->requester instanceof User, fn ($users) => $users->push($request->requester))
-                ->unique('id');
+                ->get(['id', 'name']);
+            $recipients = $request->type->isAdministrativeOnly()
+                ? $administrators
+                : $administrators
+                    ->when($request->requester instanceof User, fn ($users) => $users->push($request->requester))
+                    ->unique('id');
 
             foreach ($recipients as $recipient) {
                 if ($request->requester instanceof User
@@ -56,7 +60,10 @@ final class ContentRequestNotificationService
     {
         $this->safely(function () use ($source, $canonical, $actor, $recipients): void {
             User::query()->whereKey(array_keys($recipients))->get(['id', 'name'])->each(function (User $recipient) use ($source, $canonical, $actor, $recipients): void {
-                if (($actor !== null && $recipient->is($actor)) || ! $this->enabled($recipient, $recipients[$recipient->id] ?? 'voted')) {
+                if (($actor !== null && $recipient->is($actor))
+                    || (($source->type->isAdministrativeOnly() || $canonical->type->isAdministrativeOnly())
+                        && Gate::forUser($recipient)->denies('manage-content-requests'))
+                    || ! $this->enabled($recipient, $recipients[$recipient->id] ?? 'voted')) {
                     return;
                 }
 
@@ -106,7 +113,9 @@ final class ContentRequestNotificationService
             foreach ($roles as $recipient) {
                 $user = $recipient['user'];
 
-                if (($actor !== null && $user->is($actor)) || ! $this->enabled($user, $recipient['role'])) {
+                if (($actor !== null && $user->is($actor))
+                    || ($request->type->isAdministrativeOnly() && Gate::forUser($user)->denies('manage-content-requests'))
+                    || ! $this->enabled($user, $recipient['role'])) {
                     continue;
                 }
 

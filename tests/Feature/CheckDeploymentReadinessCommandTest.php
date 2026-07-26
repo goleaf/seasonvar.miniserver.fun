@@ -20,7 +20,18 @@ final class CheckDeploymentReadinessCommandTest extends TestCase
 
     public function test_command_reports_ready_for_a_safe_runtime_and_consistent_sqlite_database(): void
     {
+        $resource = openssl_pkey_new([
+            'curve_name' => 'prime256v1',
+            'private_key_type' => OPENSSL_KEYTYPE_EC,
+        ]);
+        $this->assertNotFalse($resource);
+        $this->assertTrue(openssl_pkey_export($resource, $privateKey));
+        $details = openssl_pkey_get_details($resource);
+        $this->assertIsArray($details);
+        $publicKey = "\x04".$details['ec']['x'].$details['ec']['y'];
+
         config([
+            'app.url' => 'https://catalog.example.com',
             'app.env' => 'production',
             'app.debug' => false,
             'logging.default' => 'daily',
@@ -32,6 +43,11 @@ final class CheckDeploymentReadinessCommandTest extends TestCase
             'session.connection' => 'sessions',
             'queue.default' => 'redis',
             'queue.connections.redis.connection' => 'queues',
+            'pwa.enabled' => true,
+            'pwa.push.enabled' => true,
+            'pwa.push.private_key' => base64_encode($privateKey),
+            'pwa.push.public_key' => rtrim(strtr(base64_encode($publicKey), '+/', '-_'), '='),
+            'pwa.push.subject' => 'mailto:operations@example.com',
         ]);
 
         $exitCode = Artisan::call('app:deployment-check', ['--json' => true]);
@@ -49,6 +65,7 @@ final class CheckDeploymentReadinessCommandTest extends TestCase
         $this->assertSame(0, $checks->get('migrations')['metadata']['pending_count']);
         $this->assertSame('pass', $checks->get('sqlite_integrity')['status']);
         $this->assertSame(0, $checks->get('sqlite_integrity')['metadata']['foreign_key_errors']);
+        $this->assertSame('pass', $checks->get('pwa_push')['status']);
     }
 
     public function test_failed_job_summary_is_bounded_and_never_exposes_payload_or_exception_text(): void

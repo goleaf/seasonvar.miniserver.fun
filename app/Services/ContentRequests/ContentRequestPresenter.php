@@ -35,7 +35,7 @@ final class ContentRequestPresenter
             hasVoted: (bool) ($request->viewer_has_voted ?? false),
             isFollowing: (bool) ($request->viewer_is_following ?? false),
             isRequester: $viewer !== null && $request->requester_id === $viewer->id,
-            canEngage: $request->status->canEngage(),
+            canEngage: ! $request->type->isAdministrativeOnly() && $request->status->canEngage(),
             correctionFieldLabel: $request->correction_field !== null
                 ? __('requests.correction_fields.'.$request->correction_field)
                 : null,

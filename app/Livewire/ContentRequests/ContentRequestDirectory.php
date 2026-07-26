@@ -82,7 +82,7 @@ final class ContentRequestDirectory extends Component
         return view('livewire.content-requests.directory', [
             'requests' => $requests,
             'schemaReady' => $schema->ready(),
-            'typeOptions' => $this->enumOptions(ContentRequestType::cases()),
+            'typeOptions' => $this->enumOptions(ContentRequestType::publicCases()),
             'statusOptions' => $this->enumOptions(array_values(array_filter(
                 ContentRequestStatus::cases(),
                 static fn (ContentRequestStatus $status): bool => ! in_array($status, [ContentRequestStatus::Merged, ContentRequestStatus::Duplicate], true),
@@ -103,7 +103,8 @@ final class ContentRequestDirectory extends Component
     private function normalize(): void
     {
         $this->search = Str::limit(Str::squish($this->search), 120, '');
-        $this->type = ContentRequestType::tryFrom($this->type)?->value ?? '';
+        $type = ContentRequestType::tryFrom($this->type);
+        $this->type = $type !== null && ! $type->isAdministrativeOnly() ? $type->value : '';
         $this->status = ContentRequestStatus::tryFrom($this->status)?->value ?? '';
         $this->sort = ContentRequestSort::tryFrom($this->sort)?->value ?? ContentRequestSort::MostVoted->value;
     }

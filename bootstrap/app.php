@@ -10,6 +10,7 @@ use App\Http\Middleware\EnsureAdministrator;
 use App\Http\Middleware\EnsureMobileEmailIsVerified;
 use App\Http\Middleware\PrivateAccountResponse;
 use App\Http\Middleware\PublicHttpCacheHeaders;
+use App\Http\Middleware\PwaOfflineShellHeaders;
 use App\Http\Middleware\ResolveCanonicalTagRoute;
 use App\Http\Middleware\ResolveOptionalSanctumUser;
 use App\Http\Middleware\SetApiLocale;
@@ -38,6 +39,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->prepend(PwaOfflineShellHeaders::class);
         $middleware->validateCsrfTokens(except: [
             'billing/webhooks/*',
         ]);
@@ -96,7 +98,15 @@ return Application::configure(basePath: dirname(__DIR__))
         ], 403);
 
         $exceptions->shouldRenderJsonWhen(
-            fn (Request $request) => $request->is('api/*') || $request->routeIs('playback.quality.store'),
+            fn (Request $request) => $request->is('api/*')
+                || ($request->expectsJson() && $request->is(
+                    'pwa/actions',
+                    'pwa/help-snapshot',
+                    'pwa/library-snapshot',
+                    'pwa/push-subscriptions',
+                    'pwa/session',
+                ))
+                || $request->routeIs('playback.quality.store'),
         );
         $exceptions->render(function (ValidationException $exception, Request $request) {
             if (! $request->is('api/*')) {

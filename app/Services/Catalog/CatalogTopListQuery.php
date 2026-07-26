@@ -110,7 +110,9 @@ final class CatalogTopListQuery
 
     public function hasItems(CatalogTopListCategory $category): bool
     {
-        return $this->rankedRows($category, 1, CatalogTopListFilters::empty())->isNotEmpty();
+        return $this
+            ->rankableQuery($category, CatalogTopListFilters::empty())
+            ->exists();
     }
 
     /** @return Collection<int, CatalogTitle> */
@@ -119,6 +121,34 @@ final class CatalogTopListQuery
         int $limit,
         CatalogTopListFilters $filters,
     ): Collection {
+        $ratingExpression = $this->ratingExpression();
+        $votesExpression = $this->votesExpression();
+        $weightedScoreExpression = "(({$ratingExpression} * {$votesExpression}) + ".
+            (self::PRIOR_RATING * self::PRIOR_VOTES).') / ('.$votesExpression.' + '.self::PRIOR_VOTES.'.0)';
+
+        return $this
+            ->rankableQuery($category, $filters)
+            ->select([
+                'catalog_titles.id',
+                'top_kinopoisk_rating.rating as top_kinopoisk_rating',
+                'top_kinopoisk_rating.votes as top_kinopoisk_votes',
+                'top_imdb_rating.rating as top_imdb_rating',
+                'top_imdb_rating.votes as top_imdb_votes',
+            ])
+            ->selectRaw("{$weightedScoreExpression} AS top_weighted_score")
+            ->orderByRaw("{$weightedScoreExpression} DESC")
+            ->orderByRaw("{$votesExpression} DESC")
+            ->orderByRaw("{$ratingExpression} DESC")
+            ->orderByDesc('catalog_titles.id')
+            ->limit(max(1, min(self::LIMIT, $limit)))
+            ->get();
+    }
+
+    /** @return Builder<CatalogTitle> */
+    private function rankableQuery(
+        CatalogTopListCategory $category,
+        CatalogTopListFilters $filters,
+    ): Builder {
         $context = new CatalogRecommendationContext(
             type: CatalogRecommendationType::TopRated,
             user: null,
@@ -127,12 +157,8 @@ final class CatalogTopListQuery
             ratingSource: 'kinopoisk',
         );
         $ratingTable = (new CatalogTitleRating)->getTable();
-        $ratingExpression = 'CASE WHEN top_kinopoisk_rating.rating IS NOT NULL '
-            .'THEN top_kinopoisk_rating.rating ELSE top_imdb_rating.rating END';
-        $votesExpression = 'CASE WHEN top_kinopoisk_rating.rating IS NOT NULL '
-            .'THEN COALESCE(top_kinopoisk_rating.votes, 0) ELSE COALESCE(top_imdb_rating.votes, 0) END';
-        $weightedScoreExpression = "(({$ratingExpression} * {$votesExpression}) + ".
-            (self::PRIOR_RATING * self::PRIOR_VOTES).') / ('.$votesExpression.' + '.self::PRIOR_VOTES.'.0)';
+        $ratingExpression = $this->ratingExpression();
+        $votesExpression = $this->votesExpression();
         $query = $this->visibility
             ->eligible($context, watchable: true)
             ->leftJoin($ratingTable.' as top_kinopoisk_rating', function (JoinClause $join): void {
@@ -150,21 +176,7 @@ final class CatalogTopListQuery
 
         $this->applyCategory($query, $category);
 
-        return $query
-            ->select([
-                'catalog_titles.id',
-                'top_kinopoisk_rating.rating as top_kinopoisk_rating',
-                'top_kinopoisk_rating.votes as top_kinopoisk_votes',
-                'top_imdb_rating.rating as top_imdb_rating',
-                'top_imdb_rating.votes as top_imdb_votes',
-            ])
-            ->selectRaw("{$weightedScoreExpression} AS top_weighted_score")
-            ->orderByRaw("{$weightedScoreExpression} DESC")
-            ->orderByRaw("{$votesExpression} DESC")
-            ->orderByRaw("{$ratingExpression} DESC")
-            ->orderByDesc('catalog_titles.id')
-            ->limit(max(1, min(self::LIMIT, $limit)))
-            ->get();
+        return $query;
     }
 
     /** @param Builder<CatalogTitle> $query */
@@ -192,18 +204,42 @@ final class CatalogTopListQuery
         $query->where('genres.slug', self::ANIMATION_GENRE_SLUG);
     }
 
-    /** @return Builder<Episode> */
+    /** @return Builder<Season> */
     private function availableEpisodeTitleIds(bool $multiple): Builder
     {
-        $query = Episode::query()
+        $availableEpisodes = Episode::query()
             ->availableTo(null)
-            ->join('seasons', 'seasons.id', '=', 'episodes.season_id')
-            ->whereIn('seasons.id', Season::query()->availableTo(null)->select('seasons.id'));
+            ->select([
+                'episodes.id',
+                'episodes.season_id',
+            ]);
 
-        return $query
+        return Season::query()
+            ->availableTo(null)
+            ->joinSub(
+                $availableEpisodes,
+                'top_available_episodes',
+                fn (JoinClause $join): JoinClause => $join->on(
+                    'top_available_episodes.season_id',
+                    '=',
+                    'seasons.id',
+                ),
+            )
             ->select('seasons.catalog_title_id')
             ->groupBy('seasons.catalog_title_id')
-            ->havingRaw($multiple ? 'COUNT(DISTINCT episodes.id) >= 2' : 'COUNT(DISTINCT episodes.id) = 1');
+            ->havingRaw($multiple ? 'COUNT(*) >= 2' : 'COUNT(*) = 1');
+    }
+
+    private function ratingExpression(): string
+    {
+        return 'CASE WHEN top_kinopoisk_rating.rating IS NOT NULL '
+            .'THEN top_kinopoisk_rating.rating ELSE top_imdb_rating.rating END';
+    }
+
+    private function votesExpression(): string
+    {
+        return 'CASE WHEN top_kinopoisk_rating.rating IS NOT NULL '
+            .'THEN COALESCE(top_kinopoisk_rating.votes, 0) ELSE COALESCE(top_imdb_rating.votes, 0) END';
     }
 
     private function nullableFloat(mixed $value): ?float

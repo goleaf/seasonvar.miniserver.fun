@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\HelpCenter;
 
 use App\DTOs\Help\HelpEscalationData;
+use App\Enums\ContentRequestType;
 use App\Enums\HelpEscalationType;
 use App\Models\HelpArticle;
 use App\Services\TechnicalIssues\TechnicalIssueContext;
@@ -85,8 +86,16 @@ final readonly class HelpEscalationService
 
             $parameters = [];
 
-            if (is_string($article->escalation_request_type) && in_array($article->escalation_request_type, (array) config('help-center.allowed_request_types', []), true)) {
-                $parameters['type'] = $article->escalation_request_type;
+            if (is_string($article->escalation_request_type)) {
+                $requestType = ContentRequestType::tryFrom($article->escalation_request_type);
+
+                if ($requestType === null
+                    || $requestType->isAdministrativeOnly()
+                    || ! in_array($requestType->value, (array) config('help-center.allowed_request_types', []), true)) {
+                    return null;
+                }
+
+                $parameters['type'] = $requestType->value;
             }
 
             $parameters['help_article'] = $article->public_id;
