@@ -459,6 +459,7 @@
 - `2026_07_26_230000_create_catalog_recommendation_feedback_preferences.php`
 - `2026_07_26_231000_add_taste_onboarding_to_catalog_recommendations.php`
 - `2026_07_26_231100_add_merge_lookup_index_to_catalog_recommendation_onboarding_titles.php`
+- `2026_07_26_232000_add_smart_rules_to_catalog_collections.php`
 <!-- project-docs:end -->
 
 ## 2026-07-16 — recommendation/discovery task 18

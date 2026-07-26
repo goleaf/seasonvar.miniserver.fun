@@ -6,8 +6,12 @@ namespace App\Livewire\Collections;
 
 use App\DTOs\CatalogCollectionData;
 use App\DTOs\CatalogCollectionItemCriteria;
+use App\DTOs\CatalogSmartCollectionRules;
 use App\Enums\CatalogCollectionSort;
 use App\Enums\CatalogCollectionVisibility;
+use App\Enums\CatalogSmartCollectionCompletion;
+use App\Enums\CatalogSmartCollectionPreset;
+use App\Enums\CatalogWatchStatus;
 use App\Livewire\Concerns\InteractsWithCatalogCollectionCategory;
 use App\Livewire\Concerns\InteractsWithCollectionLocale;
 use App\Livewire\Concerns\InteractsWithPaginationIslands;
@@ -19,10 +23,12 @@ use App\Services\Collections\CatalogCollectionItemService;
 use App\Services\Collections\CatalogCollectionQuery;
 use App\Services\Collections\CatalogCollectionResolver;
 use App\Services\Collections\CatalogCollectionService;
+use App\Services\Collections\CatalogSmartCollectionOptionsQuery;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -53,6 +59,9 @@ final class CatalogCollectionEditor extends Component
     public string $sortMode = 'manual';
 
     #[Locked]
+    public string $mode = 'manual';
+
+    #[Locked]
     public string $contentLocale = self::AUTHORING_LOCALE;
 
     public string $seoTitle = '';
@@ -60,6 +69,40 @@ final class CatalogCollectionEditor extends Component
     public string $seoDescription = '';
 
     public ?string $status = null;
+
+    public string $countrySlug = '';
+
+    public string $genreSlug = '';
+
+    public string $actorSlug = '';
+
+    public string $actorSearch = '';
+
+    public string $imdbMin = '';
+
+    public string $yearFrom = '';
+
+    public string $yearTo = '';
+
+    public string $completion = '';
+
+    public string $episodesMax = '';
+
+    public string $maxEpisodeMinutes = '';
+
+    public bool $inLibrary = false;
+
+    public bool $unwatched = false;
+
+    public bool $hasSubtitles = false;
+
+    public bool $hasNewEpisodes = false;
+
+    public string $watchStatus = '';
+
+    public string $watchStatusOlderDays = '';
+
+    public bool $videoAvailable = false;
 
     public function mount(string $collectionPublicId, CatalogCollectionResolver $resolver): void
     {
@@ -84,6 +127,28 @@ final class CatalogCollectionEditor extends Component
             'categoryPublicId' => ['nullable', 'uuid'],
             'seoTitle' => ['nullable', 'string', 'max:180'],
             'seoDescription' => ['nullable', 'string', 'max:500'],
+            'countrySlug' => ['nullable', 'string', 'max:120'],
+            'genreSlug' => ['nullable', 'string', 'max:120'],
+            'actorSlug' => ['nullable', 'string', 'max:120'],
+            'imdbMin' => ['nullable', 'string', 'max:8'],
+            'yearFrom' => ['nullable', 'string', 'max:4'],
+            'yearTo' => ['nullable', 'string', 'max:4'],
+            'completion' => ['nullable', Rule::in([
+                '',
+                ...array_column(CatalogSmartCollectionCompletion::cases(), 'value'),
+            ])],
+            'episodesMax' => ['nullable', 'string', 'max:5'],
+            'maxEpisodeMinutes' => ['nullable', 'string', 'max:4'],
+            'inLibrary' => ['boolean'],
+            'unwatched' => ['boolean'],
+            'hasSubtitles' => ['boolean'],
+            'hasNewEpisodes' => ['boolean'],
+            'watchStatus' => ['nullable', Rule::in([
+                '',
+                ...array_column(CatalogWatchStatus::cases(), 'value'),
+            ])],
+            'watchStatusOlderDays' => ['nullable', 'string', 'max:4'],
+            'videoAvailable' => ['boolean'],
         ], [
             'name.*' => __('collections.validation.name'),
             'description.*' => __('collections.validation.description'),
@@ -95,10 +160,13 @@ final class CatalogCollectionEditor extends Component
             'seoDescription.*' => __('collections.validation.seo_description'),
         ]);
         $collection = $resolver->byPublicId($this->collectionPublicId);
+        $smartRules = $collection->isSmart() ? $this->smartRules() : null;
         $updated = $service->update($this->user(), $collection, new CatalogCollectionData(
             name: $validated['name'],
             description: $validated['description'] !== '' ? $validated['description'] : null,
-            visibility: CatalogCollectionVisibility::from($validated['visibility']),
+            visibility: $collection->isSmart()
+                ? CatalogCollectionVisibility::Private
+                : CatalogCollectionVisibility::from($validated['visibility']),
             sortMode: CatalogCollectionSort::from($validated['sortMode']),
             type: $collection->type,
             contentLocale: $collection->type->value === 'editorial'
@@ -110,10 +178,36 @@ final class CatalogCollectionEditor extends Component
             seoDescription: $collection->type->value === 'editorial' && $validated['seoDescription'] !== ''
                 ? $validated['seoDescription']
                 : null,
-            categoryPublicId: $this->selectedCategoryPublicId(),
+            categoryPublicId: $collection->isSmart() ? null : $this->selectedCategoryPublicId(),
+            mode: $collection->mode,
+            smartRules: $smartRules,
         ), $this->contentVersion);
         $this->fillCollection($updated);
         $this->status = __('collections.status.updated');
+    }
+
+    public function applySmartPreset(string $preset): void
+    {
+        $preset = CatalogSmartCollectionPreset::tryFrom($preset);
+
+        if (! $preset instanceof CatalogSmartCollectionPreset) {
+            $this->addError('smartPreset', __('collections.smart.validation.preset'));
+
+            return;
+        }
+
+        $this->fillSmartRules($preset->rules());
+        $this->resetValidation();
+    }
+
+    public function resetSmartRules(CatalogCollectionResolver $resolver): void
+    {
+        $collection = $resolver->byPublicId($this->collectionPublicId);
+        Gate::authorize('update', $collection);
+        $rules = $collection->smartRules();
+        abort_unless($collection->isSmart() && $rules instanceof CatalogSmartCollectionRules, 404);
+        $this->fillSmartRules($rules);
+        $this->resetValidation();
     }
 
     public function removeItem(int $catalogTitleId, CatalogCollectionResolver $resolver, CatalogCollectionItemService $items): void
@@ -178,27 +272,32 @@ final class CatalogCollectionEditor extends Component
         CatalogCollectionResolver $resolver,
         CatalogCollectionQuery $query,
         CatalogCollectionCategoryQuery $categories,
+        CatalogSmartCollectionOptionsQuery $smartOptions,
     ): View {
         $collection = $query->summary($resolver->byPublicId($this->collectionPublicId));
         Gate::authorize('update', $collection);
         $user = $this->user();
         $items = $query->items($collection, $user, new CatalogCollectionItemCriteria(
-            sort: CatalogCollectionSort::Manual,
+            sort: $collection->isSmart() ? $collection->sort_mode : CatalogCollectionSort::Manual,
             perPage: self::ITEMS_PER_PAGE,
         ));
-        $totalItems = (int) ($collection->total_items_count ?? 0);
+        $totalItems = $collection->isSmart()
+            ? $items->total()
+            : (int) ($collection->total_items_count ?? 0);
 
-        foreach ($items->getCollection() as $item) {
-            $position = (int) $item->getAttribute('collection_position');
-            $item->setAttribute('collection_position_label', __('collections.page.position', ['position' => $position]));
-            $item->setAttribute('collection_can_move_up', $position > 1);
-            $item->setAttribute('collection_can_move_down', $position < $totalItems);
-            $item->setAttribute('collection_move_up_label', __('collections.accessibility.reorder_item', [
-                'title' => $item->display_title,
-            ]).' — '.__('collections.actions.move_up'));
-            $item->setAttribute('collection_move_down_label', __('collections.accessibility.reorder_item', [
-                'title' => $item->display_title,
-            ]).' — '.__('collections.actions.move_down'));
+        if (! $collection->isSmart()) {
+            foreach ($items->getCollection() as $item) {
+                $position = (int) $item->getAttribute('collection_position');
+                $item->setAttribute('collection_position_label', __('collections.page.position', ['position' => $position]));
+                $item->setAttribute('collection_can_move_up', $position > 1);
+                $item->setAttribute('collection_can_move_down', $position < $totalItems);
+                $item->setAttribute('collection_move_up_label', __('collections.accessibility.reorder_item', [
+                    'title' => $item->display_title,
+                ]).' — '.__('collections.actions.move_up'));
+                $item->setAttribute('collection_move_down_label', __('collections.accessibility.reorder_item', [
+                    'title' => $item->display_title,
+                ]).' — '.__('collections.actions.move_down'));
+            }
         }
         $isEditorial = $collection->type->value === 'editorial';
         $collection->loadMissing([
@@ -214,6 +313,7 @@ final class CatalogCollectionEditor extends Component
             'collectionVisibilityLabel' => $collection->visibility->label(),
             'collectionModerationLabel' => $collection->moderation_status->label(),
             'isEditorial' => $isEditorial,
+            'isSmart' => $collection->isSmart(),
             'isPendingModeration' => $collection->moderation_status->value === 'pending',
             'canOpenPublicPage' => $collection->isPubliclyViewable()
                 && ($collection->visibility !== CatalogCollectionVisibility::Public
@@ -227,6 +327,31 @@ final class CatalogCollectionEditor extends Component
                 'value' => $option->value,
                 'label' => $option->label(),
             ], CatalogCollectionSort::cases()),
+            'smartPresetOptions' => array_map(static fn (CatalogSmartCollectionPreset $preset): array => [
+                'value' => $preset->value,
+                'label' => $preset->label(),
+                'description' => $preset->description(),
+            ], CatalogSmartCollectionPreset::cases()),
+            'smartCountryOptions' => $collection->isSmart() ? $smartOptions->countries() : collect(),
+            'smartGenreOptions' => $collection->isSmart() ? $smartOptions->genres() : collect(),
+            'smartActorOptions' => $collection->isSmart() ? $smartOptions->actors($this->actorSearch) : collect(),
+            'showSmartActorResults' => $collection->isSmart() && mb_strlen($this->actorSearch) >= 2,
+            'smartCompletionOptions' => array_map(static fn (CatalogSmartCollectionCompletion $option): array => [
+                'value' => $option->value,
+                'label' => $option->label(),
+            ], CatalogSmartCollectionCompletion::cases()),
+            'smartWatchStatusOptions' => array_map(static fn (CatalogWatchStatus $option): array => [
+                'value' => $option->value,
+                'label' => __("collections.smart.watch_status.{$option->value}"),
+            ], CatalogWatchStatus::cases()),
+            'smartRuleSummary' => $collection->isSmart() ? $this->smartRuleSummary() : [],
+            'smartBooleanOptions' => [
+                ['property' => 'inLibrary', 'label' => 'in_library'],
+                ['property' => 'unwatched', 'label' => 'unwatched'],
+                ['property' => 'hasSubtitles', 'label' => 'has_subtitles'],
+                ['property' => 'hasNewEpisodes', 'label' => 'has_new_episodes'],
+                ['property' => 'videoAvailable', 'label' => 'video_available'],
+            ],
             ...$this->categorySelectionViewData($categories, $collection->category),
         ])->extends('layouts.app', [
             'title' => __('collections.actions.edit').' — '.$collection->display_name,
@@ -254,8 +379,74 @@ final class CatalogCollectionEditor extends Component
         $this->seoDescription = $translation instanceof CatalogCollectionTranslation ? ($translation->seo_description ?? '') : '';
         $this->visibility = $collection->visibility->value;
         $this->sortMode = $collection->sort_mode->value;
+        $this->mode = $collection->mode->value;
         $this->contentVersion = $collection->content_version;
         $this->fillCategorySelection($collection);
+
+        if ($collection->isSmart() && ($rules = $collection->smartRules()) instanceof CatalogSmartCollectionRules) {
+            $this->fillSmartRules($rules);
+        }
+    }
+
+    private function smartRules(): CatalogSmartCollectionRules
+    {
+        return CatalogSmartCollectionRules::fromInput([
+            'country_slug' => $this->countrySlug,
+            'genre_slug' => $this->genreSlug,
+            'actor_slug' => $this->actorSlug,
+            'imdb_min' => $this->imdbMin,
+            'year_from' => $this->yearFrom,
+            'year_to' => $this->yearTo,
+            'completion' => $this->completion,
+            'episodes_max' => $this->episodesMax,
+            'max_episode_minutes' => $this->maxEpisodeMinutes,
+            'in_library' => $this->inLibrary,
+            'unwatched' => $this->unwatched,
+            'has_subtitles' => $this->hasSubtitles,
+            'has_new_episodes' => $this->hasNewEpisodes,
+            'watch_status' => $this->watchStatus,
+            'watch_status_older_days' => $this->watchStatusOlderDays,
+            'video_available' => $this->videoAvailable,
+        ]);
+    }
+
+    private function fillSmartRules(CatalogSmartCollectionRules $rules): void
+    {
+        $this->countrySlug = $rules->countrySlug ?? '';
+        $this->genreSlug = $rules->genreSlug ?? '';
+        $this->actorSlug = $rules->actorSlug ?? '';
+        $this->imdbMin = $rules->imdbMin === null ? '' : (string) $rules->imdbMin;
+        $this->yearFrom = $rules->yearFrom === null ? '' : (string) $rules->yearFrom;
+        $this->yearTo = $rules->yearTo === null ? '' : (string) $rules->yearTo;
+        $this->completion = $rules->completion->value ?? '';
+        $this->episodesMax = $rules->episodesMax === null ? '' : (string) $rules->episodesMax;
+        $this->maxEpisodeMinutes = $rules->maxEpisodeMinutes === null ? '' : (string) $rules->maxEpisodeMinutes;
+        $this->inLibrary = $rules->inLibrary;
+        $this->unwatched = $rules->unwatched;
+        $this->hasSubtitles = $rules->hasSubtitles;
+        $this->hasNewEpisodes = $rules->hasNewEpisodes;
+        $this->watchStatus = $rules->watchStatus->value ?? '';
+        $this->watchStatusOlderDays = $rules->watchStatusOlderDays === null
+            ? ''
+            : (string) $rules->watchStatusOlderDays;
+        $this->videoAvailable = $rules->videoAvailable;
+    }
+
+    /** @return list<string> */
+    private function smartRuleSummary(): array
+    {
+        try {
+            $rules = $this->smartRules();
+        } catch (ValidationException) {
+            return [];
+        }
+
+        return collect($rules->toArray())
+            ->filter(fn (mixed $value): bool => $value !== null && $value !== false && $value !== '')
+            ->keys()
+            ->map(fn (string $key): string => __("collections.smart.fields.{$key}"))
+            ->values()
+            ->all();
     }
 
     private function user(): User

@@ -9,6 +9,7 @@ use App\Enums\ReleaseDatePrecision;
 use App\Enums\ReleaseScheduleEntryType;
 use App\Models\ReleaseCalendarFeed;
 use App\Models\ReleaseScheduleEntry;
+use App\Services\Collections\CatalogSmartCollectionQuery;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -18,6 +19,7 @@ final readonly class ReleaseCalendarFeedQuery
     public function __construct(
         private ReleaseScheduleVisibility $visibility,
         private ReleaseCalendarQuery $calendar,
+        private CatalogSmartCollectionQuery $smartCollections,
     ) {}
 
     /** @return Collection<int, ReleaseScheduleEntry> */
@@ -104,13 +106,7 @@ final readonly class ReleaseCalendarFeedQuery
                 ->where('language_code', $feed->language_code)
                 ->when($feed->catalog_title_id !== null, fn (Builder $query): Builder => $query
                     ->where('release_schedule_entries.catalog_title_id', $feed->catalog_title_id)),
-            ReleaseCalendarFeedScope::Collection => $query->whereHas(
-                'catalogTitle.collectionItems',
-                fn (Builder $items): Builder => $items->where(
-                    'catalog_collection_items.catalog_collection_id',
-                    $feed->catalog_collection_id,
-                ),
-            ),
+            ReleaseCalendarFeedScope::Collection => $this->constrainCollection($query, $feed),
         };
 
         return $query
@@ -118,5 +114,35 @@ final readonly class ReleaseCalendarFeedQuery
             ->orderBy('release_schedule_entries.id')
             ->limit(max(1, (int) config('release-calendar.feeds.max_events', 1000)))
             ->get();
+    }
+
+    /** @param Builder<ReleaseScheduleEntry> $query */
+    private function constrainCollection(Builder $query, ReleaseCalendarFeed $feed): void
+    {
+        $collection = $feed->catalogCollection;
+        $user = $feed->user;
+
+        if ($collection === null || ! $collection->isOwnedBy($user)) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        if ($collection->isSmart()) {
+            $query->whereIn(
+                'release_schedule_entries.catalog_title_id',
+                $this->smartCollections->titleIds($collection, $user),
+            );
+
+            return;
+        }
+
+        $query->whereHas(
+            'catalogTitle.collectionItems',
+            fn (Builder $items): Builder => $items->where(
+                'catalog_collection_items.catalog_collection_id',
+                $collection->id,
+            ),
+        );
     }
 }

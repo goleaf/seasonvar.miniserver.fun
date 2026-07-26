@@ -18,6 +18,9 @@
             @if ($card->imported)
                 <x-ui.status-pill variant="success" icon="fa-solid fa-rotate">{{ $card->importedLabel }}</x-ui.status-pill>
             @endif
+            @if ($card->smart)
+                <x-ui.status-pill variant="success" icon="fa-solid fa-wand-magic-sparkles">{{ __('collections.smart.badge') }}</x-ui.status-pill>
+            @endif
             @if ($card->featured)
                 <x-ui.status-pill variant="warning">{{ $card->featuredLabel }}</x-ui.status-pill>
             @endif

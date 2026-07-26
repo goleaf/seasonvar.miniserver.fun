@@ -39,7 +39,12 @@ final class CatalogCollectionSchema
             $tables = Schema::getTableListing(schemaQualified: false);
 
             return $this->available = array_diff(self::REQUIRED_TABLES, $tables) === []
-                && Schema::hasColumn('users', 'public_id');
+                && Schema::hasColumn('users', 'public_id')
+                && Schema::hasColumns('catalog_collections', [
+                    'mode',
+                    'smart_rules',
+                    'smart_rules_version',
+                ]);
         } catch (Throwable) {
             return $this->available = false;
         }

@@ -10141,6 +10141,122 @@ Detailed implementation plan:
     attempted and rejected before transfer because GitHub HTTPS credentials
     are unavailable.
 
+## Task 76 — умные личные подборки
+
+Статус: `verification_complete_git_in_progress`.
+
+Дата начала: 26.07.2026.
+
+Approved design:
+[`2026-07-26-smart-collections-design.md`](../superpowers/specs/2026-07-26-smart-collections-design.md).
+
+Detailed implementation plan:
+[`2026-07-26-smart-collections.md`](../superpowers/plans/2026-07-26-smart-collections.md).
+
+### Цель и выбранная архитектура
+
+Existing `CatalogCollection` materializes only manual membership; audit
+честно помечает smart rules как unsupported. Выбран owner-only dynamic mode:
+collection хранит versioned allowlisted JSON rules, а bounded canonical query
+каждый раз вычисляет актуальный состав из каталога, media availability,
+личной библиотеки/progress/watch status и release updates. Materialized и
+hybrid варианты отклонены из-за stale state, fan-out invalidation,
+race conditions и зависимости correctness от отсутствующих worker/scheduler.
+
+### Expected changed files
+
+- additive collection migration;
+- `CatalogCollection` model, data DTO and mode/completion/preset enums;
+- typed smart rules DTO;
+- smart rule service/options/query and existing collection item/create/query
+  integration;
+- collection dashboard/editor/page/card Livewire and Blade;
+- collection/account/calendar feed integration;
+- `lang/{ru,en}/collections.php`;
+- focused schema/unit/service/query/Livewire/calendar/export/compatibility
+  tests and browser spec/fixture if required;
+- canonical collection/data/performance/cache/security/frontend docs, docs
+  map/audit, linked design/plan;
+- task-specific README and Russian CHANGELOG hunks.
+
+### Protected files и public contracts
+
+- all existing route names and paths, including `/collections/{slug}`,
+  `/my/collections`, localized aliases and read-only `/api/v1/collections`;
+- manual membership, positions, item selector and `CatalogCollectionSort`;
+- public collection eligibility/category/discovery/profile/search/sitemap/
+  API/related/recommendation behavior;
+- editorial/source sync, moderation, feature, translations and categories;
+- title/season/episode identity, publication/audience/Premium/region/legal
+  visibility and media health boundaries;
+- library/watch-status/progress/personal-update semantics;
+- ICS feed token/scope/URL/limit and owner authorization;
+- collection cache keys/invalidation, no private shared cache;
+- account export/delete/merge and title merge;
+- importer/queue/scheduler/dependencies/environment;
+- every existing foreign staged/unstaged shared-tree change.
+
+### Migration/routes/translations/cache/permissions и risks
+
+| Domain | Статус | Решение / gate |
+| --- | --- | --- |
+| Collection schema | `critical_affected` | Add `mode`, nullable JSON, rules version; reversible, no backfill |
+| Smart privacy | `critical_affected` | User + owner + private only; public scopes explicitly manual |
+| Rules/query | `critical_affected` | Typed allowlist, invalid version fail-close, parameter-bound subqueries |
+| Manual collections | `protected_critical` | Existing item query/mutations unchanged except smart guard |
+| Livewire/mobile/a11y | `critical_affected` | Class component, labels/errors/loading/reset, bounded actor lookup |
+| Calendar ICS | `affected` | Dynamic owner title subquery, same token/scope/window/limit |
+| Public API/SEO/search/sitemap | `protected_critical` | Smart records never listed or serialized publicly |
+| Account lifecycle | `affected` | Export rules, no materialized result; delete cascade unchanged |
+| Recommendations | `protected` | Smart result is not a learned membership signal |
+| Cache | `already_compliant_by_design` | No result cache; rule write uses existing invalidator |
+| Import/media/user state | `affected_read_only` | Dynamic next read; no fan-out/scheduler |
+| Dependencies/environment/routes | `not_applicable` | No package/config secret/new route |
+| Production/rollback | `affected` | Safe additive DDL; forward-fix preferred after user rules exist |
+| Shared Git state | `critical_risk_recorded` | Exact task-only alternate index |
+
+### Task-specific requirement-compliance matrix
+
+| Requirement/domain | Статус | Evidence / следующий gate |
+| --- | --- | --- |
+| Root/index/canonical requirements fresh read | `completed` | 26.07.2026 before production edits |
+| Applicable architecture/data/UI/frontend/security/performance/cache/auth/ops/maintenance/integration docs | `completed` | Collection/user-state/media/calendar contracts traced |
+| Installed versions/database | `completed` | PHP 8.5, Laravel 13.22.0, Boost 2.4.13, Livewire 4.3.3, PHPUnit 12.5.32, Tailwind 4.3.2, SQLite |
+| Official version-dependent docs | `completed` | Laravel 13 Eloquent scopes/subqueries/validation and Livewire 4 pagination/URL/full-page guidance via Boost |
+| Existing implementation first | `completed` | Model/migration/policy/service/query/Livewire/API/account/calendar/tests inspected |
+| Alternatives/user authorization | `completed` | Dynamic owner-only design selected under explicit autonomous instruction |
+| Design/plan/files/contracts/risks | `completed` | Linked design and 71-step plan |
+| Migration classification/rollback | `completed` | `2026_07_26_232000` is `safe_additive`; manual default, no DML/index/backfill; rollback and forward-fix limitation tested/documented |
+| TDD RED | `completed` | Initial 16 failures proved missing schema/domain; subsequent schema/rules/service/query/Livewire/integration RED cases implemented |
+| Implementation | `completed` | Versioned DTO, dynamic query, six presets, Livewire UX, manual guards, export/ICS/public exclusion |
+| Query plan/index review | `completed` | Actual SQLite EXPLAIN; global `SCAN seasons` removed with correlated grouped `EXISTS`; existing taxonomy/rating/state/progress/release/media indexes used; no new index |
+| Security/privacy review | `completed` | Owner/private invariant, fail-close unknown rules, forged manual mutation denial, public/API/search exclusion and other-user/guest 404 tests |
+| Focused/full/static/build/browser | `completed_with_independent_blockers` | Smart `31/114`, related `90/2 594`, all 359 files isolated; only missing importer class and stale account flash remain unrelated. Pint/PHPStan/Rector/Vite/docs/Chromium GREEN |
+| Canonical docs/README/CHANGELOG | `completed` | Architecture/data/security/performance/cache/frontend/map/audit plus visitor README and dated Russian CHANGELOG updated |
+| Final requirements reread/diff audit | `completed` | Canonical owners/design/task перечитаны; repository-wide smart legacy/duplicate/dead/debug/secret scan завершён, task diff изолируется отдельным index |
+| Commit/push in `main` | `in_progress` | Exact task scope; external failures honest |
+
+### Безлимитный execution order
+
+Полный 71-пунктный checklist с priority, reason, files, dependencies, risks и
+verification находится в linked detailed plan и является частью этой
+compliance evidence. Текущий ближайший порядок:
+
+1. `[completed]` Fresh requirements/skills/versions/Git/schema/code audit.
+2. `[completed]` Alternatives, owner-only dynamic design and cross-feature map.
+3. `[completed]` Design spec, expected/protected files and detailed plan.
+4. `[completed]` Plan reread and RED schema/rules/service tests.
+5. `[completed]` Minimal additive domain implementation.
+6. `[completed]` RED/GREEN dynamic query and rule combinations.
+7. `[completed]` Livewire responsive UX and translations.
+8. `[completed]` Calendar/account/public compatibility integration.
+9. `[completed]` Security/performance/EXPLAIN/dead-code review.
+10. `[completed]` Focused/full/static/build/browser verification; duplicate smart badge found by Chromium, reproduced by RED test and fixed.
+11. `[completed]` Final canonical requirements/compliance reread after verification.
+12. `[in_progress]` Exact task-only commit on `main`.
+13. `[pending]` Configured non-force push; any external failure stays
+    `unresolved`.
+
 ## Task 81 — группировка пакетных событий календаря релизов
 
 Статус: `implementation_committed_push_unresolved_authentication`.

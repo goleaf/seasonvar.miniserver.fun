@@ -26,7 +26,7 @@ final readonly class ReleaseCalendarFeedResponder
         $feed = ReleaseCalendarFeed::query()
             ->with([
                 'user:id,name',
-                'catalogCollection:id,owner_id',
+                'catalogCollection:id,owner_id,mode,smart_rules,smart_rules_version',
                 'catalogTitle:id,slug,title,original_title',
             ])
             ->where('token_hash', $this->tokens->hash($privateToken))

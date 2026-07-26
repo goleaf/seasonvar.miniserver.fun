@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Collections;
 
+use App\Enums\CatalogCollectionMode;
 use App\Enums\CatalogCollectionVisibility;
 use App\Models\CatalogCollection;
 use App\Models\CatalogCollectionItem;
@@ -31,6 +32,7 @@ final class CatalogCollectionItemService
         $created = DB::transaction(function () use ($actor, $collection, $title): bool {
             $locked = CatalogCollection::query()->lockForUpdate()->findOrFail($collection->id);
             Gate::forUser($actor)->authorize('manageItems', $locked);
+            $this->assertManual($locked);
             $currentTitle = CatalogTitle::query()->lockForUpdate()->findOrFail($title->id);
             Gate::forUser($actor)->authorize('interact', $currentTitle);
             $existing = CatalogCollectionItem::query()
@@ -77,6 +79,7 @@ final class CatalogCollectionItemService
         $removed = DB::transaction(function () use ($actor, $collection, $titleId): bool {
             $locked = CatalogCollection::query()->lockForUpdate()->findOrFail($collection->id);
             Gate::forUser($actor)->authorize('manageItems', $locked);
+            $this->assertManual($locked);
             $deleted = CatalogCollectionItem::query()
                 ->whereBelongsTo($locked, 'collection')
                 ->where('catalog_title_id', $titleId)
@@ -125,6 +128,7 @@ final class CatalogCollectionItemService
         [$manageable, $changed] = DB::transaction(function () use ($actor, $title, $selectedCollectionPublicIds): array {
             $manageable = CatalogCollection::query()
                 ->where('owner_id', $actor->id)
+                ->where('mode', CatalogCollectionMode::Manual->value)
                 ->orderBy('id')
                 ->lockForUpdate()
                 ->get();
@@ -242,6 +246,7 @@ final class CatalogCollectionItemService
         DB::transaction(function () use ($actor, $collection, $orderedItemIds): void {
             $locked = CatalogCollection::query()->lockForUpdate()->findOrFail($collection->id);
             Gate::forUser($actor)->authorize('manageItems', $locked);
+            $this->assertManual($locked);
             $allIds = CatalogCollectionItem::query()
                 ->whereBelongsTo($locked, 'collection')
                 ->orderBy('position')
@@ -292,6 +297,7 @@ final class CatalogCollectionItemService
         $changed = DB::transaction(function () use ($actor, $collection, $itemId, $targetIndex, $windowStart, $windowSize): bool {
             $locked = CatalogCollection::query()->lockForUpdate()->findOrFail($collection->id);
             Gate::forUser($actor)->authorize('manageItems', $locked);
+            $this->assertManual($locked);
             $orderedItemIds = CatalogCollectionItem::query()
                 ->whereBelongsTo($locked, 'collection')
                 ->orderBy('position')
@@ -350,6 +356,7 @@ final class CatalogCollectionItemService
         $changed = DB::transaction(function () use ($actor, $collection, $itemId, $direction): bool {
             $locked = CatalogCollection::query()->lockForUpdate()->findOrFail($collection->id);
             Gate::forUser($actor)->authorize('manageItems', $locked);
+            $this->assertManual($locked);
             $item = CatalogCollectionItem::query()
                 ->whereBelongsTo($locked, 'collection')
                 ->lockForUpdate()
@@ -448,6 +455,15 @@ final class CatalogCollectionItemService
             ->orderBy('id')
             ->pluck('id')
             ->each(fn (mixed $id, int $index) => CatalogCollectionItem::query()->whereKey($id)->update(['position' => $index + 1]));
+    }
+
+    private function assertManual(CatalogCollection $collection): void
+    {
+        if ($collection->isSmart()) {
+            throw ValidationException::withMessages([
+                'collection' => [__('collections.smart.validation.manual_items')],
+            ]);
+        }
     }
 
     private function touch(CatalogCollection $collection): void

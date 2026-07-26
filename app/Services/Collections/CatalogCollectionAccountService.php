@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Collections;
 
+use App\Enums\CatalogCollectionMode;
 use App\Enums\CatalogCollectionVisibility;
 use App\Models\CatalogCollection;
 use App\Models\User;
@@ -35,6 +36,12 @@ final class CatalogCollectionAccountService
                 'category.parent:id,public_id,parent_id,slug,position,is_active',
                 'category.parent.translations:id,catalog_collection_category_id,locale,name',
                 'items' => fn ($query) => $query
+                    ->whereIn(
+                        'catalog_collection_id',
+                        CatalogCollection::query()
+                            ->select('id')
+                            ->where('mode', CatalogCollectionMode::Manual->value),
+                    )
                     ->select(['id', 'catalog_collection_id', 'catalog_title_id', 'position', 'created_at'])
                     ->with('catalogTitleWithTrashed:id,slug,title,original_title')
                     ->orderBy('position')
@@ -44,7 +51,7 @@ final class CatalogCollectionAccountService
             ->orderBy('id')
             ->get()
             ->map(function (CatalogCollection $collection): array {
-                $shareable = in_array($collection->visibility, [
+                $shareable = ! $collection->isSmart() && in_array($collection->visibility, [
                     CatalogCollectionVisibility::Public,
                     CatalogCollectionVisibility::Unlisted,
                 ], true) && $collection->deleted_at === null;
@@ -54,9 +61,14 @@ final class CatalogCollectionAccountService
                     'name' => $collection->name,
                     'description' => $collection->description,
                     'type' => $collection->type->value,
+                    'mode' => $collection->mode->value,
                     'visibility' => $collection->visibility->value,
                     'moderation_status' => $collection->moderation_status->value,
                     'sort_mode' => $collection->sort_mode->value,
+                    'smart_rules_version' => $collection->smart_rules_version,
+                    'smart_rules' => $collection->isSmart()
+                        ? $collection->smartRules()?->toArray()
+                        : null,
                     'content_locale' => $collection->content_locale,
                     'category' => $collection->category === null ? null : [
                         'slug' => $collection->category->slug,
@@ -77,7 +89,7 @@ final class CatalogCollectionAccountService
                     'created_at' => $collection->created_at?->toAtomString(),
                     'updated_at' => $collection->updated_at?->toAtomString(),
                     'deleted_at' => $collection->deleted_at?->toAtomString(),
-                    'items' => $collection->items->map(function ($item): array {
+                    'items' => $collection->isSmart() ? [] : $collection->items->map(function ($item): array {
                         $title = $item->catalogTitleWithTrashed;
 
                         return [

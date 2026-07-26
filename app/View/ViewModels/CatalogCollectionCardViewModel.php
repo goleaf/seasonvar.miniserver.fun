@@ -34,6 +34,8 @@ final readonly class CatalogCollectionCardViewModel
 
     public bool $imported;
 
+    public bool $smart;
+
     public string $visibilityLabel;
 
     public string $moderationStatusLabel;
@@ -80,14 +82,17 @@ final readonly class CatalogCollectionCardViewModel
         $this->featured = (bool) $collection->is_featured;
         $this->editorial = $collection->type === CatalogCollectionType::Editorial;
         $this->imported = (bool) $collection->getAttribute('has_import_source');
+        $this->smart = $collection->isSmart();
         $this->visibilityLabel = $collection->visibility->label();
         $this->moderationStatusLabel = $collection->moderation_status->label();
         $this->typeLabel = $collection->type->label();
         $this->ownerName = $owner instanceof User ? $owner->name : null;
         $this->categoryPath = $this->categoryPath($collection);
-        $this->itemCountLabel = trans_choice('collections.page.items', $this->itemCount, [
-            'count' => Number::format($this->itemCount, locale: app()->currentLocale()),
-        ]);
+        $this->itemCountLabel = $this->smart
+            ? __('collections.smart.automatic_count')
+            : trans_choice('collections.page.items', $this->itemCount, [
+                'count' => Number::format($this->itemCount, locale: app()->currentLocale()),
+            ]);
         $this->featuredLabel = __('collections.page.featured');
         $this->importedLabel = __('collections.page.automatically_updated');
     }

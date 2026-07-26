@@ -10,6 +10,9 @@
                     @if ($isEditorial)
                         <x-ui.status-pill variant="success">{{ $collectionTypeLabel }}</x-ui.status-pill>
                     @endif
+                    @if ($isSmart)
+                        <x-ui.status-pill variant="success" icon="fa-solid fa-wand-magic-sparkles">{{ __('collections.smart.badge') }}</x-ui.status-pill>
+                    @endif
                     @if ($canManage)
                         <x-ui.status-pill variant="muted">{{ $collectionVisibilityLabel }}</x-ui.status-pill>
                         <x-ui.status-pill variant="muted">{{ $collectionModerationLabel }}</x-ui.status-pill>
@@ -18,6 +21,9 @@
                 <h1 class="mt-3 break-words text-2xl font-black tracking-tight text-slate-800 sm:text-4xl">{{ $collection->display_name }}</h1>
                 @if ($collection->display_description)
                     <p class="mt-4 whitespace-pre-line break-words text-sm leading-7 text-slate-600">{{ $collection->display_description }}</p>
+                @endif
+                @if ($isSmart)
+                    <p class="mt-4 rounded-control bg-sky-50 px-4 py-3 text-sm font-semibold leading-6 text-sky-900">{{ __('collections.smart.page.dynamic_notice') }}</p>
                 @endif
                 <dl class="mt-5 flex flex-wrap gap-x-6 gap-y-3 text-sm">
                     @if ($ownerUrl !== null && $collection->owner)
@@ -141,7 +147,7 @@
                 @foreach ($items as $item)
                     <li wire:key="collection-item-{{ $item->collection_item_id }}" class="relative min-w-0">
                         <x-catalog.title-card :title="$item" layout="list" :show-description="false" readable />
-                        @if ($canManage)
+                        @if ($canManageItems)
                             <div class="relative z-20 flex justify-end border-t border-slate-100 px-3 pb-3 pt-2 sm:px-4">
                                 <button type="button" wire:click="removeItem({{ $item->id }})" wire:confirm="{{ __('collections.confirmations.remove_item') }}" wire:loading.attr="disabled" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-rose-50 px-3 text-sm font-bold text-rose-700 hover:bg-rose-100 sm:w-auto"><x-ui.icon name="fa-solid fa-xmark" />{{ __('collections.actions.remove') }}</button>
                             </div>

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Services\Collections;
 
 use App\DTOs\CatalogCollectionData;
+use App\DTOs\CatalogSmartCollectionRules;
+use App\Enums\CatalogCollectionMode;
 use App\Enums\CatalogCollectionModerationStatus;
 use App\Enums\CatalogCollectionType;
 use App\Enums\CatalogCollectionVisibility;
@@ -35,6 +37,7 @@ final class CatalogCollectionService
         Gate::forUser($owner)->authorize('create', CatalogCollection::class);
 
         abort_if($data->type === CatalogCollectionType::System, 403);
+        $smartRules = $this->validatedSmartConfiguration($data);
 
         if ($data->type === CatalogCollectionType::Editorial) {
             Gate::forUser($owner)->authorize('createEditorial', CatalogCollection::class);
@@ -60,7 +63,7 @@ final class CatalogCollectionService
             return $existing->refresh();
         }
 
-        $collection = DB::transaction(function () use ($owner, $data, $name, $description, $seoTitle, $seoDescription, $contentLocale, $publicId): CatalogCollection {
+        $collection = DB::transaction(function () use ($owner, $data, $name, $description, $seoTitle, $seoDescription, $contentLocale, $publicId, $smartRules): CatalogCollection {
             User::query()->lockForUpdate()->findOrFail($owner->id);
             $existing = CatalogCollection::query()->where('public_id', $publicId)->first();
 
@@ -76,11 +79,13 @@ final class CatalogCollectionService
             }
 
             $moderation = $this->initialModeration($data, $owner);
-            $category = $this->categories->resolveAssignment(
-                $data->categoryPublicId,
-                $data->visibility,
-                lockForUpdate: true,
-            );
+            $category = $data->mode === CatalogCollectionMode::Smart
+                ? null
+                : $this->categories->resolveAssignment(
+                    $data->categoryPublicId,
+                    $data->visibility,
+                    lockForUpdate: true,
+                );
 
             $collection = CatalogCollection::query()->firstOrCreate([
                 'public_id' => $publicId,
@@ -91,9 +96,12 @@ final class CatalogCollectionService
                 'description' => $description,
                 'slug' => $this->slugs->generate($name, $publicId),
                 'type' => $data->type,
+                'mode' => $data->mode,
                 'visibility' => $data->visibility,
                 'moderation_status' => $moderation,
                 'sort_mode' => $data->sortMode,
+                'smart_rules' => $smartRules?->toArray(),
+                'smart_rules_version' => CatalogSmartCollectionRules::VERSION,
                 'content_locale' => $contentLocale,
                 'is_featured' => false,
                 'published_at' => $moderation === CatalogCollectionModerationStatus::Approved
@@ -129,15 +137,25 @@ final class CatalogCollectionService
         $description = $this->validDescription($data->description);
         $seoTitle = $this->validSeoTitle($data->seoTitle);
         $seoDescription = $this->validSeoDescription($data->seoDescription);
+        $smartRules = $this->validatedSmartConfiguration($data);
 
-        $result = DB::transaction(function () use ($actor, $collection, $data, $expectedVersion, $name, $description, $seoTitle, $seoDescription): array {
+        $result = DB::transaction(function () use ($actor, $collection, $data, $expectedVersion, $name, $description, $seoTitle, $seoDescription, $smartRules): array {
             $locked = CatalogCollection::query()->lockForUpdate()->findOrFail($collection->id);
             Gate::forUser($actor)->authorize('update', $locked);
-            $category = $this->categories->resolveAssignment(
-                $data->categoryPublicId,
-                $data->visibility,
-                lockForUpdate: true,
-            );
+
+            if ($locked->mode !== $data->mode) {
+                throw ValidationException::withMessages([
+                    'mode' => [__('collections.smart.validation.mode_immutable')],
+                ]);
+            }
+
+            $category = $locked->isSmart()
+                ? null
+                : $this->categories->resolveAssignment(
+                    $data->categoryPublicId,
+                    $data->visibility,
+                    lockForUpdate: true,
+                );
 
             $locale = $this->locale($data->contentLocale)
                 ?? (string) config('catalog-collections.default_locale', 'ru');
@@ -165,6 +183,9 @@ final class CatalogCollectionService
             $sortChanged = $locked->sort_mode !== $data->sortMode;
             $nextContentLocale = $isEditorialTranslation ? $locked->content_locale : $this->locale($data->contentLocale);
             $contentLocaleChanged = $locked->content_locale !== $nextContentLocale;
+            $smartRulesChanged = $locked->isSmart()
+                && ($locked->smart_rules != $smartRules?->toArray()
+                    || $locked->smart_rules_version !== CatalogSmartCollectionRules::VERSION);
             $publicContentChanged = $baseContentChanged
                 || $translationChanged
                 || $visibilityChanged
@@ -201,7 +222,8 @@ final class CatalogCollectionService
                 || $visibilityChanged
                 || $categoryChanged
                 || $sortChanged
-                || $contentLocaleChanged;
+                || $contentLocaleChanged
+                || $smartRulesChanged;
 
             if (! $contentChanged && ! $lifecycleChanged) {
                 return [
@@ -227,6 +249,8 @@ final class CatalogCollectionService
                 'catalog_collection_category_id' => $category?->id,
                 'visibility' => $data->visibility,
                 'sort_mode' => $data->sortMode,
+                'smart_rules' => $locked->isSmart() ? $smartRules?->toArray() : null,
+                'smart_rules_version' => CatalogSmartCollectionRules::VERSION,
                 'content_locale' => $nextContentLocale,
                 'moderation_status' => $nextModeration,
                 'is_featured' => $nextFeatured,
@@ -354,6 +378,31 @@ final class CatalogCollectionService
         return $data->visibility === CatalogCollectionVisibility::Private
             ? CatalogCollectionModerationStatus::Approved
             : CatalogCollectionModerationStatus::Pending;
+    }
+
+    private function validatedSmartConfiguration(CatalogCollectionData $data): ?CatalogSmartCollectionRules
+    {
+        if ($data->mode === CatalogCollectionMode::Manual) {
+            if ($data->smartRules !== null) {
+                throw ValidationException::withMessages([
+                    'mode' => [__('collections.smart.validation.mode')],
+                ]);
+            }
+
+            return null;
+        }
+
+        if ($data->type !== CatalogCollectionType::User
+            || $data->visibility !== CatalogCollectionVisibility::Private
+            || $data->categoryPublicId !== null
+            || ! $data->smartRules instanceof CatalogSmartCollectionRules
+            || ! $data->smartRules->hasActiveRules()) {
+            throw ValidationException::withMessages([
+                'mode' => [__('collections.smart.validation.mode')],
+            ]);
+        }
+
+        return $data->smartRules;
     }
 
     private function deletePermanently(CatalogCollection $collection): void

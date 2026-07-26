@@ -179,6 +179,7 @@ final class CatalogCollectionPage extends Component
         Gate::authorize('view', $collection);
         $viewer = $this->viewer();
         $canManage = $viewer instanceof User && Gate::forUser($viewer)->allows('update', $collection);
+        $canManageItems = $canManage && ! $collection->isSmart();
         $itemViewer = $viewer;
         $criteria = new CatalogCollectionItemCriteria(
             search: $this->search,
@@ -209,9 +210,11 @@ final class CatalogCollectionPage extends Component
         $usesLocalizedEditorialCanonical = $collection->type->value === 'editorial'
             && $this->interfaceLocale !== $defaultLocale
             && $collection->translations->contains('locale', $this->interfaceLocale);
-        $headerItemCount = (int) ($canManage
-            ? ($collection->total_items_count ?? 0)
-            : ($collection->visible_items_count ?? 0));
+        $headerItemCount = $collection->isSmart()
+            ? $items->total()
+            : (int) ($canManage
+                ? ($collection->total_items_count ?? 0)
+                : ($collection->visible_items_count ?? 0));
         [$visibilityIcon, $visibilityNotice] = match ($collection->visibility) {
             CatalogCollectionVisibility::Private => ['fa-solid fa-lock text-slate-400', __('collections.page.private_notice')],
             CatalogCollectionVisibility::Unlisted => ['fa-solid fa-link text-slate-400', __('collections.page.unlisted_notice')],
@@ -236,6 +239,7 @@ final class CatalogCollectionPage extends Component
             'collectionUpdatedAtIso' => $collection->updated_at?->toAtomString(),
             'collectionUpdatedAtLabel' => $collection->updated_at?->format('d.m.Y'),
             'isEditorial' => $collection->type->value === 'editorial',
+            'isSmart' => $collection->isSmart(),
             'canShare' => $collection->visibility !== CatalogCollectionVisibility::Private,
             'headerItemCountLabel' => trans_choice('collections.page.items', $headerItemCount, [
                 'count' => $headerItemCount,
@@ -252,7 +256,7 @@ final class CatalogCollectionPage extends Component
                 'value' => $option->value,
                 'label' => $option->label(),
             ], CatalogCollectionSort::cases()),
-            'unavailableItems' => $canManage && $collection->isOwnedBy($viewer)
+            'unavailableItems' => $canManageItems && $collection->isOwnedBy($viewer)
                 ? $query->unavailableItems($collection, $viewer)
                 : collect(),
             'relatedCollections' => $collection->visibility === CatalogCollectionVisibility::Public
@@ -268,6 +272,7 @@ final class CatalogCollectionPage extends Component
                 ])
                 : route('collections.show', ['collectionSlug' => $collection->slug]),
             'canManage' => $canManage,
+            'canManageItems' => $canManageItems,
             'canReport' => $viewer instanceof User && Gate::forUser($viewer)->allows('report', $collection),
             'reportReasons' => array_map(static fn (CatalogCollectionReportReason $reason): array => [
                 'value' => $reason->value,

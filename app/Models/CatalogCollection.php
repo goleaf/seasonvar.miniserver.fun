@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\DTOs\CatalogSmartCollectionRules;
+use App\Enums\CatalogCollectionMode;
 use App\Enums\CatalogCollectionModerationStatus;
 use App\Enums\CatalogCollectionSort;
 use App\Enums\CatalogCollectionType;
@@ -30,9 +32,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property string|null $description
  * @property string $slug
  * @property CatalogCollectionType $type
+ * @property CatalogCollectionMode $mode
  * @property CatalogCollectionVisibility $visibility
  * @property CatalogCollectionModerationStatus $moderation_status
  * @property CatalogCollectionSort $sort_mode
+ * @property array<string, mixed>|null $smart_rules
+ * @property int $smart_rules_version
  * @property string|null $content_locale
  * @property bool $is_featured
  * @property int $content_version
@@ -58,9 +63,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'description',
     'slug',
     'type',
+    'mode',
     'visibility',
     'moderation_status',
     'sort_mode',
+    'smart_rules',
+    'smart_rules_version',
     'content_locale',
     'is_featured',
     'content_version',
@@ -70,6 +78,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 final class CatalogCollection extends Model
 {
     use SoftDeletes;
+
+    /** @var array<string, mixed> */
+    protected $attributes = [
+        'mode' => CatalogCollectionMode::Manual->value,
+        'smart_rules_version' => 1,
+    ];
 
     /** @return BelongsTo<User, $this> */
     public function owner(): BelongsTo
@@ -173,6 +187,7 @@ final class CatalogCollection extends Model
         );
 
         $query
+            ->where('mode', CatalogCollectionMode::Manual->value)
             ->whereNotNull('catalog_collection_category_id')
             ->whereHas('category', fn (Builder $category): Builder => $category
                 ->where('is_active', true)
@@ -201,9 +216,27 @@ final class CatalogCollection extends Model
         return $user !== null && $this->owner_id !== null && $this->owner_id === $user->getKey();
     }
 
+    public function isSmart(): bool
+    {
+        return $this->mode === CatalogCollectionMode::Smart;
+    }
+
+    public function smartRules(): ?CatalogSmartCollectionRules
+    {
+        if (! $this->isSmart() || ! is_array($this->smart_rules)) {
+            return null;
+        }
+
+        return CatalogSmartCollectionRules::fromStored(
+            $this->smart_rules,
+            $this->smart_rules_version,
+        );
+    }
+
     public function isPubliclyViewable(): bool
     {
-        return $this->visibility->isDirectlyViewable()
+        return ! $this->isSmart()
+            && $this->visibility->isDirectlyViewable()
             && $this->moderation_status->isPubliclyViewable()
             && $this->catalog_collection_category_id !== null
             && ($this->visibility !== CatalogCollectionVisibility::Public || $this->published_at !== null)
@@ -216,9 +249,12 @@ final class CatalogCollection extends Model
     {
         return [
             'type' => CatalogCollectionType::class,
+            'mode' => CatalogCollectionMode::class,
             'visibility' => CatalogCollectionVisibility::class,
             'moderation_status' => CatalogCollectionModerationStatus::class,
             'sort_mode' => CatalogCollectionSort::class,
+            'smart_rules' => 'array',
+            'smart_rules_version' => 'integer',
             'is_featured' => 'boolean',
             'content_version' => 'integer',
             'published_at' => 'immutable_datetime',

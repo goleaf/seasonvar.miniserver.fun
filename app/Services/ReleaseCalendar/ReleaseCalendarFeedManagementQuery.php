@@ -28,7 +28,7 @@ final readonly class ReleaseCalendarFeedManagementQuery
         return ReleaseCalendarFeed::query()
             ->whereBelongsTo($user)
             ->with([
-                'catalogCollection:id,public_id,name,type',
+                'catalogCollection:id,public_id,name,type,mode',
                 'catalogTitle:id,slug,title,original_title',
             ])
             ->latest('created_at')
@@ -44,7 +44,7 @@ final readonly class ReleaseCalendarFeedManagementQuery
             ->orderBy('name')
             ->orderBy('id')
             ->limit(100)
-            ->get(['id', 'public_id', 'name', 'type']);
+            ->get(['id', 'public_id', 'name', 'type', 'mode']);
     }
 
     /** @return Collection<int, CatalogTitle> */

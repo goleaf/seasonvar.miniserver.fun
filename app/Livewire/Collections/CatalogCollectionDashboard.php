@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Livewire\Collections;
 
 use App\DTOs\CatalogCollectionData;
+use App\Enums\CatalogCollectionMode;
+use App\Enums\CatalogCollectionSort;
 use App\Enums\CatalogCollectionType;
 use App\Enums\CatalogCollectionVisibility;
+use App\Enums\CatalogSmartCollectionPreset;
 use App\Livewire\Concerns\InteractsWithCatalogCollectionCategory;
 use App\Livewire\Concerns\InteractsWithCollectionLocale;
 use App\Livewire\Concerns\InteractsWithPaginationIslands;
@@ -45,6 +48,10 @@ final class CatalogCollectionDashboard extends Component
 
     public string $type = 'user';
 
+    public string $mode = 'manual';
+
+    public string $smartPreset = '';
+
     public ?string $status = null;
 
     #[Locked]
@@ -71,27 +78,63 @@ final class CatalogCollectionDashboard extends Component
             'description' => ['nullable', 'string', 'max:10000'],
             'visibility' => ['required', Rule::enum(CatalogCollectionVisibility::class)],
             'type' => ['required', Rule::in($this->creatableTypes($user))],
+            'mode' => ['required', Rule::enum(CatalogCollectionMode::class)],
+            'smartPreset' => [
+                Rule::requiredIf($this->mode === CatalogCollectionMode::Smart->value),
+                'nullable',
+                Rule::enum(CatalogSmartCollectionPreset::class),
+            ],
             'categoryRootPublicId' => ['nullable', 'uuid'],
             'categoryPublicId' => ['nullable', 'uuid'],
         ], $this->messages());
 
+        $mode = CatalogCollectionMode::from($validated['mode']);
+        $preset = $mode === CatalogCollectionMode::Smart
+            ? CatalogSmartCollectionPreset::from($validated['smartPreset'])
+            : null;
+        $visibility = $mode === CatalogCollectionMode::Smart
+            ? CatalogCollectionVisibility::Private
+            : CatalogCollectionVisibility::from($validated['visibility']);
+        $type = $mode === CatalogCollectionMode::Smart
+            ? CatalogCollectionType::User
+            : CatalogCollectionType::from($validated['type']);
         $collection = $service->create($user, new CatalogCollectionData(
             name: $validated['name'],
             description: $validated['description'] !== '' ? $validated['description'] : null,
-            visibility: CatalogCollectionVisibility::from($validated['visibility']),
-            type: CatalogCollectionType::from($validated['type']),
-            contentLocale: $validated['type'] === CatalogCollectionType::Editorial->value
+            visibility: $visibility,
+            sortMode: $mode === CatalogCollectionMode::Smart
+                ? CatalogCollectionSort::RecentlyUpdated
+                : CatalogCollectionSort::Manual,
+            type: $type,
+            contentLocale: $type === CatalogCollectionType::Editorial
                 ? self::AUTHORING_LOCALE
                 : null,
             publicId: $this->creationPublicId,
-            categoryPublicId: $this->selectedCategoryPublicId(),
+            categoryPublicId: $mode === CatalogCollectionMode::Smart
+                ? null
+                : $this->selectedCategoryPublicId(),
+            mode: $mode,
+            smartRules: $preset?->rules(),
         ));
 
-        $this->reset(['name', 'description', 'type', 'showCreate']);
+        $this->reset(['name', 'description', 'type', 'mode', 'smartPreset', 'showCreate']);
         $this->resetCategorySelection();
         $this->visibility = $this->defaultVisibility;
         Session::flash('catalog_collection_status', __('collections.status.created'));
         $this->redirectRoute('collections.edit', ['collectionPublicId' => $collection->public_id], navigate: true);
+    }
+
+    public function updatedMode(): void
+    {
+        if ($this->mode !== CatalogCollectionMode::Smart->value) {
+            $this->smartPreset = '';
+
+            return;
+        }
+
+        $this->visibility = CatalogCollectionVisibility::Private->value;
+        $this->type = CatalogCollectionType::User->value;
+        $this->resetCategorySelection();
     }
 
     public function delete(string $publicId, CatalogCollectionResolver $resolver, CatalogCollectionService $service): void
@@ -145,6 +188,15 @@ final class CatalogCollectionDashboard extends Component
                 'label' => $option->label(),
             ], $typeOptions),
             'showTypeSelector' => count($typeOptions) > 1,
+            'modeOptions' => array_map(static fn (CatalogCollectionMode $option): array => [
+                'value' => $option->value,
+                'label' => $option->label(),
+            ], CatalogCollectionMode::cases()),
+            'smartPresetOptions' => array_map(static fn (CatalogSmartCollectionPreset $preset): array => [
+                'value' => $preset->value,
+                'label' => $preset->label(),
+                'description' => $preset->description(),
+            ], CatalogSmartCollectionPreset::cases()),
             'canCreate' => Gate::forUser($user)->allows('create', CatalogCollection::class),
             'restorationDays' => max(1, (int) config('catalog-collections.restoration_days', 30)),
             ...$this->categorySelectionViewData($categories),
@@ -170,6 +222,8 @@ final class CatalogCollectionDashboard extends Component
             'description.max' => __('collections.validation.description'),
             'visibility.*' => __('collections.validation.visibility'),
             'type.*' => __('collections.validation.type'),
+            'mode.*' => __('collections.smart.validation.mode'),
+            'smartPreset.*' => __('collections.smart.validation.preset'),
             'categoryRootPublicId.*' => __('collections.validation.category'),
             'categoryPublicId.*' => __('collections.validation.category'),
         ];

@@ -30,9 +30,39 @@
                 <x-form.field :label="__('collections.form.name')" for="new-collection-name" :placeholder="__('collections.form.name_placeholder')" wire:model="name" required />
                 <div>
                     <label for="new-collection-description" class="block text-sm font-bold text-slate-700">{{ __('collections.form.description') }}</label>
-                    <textarea id="new-collection-description" wire:model="description" rows="5" maxlength="10000" placeholder="{{ __('collections.form.description_placeholder') }}" class="mt-2 w-full rounded-control border border-slate-300 bg-white px-3 py-2.5 text-base text-slate-800 outline-none placeholder:text-slate-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"></textarea>
+            <textarea id="new-collection-description" wire:model="description" rows="5" maxlength="10000" placeholder="{{ __('collections.form.description_placeholder') }}" class="mt-2 w-full rounded-control border border-slate-300 bg-white px-3 py-2.5 text-base text-slate-800 outline-none placeholder:text-slate-600 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"></textarea>
                     <x-form.input-error for="description" id="new-collection-description-error" />
                 </div>
+                <fieldset>
+                    <legend class="text-sm font-bold text-slate-700">{{ __('collections.smart.mode_label') }}</legend>
+                    <div class="mt-2 grid gap-2 sm:grid-cols-2">
+                        @foreach ($modeOptions as $option)
+                            <label class="flex min-h-20 cursor-pointer gap-3 rounded-control border border-slate-200 p-3 has-[:checked]:border-emerald-600 has-[:checked]:bg-emerald-50">
+                                <input type="radio" wire:model.live="mode" value="{{ $option['value'] }}" class="mt-1 h-5 w-5 border-slate-300 text-emerald-700 focus:ring-emerald-600">
+                                <span class="font-bold text-slate-800">{{ $option['label'] }}</span>
+                            </label>
+                        @endforeach
+                    </div>
+                    <x-form.input-error for="mode" />
+                </fieldset>
+                @if ($mode === 'smart')
+                    <div class="rounded-control border border-sky-200 bg-sky-50 p-4">
+                        <label for="new-collection-smart-preset" class="block text-sm font-bold text-sky-900">{{ __('collections.smart.preset_label') }}</label>
+                        <select id="new-collection-smart-preset" wire:model="smartPreset" class="mt-2 min-h-11 w-full rounded-control border border-sky-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100">
+                            <option value="">{{ __('collections.smart.preset_placeholder') }}</option>
+                            @foreach ($smartPresetOptions as $option)
+                                <option value="{{ $option['value'] }}">{{ $option['label'] }}</option>
+                            @endforeach
+                        </select>
+                        <x-form.input-error for="smartPreset" />
+                        @foreach ($smartPresetOptions as $option)
+                            @if ($smartPreset === $option['value'])
+                                <p class="mt-2 text-xs leading-5 text-sky-800">{{ $option['description'] }}</p>
+                            @endif
+                        @endforeach
+                        <p class="mt-3 text-xs font-semibold leading-5 text-sky-800">{{ __('collections.smart.private_hint') }}</p>
+                    </div>
+                @else
                 <fieldset>
                     <legend class="text-sm font-bold text-slate-700">{{ __('collections.form.visibility') }}</legend>
                     <div class="mt-2 grid gap-2 sm:grid-cols-3">
@@ -62,6 +92,7 @@
                             @endforeach
                         </select>
                     </div>
+                @endif
                 @endif
                 <div class="flex flex-wrap gap-2">
                     <button type="submit" wire:loading.attr="disabled" wire:target="create" class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-600 disabled:cursor-wait disabled:opacity-60 sm:flex-none">

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Collections;
 
 use App\DTOs\CatalogCollectionItemCriteria;
+use App\Enums\CatalogCollectionMode;
 use App\Enums\CatalogCollectionModerationStatus;
 use App\Enums\CatalogCollectionReportStatus;
 use App\Enums\CatalogCollectionSort;
@@ -60,6 +61,7 @@ final class CatalogCollectionQuery
         private readonly HdRezkaCollectionTypeCompatibility $sourceTypes,
         private readonly CommentRelationshipService $relationships,
         private readonly UserPortalCache $userPortalCache,
+        private readonly CatalogSmartCollectionQuery $smartCollections,
     ) {}
 
     /** @return LengthAwarePaginator<int, CatalogCollection> */
@@ -237,8 +239,9 @@ final class CatalogCollectionQuery
         }
 
         return CatalogCollection::query()
-            ->select(['id', 'public_id', 'name', 'visibility', 'type', 'sort_mode', 'updated_at'])
+            ->select(['id', 'public_id', 'name', 'visibility', 'type', 'mode', 'sort_mode', 'updated_at'])
             ->where('owner_id', $user->id)
+            ->where('mode', CatalogCollectionMode::Manual->value)
             ->with(['translations' => fn ($query) => $query
                 ->select(['id', 'catalog_collection_id', 'locale', 'name', 'description', 'seo_title', 'seo_description'])
                 ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))])
@@ -330,22 +333,34 @@ final class CatalogCollectionQuery
     ): LengthAwarePaginator {
         /** @var array<int|string, string|\Closure(\Illuminate\Database\Eloquent\Relations\Relation<*, *, *>): mixed> $cardLoads */
         $cardLoads = $this->taxonomies->cardSummaryLoads();
-        $query = $this->titles->visibleTo($viewer)
-            ->join('catalog_collection_items as collection_item', function ($join) use ($collection): void {
-                $join->on('collection_item.catalog_title_id', '=', 'catalog_titles.id')
-                    ->where('collection_item.catalog_collection_id', '=', $collection->id);
-            })
-            ->select('catalog_titles.*')
-            ->addSelect([
-                'collection_item.id as collection_item_id',
-                'collection_item.position as collection_position',
-                'collection_item.created_at as collection_added_at',
-            ])
-            ->withCasts([
-                'collection_item_id' => 'integer',
-                'collection_position' => 'integer',
-                'collection_added_at' => 'immutable_datetime',
-            ])
+        $query = $this->titles->visibleTo($viewer);
+
+        if ($collection->isSmart()) {
+            $query = $this->smartCollections
+                ->constrain($query, $collection, $viewer)
+                ->select('catalog_titles.*')
+                ->addSelect('catalog_titles.id as collection_item_id')
+                ->withCasts(['collection_item_id' => 'integer']);
+        } else {
+            $query = $query
+                ->join('catalog_collection_items as collection_item', function ($join) use ($collection): void {
+                    $join->on('collection_item.catalog_title_id', '=', 'catalog_titles.id')
+                        ->where('collection_item.catalog_collection_id', '=', $collection->id);
+                })
+                ->select('catalog_titles.*')
+                ->addSelect([
+                    'collection_item.id as collection_item_id',
+                    'collection_item.position as collection_position',
+                    'collection_item.created_at as collection_added_at',
+                ])
+                ->withCasts([
+                    'collection_item_id' => 'integer',
+                    'collection_position' => 'integer',
+                    'collection_added_at' => 'immutable_datetime',
+                ]);
+        }
+
+        $query
             ->with($cardLoads)
             ->withCount($this->titles->publicCardCounts($viewer));
 
@@ -372,17 +387,32 @@ final class CatalogCollectionQuery
             $query->where('catalog_titles.year', $criteria->year);
         }
 
-        $query = match ($criteria->sort) {
-            CatalogCollectionSort::Manual => $query->orderBy('collection_item.position')->orderBy('collection_item.id'),
-            CatalogCollectionSort::RecentlyAdded => $query->orderByDesc('collection_item.created_at')->orderByDesc('collection_item.id'),
-            CatalogCollectionSort::OldestAdded => $query->orderBy('collection_item.created_at')->orderBy('collection_item.id'),
-            CatalogCollectionSort::Title => $query->orderBy('catalog_titles.title')->orderBy('catalog_titles.id'),
-            CatalogCollectionSort::ReleaseYear => $query->orderByDesc('catalog_titles.year')->orderByDesc('catalog_titles.id'),
-            CatalogCollectionSort::Rating => $query
+        $query = match ([$collection->isSmart(), $criteria->sort]) {
+            [false, CatalogCollectionSort::Manual] => $query->orderBy('collection_item.position')->orderBy('collection_item.id'),
+            [false, CatalogCollectionSort::RecentlyAdded] => $query->orderByDesc('collection_item.created_at')->orderByDesc('collection_item.id'),
+            [false, CatalogCollectionSort::OldestAdded] => $query->orderBy('collection_item.created_at')->orderBy('collection_item.id'),
+            [true, CatalogCollectionSort::Manual], [true, CatalogCollectionSort::RecentlyUpdated] => $query
+                ->orderByDesc('catalog_titles.indexed_at')
+                ->orderByDesc('catalog_titles.id'),
+            [true, CatalogCollectionSort::RecentlyAdded] => $query
+                ->orderByDesc('catalog_titles.content_added_at')
+                ->orderByDesc('catalog_titles.id'),
+            [true, CatalogCollectionSort::OldestAdded] => $query
+                ->orderBy('catalog_titles.content_added_at')
+                ->orderBy('catalog_titles.id'),
+            [false, CatalogCollectionSort::Title], [true, CatalogCollectionSort::Title] => $query
+                ->orderBy('catalog_titles.title')
+                ->orderBy('catalog_titles.id'),
+            [false, CatalogCollectionSort::ReleaseYear], [true, CatalogCollectionSort::ReleaseYear] => $query
+                ->orderByDesc('catalog_titles.year')
+                ->orderByDesc('catalog_titles.id'),
+            [false, CatalogCollectionSort::Rating], [true, CatalogCollectionSort::Rating] => $query
                 ->withMax('ratings as collection_rating', 'rating')
                 ->orderByDesc('collection_rating')
                 ->orderByDesc('catalog_titles.id'),
-            CatalogCollectionSort::RecentlyUpdated => $query->orderByDesc('catalog_titles.indexed_at')->orderByDesc('catalog_titles.id'),
+            [false, CatalogCollectionSort::RecentlyUpdated] => $query
+                ->orderByDesc('catalog_titles.indexed_at')
+                ->orderByDesc('catalog_titles.id'),
         };
 
         $paginator = $query->paginate(max(6, min(48, $criteria->perPage)), pageName: $pageName);
@@ -394,7 +424,7 @@ final class CatalogCollectionQuery
     /** @return Collection<int, CatalogCollectionItem> */
     public function unavailableItems(CatalogCollection $collection, User $viewer, int $limit = 20): Collection
     {
-        if (! $collection->isOwnedBy($viewer)) {
+        if (! $collection->isOwnedBy($viewer) || $collection->isSmart()) {
             return collect();
         }
 
@@ -420,10 +450,14 @@ final class CatalogCollectionQuery
      */
     public function filterOptions(CatalogCollection $collection, ?User $viewer): array
     {
-        $visibleCollectionTitleIds = $this->titles->visibleTo($viewer)
-            ->whereHas('collectionItems', fn (Builder $query): Builder => $query
-                ->where('catalog_collection_id', $collection->id))
-            ->select('catalog_titles.id');
+        $visibleCollectionTitleIds = $collection->isSmart()
+            ? $this->smartCollections
+                ->constrain($this->titles->visibleTo($viewer), $collection, $viewer)
+                ->select('catalog_titles.id')
+            : $this->titles->visibleTo($viewer)
+                ->whereHas('collectionItems', fn (Builder $query): Builder => $query
+                    ->where('catalog_collection_id', $collection->id))
+                ->select('catalog_titles.id');
         $taxonomyConstraint = fn (Builder $query): Builder => $query
             ->whereIn('catalog_titles.id', clone $visibleCollectionTitleIds);
 
@@ -445,9 +479,8 @@ final class CatalogCollectionQuery
             ->orderBy('name')
             ->orderBy('id')
             ->get();
-        $years = $this->titles->visibleTo($viewer)
-            ->whereHas('collectionItems', fn (Builder $query): Builder => $query
-                ->where('catalog_collection_id', $collection->id))
+        $years = (clone $visibleCollectionTitleIds)
+            ->select('catalog_titles.year')
             ->whereNotNull('year')
             ->distinct()
             ->orderByDesc('year')

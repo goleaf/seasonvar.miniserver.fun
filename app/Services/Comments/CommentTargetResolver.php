@@ -149,6 +149,7 @@ final class CommentTargetResolver
                 'owner_id',
                 'catalog_collection_category_id',
                 'type',
+                'mode',
                 'visibility',
                 'moderation_status',
                 'published_at',

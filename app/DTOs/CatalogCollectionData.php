@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\DTOs;
 
+use App\Enums\CatalogCollectionMode;
 use App\Enums\CatalogCollectionSort;
 use App\Enums\CatalogCollectionType;
 use App\Enums\CatalogCollectionVisibility;
@@ -21,5 +22,7 @@ final readonly class CatalogCollectionData
         public ?string $seoTitle = null,
         public ?string $seoDescription = null,
         public ?string $categoryPublicId = null,
+        public CatalogCollectionMode $mode = CatalogCollectionMode::Manual,
+        public ?CatalogSmartCollectionRules $smartRules = null,
     ) {}
 }
