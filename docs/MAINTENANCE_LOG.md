@@ -457,6 +457,8 @@
 - `2026_07_25_220709_create_release_calendar_feeds_table.php`
 - `2026_07_26_120000_replace_recommendation_feedback_index_for_activity_order.php`
 - `2026_07_26_230000_create_catalog_recommendation_feedback_preferences.php`
+- `2026_07_26_231000_add_taste_onboarding_to_catalog_recommendations.php`
+- `2026_07_26_231100_add_merge_lookup_index_to_catalog_recommendation_onboarding_titles.php`
 <!-- project-docs:end -->
 
 ## 2026-07-16 — recommendation/discovery task 18

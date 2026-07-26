@@ -60,6 +60,11 @@ final class CatalogTasteOnboardingSchemaTest extends TestCase
             ['user_id', 'kind', 'catalog_title_id'],
         );
         $this->assertIndexColumns(
+            'catalog_recommendation_onboarding_titles',
+            'recommendation_onboarding_title_merge_lookup_idx',
+            ['catalog_title_id', 'id'],
+        );
+        $this->assertIndexColumns(
             'catalog_recommendation_preferred_genres',
             'recommendation_preferred_genre_user_genre_unique',
             ['user_id', 'genre_id'],
@@ -119,6 +124,10 @@ final class CatalogTasteOnboardingSchemaTest extends TestCase
                 'EXPLAIN QUERY PLAN SELECT country_id FROM catalog_recommendation_preferred_countries WHERE user_id = ? ORDER BY country_id',
                 [$user->id],
             ),
+            DB::select(
+                'EXPLAIN QUERY PLAN SELECT id FROM catalog_recommendation_onboarding_titles WHERE catalog_title_id = ? ORDER BY id',
+                [$title->id],
+            ),
         ];
         $details = collect($plans)
             ->flatten(1)
@@ -128,6 +137,7 @@ final class CatalogTasteOnboardingSchemaTest extends TestCase
         $this->assertStringContainsString('recommendation_onboarding_title_user_kind_idx', $details);
         $this->assertStringContainsString('recommendation_preferred_genre_user_genre_unique', $details);
         $this->assertStringContainsString('recommendation_preferred_country_user_country_unique', $details);
+        $this->assertStringContainsString('recommendation_onboarding_title_merge_lookup_idx', $details);
     }
 
     /** @param list<string> $columns */

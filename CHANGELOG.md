@@ -29,6 +29,15 @@
   передачи данных: среда не предоставила GitHub HTTPS username/credentials;
   force push, смена remote и переписывание истории не выполнялись.
 
+- Финальный database-review onboarding выявил table scan в редком title merge:
+  owner-индексы не обслуживали фактический `WHERE catalog_title_id = ? ORDER
+  BY id`. Отдельная обратимая migration добавляет только доказанный
+  `(catalog_title_id,id)` index; genre-first/country-first индексы отклонены
+  как неиспользуемые. RED воспроизвёл два отказа и `SCAN`, после исправления
+  schema и merger matrix прошла 5 тестов с 48 проверками, а disposable SQLite
+  успешно выполнил migrate, rollback и повторное применение follow-up
+  migration.
+
 - Консолидированы точные запросы прямого rebuild `/stats` без изменения
   публичного snapshot, маршрутов, cache key/TTL, schema или write paths.
   `CatalogStatsPageBuilder` теперь одним visibility-aware aggregate считает

@@ -619,9 +619,9 @@ Status precedence при merge: `dropped > completed > paused > watching > plann
 
 | Таблица | Целостность и индексируемый запрос |
 | --- | --- |
-| `catalog_recommendation_onboarding_titles` | Одна unique `(user_id,catalog_title_id)` строка с `kind=liked|excluded`; отдельные `(user_id,kind,id)` и `(catalog_title_id,user_id)` обслуживают owner/kind чтение, exclusion и merge. |
-| `catalog_recommendation_preferred_genres` | Одна unique `(user_id,genre_id)` строка; обратный `(genre_id,user_id)` поддерживает integrity/audit без дублирования taxonomy. |
-| `catalog_recommendation_preferred_countries` | Одна unique `(user_id,country_id)` строка; обратный `(country_id,user_id)` сохраняет тот же contract для стран. |
+| `catalog_recommendation_onboarding_titles` | Одна unique `(user_id,catalog_title_id)` строка с `kind=liked|excluded`; `(user_id,kind,catalog_title_id)` обслуживает owner/kind чтение и exclusion, а `(catalog_title_id,id)` — фактический `eachById` при merge тайтлов. |
+| `catalog_recommendation_preferred_genres` | Одна unique `(user_id,genre_id)` строка обслуживает owner read/reset без дублирования taxonomy; обратный индекс не добавлен, потому что feature не выполняет genre-first запрос. |
+| `catalog_recommendation_preferred_countries` | Одна unique `(user_id,country_id)` строка сохраняет тот же owner contract для стран; обратный индекс также не добавлен без выполняемого country-first запроса. |
 
 Все FK используют cascade при удалении owner или taxonomy/title. Save заменяет
 bounded наборы в одной транзакции; 5–10 `liked`, не более 10 `excluded`, до 8
@@ -637,4 +637,6 @@ additive и обратима. `down()` удаляет только новые re
 намеренно удаляет onboarding state и потому допустимо только после backup и
 осознанного rollback. Disposable SQLite migration/rollback/remigration,
 foreign-key integrity и `EXPLAIN QUERY PLAN` для каждого нового owner index
-зафиксированы тестом схемы.
+зафиксированы тестом схемы. Follow-up migration
+`2026_07_26_231100_add_merge_lookup_index_to_catalog_recommendation_onboarding_titles.php`
+additive добавляет и отдельно удаляет только доказанный merge lookup index.

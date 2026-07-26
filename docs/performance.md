@@ -680,7 +680,8 @@ recommendation boundary.
 Query-count regression сравнивает минимальный и максимальный допустимый
 selection set и фиксирует постоянное число запросов. Disposable SQLite
 `EXPLAIN QUERY PLAN` выбирает unique owner/title, owner/kind, owner/genre и
-owner/country indexes, добавленные migration. Новые индексы соответствуют
-реальным owner/exclusion/merge reads; дополнительных broad или дублирующих
-индексов нет. Это structural/query-plan evidence, а не p95 или production
-latency SLA.
+owner/country indexes, добавленные основной migration, а title merge —
+follow-up `(catalog_title_id,id)` index. Новые индексы соответствуют реальным
+owner/exclusion/merge reads; genre-first и country-first indexes отклонены,
+потому что таких запросов нет. Это structural/query-plan evidence, а не p95
+или production latency SLA.

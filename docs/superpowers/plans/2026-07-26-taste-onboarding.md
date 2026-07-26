@@ -291,3 +291,10 @@ Design:
   `f3fd4d4`. Обычный `git push origin main` завершился кодом 128 до передачи
   данных из-за отсутствующей GitHub HTTPS-аутентификации; force push и смена
   remote не выполнялись.
+- Final database review обнаружил, что title merge использует
+  `WHERE catalog_title_id = ? ORDER BY id`, но owner indexes оставляли этот
+  редкий путь на `SCAN`. RED дал 2/2 failures; отдельная reversible migration
+  добавила только `(catalog_title_id,id)`, после чего schema/merger прошли
+  5/5 tests с 48 assertions и disposable SQLite подтвердил
+  migrate/rollback/remigrate. Genre-first/country-first indexes не добавлены
+  без выполняемых запросов.

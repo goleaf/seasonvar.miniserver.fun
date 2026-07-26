@@ -659,10 +659,13 @@ Application rollback возвращает прежний PHP-код и выпо�
 
 Перед deploy сделать штатный backup SQLite, проверить свободное место,
 `php artisan migrate:status`, отсутствие длительного importer writer и
-возможность остановить новые web writes на короткое окно. Migration
+возможность остановить новые web writes на короткое окно. Основная migration
 `2026_07_26_231000_add_taste_onboarding_to_catalog_recommendations.php`
 additive: она добавляет nullable/default preference columns и три пустые
-relation table, без backfill каталога.
+relation table, без backfill каталога. Следующая migration
+`2026_07_26_231100_add_merge_lookup_index_to_catalog_recommendation_onboarding_titles.php`
+добавляет только `(catalog_title_id,id)` для фактического `eachById` title
+merge и должна применяться в том же writer window.
 
 Безопасный порядок: deploy совместимого PHP-кода со schema guard, выполнить
 `php artisan migrate --force`, затем проверить route list, verified onboarding
@@ -676,6 +679,7 @@ autocomplete или recommendation candidate pool не повреждает со
 guard не увидит новые таблицы/columns. Application rollback выполняется
 возвратом PHP-кода без `migrate:rollback`; новые nullable/table данные старому
 коду не мешают. Schema rollback допустим только после backup и остановки
-writers: `down()` удалит onboarding relations и preference columns, то есть
-приватные выбранные вкусы будут потеряны. Queue, importer, provider, storage,
-service worker и external credentials этой функцией не изменяются.
+writers: сначала откатывается отдельный merge index, затем основная migration;
+её `down()` удалит onboarding relations и preference columns, то есть приватные
+выбранные вкусы будут потеряны. Queue, importer, provider, storage, service
+worker и external credentials этой функцией не изменяются.
