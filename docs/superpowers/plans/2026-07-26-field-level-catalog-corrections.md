@@ -168,19 +168,22 @@ Design: [`../specs/2026-07-26-field-level-catalog-corrections-design.md`](../spe
 - [completed] Запустить `npm run build`, Blade/docs/config/route checks и
   browser desktop/mobile QA. Зависимости: UI complete. Риск: production
   browser unavailable. Проверка: factual output or `unresolved`.
-- [in_progress] Перечитать requirements/task, обновить compliance matrix,
+- [completed] Перечитать requirements/task, обновить compliance matrix,
   выполнить `git status`, diff/stat/cached/untracked, secret/debug/format
   scans. Зависимости: all checks. Риск: чужие staged files. Проверка:
   alternate index exact scope and clean diff check.
-- [pending] Создать логичный commit в существующей `main` с осмысленным
+- [completed] Создать логичный commit в существующей `main` с осмысленным
   сообщением. Почему: user explicitly requested delivery. Зависимости:
   verified scope and required docs. Риск: hook sees foreign index.
   Проверка: alternate-index staged diff, commit hash and original index
-  restoration.
-- [pending] Выполнить обычный push текущей `main` без force. Зависимости:
+  restoration. Результат: `cd7242390f21005b3e3de351ec6047f41242e247`,
+  `feat: add field-level catalog corrections`.
+- [completed] Выполнить обычный push текущей `main` без force. Зависимости:
   clean working tree requirement may be blocked by foreign changes and
   remote auth. Риск: credentials/remote refusal. Проверка: factual command
-  and output; external refusal remains `unresolved`.
+  and output; external refusal remains `unresolved`. Результат:
+  `GIT_TERMINAL_PROMPT=0 git push origin main` завершился кодом `128`:
+  `fatal: could not read Username for 'https://github.com': terminal prompts disabled`.
 
 ## Expected changed files
 
@@ -225,9 +228,9 @@ Design: [`../specs/2026-07-26-field-level-catalog-corrections-design.md`](../spe
 | Additive reversible SQLite-compatible schema | `completed` | Isolated forward/rollback verification of both nullable columns |
 | No Blade queries / responsive Russian UI | `completed` | Prepared URLs/context; 44 px/no-overflow/error-free Playwright matrix |
 | Performance/index/query review | `completed` | No per-chip query; existing active identity unique index selected by SQLite EXPLAIN |
-| Documentation/README/CHANGELOG | `completed_with_external_docs_blocker` | Canonical owners, visitor history and changelog updated; managed `MAINTENANCE_LOG` refresh belongs to foreign staged scope |
-| Commit only in `main` | `in_progress` | Final Git evidence pending |
-| Push current remote branch | `unresolved` | Pending; existing HTTPS auth failure is known but will be retried |
+| Documentation/README/CHANGELOG | `completed` | Canonical owners, visitor history and changelog updated; managed migration inventory includes the previously missing `234000` and new `235500`, docs refresh passed |
+| Commit only in `main` | `completed` | `cd7242390f21005b3e3de351ec6047f41242e247` — `feat: add field-level catalog corrections` |
+| Push current remote branch | `unresolved` | Non-force `git push origin main` reached the HTTPS remote and failed because terminal-disabled Git could not read a GitHub username |
 
 ## Verification evidence
 

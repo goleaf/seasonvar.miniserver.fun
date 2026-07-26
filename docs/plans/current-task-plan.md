@@ -12074,7 +12074,7 @@ queue, scheduler, config или environment change не планируется. 
 ---
 ## Task 97 — field-level исправления данных каталога
 
-Статус: `implementation_completed_delivery_in_progress`.
+Статус: `implementation_committed_push_unresolved_auth`.
 
 Канонический design и полный живой checklist:
 [`2026-07-26-field-level-catalog-corrections-design.md`](../superpowers/specs/2026-07-26-field-level-catalog-corrections-design.md)
@@ -12101,5 +12101,5 @@ queue, scheduler, config или environment change не планируется. 
 | Implementation | `completed` | 11 field actions, five tag reasons, target resolver, identity, vote/moderation reuse |
 | Security/performance | `completed` | Target/current-value revalidation, poster URL privacy, escaped proposal, no per-chip query, active identity index plan |
 | Verification | `completed_with_foreign_full_suite_failures` | Focused 12/66; Blade/translation 83/79 084; related 95/1 818; Playwright 3/3; Vite/Pint/routes/Composer GREEN. Full 2 086: 2 056 pass, 11 skip, 18 foreign failures and 1 foreign error |
-| Managed docs refresh | `unresolved_external_scope` | `docs/MAINTENANCE_LOG.md` was already staged by another task and remains stale against concurrent repository changes |
-| Git delivery | `in_progress` | Exact alternate index on `main`; ordinary push remains |
+| Managed docs refresh | `completed` | Inventory дополнен отсутствовавшей `234000` и новой `235500`; `project:docs-refresh --check` прошёл |
+| Git delivery | `unresolved_remote_auth` | `cd7242390f21005b3e3de351ec6047f41242e247` создан в `main`; `git push origin main` получил `fatal: could not read Username for 'https://github.com': terminal prompts disabled` |
