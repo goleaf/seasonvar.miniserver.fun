@@ -10143,7 +10143,7 @@ Detailed implementation plan:
 
 ## Task 81 — группировка пакетных событий календаря релизов
 
-Статус: `verified_delivery_pending`.
+Статус: `implementation_committed_push_unresolved_authentication`.
 
 Дата начала: 26.07.2026.
 
@@ -10188,7 +10188,7 @@ foreign shared-worktree scope.
 | Actual stack | `completed` | PHP 8.5, Laravel 13.22.0, Livewire 4.3.3, Boost 2.4.13, Tailwind 4.3.2, PHPUnit 12.5.32, SQLite |
 | Existing implementation first | `completed` | Routes/query/DTO/SEO/page/Blade/tests/feed/notification/admin/import traced |
 | Alternatives/user authorization | `completed` | Client/post-page grouping rejected; repeated explicit directive authorizes two-phase query |
-| Design | `completed_with_commit_blocker` | Spec complete; hook-enabled isolated commit blocked because foreign `CHANGELOG.md` has unstaged content |
+| Design | `completed` | Spec complete; implementation and evidence included in exact feature commit `a9d8b56` |
 | Plan/files/contracts/risks | `completed` | Linked unlimited plan and risk matrix |
 | TDD | `completed` | Initial 3 RED failures; focused 11/56 and related 137/1 228 GREEN |
 | Schema/index | `not_applicable` | SQLite EXPLAIN uses existing public time/date indexes; no DDL justified |
@@ -10197,7 +10197,7 @@ foreign shared-worktree scope.
 | Notifications/feed/admin/import/API | `already_compliant` | Canonical rows untouched; related feed/default tests green |
 | Docs/README/CHANGELOG | `completed` | Canonical owners and dated visitor/product notes updated |
 | Verification/final audit | `completed_with_repository_limits` | Global PHPStan, task Rector/Pint/syntax, audits/build/browser and related tests green; monolithic PHPUnit hits 256 МБ, split suite exposes two unrelated repository failures; full Rector/docs checks expose foreign changes |
-| Commit/push main | `pending` | Exact task-only scope; external failure honest |
+| Commit/push main | `completed_commit_unresolved_push_authentication` | Exact 20-file feature commit `a9d8b56` created on `main`; `git push origin main` exited 128 before transfer because GitHub HTTPS credentials are unavailable |
 
 ### Безлимитный execution order
 
@@ -10213,5 +10213,8 @@ foreign shared-worktree scope.
 10. `[completed_with_repository_limits]` Focused/full/static/build/browser verification and fixes.
 11. `[completed]` Canonical docs, visitor README and Russian changelog.
 12. `[completed]` Final requirement reread and exact task diff audit.
-13. `[pending]` Hook-enabled isolated implementation commit in existing `main`.
-14. `[pending]` Configured non-force push; failure stays `unresolved`.
+13. `[completed]` Hook-enabled exact 20-file implementation commit
+    `a9d8b56` created in existing `main`.
+14. `[completed_unresolved_authentication]` Configured non-force
+    `git push origin main` exited 128 before transfer:
+    `fatal: could not read Username for 'https://github.com': No such device or address`.

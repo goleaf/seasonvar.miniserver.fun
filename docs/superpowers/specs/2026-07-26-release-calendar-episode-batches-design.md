@@ -2,7 +2,8 @@
 
 Дата: 26.07.2026.
 
-Статус: implemented and verified; delivery pending.
+Статус: implemented and verified in `a9d8b56`; push unresolved because
+GitHub HTTPS credentials are unavailable.
 
 ## Цель
 

@@ -290,20 +290,21 @@ Discovery может сократить список, но любое расши
     обновить compliance matrix и выполнить repository-wide legacy/dead/
     duplicate/TODO/debug/secret scan.
 
-38. `[pending][critical]` Проверить `git status`, unstaged/staged/untracked,
+38. `[completed][critical]` Проверить `git status`, unstaged/staged/untracked,
     exact `git diff`, `--stat`, staged diff, branch/upstream/remote и
     task-only scope.
 
 ### J. Commit и push
 
-39. `[pending][critical]` Сформировать alternate/path-limited index только из
+39. `[completed][critical]` Сформировать alternate/path-limited index только из
     task files/hunks, запустить hooks и создать логический implementation
     commit в `main`.
 
-40. `[pending][critical]` Проверить commit tree/hash/message и чистоту
+40. `[completed][critical]` Проверить commit tree/hash/message и чистоту
     task scope; чужие изменения не добавлять и не сбрасывать.
 
-41. `[pending][critical]` Выполнить обычный `git push origin main` без force.
+41. `[completed_unresolved_authentication][critical]` Выполнить обычный
+    `git push origin main` без force.
     Внешний отказ сохранить как `unresolved` с точной командой/ошибкой/hash.
 
 ## Compliance matrix
@@ -314,7 +315,7 @@ Discovery может сократить список, но любое расши
 | Installed versions/database | `completed` | PHP 8.5, Laravel 13.22.0, Livewire 4.3.3, Boost 2.4.13, Tailwind 4.3.2, PHPUnit 12.5.32, SQLite |
 | Existing implementation first | `completed` | Routes/query/DTO/page/Blade/SEO/tests/feed/notification/admin/import traced |
 | Alternatives and authorization | `completed` | Repeated explicit instruction authorizes recommended two-phase design |
-| Design spec | `completed` | Linked design reviewed; hook-enabled design commit blocked by foreign changelog |
+| Design spec | `completed` | Linked design reviewed and included with implementation commit `a9d8b56` |
 | Current plan/files/contracts/risks | `completed` | Plan, expected files, protected contracts и discovery update сохранены |
 | Schema/migration/index | `not_applicable` | SQLite EXPLAIN выбирает существующие public time/date indexes; DDL не оправдан |
 | Input validation | `already_compliant` | Existing enum/integer normalization unchanged; combined-filter regression green |
@@ -329,4 +330,4 @@ Discovery может сократить список, но любое расши
 | Full/static/build/browser verification | `completed_with_repository_limits` | Focused 11/56, related 137/1 228, translation 3/74 795, global PHPStan, scoped Rector/Pint/syntax, audits/build and browser green; monolithic suite/full Rector/docs have recorded foreign baseline blockers |
 | Canonical docs/README/CHANGELOG | `completed` | Calendar/frontend/performance owners, visitor README and dated Russian changelog updated |
 | Final legacy/security/diff audit | `completed` | Task scope, dependencies, duplicate symbols, debug/TODO, secrets, routes and foreign files checked before staging |
-| Commit/push main | `pending` | Exact task scope; external failure honest |
+| Commit/push main | `completed_commit_unresolved_push_authentication` | Exact 20-file feature commit `a9d8b56`; ordinary push exited 128 before transfer because GitHub HTTPS credentials are unavailable |
