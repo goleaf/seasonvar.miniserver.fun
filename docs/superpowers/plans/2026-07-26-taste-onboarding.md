@@ -247,12 +247,12 @@ Design:
     - Почему: shared dirty tree и user-required exact scope.
     - Проверка: status, unstaged/staged diff/stat, untracked, route, branch,
       remote, debug/TODO/secrets/unrelated formatting.
-46. `[pending]` Создать exact logical commit в existing `main`.
+46. `[completed]` Создать exact logical commit в existing `main`.
     - Почему: завершить разрешённую работу без foreign changes.
     - Риск: concurrent HEAD/index changes.
     - Проверка: alternate index exact manifest, cached diff/check, resulting
       hash/message and parent.
-47. `[pending]` Выполнить configured non-force push текущей `main`.
+47. `[completed]` Выполнить configured non-force push текущей `main`.
     - Почему: user explicitly requested delivery.
     - Риск: existing HTTPS authentication blocker.
     - Проверка: literal command/exit/output; failure remains unresolved.
@@ -287,3 +287,7 @@ Design:
   (нет flash message) и
   `SeasonvarImportDispatchBatcherTest::test_dispatch_next_registers_serial_pages_in_one_bounded_batch`
   (foreign class ещё отсутствует в shared working tree).
+- Git: exact 57-file commit `763ad12` создан от parent `d776ee6` с tree
+  `f3fd4d4`. Обычный `git push origin main` завершился кодом 128 до передачи
+  данных из-за отсутствующей GitHub HTTPS-аутентификации; force push и смена
+  remote не выполнялись.

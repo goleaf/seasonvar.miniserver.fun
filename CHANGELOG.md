@@ -24,6 +24,11 @@
   повторно проверен, а два отказа и одна ошибка остались в параллельных
   account-session/importer изменениях вне этой функции.
 
+- Поставка onboarding вкусов зафиксирована точным commit `763ad12` в
+  существующей `main`. Обычный `git push origin main` завершился кодом 128 до
+  передачи данных: среда не предоставила GitHub HTTPS username/credentials;
+  force push, смена remote и переписывание истории не выполнялись.
+
 - Консолидированы точные запросы прямого rebuild `/stats` без изменения
   публичного snapshot, маршрутов, cache key/TTL, schema или write paths.
   `CatalogStatsPageBuilder` теперь одним visibility-aware aggregate считает

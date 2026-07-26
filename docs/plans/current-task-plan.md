@@ -9710,7 +9710,7 @@ model отложен до отдельного consistency/invalidation/rollback
 
 ## Task 71 — быстрый onboarding вкусов
 
-Статус: `implementation_verified_commit_pending`.
+Статус: `implementation_committed_push_unresolved_authentication`.
 
 Дата начала: 26.07.2026.
 
@@ -9787,7 +9787,8 @@ worktree changes remain compatible.
 | Implementation | `completed` | Additive schema, typed services, full-page Livewire, recommendation/lifecycle integration and docs implemented |
 | Verification/docs | `completed` | Task matrix 52/52 (73 746 assertions), final 27/27 (73 610), schema rollback/EXPLAIN, Pint/PHPStan/Rector/docs/Vite and Playwright 3/3 GREEN |
 | Full-suite foreign state | `unresolved` | Full 1 GiB suite 1 895/1 909 passed; two foreign failures and one foreign missing-class error remain outside Task 71 |
-| Commit/push | `pending` | Exact Task 71 scope only |
+| Commit | `completed` | Exact 57-file Task 71 commit `763ad12` (`feat: add taste onboarding for recommendations`) on existing `main` |
+| Push | `unresolved` | `git push origin main` exited 128 before transfer: GitHub HTTPS username/credentials unavailable |
 
 ### Execution checklist
 
@@ -9808,9 +9809,10 @@ worktree changes remain compatible.
    verification.
 10. `[completed][critical]` Canonical docs, README, CHANGELOG and final
     compliance reread.
-11. `[pending][critical]` Exact isolated commit on existing `main`.
-12. `[pending][critical]` Configured non-force push; external rejection is
-    recorded as unresolved.
+11. `[completed][critical]` Exact isolated commit `763ad12` on existing
+    `main`.
+12. `[completed][critical]` Configured non-force push attempted; external
+    HTTPS authentication rejection recorded as unresolved.
 
 ### Verification evidence
 
@@ -9829,3 +9831,8 @@ worktree changes remain compatible.
   повторно прошёл; unresolved foreign failures — account-session flash и
   отсутствующий `SeasonvarImportDispatchBatcher` из параллельной importer
   работы.
+- Alternate index от parent `d776ee6` содержал только 57 Task 71 файлов;
+  commit `763ad12` сохранил tree `f3fd4d4` без foreign stats/card/translation
+  formatting hunks. `git push origin main` завершился кодом 128 до передачи
+  данных: `fatal: could not read Username for 'https://github.com': No such
+  device or address`.
