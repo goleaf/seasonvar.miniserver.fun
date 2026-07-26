@@ -6,6 +6,7 @@ namespace Tests\Feature;
 
 use App\Enums\CatalogRecommendationType;
 use App\Models\CatalogTitle;
+use App\Models\CatalogTitleRating;
 use App\Models\LicensedMedia;
 use App\Services\Catalog\CatalogHomePageBuilder;
 use App\Services\Catalog\CatalogHomeSnapshotCache;
@@ -120,6 +121,75 @@ final class CatalogHomeWebProjectionTest extends TestCase
         }
     }
 
+    public function test_home_card_rating_eager_load_uses_the_existing_title_provider_index(): void
+    {
+        $this->seedHomeProjectionTitles();
+        $validTitle = CatalogTitle::query()
+            ->where('slug', 'homepage-web-projection-1')
+            ->firstOrFail();
+        $outOfRangeTitle = CatalogTitle::query()
+            ->where('slug', 'homepage-web-projection-2')
+            ->firstOrFail();
+        CatalogTitleRating::query()->create([
+            'catalog_title_id' => $validTitle->id,
+            'provider' => 'kinopoisk',
+            'rating' => 8.20,
+        ]);
+        CatalogTitleRating::query()->create([
+            'catalog_title_id' => $validTitle->id,
+            'provider' => 'metacritic',
+            'rating' => 9.10,
+        ]);
+        CatalogTitleRating::query()->create([
+            'catalog_title_id' => $outOfRangeTitle->id,
+            'provider' => 'imdb',
+            'rating' => 11.00,
+        ]);
+        app(CatalogHomeSnapshotCache::class)->refresh();
+        $ratingQueries = [];
+        DB::listen(function (QueryExecuted $query) use (&$ratingQueries): void {
+            if (str_contains($query->sql, 'catalog_title_ratings')) {
+                $ratingQueries[] = $query;
+            }
+        });
+
+        $web = app(CatalogHomePageBuilder::class)->webData();
+        $validCard = $web['latestTitles']->firstWhere('id', $validTitle->id);
+        $outOfRangeCard = $web['latestTitles']->firstWhere('id', $outOfRangeTitle->id);
+        $ratingQuery = collect($ratingQueries)->sole();
+        $normalizedSql = str($ratingQuery->sql)
+            ->replace(['`', '"'], '')
+            ->lower()
+            ->squish()
+            ->toString();
+
+        $this->assertInstanceOf(CatalogTitle::class, $validCard);
+        $this->assertInstanceOf(CatalogTitle::class, $outOfRangeCard);
+        $this->assertSame(['kinopoisk'], $validCard->ratings->pluck('provider')->all());
+        $this->assertSame(
+            ['catalog_title_id', 'provider', 'rating'],
+            array_keys($validCard->ratings->sole()->getAttributes()),
+        );
+        $this->assertEmpty($outOfRangeCard->ratings);
+        $this->assertStringContainsString(
+            'from catalog_title_ratings indexed by catalog_title_ratings_catalog_title_id_provider_unique where',
+            $normalizedSql,
+        );
+
+        $plan = collect(DB::select('EXPLAIN QUERY PLAN '.$ratingQuery->toRawSql()))
+            ->pluck('detail')
+            ->implode("\n");
+
+        $this->assertStringContainsString(
+            'catalog_title_ratings_catalog_title_id_provider_unique',
+            $plan,
+        );
+        $this->assertStringNotContainsString(
+            'catalog_ratings_provider_score_votes_title_idx',
+            $plan,
+        );
+    }
+
     public function test_full_projection_hydrates_shared_card_sections_in_one_query_group(): void
     {
         $this->seedHomeProjectionTitles();
@@ -185,7 +255,7 @@ final class CatalogHomeWebProjectionTest extends TestCase
             ),
             'ratings' => fn (string $sql): bool => str_starts_with(
                 $sql,
-                'select catalog_title_ratings.catalog_title_id, catalog_title_ratings.provider, catalog_title_ratings.rating from catalog_title_ratings where',
+                'select catalog_title_ratings.catalog_title_id, catalog_title_ratings.provider, catalog_title_ratings.rating from catalog_title_ratings indexed by catalog_title_ratings_catalog_title_id_provider_unique where',
             ),
         ];
 

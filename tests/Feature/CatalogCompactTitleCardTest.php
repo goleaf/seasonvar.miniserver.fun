@@ -151,5 +151,9 @@ final class CatalogCompactTitleCardTest extends TestCase
             'select "catalog_title_ratings"."catalog_title_id", "catalog_title_ratings"."provider", "catalog_title_ratings"."rating"',
             $ratingQueries->sole(),
         );
+        $this->assertStringContainsString(
+            'from "catalog_title_ratings" INDEXED BY "catalog_title_ratings_catalog_title_id_provider_unique"',
+            $ratingQueries->sole(),
+        );
     }
 }

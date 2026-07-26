@@ -718,6 +718,66 @@ baseline на `genres + ratings` и удалил latest-only `latestSeason`.
 структурное evidence текущего contract; прежние wall-time measurements Task
 74 остаются историческими и не объявляются новым benchmark.
 
+## SQLite-index для eager-load рейтингов карточек
+
+Follow-up 26.07.2026 измерил новый общий rating eager-load после перехода
+карточек на `genres + ratings`. Девять fresh-process вызовов
+`CatalogHomePageBuilder::webData()` до изменения дали медиану builder
+`146,85 ms` и SQL `39,24 ms`; section counts оставались `12/0/8/0`, 12
+release groups и восемь recommendations. Два bounded rating query были
+одними из самых дорогих: SQLite выбирал covering
+`catalog_ratings_provider_score_votes_title_idx
+(provider,rating,votes,catalog_title_id)`, проходил широкий provider/rating
+range и только затем отбрасывал чужие title IDs.
+
+Чередующийся read-only probe из 21 sample для 20 фактических homepage IDs
+сравнил прежний planner path с уже существующим unique
+`catalog_title_ratings_catalog_title_id_provider_unique
+(catalog_title_id,provider)`. Исходные медианы составили `4,552 ms` и
+`0,124 ms`; повтор под параллельной нагрузкой — `12,828 ms` и `0,252 ms`.
+Обе формы каждый раз вернули 32 строки и одинаковый SHA-256
+`ddcdadf0cc2b560985f604fcb39acbc07037fb2904b7e15607b946e5f7a46eb2`.
+Поэтому новый почти дублирующий covering index и ослабление
+`rating BETWEEN 0 AND 10` отклонены.
+
+`CatalogTaxonomyRegistry::cardSummaryLoads()` теперь только на SQLite
+добавляет grammar-safe `INDEXED BY` к relation builder. Проекция
+`catalog_title_id/provider/rating`, providers `kinopoisk|imdb` и range
+`0..10` не менялись; остальные database drivers получают прежний Eloquent
+query без hint. Реальный homepage test фиксирует один eager-load, exact
+payload и `EXPLAIN QUERY PLAN`: используется unique title/provider index, а
+широкий provider/rating index отсутствует.
+
+Вторая settled серия из девяти fresh processes сохранила все section counts
+и выполняла 33 SQL statements; медиана учтённого SQL составила `33,39 ms`.
+Wall median `154,00 ms` против исходных `146,85 ms` оказался шумным из-за
+одновременной SQLite-нагрузки и не объявляется улучшением. Изменение не
+убирает отдельный statement: его результат — устранение широкого scan внутри
+каждого общего card rating eager-load.
+
+Managed Chromium проверил публичные HTTPS `/` и `/ru` на `1440×1200` и
+`390×844`. Desktop network-idle составил `1 915–2 350 ms`, mobile —
+`1 190–1 334 ms`; локальный cold/BYPASS desktop завершился за `3 036 ms`.
+Везде получены `200`, H1 «Сериалы онлайн», 12 карточек последних обновлений,
+нулевой horizontal overflow и отсутствие console/page/request/local-asset
+ошибок. `/api/v1/home` вернул `200` за `339 ms` и прежние
+`48/12/8/12`. Семь HTTPS curl samples дали один `MISS` с total `0,694 s` и
+шесть `HIT` с total `0,152–0,841 s`. Это диагностические observations
+текущего сервера, не p95/SLA.
+
+Focused matrix прошла 27 тестов со 174 утверждениями, broad
+shared-consumer matrix — 92 теста с 633 утверждениями.
+Pint, PHP syntax, task-scoped PHPStan, Rector и Vite завершились успешно.
+Полный suite с временным test-only лимитом 1 ГБ выполнил 1 949 тестов:
+1 933 passed, 11 skipped; три failures и две errors принадлежат параллельным
+smart-collection, account-session и import-batcher изменениям. Обычный
+процесс до этого дважды остановился на закреплённом cumulative `256M`.
+Финальный `project:docs-refresh --check` сообщает только посторонний drift
+`docs/MAINTENANCE_LOG.md`. Migration, schema/index, DML, route, translation,
+cache key/version/TTL/invalidation, dependency, queue или environment не
+изменены. Rollback — обычный revert PHP/tests/docs без database restore,
+cache flush или migration rollback.
+
 ## Производительность onboarding вкусов Task 71
 
 Autocomplete ограничен существующим suggestion query и не гидратирует полный

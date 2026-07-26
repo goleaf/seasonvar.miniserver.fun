@@ -10026,3 +10026,114 @@ Rollback — обычный revert task commit без database/cache cleanup.
 10. `[completed][critical]` Final requirements, legacy/debug/secret/unrelated audit.
 11. `[pending][critical]` Exact alternate-index commit in existing `main`.
 12. `[pending][critical]` Configured non-force push to `origin/main`.
+
+## Task 77 — SQLite-index для eager-load рейтингов карточек
+
+Статус: `verified_commit_pending`.
+
+Дата начала: 26.07.2026.
+
+Approved design:
+[`2026-07-26-card-rating-eager-load-sqlite-index-design.md`](../superpowers/specs/2026-07-26-card-rating-eager-load-sqlite-index-design.md).
+
+Detailed implementation plan:
+[`2026-07-26-card-rating-eager-load-sqlite-index.md`](../superpowers/plans/2026-07-26-card-rating-eager-load-sqlite-index.md).
+
+### Цель и measured root cause
+
+После Task 73/74 production-shaped `CatalogHomePageBuilder::webData()`
+стабильно выполняет 34 SQL. SQLite выбирает широкий covering
+`catalog_ratings_provider_score_votes_title_idx` для bounded eager-load
+рейтингов карточек, хотя запрос прежде всего ограничен небольшим
+`catalog_title_id IN (...)`.
+
+21 alternating read-only sample показал медиану `4,552 ms` для planner path
+и `0,124 ms` для уже существующего unique
+`catalog_title_ratings_catalog_title_id_provider_unique`; обе формы вернули
+32 одинаковые строки с одним SHA-256. Выбран SQLite-only grammar-safe
+`INDEXED BY` в каноническом `CatalogTaxonomyRegistry`, без нового индекса и
+без ослабления provider/range semantics.
+
+### Expected changed files
+
+- `app/Services/Catalog/CatalogTaxonomyRegistry.php`;
+- `tests/Feature/CatalogHomeWebProjectionTest.php`;
+- `tests/Feature/CatalogCompactTitleCardTest.php`;
+- linked Task 77 design и detailed execution plan;
+- task-specific hunks `docs/performance.md` и этого current plan;
+- task-specific hunks `README.md` и `CHANGELOG.md`.
+
+### Protected files и public contracts
+
+- `/`, `/ru`, named/localized homepage, Livewire/Blade/SEO;
+- `/api/v1/home`, catalogue, search, Top 100, discovery, recommendations и
+  personal library card payloads;
+- homepage full/web keys, limits, order and query-count contract;
+- `catalog_title_id/provider/rating`, `kinopoisk|imdb`, rating `0..10`;
+- КиноПоиск display preference with IMDb fallback;
+- `CatalogTaxonomyRegistry` as the shared card-load owner;
+- all non-SQLite SQL and all migration/schema/index/data contracts;
+- snapshot/response cache key/version/TTL/stale/invalidation;
+- importer, queue, scheduler, auth, permissions, Premium, region, legal,
+  privacy and availability boundaries;
+- every foreign Task 75/76 staged/unstaged change.
+
+### Migrations, routes, translations, cache и compatibility risks
+
+| Domain | Статус | Решение / gate |
+| --- | --- | --- |
+| Homepage/catalog rating read | `critical_affected` | Actual eager-load SQL and payload regression |
+| SQLite query planner | `critical_affected` | Exact existing unique index + EXPLAIN gate |
+| Other DB engines | `protected_critical` | Driver guard returns unchanged Eloquent builder |
+| Rating semantics/card UI | `protected_critical` | Exact columns/providers/range and display tests |
+| Shared consumers | `affected_read_only` | Homepage/catalog/search/top/recommendations/library tests |
+| Database schema/DML | `not_applicable` | No migration/index/backfill/write |
+| Routes/translations/UI assets | `not_applicable` | No visible copy/layout/JS/CSS change |
+| Cache | `already_compliant` | No key/version/TTL/invalidation/flush |
+| Security/privacy/auth/legal | `already_compliant` | Read-only query-plan change after canonical scopes |
+| Import/queue/scheduler | `already_compliant` | Write paths and jobs untouched |
+| Production/rollback | `affected_low` | Code/docs revert; no DB/cache cleanup |
+| Shared Git state | `critical_risk_recorded` | Exact Task 77 alternate-index commit only |
+
+### Task-specific requirement-compliance matrix
+
+| Requirement/domain | Статус | Evidence / следующий gate |
+| --- | --- | --- |
+| Root/index/canonical requirements fresh read | `completed` | 26.07.2026 before production edits |
+| Architecture/development/multilingual/security/performance/cache/UI/frontend/ops/maintenance/integration owners | `completed` | Canonical card/homepage contracts traced |
+| Administration/authorization owners | `not_applicable` | No route/write/admin/auth boundary change |
+| Installed runtime/packages/database | `completed` | PHP 8.5.8, Laravel 13.22.0, Boost 2.4.13, Livewire 4.3.3, PHPUnit 12.5.32, SQLite 3.46.1 |
+| Official version-dependent docs | `completed` | Laravel 13 eager-load projection, DB listener and query-builder behavior via Boost |
+| Existing implementation first | `completed` | Registry, builder, recommendation loader, card component, migrations/indexes and tests traced |
+| Read-only root-cause profile | `completed` | 9 builder samples, 21 paired rating samples, exact row hash and EXPLAIN |
+| Alternatives/user authorization | `completed` | New index and weakened predicate rejected; explicit autonomous approval applies |
+| Design/plan/files/contracts/risks | `completed` | Linked approved design and unlimited TDD plan |
+| Design commit | `completed` | `1982d17`; exact isolated file, hook bypass only because foreign unstaged CHANGELOG blocked docs hook |
+| TDD RED | `completed` | 1 test, 6 passing precondition assertions; failed only on missing exact `INDEXED BY` |
+| Implementation | `completed` | SQLite-only `HasMany::getQuery()` hint; exact columns/providers/range unchanged |
+| Focused/static/profile/browser | `completed` | 27/174 + 92/633 GREEN; static/Vite/profile/browser GREEN |
+| Full-suite repository state | `unresolved` | 1 933/1 949 passed, 11 skipped; five failures/errors are foreign Task 76/account/importer work |
+| Managed docs shared state | `unresolved` | `project:docs-refresh --check` reports foreign `docs/MAINTENANCE_LOG.md` drift |
+| Documentation/README/CHANGELOG | `completed` | Performance owner, visitor history and Russian changelog updated |
+| Final requirement reread/diff audit | `completed` | One registry owner, no legacy matcher/Blade query/debug artifact; final consumer matrix 36/334 GREEN |
+| Commit/push in `main` | `unresolved` | Exact task-only commit and configured push are the remaining delivery steps |
+
+### Безлимитный execution order
+
+1. `[completed]` Fresh skills, requirements, versions and shared-tree audit.
+2. `[completed]` Existing card loader/consumer/index/query trace.
+3. `[completed]` Nine-sample builder baseline and 21-sample matched probe.
+4. `[completed]` Alternatives, approved design and isolated design commit.
+5. `[completed]` Detailed TDD plan, files/contracts/risks/compliance matrix.
+6. `[completed]` Plan reread and real-homepage RED regression.
+7. `[completed]` Minimal SQLite-aware registry implementation.
+8. `[completed]` Shared homepage/catalog/search/recommendation/library GREEN.
+9. `[completed]` Repeated profile and exact output/query-plan comparison.
+10. `[completed]` Pint/static/full/Vite/docs/diff verification with foreign
+    full-suite and managed-doc failures recorded as `unresolved`.
+11. `[completed]` Desktop/mobile/localized/API browser verification.
+12. `[completed]` Performance owner, README and Russian CHANGELOG.
+13. `[completed]` Final canonical reread and legacy/debug/secret/cache audit.
+14. `[in_progress]` Exact Task 77 implementation/docs commit on `main`.
+15. `[pending]` Configured non-force push; any external failure stays
+    `unresolved`.

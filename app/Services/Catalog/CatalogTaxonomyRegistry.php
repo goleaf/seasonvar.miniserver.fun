@@ -7,6 +7,7 @@ use App\Models\Actor;
 use App\Models\AgeRating;
 use App\Models\CatalogStatus;
 use App\Models\CatalogTitle;
+use App\Models\CatalogTitleRating;
 use App\Models\Country;
 use App\Models\Director;
 use App\Models\Genre;
@@ -15,9 +16,12 @@ use App\Models\Studio;
 use App\Models\Tag;
 use App\Models\Translation;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class CatalogTaxonomyRegistry
 {
+    private const CARD_RATING_TITLE_PROVIDER_INDEX = 'catalog_title_ratings_catalog_title_id_provider_unique';
+
     /**
      * @var array<string, array{model: class-string<Model>, relation: string}>
      */
@@ -129,15 +133,40 @@ class CatalogTaxonomyRegistry
             ...collect($this->relationSummaryLoads())
                 ->only($this->cardRelations())
                 ->all(),
-            'ratings' => fn ($query) => $query
-                ->select([
-                    'catalog_title_ratings.catalog_title_id',
-                    'catalog_title_ratings.provider',
-                    'catalog_title_ratings.rating',
-                ])
-                ->whereIn('catalog_title_ratings.provider', ['kinopoisk', 'imdb'])
-                ->whereBetween('catalog_title_ratings.rating', [0, 10]),
+            'ratings' => /** @param HasMany<CatalogTitleRating, CatalogTitle> $relation */
+                fn (HasMany $relation): HasMany => $this->preferCardRatingTitleProviderIndex($relation)
+                    ->select([
+                        'catalog_title_ratings.catalog_title_id',
+                        'catalog_title_ratings.provider',
+                        'catalog_title_ratings.rating',
+                    ])
+                    ->whereIn('catalog_title_ratings.provider', ['kinopoisk', 'imdb'])
+                    ->whereBetween('catalog_title_ratings.rating', [0, 10]),
         ];
+    }
+
+    /**
+     * @param  HasMany<CatalogTitleRating, CatalogTitle>  $relation
+     * @return HasMany<CatalogTitleRating, CatalogTitle>
+     */
+    private function preferCardRatingTitleProviderIndex(HasMany $relation): HasMany
+    {
+        $query = $relation->getQuery();
+        $connection = $query->getModel()->getConnection();
+
+        if ($connection->getDriverName() !== 'sqlite') {
+            return $relation;
+        }
+
+        $grammar = $connection->getQueryGrammar();
+
+        $query->fromRaw(
+            $grammar->wrapTable($query->getModel()->getTable())
+            .' INDEXED BY '
+            .$grammar->wrap(self::CARD_RATING_TITLE_PROVIDER_INDEX),
+        );
+
+        return $relation;
     }
 
     public function relationName(string $filterType): string
