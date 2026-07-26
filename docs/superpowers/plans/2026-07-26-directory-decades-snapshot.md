@@ -255,3 +255,8 @@ rg -n "dd\\(|dump\\(|var_dump|TODO|FIXME" <exact-task-paths>
 - README и docs checks прошли. Whole-worktree CHANGELOG policy останавливается
   на foreign Task 87 строке со словом `source-health` до новой русской записи;
   exact staged Task 89 snapshot остаётся delivery gate.
+- Exact hook-enabled implementation/docs commit `94ef9c4` создан в
+  существующей ветке `main` только из 11 файлов Task 89.
+- Обычный non-force `git push origin main` завершился кодом 128 до передачи
+  данных: для GitHub HTTPS недоступны credentials. Remote, история и force
+  options не изменялись; доставка в remote честно остаётся `unresolved`.

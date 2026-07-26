@@ -10786,7 +10786,7 @@ rebuild/failure fallback; migration/index/table/queue не добавляютс�
 
 ## Task 89 — быстрый snapshot десятилетий справочника годов
 
-Статус: `verified_delivery_pending`.
+Статус: `completed_commit_unresolved_push_authentication`.
 
 Дата начала: 26.07.2026.
 
@@ -10871,7 +10871,7 @@ table, dependency, queue, route или cache domain не добавляется.
 | Read-only root-cause profile | `completed` | Nine old/new samples and EXPLAIN on current production-scale DB |
 | Alternatives/user authorization | `completed` | Fast rebuild + existing facet snapshot selected under explicit autonomy |
 | Design/spec self-review | `completed` | Linked design reread; no placeholders or scope contradiction |
-| Design-only commit | `unresolved_shared_changelog` | Exact alternate-index hook correctly refused because foreign `CHANGELOG.md` is dirty outside that index; prepared spec stays in worktree for final exact delivery |
+| Design-only commit | `completed_with_implementation` | Standalone hook correctly refused the foreign dirty CHANGELOG; approved spec was then included in exact Task 89 commit `94ef9c4` |
 | Detailed plan/files/contracts/risks | `completed` | Linked TDD plan and manifests above |
 | TDD RED/GREEN | `completed` | RED 2 tests / 4 assertions with two intended failures; minimal GREEN 2/8; final focused classes 11/49 |
 | Cache lifecycle/failure | `completed` | Version-bump and bounds-identity tests plus TieredCache state/failure matrix GREEN |
@@ -10880,7 +10880,7 @@ table, dependency, queue, route или cache domain не добавляется.
 | Static/style/docs/full verification | `completed_with_unresolved_full_runner_memory` | Exact Pint/syntax/PHPStan 1G/Rector/docs/diff GREEN; monolithic runner repeatedly exhausts XML-enforced 256 MB in foreign large-page cache test |
 | Docs/README/CHANGELOG | `completed_task_scope_with_foreign_policy_blocker` | Caching/performance/search/visitor/technical entries authored; README/docs checks GREEN; whole CHANGELOG policy stops on foreign Task 87 word `source-health` before Task 89 entry |
 | Final requirements/legacy/debug/secret audit | `completed` | Applicable canonical requirements and prepared plan reread; computed-group/cache-key/debug/secret/temporary/diff searches reviewed |
-| Commit/push main | `pending` | Hook-enabled exact task scope; external failure honest |
+| Commit/push main | `completed_commit_unresolved_push_authentication` | Exact 11-file implementation/docs commit `94ef9c4` created on `main`; configured non-force push exited 128 before transfer because GitHub HTTPS credentials are unavailable |
 
 ### Безлимитный execution order
 
@@ -10898,5 +10898,8 @@ table, dependency, queue, route или cache domain не добавляется.
 11. `[completed]` Related web/API/cache/SEO/warming regression matrix.
 12. `[completed]` Canonical docs, README and Russian CHANGELOG task hunks.
 13. `[completed]` Full-suite assessment and final requirements/legacy/secret audit.
-14. `[pending]` Exact hook-enabled Task 89 commits on existing `main`.
-15. `[pending]` Configured non-force push; external failure stays `unresolved`.
+14. `[completed]` Exact hook-enabled 11-file Task 89 implementation/docs commit
+    `94ef9c4` created on existing `main`.
+15. `[completed_unresolved_authentication]` Configured non-force
+    `git push origin main` exited 128 before transfer because GitHub HTTPS
+    credentials are unavailable; force, remote and history were not changed.
