@@ -1,6 +1,6 @@
 # Деплой
 
-Обновлено: 20.07.2026
+Обновлено: 26.07.2026
 
 ## Canonical Task 28 production strategy
 
@@ -369,6 +369,16 @@ php artisan app:failed-job-audit --json --samples=1
 */5 * * * * cd /path/to/seasonvar && /usr/bin/php artisan queue:monitor 'redis:seasonvar-title-refresh,redis:seasonvar-import' --max=5000 >> storage/logs/seasonvar-queue-monitor.log 2>&1
 ```
 
+На verified host 26.07.2026 это единственный активный producer полного
+импорта. Историческая aaPanel task синхронного `seasonvar:import` отключена,
+её сохранённая команда использует `www` только как fail-safe, а соответствующая
+root crontab entry отсутствует. При восстановлении панели нельзя включать эту
+task одновременно с queued cron: сначала выбирается один профиль, затем
+проверяются process user, active global run, queue depth и ownership текущего
+Laravel log. После остановки sync CLI используйте `SIGTERM` и дождитесь
+terminal `cancelled`; `kill -9` и ручная смена import status не являются
+штатной границей.
+
 15.07.2026 production evidence опровергло прежнее предположение о полном lifecycle deduplication: baseline содержал 11 queued runs, 8037 pending jobs и 5670 live claims; более поздний snapshot — 12 running sitemap runs и 1601 active groups. Новый общий coordinator переиспользует один active global run, а повторный cron вызов дополнительно dispatches уникальный finalizer watchdog. Установленный `schedule:run` обслуживает полный project schedule, включая десятиминутный резервный cache warm. Existing failed/backlog jobs не retry-ить и не очищать массово: сначала сопоставить их с текущим run/group/claim state через `app:failed-job-audit`.
 
 ## Historical server requirements snapshot 15.07.2026
@@ -446,10 +456,19 @@ sudo install -m 0644 deploy/logrotate/seasonvar /etc/logrotate.d/seasonvar
 sudo logrotate --debug /etc/logrotate.d/seasonvar
 php artisan config:cache
 php artisan about --only=environment
-systemctl --no-pager --full status seasonvar-import-forever.service
+systemctl is-active seasonvar-import-forever.service || true
+systemctl is-active seasonvar-import-worker@{1..4}.service
+systemctl is-active seasonvar-title-refresh-worker@{1..8}.service
 ```
 
-Команда reload зависит от process manager сервера: для systemd используется `sudo systemctl reload <php-fpm-unit>`, а для отдельного PHP-FPM master — сигнал `USR2` его master PID. Не запускайте второй importer во время проверки. После reload выполните гостевой HTTP GET, `php artisan app:health --json` и убедитесь, что `seasonvar-import-forever.service` остаётся единственным активным импортёром.
+Команда reload зависит от process manager сервера: для systemd используется
+`sudo systemctl reload <php-fpm-unit>`, а для отдельного PHP-FPM master —
+сигнал `USR2` его master PID. Не запускайте второй importer во время проверки.
+После reload выполните гостевой HTTP GET, `php artisan app:health --json` и
+убедитесь, что активен ровно выбранный профиль: либо
+`seasonvar-import-forever.service`, либо queued cron с import/title-refresh
+workers. Наблюдаемый `schedule:work` другого checkout не является scheduler
+Seasonvar и не заменяет минутный `www` cron этого проекта.
 
 Запускать при деплое после установки зависимостей и настройки environment-значений:
 

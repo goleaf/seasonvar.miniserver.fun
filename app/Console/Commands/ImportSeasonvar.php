@@ -85,6 +85,10 @@ class ImportSeasonvar extends Command
         }
 
         if ((bool) $this->option('queued')) {
+            if (! $this->recoverUnconfirmedGlobalSyncRuns($processInspector)) {
+                return self::SUCCESS;
+            }
+
             return $this->handleQueued($queuedDispatcher, $pageTypes, $sitemapTailLimit);
         }
 
@@ -113,6 +117,14 @@ class ImportSeasonvar extends Command
         }
 
         try {
+            if (! $inventoryOnly
+                && ! $refreshMediaSizes
+                && $this->argument('url') === null
+                && ! $this->recoverUnconfirmedGlobalSyncRuns($processInspector)
+            ) {
+                return self::SUCCESS;
+            }
+
             $lockStore->put(self::LOCK_PROCESS_KEY, $process, $lockSeconds);
             $reservedRun = null;
 
@@ -224,11 +236,7 @@ class ImportSeasonvar extends Command
         Store&LockProvider $lockStore,
         int $lockSeconds,
     ): bool {
-        $runningRuns = SeasonvarImportRun::query()
-            ->where('status', 'running')
-            ->where('execution_mode', 'sync')
-            ->latest('updated_at')
-            ->get();
+        $runningRuns = $this->runningSyncRuns();
         $lockProcess = $lockStore->get(self::LOCK_PROCESS_KEY);
         $inspection = $processInspector->inspect(is_array($lockProcess) ? $lockProcess : null, $runningRuns);
 
@@ -252,6 +260,51 @@ class ImportSeasonvar extends Command
         }
 
         return true;
+    }
+
+    private function recoverUnconfirmedGlobalSyncRuns(
+        SeasonvarImportProcessInspector $processInspector,
+    ): bool {
+        $runningRuns = $this->runningSyncRuns(globalOnly: true);
+
+        if ($runningRuns->isEmpty()) {
+            return true;
+        }
+
+        $inspection = $processInspector->inspect(null, $runningRuns);
+
+        if ($inspection['running']) {
+            $this->warn($this->runningProcessMessage($inspection));
+
+            return false;
+        }
+
+        $this->markUnconfirmedRunsFailed($runningRuns);
+        $this->warn('Найден зависший запуск импорта: активный Linux-процесс не подтвержден. Запуск закрыт, можно продолжать обновление.');
+
+        if ($inspection['checks'] !== []) {
+            $this->line('Проверки процесса: '.$this->formatProcessChecks($inspection['checks']));
+        }
+
+        return true;
+    }
+
+    /**
+     * @return Collection<int, SeasonvarImportRun>
+     */
+    private function runningSyncRuns(bool $globalOnly = false): Collection
+    {
+        $query = SeasonvarImportRun::query()
+            ->where('status', 'running')
+            ->where('execution_mode', 'sync');
+
+        if ($globalOnly) {
+            $query->where('mode', 'sitemap');
+        }
+
+        return $query
+            ->latest('updated_at')
+            ->get();
     }
 
     /**

@@ -20,6 +20,7 @@
     <php>
         <ini name="memory_limit" value="256M"/>
         <env name="APP_ENV" value="testing" force="true"/>
+        <env name="LOG_CHANNEL" value="null" force="true"/>
         <env name="APP_CONFIG_CACHE" value="bootstrap/cache/testing-config.php" force="true"/>
         <env name="APP_ROUTES_CACHE" value="bootstrap/cache/testing-routes-v7.php" force="true"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>

@@ -1,8 +1,23 @@
 # Переменные окружения
 
-Обновлено: 24.07.2026
+Обновлено: 26.07.2026
 
 Полный безопасный шаблон находится в `.env.example`. Реальный `.env` не изменяется deployment-кодом и не коммитится.
+
+## Verified import recovery 26.07.2026
+
+- Для этого checkout подтверждён один scheduler owner: минутный
+  `schedule:run` в crontab пользователя `www`. Наблюдаемый на host
+  `schedule:work` принадлежит другому checkout и отдельному systemd unit, не
+  выполняет Seasonvar schedule.
+- Полный import использует один active queued profile: canonical
+  `seasonvar:import --queued` cron, 4 import workers и 8 title-refresh workers
+  от `www`. Дублирующая aaPanel sync task отключена; forever unit не активен.
+- Cache-warm worker также активен от `www`; текущий Laravel daily log имеет
+  owner `www` и mode `0644`. Реальные значения environment и private paths не
+  читались и не публикуются.
+- Private SQLite recovery backup проверен до schema rollout; это локальный
+  recovery artifact, а не доказательство off-host backup или restore rehearsal.
 
 ## Read-only operational baseline 24.07.2026
 
@@ -174,6 +189,12 @@ php artisan cache:warm-catalog --queue --refresh
 php artisan cache:metrics --json
 ```
 
-После пересборки config cache нужно выполнить graceful reload PHP-FPM тем способом, которым он управляется на сервере, и проверить `seasonvar-import-forever.service`. Сам импортёр нельзя дублировать вторым процессом.
+После пересборки config cache нужно выполнить graceful reload PHP-FPM тем
+способом, которым он управляется на сервере, и проверить ровно выбранный
+import profile. Для queued-профиля проверяются
+`seasonvar-import-worker@1..4`, `seasonvar-title-refresh-worker@1..8`,
+единственный `www` cron `seasonvar:import --queued` и отсутствие active
+`seasonvar-import-forever.service`; для sync-профиля — обратное. Одновременно
+оба профиля и два scheduler owner не запускаются.
 
 Не используйте `optimize:clear` или `cache:clear` как обычную реакцию на configuration error: default store может быть общим Redis application cache.

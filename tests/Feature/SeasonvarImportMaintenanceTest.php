@@ -131,6 +131,106 @@ class SeasonvarImportMaintenanceTest extends TestCase
         $this->assertNotNull($unconfirmedRun->finished_at);
     }
 
+    public function test_sync_command_recovers_an_unconfirmed_global_sync_run_after_its_cache_lock_expired(): void
+    {
+        Http::preventStrayRequests();
+        $this->fakeImportProcessInspector(running: false, checks: ['fake-proc:missing', 'fake-pgrep:no-match']);
+        $unconfirmedRun = SeasonvarImportRun::query()->create([
+            'mode' => 'sitemap',
+            'execution_mode' => 'sync',
+            'status' => 'running',
+            'force' => false,
+            'forever' => false,
+            'process_id' => 12345,
+            'process_host' => 'test-host',
+            'process_command' => 'php artisan seasonvar:import --no-discovery',
+            'started_at' => now()->subHour(),
+            'last_heartbeat_at' => now()->subMinutes(10),
+        ]);
+
+        $this->artisan('seasonvar:import', ['--no-discovery' => true])
+            ->expectsOutputToContain('Найден зависший запуск импорта')
+            ->expectsOutputToContain('Готово')
+            ->assertExitCode(0);
+
+        $unconfirmedRun->refresh();
+
+        $this->assertSame('failed', $unconfirmedRun->status);
+        $this->assertSame('Предыдущий запуск не имеет подтвержденного активного Linux-процесса и был закрыт автоматически.', $unconfirmedRun->last_error);
+        $this->assertNotNull($unconfirmedRun->finished_at);
+        $this->assertSame(1, SeasonvarImportRun::query()
+            ->where('mode', 'sitemap')
+            ->where('execution_mode', 'sync')
+            ->where('status', 'completed')
+            ->count());
+    }
+
+    public function test_queued_command_recovers_an_unconfirmed_global_sync_run_after_its_cache_lock_expired(): void
+    {
+        Http::preventStrayRequests();
+        $this->fakeImportProcessInspector(running: false, checks: ['fake-proc:missing', 'fake-pgrep:no-match']);
+        $unconfirmedRun = SeasonvarImportRun::query()->create([
+            'mode' => 'sitemap',
+            'execution_mode' => 'sync',
+            'status' => 'running',
+            'force' => false,
+            'forever' => false,
+            'process_id' => 12345,
+            'process_host' => 'test-host',
+            'process_command' => 'php artisan seasonvar:import --no-discovery',
+            'started_at' => now()->subHour(),
+            'last_heartbeat_at' => now()->subMinutes(10),
+        ]);
+
+        $this->artisan('seasonvar:import', [
+            '--queued' => true,
+            '--no-discovery' => true,
+        ])
+            ->expectsOutputToContain('Найден зависший запуск импорта')
+            ->expectsOutputToContain('поставлено в очередь: 0')
+            ->assertExitCode(0);
+
+        $unconfirmedRun->refresh();
+
+        $this->assertSame('failed', $unconfirmedRun->status);
+        $this->assertSame(1, SeasonvarImportRun::query()
+            ->where('mode', 'sitemap')
+            ->where('execution_mode', 'queue')
+            ->where('status', 'completed')
+            ->count());
+    }
+
+    public function test_queued_command_does_not_close_a_confirmed_live_global_sync_run_without_a_cache_lock(): void
+    {
+        Http::preventStrayRequests();
+        $this->fakeImportProcessInspector(running: true, checks: ['fake-posix:alive', 'fake-ps:match']);
+        $liveRun = SeasonvarImportRun::query()->create([
+            'mode' => 'sitemap',
+            'execution_mode' => 'sync',
+            'status' => 'running',
+            'force' => false,
+            'forever' => false,
+            'process_id' => 12345,
+            'process_host' => 'test-host',
+            'process_command' => 'php artisan seasonvar:import --no-discovery',
+            'started_at' => now()->subHour(),
+            'last_heartbeat_at' => now(),
+        ]);
+
+        $this->artisan('seasonvar:import', [
+            '--queued' => true,
+            '--no-discovery' => true,
+        ])
+            ->expectsOutputToContain('Активный процесс обновления подтвержден')
+            ->assertExitCode(0);
+
+        $liveRun->refresh();
+
+        $this->assertSame('running', $liveRun->status);
+        $this->assertNull($liveRun->finished_at);
+        $this->assertSame(1, SeasonvarImportRun::query()->count());
+    }
+
     public function test_sync_command_recovers_a_stale_queued_global_run_without_live_claims(): void
     {
         Http::preventStrayRequests();

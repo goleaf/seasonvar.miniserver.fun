@@ -1,8 +1,34 @@
 # Очереди и jobs
 
-Обновлено: 25.07.2026
+Обновлено: 26.07.2026
 
-Историческая Task 28 verification подтверждала 4 `seasonvar-import`, 8 `seasonvar-title-refresh` и 1 `cache-warm-v2` worker. Повторный baseline 24.07.2026 не видел их heartbeat, но production recovery 25.07.2026 снова подтвердил четыре живых import worker и восемь title-refresh worker по process command. Имена управляющих unit всё ещё не доказаны read-only проверкой, поэтому runbook не выдумывает `systemctl`-цели и не останавливает процессы. Supervisor/Horizon отсутствуют; Redis process manager unit name также не подтверждён.
+## Verified recovery 26.07.2026
+
+После прерванного production recovery пул восстановлен штатными units: четыре
+`seasonvar-import`, восемь `seasonvar-title-refresh` и один `cache-warm-v2`
+worker активны и работают от `www`. Дублирующая aaPanel sync task отключена;
+единственный активный producer полного импорта — canonical `www` cron
+`seasonvar:import --queued` десять раз в сутки. Возврат root sync task или
+одновременное включение обоих профилей запрещены.
+
+Сохранённые jobs, claims и failed rows не очищались и массово не повторялись.
+После запуска workers семь прежних `finalizing` visitor groups и четыре новых
+targeted runs завершились `completed`: 30 из 30 prepared pages применены,
+failed pages нет, `seasonvar-title-refresh` и `seasonvar-import` дренированы до
+нулевых pending/delayed/reserved. Redis refresh state затронутых карточек стал
+`completed`, поэтому Livewire polling больше не оставляет посетителю вечное
+«Обновляем данные». Стартовый одновременный всплеск writers дал один
+SQLite-lock при создании global queue-run без claims/staging; его строка
+остаётся под канонической `SEASONVAR_QUEUE_STALE_AFTER_MINUTES` recovery, а не
+закрывается ручной правкой.
+
+Историческая Task 28 verification подтверждала 4 `seasonvar-import`, 8
+`seasonvar-title-refresh` и 1 `cache-warm-v2` worker. Повторный baseline
+24.07.2026 не видел их heartbeat, а recovery 26.07.2026 проверил точные
+`seasonvar-import-worker@1..4`, `seasonvar-title-refresh-worker@1..8` и
+`seasonvar-cache-warm-worker.service`: все 13 units имеют
+`ActiveState=active`, `SubState=running`, без рестартов на момент проверки.
+Supervisor/Horizon для этих queues не используются.
 
 ## Operational queue baseline 24.07.2026
 

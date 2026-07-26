@@ -1,6 +1,6 @@
 # Конвейер импорта Seasonvar
 
-Обновлено: 25.07.2026
+Обновлено: 26.07.2026
 
 ## Граница данных
 
@@ -76,6 +76,17 @@ Serial fetcher и parser распознают точное provider-сообще
 Установка и безопасное переключение systemd-профилей описаны в [`deployment.md`](deployment.md), queue lifecycle — в [`queues.md`](queues.md).
 
 ## Queue coordinator и статусы
+
+Перед `--queued` dispatch и перед резервированием нового полного sync CLI
+проверяет каждую активную `sitemap/sync/running` строку через
+`SeasonvarImportProcessInspector`, даже если прежний cache lock уже истёк.
+Подтверждённый Linux-процесс сохраняется и блокирует второй global lifecycle;
+строка без подтверждённого процесса закрывается штатным `failed`, после чего
+command продолжает обычный coordinator path. Targeted URL runs, queue-runs,
+claims, prepared payload и публичные options/exit codes эта проверка не
+меняет. Поэтому исчезнувший sync process больше не оставляет queued cron
+навсегда в состоянии «активный запуск», а живой процесс нельзя закрыть только
+по возрасту heartbeat.
 
 Sync CLI/legacy wrapper, `/admin/imports`, cron/CLI `--queued` и retry используют общий `SeasonvarGlobalImportRunCoordinator`. Atomic start-lock охватывает active lookup и вставку: пока существует глобальный `sitemap` run любого execution mode в `queued/running`, повторный вызов возвращает его и не создаёт run, page jobs или title groups. Sync path заранее создаёт running reservation и передаёт её в pipeline без второй audit-строки. Targeted `mode=url` refresh не владеет этой глобальной границей и не блокируется. Новый `queued` run создаётся короткой transaction; `StartSeasonvarQueuedImport` получает только scalar run ID. Coordinator job имеет 3 attempts, backoff 60/300/900 секунд, timeout 900 секунд и unique lock на run. Transient network/408/425/429/5xx/SQLite-lock ошибки возвращают run в `queued` для retry; permanent validation/provider errors переводят его в `failed` без бесполезного повтора.
 

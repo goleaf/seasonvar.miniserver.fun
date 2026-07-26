@@ -36,6 +36,16 @@ class ProductionOperationsDocumentationTest extends TestCase
         }
     }
 
+    public function test_phpunit_does_not_write_to_the_production_daily_log(): void
+    {
+        $phpunit = File::get(base_path('phpunit.xml'));
+
+        $this->assertStringContainsString(
+            '<env name="LOG_CHANNEL" value="null" force="true"/>',
+            $phpunit,
+        );
+    }
+
     public function test_deployment_documentation_covers_the_production_rollout_checks(): void
     {
         $deployment = File::get(base_path('docs/deployment.md'));
