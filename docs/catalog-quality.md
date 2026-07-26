@@ -21,6 +21,60 @@ policy, audit, validation, transaction и cache invalidation. В центре н
 массовой автокоррекции, удаления тегов, запуска сетевых проверок или вывода
 закрытых source/media URL.
 
+## Provenance полей и confidence
+
+Текущее значение ключевого поля должно быть объяснимо через источник,
+последнее подтверждение, confidence `0..100` и статус проверки. Для scalar
+полей, жанров и стран evidence хранится в
+`catalog_metadata_observations`, выбранная история — в
+`catalog_field_versions`, а расхождения источников — в
+`catalog_metadata_conflicts`.
+
+`catalog_title_tag_sources` и `tag_provider_mappings` остаются единственным
+каноническим provenance-boundary глобальных тегов. Теги не копируются в
+generic observations: административный presenter объединяет текущую
+assignment provenance, confidence mapping и moderation state. Imported tag
+без current provenance получает объяснимый fallback confidence `12` и
+статус «проверить».
+
+Confidence является детерминированным сигналом качества evidence, а не
+вероятностным обещанием истинности:
+
+- редакторское подтверждение — `100`;
+- прямое непустое поле Seasonvar — `98`;
+- полный taxonomy snapshot — `96`;
+- неполный taxonomy snapshot — `70` и запрет автоматической публикации
+  такого evidence;
+- отсутствующее provider-значение — `35`;
+- legacy current value без observation — `60`;
+- imported tag без current provenance — `12`.
+
+Повторное идентичное observation обновляет время подтверждения и не создаёт
+новую выбранную версию. Изменившееся provider-значение становится новой
+версией только если оно действительно выбрано; при сохранённом
+редакторском значении создаётся или обновляется conflict. Совпадение
+значений разрешает conflict без удаления истории.
+
+Для `genres` и `countries` provider observation намеренно отделено от
+выбранного значения. Импорт связей выполняется через additive
+`syncWithoutDetaching`, поэтому неполный ответ Seasonvar не может объявить
+свой список полным текущим состоянием каталога: selected version строится по
+фактическим relations, а несовпадение открывает conflict. Этот же recorder
+вызывается и обычным prepared-page apply, и локальным metadata backfill;
+успешный backfill пакетно помечает существующие quality snapshots как
+`needs_refresh`.
+
+Существующий `catalog:quality-refresh` записывает bounded lifecycle в
+`catalog_quality_runs`, а snapshot/issues могут ссылаться на конкретный run.
+Предложенное общее имя `catalog_quality_issues` не создаёт вторую таблицу:
+каноническим хранилищем текущих проблем остаётся
+`catalog_title_quality_issues`.
+
+Provenance не меняет публичную видимость автоматически. Слабое evidence
+становится publication-ineligible для новых автоматических назначений, но
+существующие редакторские значения, теги и public contracts не удаляются
+без отдельного подтверждённого workflow.
+
 ## Модель оценки
 
 Версионированный детерминированный evaluator начинает с `100`, вычитает
@@ -138,7 +192,7 @@ page size `15|25|50`, детерминированную пагинацию и U
 ## Развёртывание, восстановление и проверка
 
 До deploy нужен штатный backup assessment и `migrate:status`. Порядок:
-additive migration, код, assets, restart реально используемых workers,
+две additive provenance migrations, код, assets, restart реально используемых workers,
 ограниченный ручной запуск `catalog:quality-refresh`, затем проверка schedule
 и admin route. Недоступный scheduler означает stale queue, но не ломает
 публичный каталог.

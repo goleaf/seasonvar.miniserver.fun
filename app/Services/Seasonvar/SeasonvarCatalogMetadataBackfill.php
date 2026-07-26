@@ -8,6 +8,7 @@ use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Models\SourcePage;
 use App\Services\Api\V1\Sync\CatalogSyncChangePublisher;
+use App\Services\Catalog\Quality\CatalogTitleQualityDirtyTracker;
 use App\Services\Catalog\Search\CatalogSearchIndexer;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -23,6 +24,8 @@ class SeasonvarCatalogMetadataBackfill
         private readonly SeasonvarDatabaseTransaction $databaseTransaction,
         private readonly CatalogSearchIndexer $searchIndexer,
         private readonly SeasonvarEditorialFieldResolver $editorialFields,
+        private readonly SeasonvarCatalogMetadataProvenance $metadataProvenance,
+        private readonly CatalogTitleQualityDirtyTracker $quality,
         private readonly CatalogSyncChangePublisher $syncChanges,
     ) {}
 
@@ -163,6 +166,7 @@ class SeasonvarCatalogMetadataBackfill
                             'indexed_at' => now(),
                             'relation_metadata_version' => SeasonvarCatalogParser::METADATA_VERSION,
                         ]);
+                        $this->metadataProvenance->record($title, $page, $data);
 
                         return $attached;
                     },
@@ -239,9 +243,11 @@ class SeasonvarCatalogMetadataBackfill
         }
 
         if ($updatedTitleIds !== []) {
-            $this->searchIndexer->synchronizeTitleIds(array_keys($updatedTitleIds));
+            $titleIds = array_keys($updatedTitleIds);
+            $this->searchIndexer->synchronizeTitleIds($titleIds);
+            $this->quality->mark($titleIds);
 
-            foreach (array_keys($updatedTitleIds) as $titleId) {
+            foreach ($titleIds as $titleId) {
                 $this->syncChanges->publishUpsert((int) $titleId);
             }
         }

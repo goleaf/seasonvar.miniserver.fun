@@ -117,3 +117,24 @@ country, bounded query count, cache format `2`, neutral focus, `Ctrl+K` и
 `/`, keyboard navigation, session-only recent queries, true-zero request
 CTA, fullscreen focus/scroll cleanup, sticky compaction, safe area,
 authentication и отсутствие console/network/overflow/axe regressions.
+
+Task 92 provenance метаданных покрывают
+`CatalogMetadataProvenanceSchemaTest`,
+`CatalogMetadataProvenanceRecorderTest`,
+`CatalogMetadataProvenanceQueryTest`,
+`SeasonvarCatalogPreparedApplyTest`,
+`SeasonvarCatalogMetadataBackfillTest`,
+`CatalogSearchSynchronizationTest`,
+`CatalogQualityRecalculationTest`,
+`CatalogQualityRefreshCommandTest` и
+`Administration/CatalogQualityCenterTest`. Матрица проверяет additive
+schema/rollback/FK/unique, SQLite `EXPLAIN`, normalization/confidence,
+idempotent confirmation, monotonic versions, open/resolved conflicts,
+неполный taxonomy snapshot, оба пути Seasonvar, editorial actor, quality
+run, dirty invalidation, отсутствие N+1, gate, private URL exclusion и
+provider-tag confidence. Связанный quality/tag/import regression suite
+содержит `81` тест и `479` утверждений; старый budget contract теперь
+проверяет постоянный ceiling grouped provenance reads для одной и 21
+карточки. `tests/browser/catalog-quality.spec.js` проверяет тот же центр на
+desktop/mobile/tablet, включая URL state, touch target, отсутствие
+горизонтального overflow и ошибок браузера.

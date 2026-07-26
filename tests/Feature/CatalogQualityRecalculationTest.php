@@ -7,6 +7,7 @@ namespace Tests\Feature;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleQualityIssue;
 use App\Models\CatalogTitleQualitySnapshot;
+use App\Services\Catalog\Quality\CatalogMetadataProvenanceRecorder;
 use App\Services\Catalog\Quality\CatalogTitleQualityInputLoader;
 use App\Services\Catalog\Quality\CatalogTitleQualityRecalculator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -80,5 +81,26 @@ final class CatalogQualityRecalculationTest extends TestCase
 
         self::assertLessThanOrEqual($singleCount + 2, $batchCount);
         self::assertLessThanOrEqual(12, $batchCount);
+    }
+
+    #[Test]
+    public function recalculation_uses_current_provider_observations_when_legacy_baseline_is_absent(): void
+    {
+        $title = CatalogTitle::factory()->create([
+            'title' => 'Редакторское название',
+            'provider_field_values' => null,
+        ]);
+        app(CatalogMetadataProvenanceRecorder::class)->recordProviderSnapshot(
+            $title,
+            $title->sourcePage,
+            ['title' => 'Название Seasonvar'],
+        );
+
+        app(CatalogTitleQualityRecalculator::class)->recalculate([$title->id]);
+
+        self::assertDatabaseHas('catalog_title_quality_issues', [
+            'catalog_title_id' => $title->id,
+            'code' => 'data_conflicts',
+        ]);
     }
 }

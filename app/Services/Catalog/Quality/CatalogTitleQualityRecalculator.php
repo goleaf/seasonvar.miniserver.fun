@@ -6,6 +6,7 @@ namespace App\Services\Catalog\Quality;
 
 use App\DTOs\CatalogQuality\CatalogTitleQualityIssueData;
 use App\Enums\CatalogQualitySeverity;
+use App\Models\CatalogQualityRun;
 use App\Models\CatalogTitleQualityIssue;
 use App\Models\CatalogTitleQualitySnapshot;
 use Carbon\CarbonImmutable;
@@ -19,7 +20,7 @@ final readonly class CatalogTitleQualityRecalculator
     ) {}
 
     /** @param iterable<int, int|string> $titleIds */
-    public function recalculate(iterable $titleIds): int
+    public function recalculate(iterable $titleIds, ?CatalogQualityRun $run = null): int
     {
         $evaluatedAt = CarbonImmutable::now();
         $facts = $this->loader->load($titleIds, $evaluatedAt);
@@ -27,7 +28,7 @@ final readonly class CatalogTitleQualityRecalculator
         foreach ($facts as $fact) {
             $result = $this->evaluator->evaluate($fact);
 
-            DB::transaction(function () use ($fact, $result, $evaluatedAt): void {
+            DB::transaction(function () use ($fact, $result, $evaluatedAt, $run): void {
                 $firstDetectedAt = CatalogTitleQualityIssue::query()
                     ->where('catalog_title_id', $fact->catalogTitleId)
                     ->pluck('first_detected_at', 'code');
@@ -35,6 +36,7 @@ final readonly class CatalogTitleQualityRecalculator
                 $rows = array_map(
                     static fn (CatalogTitleQualityIssueData $issue): array => [
                         'catalog_title_id' => $fact->catalogTitleId,
+                        'catalog_quality_run_id' => $run?->id,
                         'code' => $issue->code,
                         'category' => $issue->category->value,
                         'severity' => $issue->severity->value,
@@ -57,6 +59,7 @@ final readonly class CatalogTitleQualityRecalculator
                         ['catalog_title_id', 'code'],
                         [
                             'category',
+                            'catalog_quality_run_id',
                             'severity',
                             'penalty',
                             'evidence',
@@ -79,6 +82,7 @@ final readonly class CatalogTitleQualityRecalculator
                     ['catalog_title_id' => $fact->catalogTitleId],
                     [
                         'quality_score' => $result->score,
+                        'catalog_quality_run_id' => $run?->id,
                         'severity' => $result->severity,
                         'issue_count' => count($result->issues),
                         'critical_count' => collect($result->issues)->filter(

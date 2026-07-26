@@ -16,6 +16,7 @@ use App\Models\Season;
 use App\Models\User;
 use App\Services\Admin\AdminAuditRecorder;
 use App\Services\Api\V1\Sync\CatalogSyncChangePublisher;
+use App\Services\Catalog\Quality\CatalogMetadataProvenanceRecorder;
 use App\Services\Catalog\Search\CatalogSearchIndexer;
 use App\Services\Media\PlaybackSourceUrlGuard;
 use Closure;
@@ -87,6 +88,7 @@ final class CatalogAdministrationService
         private readonly CatalogCacheInvalidator $cacheInvalidator,
         private readonly PlaybackSourceUrlGuard $playbackUrls,
         private readonly CatalogSearchIndexer $searchIndexer,
+        private readonly CatalogMetadataProvenanceRecorder $metadataProvenance,
         private readonly AdminAuditRecorder $auditRecorder,
         private readonly CatalogSyncChangePublisher $syncChanges,
     ) {}
@@ -176,13 +178,23 @@ final class CatalogAdministrationService
                 ])->save();
 
                 $saved = $current->fresh();
+                $changedFields = $this->changedAuditFields(
+                    $beforeAttributes,
+                    $saved,
+                    self::TITLE_AUDIT_FIELDS,
+                );
+                $this->metadataProvenance->recordEditorialSelection(
+                    $saved,
+                    $user,
+                    $changedFields,
+                );
                 $this->auditRecorder->record(
                     $user,
                     $action,
                     $saved,
                     $beforeVersion,
                     $this->titleVersion($saved),
-                    $this->changedAuditFields($beforeAttributes, $saved, self::TITLE_AUDIT_FIELDS),
+                    $changedFields,
                 );
 
                 return $saved;

@@ -100,6 +100,20 @@ class CatalogSearchSynchronizationTest extends TestCase
 
         $this->assertSame('Новое редакторское имя', $document->title);
         $this->assertSame('', $document->taxonomies);
+        $this->assertDatabaseHas('catalog_metadata_observations', [
+            'catalog_title_id' => $updated->id,
+            'field_key' => 'title',
+            'source_kind' => 'editorial',
+            'confidence' => 100,
+            'is_current' => true,
+        ]);
+        $titleVersion = $updated->fieldVersions()
+            ->where('field_key', 'title')
+            ->whereNull('superseded_at')
+            ->sole();
+        $this->assertSame('Новое редакторское имя', $titleVersion->value);
+        $this->assertSame($admin->id, $titleVersion->actor_id);
+        $this->assertSame('editorial', $titleVersion->source_kind->value);
         $this->assertSame(
             [ApiSyncChange::OPERATION_UPSERT, ApiSyncChange::OPERATION_UPSERT],
             ApiSyncChange::query()->orderBy('id')->pluck('operation')->all(),

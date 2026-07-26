@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Catalog\Quality;
 
+use App\DTOs\CatalogQuality\CatalogMetadataProvenanceViewData;
 use App\DTOs\CatalogQuality\CatalogQualityIssueViewData;
 use App\DTOs\CatalogQuality\CatalogQualityQueueItemData;
 use App\DTOs\CatalogQuality\CatalogQualityQueueSummaryData;
@@ -19,6 +20,10 @@ use Illuminate\Support\Facades\Schema;
 
 final class CatalogQualityQueueQuery
 {
+    public function __construct(
+        private readonly CatalogMetadataProvenanceQuery $metadataProvenance,
+    ) {}
+
     /** @return list<string> */
     public static function queues(): array
     {
@@ -184,17 +189,28 @@ final class CatalogQualityQueueQuery
                 ->orderBy('catalog_title_quality_snapshots.catalog_title_id'),
         };
 
-        return $query
-            ->paginate(
-                perPage: $perPage,
-                pageName: 'qualityPage',
-                page: $page,
-            )
-            ->through(fn (CatalogTitleQualitySnapshot $snapshot): CatalogQualityQueueItemData => $this->present($snapshot));
+        $page = $query->paginate(
+            perPage: $perPage,
+            pageName: 'qualityPage',
+            page: $page,
+        );
+        $provenance = $this->metadataProvenance->forTitleIds(
+            $page->getCollection()->pluck('catalog_title_id'),
+        );
+
+        return $page->through(
+            fn (CatalogTitleQualitySnapshot $snapshot): CatalogQualityQueueItemData => $this->present(
+                $snapshot,
+                $provenance->get((int) $snapshot->catalog_title_id, []),
+            ),
+        );
     }
 
-    private function present(CatalogTitleQualitySnapshot $snapshot): CatalogQualityQueueItemData
-    {
+    /** @param list<CatalogMetadataProvenanceViewData> $provenance */
+    private function present(
+        CatalogTitleQualitySnapshot $snapshot,
+        array $provenance,
+    ): CatalogQualityQueueItemData {
         $title = $snapshot->catalogTitle;
         abort_unless($title !== null, 404);
 
@@ -216,6 +232,7 @@ final class CatalogQualityQueueQuery
             issues: $snapshot->issues
                 ->map(fn (CatalogTitleQualityIssue $issue): CatalogQualityIssueViewData => $this->presentIssue($issue))
                 ->all(),
+            provenance: $provenance,
             editUrl: route('admin.catalog', ['catalog_q' => $snapshot->catalog_title_id]),
         );
     }

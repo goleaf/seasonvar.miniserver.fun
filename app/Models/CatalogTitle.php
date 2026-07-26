@@ -297,6 +297,24 @@ class CatalogTitle extends Model
         return $this->hasMany(CatalogTitleQualityIssue::class);
     }
 
+    /** @return HasMany<CatalogMetadataObservation, $this> */
+    public function metadataObservations(): HasMany
+    {
+        return $this->hasMany(CatalogMetadataObservation::class);
+    }
+
+    /** @return HasMany<CatalogMetadataConflict, $this> */
+    public function metadataConflicts(): HasMany
+    {
+        return $this->hasMany(CatalogMetadataConflict::class);
+    }
+
+    /** @return HasMany<CatalogFieldVersion, $this> */
+    public function fieldVersions(): HasMany
+    {
+        return $this->hasMany(CatalogFieldVersion::class);
+    }
+
     /** @return HasMany<CatalogTitleUserState, $this> */
     public function userStates(): HasMany
     {

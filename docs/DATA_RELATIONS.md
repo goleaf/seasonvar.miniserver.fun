@@ -666,3 +666,28 @@ foreign-key integrity и `EXPLAIN QUERY PLAN` для каждого нового
 зафиксированы тестом схемы. Follow-up migration
 `2026_07_26_231100_add_merge_lookup_index_to_catalog_recommendation_onboarding_titles.php`
 additive добавляет и отдельно удаляет только доказанный merge lookup index.
+
+## Provenance метаданных каталога Task 92
+
+| Таблица | Владелец и целостность |
+| --- | --- |
+| `catalog_metadata_observations` | Append-preserving evidence одного allowlisted поля `CatalogTitle` от provider/editorial source. Unique identity `(catalog_title_id,field_key,source_kind,source_key,value_hash)` делает повторное подтверждение идемпотентным; title cascade, nullable source/page `nullOnDelete`. |
+| `catalog_field_versions` | Монотонная выбранная история `(catalog_title_id,field_key,version)` со snapshot значения/hash, nullable observation/actor и одним текущим состоянием через `superseded_at IS NULL`. |
+| `catalog_metadata_conflicts` | Направленное расхождение выбранного и competing hash с сохраняемыми first/last/resolved timestamps; observation FK nullable, title cascade. |
+| `catalog_quality_runs` | Ограниченный lifecycle существующего `catalog:quality-refresh`; nullable run FK в canonical `catalog_title_quality_snapshots` и `catalog_title_quality_issues` использует `nullOnDelete`. |
+
+Теги не дублируются в observations: их provenance принадлежит
+`catalog_title_tag_sources` и `tag_provider_mappings`. Предложенная
+`catalog_quality_issues` не создаётся, потому что текущие нормализованные
+проблемы уже принадлежат `catalog_title_quality_issues`.
+
+Current observation обслуживает
+`(catalog_title_id,field_key,is_current,last_confirmed_at)`, очередь
+конфликтов —
+`(status,severity,last_detected_at,catalog_title_id)`, выбранную версию —
+`(catalog_title_id,field_key,superseded_at,version)`. SQLite
+`EXPLAIN QUERY PLAN` подтверждает использование первых двух индексов;
+page-level presenter ограничен 50 title ID и не выполняет запросов из Blade.
+Обе migrations additive и обратимы: сначала удаляются nullable run links,
+затем runs/versions/conflicts/observations; authoritative catalog, tag и
+quality rows при этом не меняются.

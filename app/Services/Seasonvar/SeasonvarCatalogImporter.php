@@ -73,6 +73,7 @@ class SeasonvarCatalogImporter
         private readonly SeasonvarTitlePageStateSynchronizer $titlePageStateSynchronizer,
         private readonly SeasonvarImportErrorSanitizer $errors,
         private readonly CatalogSearchIndexer $searchIndexer,
+        private readonly SeasonvarCatalogMetadataProvenance $metadataProvenance,
         private readonly CatalogTitleQualityDirtyTracker $quality,
         private readonly CatalogSyncChangePublisher $syncChanges,
         private readonly CatalogRecommendationDirtyTitleTracker $recommendationDirtyTitles,
@@ -537,6 +538,11 @@ class SeasonvarCatalogImporter
                 $data->taxonomies,
                 $progress,
                 completeTagSnapshot: $data->hasCompleteMetadataSnapshot(),
+            );
+            $this->metadataProvenance->record(
+                $catalogTitle,
+                $page,
+                $data,
             );
             $this->syncCatalogAliases($catalogTitle, $data->aliases, $progress);
             $this->syncCatalogRatings($catalogTitle, $data->ratings, $progress);
@@ -1390,6 +1396,7 @@ class SeasonvarCatalogImporter
                 'variant_name' => $variant['variant_name'],
                 'variant_key' => $variant['variant_key'],
                 'has_subtitles' => $variant['has_subtitles'],
+                'subtitle_language' => $variant['subtitle_language'],
                 'format' => $format,
                 'published_at' => $media->published_at ?? now(),
             ];

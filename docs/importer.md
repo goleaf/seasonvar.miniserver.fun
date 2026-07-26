@@ -222,6 +222,26 @@ bounded `catalog:quality-refresh` подберёт его как initial backlog
 формула, evidence и rollout описаны в
 [`catalog-quality.md`](catalog-quality.md).
 
+## Provenance импортированных метаданных
+
+Обычное применение prepared page и локальный
+`SeasonvarCatalogMetadataBackfill` используют один
+`SeasonvarCatalogMetadataProvenance`. После валидации DTO и сохранения title
+и relations он передаёт в recorder только allowlisted поля `title`,
+`original_title`, `type`, `year`, `description`, `poster_url`, `genres` и
+`countries`. Observation хранит нормализованное JSON-значение, hash,
+confidence и время подтверждения; raw URL страницы, HTML и media URL в этот
+слой не копируются.
+
+Повторное совпадающее значение обновляет confirmation без новой field
+version. Для неполного taxonomy snapshot evidence получает confidence `70`
+и не считается пригодным для автоматической публикации; выбранная версия
+строится по фактическим additive relations, поэтому сохранённые прежние
+жанры или страны не исчезают и расхождение становится conflict. Backfill
+после commit пакетно помечает только затронутые существующие quality
+snapshots через `CatalogTitleQualityDirtyTracker`; синхронного пересчёта и
+production-wide backfill в migration нет.
+
 ## Импортные и пользовательские отзывы
 
 `catalog_title_reviews` remains one table. Seasonvar importer owns only `origin=provider` rows and continues to upsert by `(catalog_title_id,body_hash)` with source page, provider author, plain body and publication date. It never assigns portal `user_id`, title/spoiler/verified/moderation ownership/submission fields, never creates helpful votes and never changes `catalog_title_user_states`.

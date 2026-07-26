@@ -160,6 +160,49 @@
                                     </ul>
                                 @endif
                             </div>
+
+                            <details class="mt-4 border-t border-slate-100 pt-4">
+                                <summary class="min-h-11 cursor-pointer rounded-control px-2 py-3 text-sm font-bold text-slate-800 hover:bg-slate-50">
+                                    {{ __('catalog-quality.provenance.title') }}
+                                    <span class="ml-1 text-xs font-normal text-slate-500">
+                                        {{ trans_choice('catalog-quality.provenance.row_count', count($item->provenance), ['count' => count($item->provenance)]) }}
+                                    </span>
+                                </summary>
+
+                                @if ($item->provenance === [])
+                                    <p class="px-2 pb-2 text-sm text-slate-600">{{ __('catalog-quality.provenance.empty') }}</p>
+                                @else
+                                    <div class="mt-2 grid gap-2" role="list" aria-label="{{ __('catalog-quality.provenance.list_label') }}">
+                                        @foreach ($item->provenance as $provenance)
+                                            <div wire:key="catalog-provenance-{{ $item->catalogTitleId }}-{{ $provenance->key }}" role="listitem" class="grid gap-2 rounded-control border border-slate-200 bg-slate-50 p-3 text-xs sm:grid-cols-[minmax(7rem,0.7fr)_minmax(10rem,1.4fr)_minmax(8rem,1fr)_auto] sm:items-center">
+                                                <div>
+                                                    <p class="font-bold text-slate-800">{{ $provenance->fieldLabel }}</p>
+                                                    <p class="mt-1 break-words leading-5 text-slate-600">{{ $provenance->valueLabel }}</p>
+                                                </div>
+                                                <div class="text-slate-600">
+                                                    <span class="font-bold text-slate-700">{{ __('catalog-quality.provenance.source') }}:</span>
+                                                    {{ $provenance->sourceLabel }}
+                                                </div>
+                                                <div class="text-slate-600">
+                                                    <span class="font-bold text-slate-700">{{ __('catalog-quality.provenance.confirmed_at') }}:</span>
+                                                    {{ $provenance->confirmedAtLabel }}
+                                                </div>
+                                                <div class="flex flex-wrap items-center gap-2 sm:justify-end">
+                                                    <span class="rounded-full bg-white px-2 py-1 font-black tabular-nums text-slate-700 ring-1 ring-slate-200">
+                                                        {{ $provenance->confidence }}%
+                                                    </span>
+                                                    <span @class([
+                                                        'rounded-full px-2 py-1 font-bold',
+                                                        'bg-emerald-100 text-emerald-800' => $provenance->status === 'confirmed',
+                                                        'bg-amber-100 text-amber-800' => $provenance->status === 'review',
+                                                        'bg-rose-100 text-rose-800' => $provenance->status === 'conflict',
+                                                    ])>{{ $provenance->statusLabel }}</span>
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @endif
+                            </details>
                         </article>
                     @endforeach
                 </div>

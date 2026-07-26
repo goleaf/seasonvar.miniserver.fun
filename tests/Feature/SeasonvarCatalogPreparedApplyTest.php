@@ -44,6 +44,7 @@ class SeasonvarCatalogPreparedApplyTest extends TestCase
             'external_id' => '24212',
             'slug' => 'ryzaia-8',
             'title' => 'Рыжая',
+            'year' => 2026,
             'source_url' => $firstPage->url,
             'source_url_hash' => hash('sha256', $firstPage->url),
         ]);
@@ -64,6 +65,20 @@ class SeasonvarCatalogPreparedApplyTest extends TestCase
         $this->assertDatabaseCount('catalog_titles', 1);
         $this->assertSame([1, 2, 9], $canonical->seasons()->pluck('number')->all());
         $this->assertTrue($canonical->qualitySnapshot()->sole()->needs_refresh);
+        $this->assertDatabaseHas('catalog_metadata_observations', [
+            'catalog_title_id' => $canonical->id,
+            'field_key' => 'year',
+            'source_kind' => 'provider',
+            'confidence' => 98,
+            'is_current' => true,
+            'is_publication_eligible' => true,
+        ]);
+        $yearVersion = $canonical->fieldVersions()
+            ->where('field_key', 'year')
+            ->whereNull('superseded_at')
+            ->sole();
+        $this->assertSame(2026, $yearVersion->value);
+        $this->assertSame('provider', $yearVersion->source_kind->value);
         $this->assertSame(3, ApiSyncChange::query()
             ->where('operation', ApiSyncChange::OPERATION_UPSERT)
             ->where('resource_key', 'ryzaia-8')

@@ -38,7 +38,7 @@ final class CatalogQualityQueueQueryTest extends TestCase
 
         self::assertCount(21, $page->items());
         self::assertLessThanOrEqual($singleCount + 1, $batchCount);
-        self::assertLessThanOrEqual(7, $batchCount);
+        self::assertLessThanOrEqual(14, $batchCount);
     }
 
     #[Test]

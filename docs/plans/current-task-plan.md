@@ -11494,3 +11494,113 @@ dependency, queue, environment variable или production DML не планир�
     `GIT_TERMINAL_PROMPT=0 git push origin main` exited 128 before transfer.
 
 ---
+
+## Task 92 — provenance метаданных каталога
+
+Статус: `verification_completed_commit_in_progress`.
+
+Дата начала: 26.07.2026.
+
+Approved design:
+[`2026-07-26-catalog-metadata-provenance-design.md`](../superpowers/specs/2026-07-26-catalog-metadata-provenance-design.md).
+
+Detailed implementation plan:
+[`2026-07-26-catalog-metadata-provenance.md`](../superpowers/plans/2026-07-26-catalog-metadata-provenance.md).
+
+### Фактический baseline
+
+- PHP `8.5.8`, Laravel `13.22.0`, Boost `2.4.13`, Livewire `4.3.3`,
+  PHPUnit `12.5.32`, Pint `1.29.3`, Tailwind `4.3.2`, Vite `8.1.4`,
+  SQLite local/in-memory tests.
+- Ветка `main`, remote `origin`; checkout ahead remote и содержит большой
+  foreign staged/unstaged/untracked scope, который нельзя смешивать с Task 92.
+- `provider_field_values` хранит только последний provider baseline.
+- Tag provenance уже канонически хранится в
+  `catalog_title_tag_sources`/`tag_provider_mappings`.
+- Quality snapshots/issues и full-page Livewire center уже реализованы;
+  новая работа расширяет их, а не создаёт параллельный центр.
+
+### Expected changed files
+
+- новые additive migrations, models, enums, DTO и provenance services;
+- `SeasonvarCatalogImporter`, `SeasonvarCatalogMetadataBackfill`, общий
+  Seasonvar provenance adapter и `CatalogAdministrationService`;
+- существующие quality loader/recalculator/command/query/Livewire view;
+- focused provenance/schema/import/admin/quality/Livewire tests;
+- ru/en catalog-quality translations;
+- canonical quality/data/import/admin/testing docs;
+- Task 92 design/plan/current plan, README и CHANGELOG.
+
+### Protected contracts
+
+- public catalog/routes/API/resources/query/pagination/slug binding;
+- `seasonvar:import` и existing retryable transaction;
+- canonical tag provenance/mapping/moderation/public eligibility;
+- quality score formula, queues и read-only correction boundary;
+- admin policies, gates, audit и optimistic concurrency;
+- search/recommendation/SEO/cache/player/notification/Premium/region/legal;
+- private source/media URL, snapshots, secrets и production credentials;
+- foreign shared-tree paths/hunks и вся история `main`.
+
+### Cross-feature и production risks
+
+| Domain | Статус | Решение / gate |
+| --- | --- | --- |
+| Import transaction | `critical_affected` | Observation/conflict/version внутри existing retryable transaction |
+| Editorial writes | `critical_affected` | Existing policy/version/audit transaction retained |
+| Tags | `protected_critical` | Existing tables remain owner; presenter only joins evidence |
+| Quality queues | `critical_affected` | Existing issue table/run links and regression |
+| Public publication | `protected_critical` | No retroactive detach/hide; only evidence eligibility |
+| SQL/history growth | `high_affected` | Idempotent confirmation, no-op version, bounded page reads |
+| Privacy/security | `critical_affected` | No raw URLs/HTML/media/secrets/errors; escaped bounded UI |
+| Rolling deploy | `high_affected` | Additive schema and safe schema-unavailable fallback |
+| SQLite rollback | `high_affected` | Explicit FK drop order, migrate rollback/forward/integrity |
+| Cache/search/recommendations | `protected_high` | Existing post-import/admin invalidation unchanged |
+| API/routes | `not_applicable` | No route/resource/public shape change |
+| Dependencies/environment | `not_applicable` | No package, `.env`, service or secret change |
+| Shared Git state | `critical_risk_recorded` | Exact Task 92 paths/hunks only; no blind add |
+
+### Task-specific requirement-compliance matrix
+
+| Requirement/domain | Статус | Evidence / следующий gate |
+| --- | --- | --- |
+| Root/index/canonical fresh read | `completed` | 26.07.2026 before production PHP edit |
+| Applicable skills/rules | `completed` | Laravel/importer/UI/TDD/plan/security rules read |
+| Existing implementation first | `completed` | Import/admin/tag/quality/schema/tests traced |
+| Runtime/packages/DB/frontend/Git | `completed` | Actual versions and dirty main recorded above |
+| Official version-dependent docs | `completed` | Laravel 13 migrations/upsert/transactions/Livewire URL/pagination via Boost |
+| New permanent rule in owner | `completed` | `docs/catalog-quality.md` updated before code |
+| Design/files/contracts/risks/rollback | `completed` | Linked design and plan |
+| Prepared-plan reread | `completed` | Completed before first RED |
+| TDD RED/GREEN | `completed` | Schema, recorder, import/backfill/admin, run, query and Livewire |
+| Validation/normalization | `completed` | Enum allowlists, normalized JSON/hash, bounded confidence |
+| Authorization/security/privacy | `completed` | Existing gate/policy, escaped bounded display, no private URL |
+| Migration/index/data | `completed` | Additive/reversible, rollback/remigrate/FK green, no production backfill |
+| SQL/performance/EXPLAIN | `completed` | 1/25 constant query budget and two indexed SQLite plans |
+| Error/rolling deployment | `completed` | Safe schema fallback and generic persisted failure code |
+| Docs/README/CHANGELOG | `completed` | Canonical owners, visitor history and Russian changelog updated |
+| Focused/static/build/browser/full checks | `completed_with_foreign_full_suite_failures` | Task scope `43/295`, related `81/479`, Pint/PHPStan/Rector/composer/build GREEN, Playwright `3/3`; full `2056`: `2031` passed, `13` failed, `1` error, `11` skipped только в foreign parallel scope |
+| Final requirement/legacy/secret audit | `completed` | Applicable requirements reread; exact Task 92 scope has no secret/debug/TODO residue, unrelated shared-tree changes remain excluded |
+| Commit/push main | `in_progress` | Exact isolated commit and ordinary push |
+
+### Execution order
+
+1. `[completed]` Fresh requirements, skills, versions, structure and Git audit.
+2. `[completed]` Import/admin/tag/quality/data-flow trace and alternatives.
+3. `[completed]` Canonical contract, approved design, detailed plan and risks.
+4. `[completed]` Prepared-plan reread and isolated RED tests.
+5. `[completed]` Additive schema/models/relationships.
+6. `[completed]` Normalization/confidence and atomic recorder.
+7. `[completed]` Import/backfill/editorial integration.
+8. `[completed]` Quality run, dirty tracking and loader integration.
+9. `[completed]` Page-bounded provenance presenter and accessible disclosure UI.
+10. `[completed]` Focused GREEN, migration integrity, query count/EXPLAIN.
+11. `[completed_with_foreign_full_suite_failures]` Related
+    security/compatibility/static/build/browser checks GREEN; full suite
+    выполнился с отдельно зафиксированными foreign failures.
+12. `[completed]` Canonical docs, README, Russian CHANGELOG and current matrix.
+13. `[completed]` Exact diff/secret/debug/shared-tree audit.
+14. `[in_progress]` Exact Task 92 commit on `main`.
+15. `[pending]` Ordinary configured push; external failure recorded honestly.
+
+---

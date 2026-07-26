@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property int $catalog_title_id
+ * @property int|null $catalog_quality_run_id
  * @property int $quality_score
  * @property CatalogQualitySeverity $severity
  * @property int $issue_count
@@ -26,6 +27,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 #[Fillable([
     'catalog_title_id',
+    'catalog_quality_run_id',
     'quality_score',
     'severity',
     'issue_count',
@@ -60,11 +62,18 @@ final class CatalogTitleQualitySnapshot extends Model
         );
     }
 
+    /** @return BelongsTo<CatalogQualityRun, $this> */
+    public function qualityRun(): BelongsTo
+    {
+        return $this->belongsTo(CatalogQualityRun::class, 'catalog_quality_run_id');
+    }
+
     /** @return array<string, string> */
     protected function casts(): array
     {
         return [
             'quality_score' => 'integer',
+            'catalog_quality_run_id' => 'integer',
             'severity' => CatalogQualitySeverity::class,
             'issue_count' => 'integer',
             'critical_count' => 'integer',

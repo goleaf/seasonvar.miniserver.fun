@@ -131,6 +131,15 @@ rollback принадлежат [`catalog-quality.md`](catalog-quality.md).
 детерминированной pagination `15|25|50`; raw provider payload и source/media
 URL не попадают в Livewire state или HTML.
 
+В каждой карточке очереди доступен закрытый по умолчанию блок
+«Происхождение данных». Он batch-запросами для текущей страницы показывает
+выбранное значение, источник, последнее подтверждение, confidence и статус
+поля или тега. Теги используют существующие
+`catalog_title_tag_sources`/`tag_provider_mappings`; неизвестное imported
+назначение без current provenance получает `12%` и «Проверить». Блок
+остаётся read-only, не выполняет сетевые запросы, не раскрывает source URL и
+не заменяет существующий редакторский workflow `/admin/catalog`.
+
 ## Деплой
 
 Перед развёртыванием применяются пять additive migrations `2026_07_19_235900`—`2026_07_19_235904`, затем код/assets и штатный restart существующих long-lived workers. Preflight: backup по production runbook, `migrate:status`, доступность `users`/старого `admin_audit_events`, проверка `ADMIN_BOOTSTRAP_SUPERADMIN_EMAILS` и legacy allowlists без вывода значений. Post-deploy: `/admin`, route middleware, final-super invariant, private/no-store/noindex headers, targeted cache/search actions, queue/import status и public portal smoke.

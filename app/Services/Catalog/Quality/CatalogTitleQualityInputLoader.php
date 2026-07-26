@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace App\Services\Catalog\Quality;
 
 use App\DTOs\CatalogQuality\CatalogTitleQualityFacts;
+use App\Enums\CatalogMetadataSourceKind;
 use App\Enums\ReleaseKind;
+use App\Models\CatalogMetadataObservation;
 use App\Models\CatalogTitle;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 final class CatalogTitleQualityInputLoader
 {
@@ -64,6 +67,7 @@ final class CatalogTitleQualityInputLoader
                     ((int) $row->catalog_title_id).':'.((int) $row->tag_id) => true,
                 ],
             );
+        $metadataObservations = $this->providerMetadataObservations($ids->all());
         $seasons = $this->seasonFacts($ids->all());
         $media = $this->mediaFacts($ids->all());
         $now = $evaluatedAt ?? CarbonImmutable::now();
@@ -73,13 +77,26 @@ final class CatalogTitleQualityInputLoader
                 $provenance,
                 $seasons,
                 $media,
+                $metadataObservations,
                 $now,
             ): array {
                 $titleId = (int) $title->id;
+                $titleMetadata = $metadataObservations->get($titleId, collect());
                 $sourceCheckedAt = collect([
                     $title->sourcePage?->last_crawled_at,
                     $title->sourcePage?->last_imported_at,
+                    $titleMetadata->max('last_confirmed_at'),
                 ])->filter()->sortDesc()->first();
+                $providerFieldValues = [
+                    ...($title->provider_field_values ?? []),
+                    ...$titleMetadata
+                        ->mapWithKeys(
+                            static fn (CatalogMetadataObservation $observation): array => [
+                                $observation->field_key->value => $observation->value,
+                            ],
+                        )
+                        ->all(),
+                ];
 
                 return [$titleId => CatalogTitleQualityFacts::fromArray([
                     'catalog_title_id' => $titleId,
@@ -99,7 +116,7 @@ final class CatalogTitleQualityInputLoader
                             ),
                         ])
                         ->all(),
-                    'provider_field_values' => $title->provider_field_values ?? [],
+                    'provider_field_values' => $providerFieldValues,
                     'seasons' => $seasons[$titleId] ?? [],
                     'media' => $media[$titleId] ?? [
                         'published_playable_count' => 0,
@@ -117,6 +134,49 @@ final class CatalogTitleQualityInputLoader
                     'evaluated_at' => $now,
                 ])];
             });
+    }
+
+    /**
+     * @param  list<int>  $titleIds
+     * @return Collection<int, Collection<int, CatalogMetadataObservation>>
+     */
+    private function providerMetadataObservations(array $titleIds): Collection
+    {
+        if (! Schema::hasTable('catalog_metadata_observations')) {
+            return collect();
+        }
+
+        return CatalogMetadataObservation::query()
+            ->select([
+                'id',
+                'catalog_title_id',
+                'field_key',
+                'value',
+                'last_confirmed_at',
+            ])
+            ->whereIn('catalog_title_id', $titleIds)
+            ->where('source_kind', CatalogMetadataSourceKind::Provider->value)
+            ->where('is_current', true)
+            ->whereIn('field_key', [
+                'title',
+                'original_title',
+                'type',
+                'year',
+                'description',
+                'poster_url',
+            ])
+            ->orderBy('catalog_title_id')
+            ->orderBy('field_key')
+            ->orderByDesc('last_confirmed_at')
+            ->get()
+            ->unique(
+                static fn (CatalogMetadataObservation $observation): string => implode(':', [
+                    $observation->catalog_title_id,
+                    $observation->field_key->value,
+                ]),
+            )
+            ->toBase()
+            ->groupBy('catalog_title_id');
     }
 
     /**

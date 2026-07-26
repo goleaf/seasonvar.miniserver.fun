@@ -8,6 +8,7 @@ final readonly class CatalogQualityQueueItemData
 {
     /**
      * @param  list<CatalogQualityIssueViewData>  $issues
+     * @param  list<CatalogMetadataProvenanceViewData>  $provenance
      */
     public function __construct(
         public int $catalogTitleId,
@@ -23,6 +24,7 @@ final readonly class CatalogQualityQueueItemData
         public string $evaluatedAtLabel,
         public bool $needsRefresh,
         public array $issues,
+        public array $provenance,
         public string $editUrl,
     ) {}
 }

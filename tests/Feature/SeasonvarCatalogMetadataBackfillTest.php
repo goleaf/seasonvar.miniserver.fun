@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Actor;
 use App\Models\ApiSyncChange;
 use App\Models\CatalogTitle;
+use App\Models\CatalogTitleQualitySnapshot;
 use App\Models\LicensedMedia;
 use App\Models\Network;
 use App\Models\Season;
@@ -166,6 +167,9 @@ class SeasonvarCatalogMetadataBackfillTest extends TestCase
             'source_page_id' => $page->id,
             'relation_metadata_version' => 0,
         ]);
+        CatalogTitleQualitySnapshot::factory()->for($title)->create([
+            'needs_refresh' => false,
+        ]);
         $latestCapturedAt = now()->startOfSecond();
         $latestSnapshot = $this->snapshot($page, $this->trustedMetadataHtml(), $latestCapturedAt);
         $this->snapshot(
@@ -180,6 +184,7 @@ class SeasonvarCatalogMetadataBackfillTest extends TestCase
                 $events[] = compact('event', 'context');
             },
         );
+        $this->assertSame(0, $result['failed'], json_encode($events, JSON_THROW_ON_ERROR));
 
         $page->refresh();
         $title->refresh();
@@ -195,7 +200,21 @@ class SeasonvarCatalogMetadataBackfillTest extends TestCase
         $this->assertNotContains('Рекомендовано!', $page->metadata_presence);
         $this->assertSame('show', $title->type);
         $this->assertSame('show', $title->provider_field_values['type']);
+        $this->assertDatabaseHas('catalog_metadata_observations', [
+            'catalog_title_id' => $title->id,
+            'field_key' => 'type',
+            'source_kind' => 'provider',
+            'confidence' => 98,
+            'is_current' => true,
+        ]);
+        $this->assertDatabaseHas('catalog_field_versions', [
+            'catalog_title_id' => $title->id,
+            'field_key' => 'type',
+            'source_kind' => 'provider',
+            'value_hash' => hash('sha256', json_encode('show', JSON_THROW_ON_ERROR)),
+        ]);
         $this->assertSame(SeasonvarCatalogParser::METADATA_VERSION, $title->relation_metadata_version);
+        $this->assertTrue($title->qualitySnapshot()->sole()->needs_refresh);
         $this->assertDatabaseHas((new Studio)->getTable(), ['name' => 'A-1 Pictures']);
         $this->assertDatabaseHas((new Network)->getTable(), ['name' => 'Пятница']);
         $this->assertDatabaseHas((new Translation)->getTable(), ['name' => 'RuDub']);

@@ -2,6 +2,34 @@
 
 ## 2026-07-26
 
+- Добавлен provenance-слой метаданных каталога. Обратимые migrations
+  `2026_07_26_064318_create_catalog_metadata_provenance_tables.php` и
+  `2026_07_26_064319_add_quality_run_links_to_catalog_quality_tables.php`
+  создают `catalog_metadata_observations`, `catalog_metadata_conflicts`,
+  `catalog_field_versions`, `catalog_quality_runs` и nullable связи запусков
+  с существующими quality snapshots/issues. Один
+  `CatalogMetadataProvenanceRecorder` нормализует allowlisted значения,
+  обновляет идентичные confirmations без разрастания версий, сохраняет
+  editorial actor, открывает и разрешает conflicts и отличает provider
+  evidence от фактически выбранных additive жанров/стран.
+  `SeasonvarCatalogMetadataProvenance` подключён к prepared-page apply и
+  локальному metadata backfill; последний пакетно помечает затронутые
+  quality snapshots как dirty. `CatalogTitleQualityInputLoader` использует
+  current observations с совместимым fallback, а
+  `catalog:quality-refresh` сохраняет bounded success/failed lifecycle без
+  текста исключения. `/admin/catalog/quality` показывает в доступном
+  раскрываемом блоке источник, confirmation, confidence и статус полей и
+  канонического tag provenance, ограничивая описания и не передавая private
+  URL. Page presenter ограничен 50 карточками и постоянным бюджетом
+  запросов; schema capability кешируется на время одного presenter/importer
+  service instance и не выполняет три повторных schema lookup для каждого
+  тайтла. SQLite `EXPLAIN QUERY PLAN` подтвердил
+  `catalog_metadata_observation_current_idx` и
+  `catalog_metadata_conflict_queue_idx`. Добавлены schema/recorder/query,
+  importer/backfill/editorial/run/recalculation/Livewire regressions;
+  связанная матрица прошла `81` тест с `479` утверждениями, Playwright —
+  desktop/mobile/tablet `3/3`.
+
 - `CatalogDirectoryQuery` теперь использует один построитель запросов
   `taxonomyCandidates()` для фильтрованных итоговых счётчиков и
   `sort=count_desc`. При активном `q` или `letter` идентификаторы кандидатов

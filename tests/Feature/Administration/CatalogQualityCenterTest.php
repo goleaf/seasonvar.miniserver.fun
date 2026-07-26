@@ -8,14 +8,24 @@ use App\Enums\AdminMembershipStatus;
 use App\Enums\AdminRoleCode;
 use App\Enums\CatalogQualityIssueCategory;
 use App\Enums\CatalogQualitySeverity;
+use App\Enums\TagModerationStatus;
+use App\Enums\TagProviderMappingStatus;
+use App\Enums\TagSource;
+use App\Enums\TagType;
+use App\Enums\TagVisibility;
 use App\Livewire\Administration\CatalogQualityCenterPage;
 use App\Models\AdminRole;
 use App\Models\AdminUserRole;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleQualityIssue;
 use App\Models\CatalogTitleQualitySnapshot;
+use App\Models\CatalogTitleTagSource;
+use App\Models\Tag;
+use App\Models\TagProviderMapping;
 use App\Models\User;
+use App\Services\Catalog\Quality\CatalogMetadataProvenanceRecorder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -134,6 +144,71 @@ final class CatalogQualityCenterTest extends TestCase
             ->assertSet('sort', 'score_asc')
             ->assertSet('perPage', 25)
             ->assertHasNoErrors();
+    }
+
+    #[Test]
+    public function cards_explain_field_and_tag_provenance_without_exposing_private_urls(): void
+    {
+        $viewer = $this->administrator(AdminRoleCode::Moderator);
+        $title = CatalogTitle::factory()->create([
+            'title' => 'Цветок зла',
+            'year' => 2020,
+            'source_url' => 'https://seasonvar.ru/private-title-page',
+        ]);
+        CatalogTitleQualitySnapshot::factory()->for($title)->create([
+            'quality_score' => 72,
+        ]);
+        app(CatalogMetadataProvenanceRecorder::class)->recordProviderSnapshot(
+            $title,
+            $title->sourcePage,
+            ['year' => 2020],
+        );
+        $tag = Tag::query()->create([
+            'public_id' => (string) Str::uuid(),
+            'name' => 'Гномы',
+            'slug' => 'gnomy-quality-test',
+            'type' => TagType::Imported,
+            'visibility' => TagVisibility::Public,
+            'moderation_status' => TagModerationStatus::Approved,
+            'source' => TagSource::Seasonvar,
+            'normalized_name' => 'гномы',
+            'normalized_name_hash' => hash('sha256', 'гномы'),
+        ]);
+        $title->tags()->attach($tag);
+        $providerKey = hash('sha256', 'provider-tag:gnomes');
+        TagProviderMapping::query()->create([
+            'provider' => 'seasonvar',
+            'provider_key' => $providerKey,
+            'tag_id' => $tag->id,
+            'raw_label' => 'Гномы',
+            'normalized_name' => 'гномы',
+            'normalized_name_hash' => hash('sha256', 'гномы'),
+            'status' => TagProviderMappingStatus::Pending,
+            'confidence' => 12,
+            'last_seen_at' => now(),
+        ]);
+        CatalogTitleTagSource::query()->create([
+            'catalog_title_id' => $title->id,
+            'tag_id' => $tag->id,
+            'source' => TagSource::Seasonvar,
+            'provider' => 'seasonvar',
+            'source_id' => $title->source_id,
+            'source_key' => $providerKey,
+            'is_current' => true,
+            'first_seen_at' => now(),
+            'last_seen_at' => now(),
+        ]);
+
+        Livewire::actingAs($viewer)
+            ->test(CatalogQualityCenterPage::class)
+            ->assertSeeText('Происхождение данных')
+            ->assertSeeText('Год')
+            ->assertSeeText('Seasonvar')
+            ->assertSeeText('98%')
+            ->assertSeeText('Гномы')
+            ->assertSeeText('12%')
+            ->assertSeeText('Проверить')
+            ->assertDontSee('https://seasonvar.ru/private-title-page');
     }
 
     #[Test]

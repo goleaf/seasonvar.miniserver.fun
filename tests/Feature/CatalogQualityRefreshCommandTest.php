@@ -63,6 +63,15 @@ final class CatalogQualityRefreshCommandTest extends TestCase
             'catalog_title_id' => $fresh->id,
             'quality_score' => 99,
         ]);
+        $runId = (int) $missing->qualitySnapshot()->valueOrFail('catalog_quality_run_id');
+        self::assertDatabaseHas('catalog_quality_runs', [
+            'id' => $runId,
+            'status' => 'succeeded',
+            'trigger' => 'command',
+            'requested_limit' => 2,
+            'processed_count' => 2,
+            'failure_code' => null,
+        ]);
 
         Carbon::setTestNow();
     }

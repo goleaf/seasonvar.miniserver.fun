@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property int $catalog_title_id
+ * @property int|null $catalog_quality_run_id
  * @property string $code
  * @property CatalogQualityIssueCategory $category
  * @property CatalogQualitySeverity $severity
@@ -25,6 +26,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 #[Fillable([
     'catalog_title_id',
+    'catalog_quality_run_id',
     'code',
     'category',
     'severity',
@@ -44,11 +46,18 @@ final class CatalogTitleQualityIssue extends Model
         return $this->belongsTo(CatalogTitle::class);
     }
 
+    /** @return BelongsTo<CatalogQualityRun, $this> */
+    public function qualityRun(): BelongsTo
+    {
+        return $this->belongsTo(CatalogQualityRun::class, 'catalog_quality_run_id');
+    }
+
     /** @return array<string, string> */
     protected function casts(): array
     {
         return [
             'category' => CatalogQualityIssueCategory::class,
+            'catalog_quality_run_id' => 'integer',
             'severity' => CatalogQualitySeverity::class,
             'penalty' => 'integer',
             'evidence' => 'array',
