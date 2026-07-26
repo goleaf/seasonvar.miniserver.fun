@@ -8829,7 +8829,7 @@ budgets и browser evidence. Затем будут созданы отдельн
 
 ## Task 66 — SQLite order path для `recently_added` на главной
 
-Статус: `approved_design_and_plan_tdd_pending`.
+Статус: `implementation_verified_committed_push_unresolved_authentication`.
 
 Дата начала: 26.07.2026.
 
@@ -8918,7 +8918,7 @@ temporary B-tree.
 | Full PHPUnit | `unresolved` | Accumulated `256M` exhaustion in `UnifiedDiscoveryCollectionsTest`; exact 1/3 GREEN |
 | Managed docs check | `unresolved` | `project:docs-refresh --check` reports foreign `docs/MAINTENANCE_LOG.md`; Task 66 changed no managed block |
 | README/CHANGELOG/final requirement reread | `completed` | Visitor/technical/performance owners updated; canonical owners re-read |
-| Commit/push in `main` | `unresolved` | Exact Task 66 delivery still pending |
+| Commit/push in `main` | `completed_commit_unresolved_push_authentication` | Exact eight-file Task 66 commit `e2f25af` создан в `main`; staged README/CHANGELOG policies и exact diff check прошли. Настроенный HTTPS push отклонён до передачи данных: `fatal: could not read Username for 'https://github.com': No such device or address` |
 
 ### Безлимитный execution order
 
@@ -8930,7 +8930,9 @@ temporary B-tree.
 6. `[completed]` Minimal driver-guarded implementation and GREEN.
 7. `[completed]` Focused/static/broad/profile/live verification.
 8. `[completed]` Docs/README/CHANGELOG/final reread and legacy scan.
-9. `[pending]` Exact isolated commit in `main` and configured push.
+9. `[completed_commit_unresolved_push_authentication]` Exact isolated commit
+   `e2f25af` создан в `main`; configured HTTPS push выполнен и отклонён до
+   передачи данных из-за отсутствующей GitHub-аутентификации.
 
 ### Implementation и verification evidence
 
@@ -8960,3 +8962,10 @@ temporary B-tree.
   `recentlyAdded()` implementation, the single existing index migration and
   no duplicate route/service/cache path or related unfinished marker. Legacy
   `indexed_at` matches are historical documentation of the former order.
+- Exact alternate index содержал только восемь заявленных Task 66 файлов.
+  Staged README/CHANGELOG policies и `git diff --cached --check` прошли;
+  shared-tree guard был пропущен через предусмотренный проектом
+  `SEASONVAR_SKIP_GIT_GUARD=1`, потому что общий рабочий снимок содержит
+  параллельные незавершённые задачи. Commit `e2f25af` создан в `main`.
+  Configured HTTPS push завершился кодом 128 до передачи данных:
+  `could not read Username for 'https://github.com'`.

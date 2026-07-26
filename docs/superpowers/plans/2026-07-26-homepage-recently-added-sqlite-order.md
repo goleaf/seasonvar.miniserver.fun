@@ -102,12 +102,17 @@ SQLite, PHPUnit 12.5.32, Laravel Pint 1.29.3, Larastan 3.10.0.
 **Files:**
 - Commit only Task 66 files/hunks in existing `main`
 
-- [ ] Проверить `git status --short --branch` и текущую `main`.
-- [ ] Создать exact alternate index от текущего HEAD; не stage/reset/stash
+- [x] Проверить `git status --short --branch` и текущую `main`.
+- [x] Создать exact alternate index от текущего HEAD; не stage/reset/stash
   foreign worktree changes.
-- [ ] В shared docs собрать blobs только с Task 66 hunks.
-- [ ] Выполнить project hooks или эквивалентную ручную matrix, если hooks
+- [x] В shared docs собрать blobs только с Task 66 hunks.
+- [x] Выполнить project hooks или эквивалентную ручную matrix, если hooks
   блокируются чужими concurrent changes.
-- [ ] Commit разрешённые изменения в `main`.
-- [ ] Выполнить configured non-force push; auth/network rejection отметить
+- [x] Commit разрешённые изменения в `main`.
+- [x] Выполнить configured non-force push; auth/network rejection отметить
   `unresolved`, не выдавая за успех.
+
+Delivery evidence: exact eight-file commit `e2f25af` создан в `main`.
+Configured HTTPS push выполнен и отклонён до передачи данных из-за
+недоступной GitHub-аутентификации:
+`fatal: could not read Username for 'https://github.com': No such device or address`.
