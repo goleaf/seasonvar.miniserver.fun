@@ -19,6 +19,7 @@ use App\Models\TechnicalIssueFollower;
 use App\Models\TechnicalIssueRedaction;
 use App\Models\TechnicalIssueStatusHistory;
 use App\Models\User;
+use App\Services\Catalog\PlaybackQualityReportSnapshot;
 use App\Services\TechnicalIssues\TechnicalIssueAttachmentService;
 use App\Services\TechnicalIssues\TechnicalIssueDuplicateService;
 use App\Services\TechnicalIssues\TechnicalIssueIdentity;
@@ -49,6 +50,7 @@ final readonly class CreateTechnicalIssue
         private TechnicalIssueRateLimiter $rateLimiter,
         private TechnicalIssueNotificationService $notifications,
         private TechnicalIssueOccurrenceService $occurrences,
+        private PlaybackQualityReportSnapshot $playbackDiagnostics,
     ) {}
 
     /** @param array<int, UploadedFile> $screenshots */
@@ -75,6 +77,11 @@ final readonly class CreateTechnicalIssue
         $target = $this->targets->resolve($user, $input->contextToken, $input->featureCode);
         $input = $this->types->allowlistedInput($input);
         $input = $this->clampedInput($input, $target->knownDurationSeconds);
+        $playbackDiagnosticValues = $input->diagnosticsConsent
+            ? $this->playbackDiagnostics->values(
+                $this->playbackDiagnostics->resolve($input->playbackDiagnosticsToken, $target),
+            )
+            : [];
         $this->types->assert($input, $target);
         $summary = $this->text->summary($input->summary);
         $expected = $this->text->body($input->expectedBehavior, 4000);
@@ -128,7 +135,7 @@ final readonly class CreateTechnicalIssue
         try {
             $issue = DB::transaction(function () use (
                 $user, $input, $target, $submissionKey, $publicId, $storedAttachments, $identity,
-                $summary, $expected, $actual, $steps,
+                $summary, $expected, $actual, $steps, $playbackDiagnosticValues,
             ): TechnicalIssue {
                 $issue = TechnicalIssue::query()->create([
                     'public_id' => $publicId,
@@ -182,6 +189,7 @@ final readonly class CreateTechnicalIssue
                         'network_online' => $input->networkOnline,
                         'player_component' => $target->playerComponent,
                         'source_health_code' => $target->sourceHealthCode,
+                        ...$playbackDiagnosticValues,
                     ]);
                 }
 
@@ -293,6 +301,7 @@ final readonly class CreateTechnicalIssue
             viewportHeight: $input->viewportHeight,
             timezone: $input->timezone,
             networkOnline: $input->networkOnline,
+            playbackDiagnosticsToken: $input->playbackDiagnosticsToken,
             submissionToken: $input->submissionToken,
         );
     }

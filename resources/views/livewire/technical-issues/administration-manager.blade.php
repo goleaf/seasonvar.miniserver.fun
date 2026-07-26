@@ -4,6 +4,72 @@
     @if ($actionError)<p role="alert" class="rounded-control bg-rose-50 p-4 text-sm font-bold text-rose-800">{{ $actionError }}</p>@endif
     @if ($schemaReady)<section aria-labelledby="support-counts" class="rounded-panel border border-slate-200 bg-white p-4 shadow-panel"><h2 id="support-counts" class="font-black text-slate-900">{{ __('issues.admin.counts') }}</h2><dl class="mt-3 flex flex-wrap gap-3">@foreach ($counts as $statusCode => $count)<div class="rounded-control bg-slate-50 px-3 py-2"><dt class="text-xs text-slate-500">{{ __('issues.statuses.'.$statusCode) }}</dt><dd class="font-black text-slate-900">{{ $count }}</dd></div>@endforeach</dl></section>@endif
 
+    <section aria-labelledby="playback-quality-heading" class="rounded-panel border border-slate-200 bg-white p-4 shadow-panel sm:p-5">
+        <div class="flex flex-wrap items-end justify-between gap-3">
+            <div>
+                <h2 id="playback-quality-heading" class="font-black text-slate-900">{{ __('issues.admin.quality_title') }}</h2>
+                <p class="mt-1 max-w-3xl text-sm leading-6 text-slate-600">{{ __('issues.admin.quality_description') }}</p>
+            </div>
+            @if ($qualitySchemaReady)
+                <div>
+                    <label for="quality-period" class="block text-sm font-bold text-slate-800">{{ __('issues.admin.quality_period') }}</label>
+                    <select id="quality-period" wire:model.live="qualityPeriod" class="mt-2 min-h-11 rounded-control border border-slate-300 bg-white px-3">
+                        @foreach ($qualityPeriodOptions as $option)
+                            <option value="{{ $option['value'] }}">{{ $option['label'] }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            @endif
+        </div>
+
+        @if (! $qualitySchemaReady)
+            <p class="mt-4 rounded-control bg-amber-50 p-4 text-sm font-bold text-amber-900">{{ __('issues.admin.quality_unavailable') }}</p>
+        @else
+            <dl class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div class="rounded-control bg-slate-50 p-4">
+                    <dt class="text-sm font-bold text-slate-600">{{ __('issues.admin.quality_startup') }}</dt>
+                    <dd class="mt-1 text-2xl font-black text-slate-900">{{ $qualityMetrics['overview']['average_startup_time_ms'] === null ? '—' : number_format($qualityMetrics['overview']['average_startup_time_ms'], 0, ',', ' ').' '.__('issues.admin.milliseconds') }}</dd>
+                </div>
+                <div class="rounded-control bg-slate-50 p-4">
+                    <dt class="text-sm font-bold text-slate-600">{{ __('issues.admin.quality_rebuffer') }}</dt>
+                    <dd class="mt-1 text-2xl font-black text-slate-900">{{ number_format($qualityMetrics['overview']['rebuffer_ratio_percent'], 1, ',', ' ') }}%</dd>
+                </div>
+                <div class="rounded-control bg-slate-50 p-4">
+                    <dt class="text-sm font-bold text-slate-600">{{ __('issues.admin.quality_errors') }}</dt>
+                    <dd class="mt-1 text-2xl font-black text-slate-900">{{ number_format($qualityMetrics['overview']['playback_error_rate_percent'], 1, ',', ' ') }}%</dd>
+                </div>
+                <div class="rounded-control bg-slate-50 p-4">
+                    <dt class="text-sm font-bold text-slate-600">{{ __('issues.admin.quality_fallback') }}</dt>
+                    <dd class="mt-1 text-2xl font-black text-slate-900">{{ number_format($qualityMetrics['overview']['fallback_success_rate_percent'], 1, ',', ' ') }}%</dd>
+                </div>
+            </dl>
+
+            <div class="mt-4 grid gap-4 lg:grid-cols-3">
+                @foreach ([
+                    ['key' => 'errors_by_browser', 'title' => __('issues.admin.quality_by_browser')],
+                    ['key' => 'errors_by_provider', 'title' => __('issues.admin.quality_by_provider')],
+                    ['key' => 'errors_by_quality', 'title' => __('issues.admin.quality_by_quality')],
+                ] as $breakdown)
+                    <section aria-labelledby="quality-{{ str_replace('_', '-', $breakdown['key']) }}" class="overflow-hidden rounded-control border border-slate-200">
+                        <h3 id="quality-{{ str_replace('_', '-', $breakdown['key']) }}" class="bg-slate-50 px-4 py-3 text-sm font-black text-slate-900">{{ $breakdown['title'] }}</h3>
+                        @if ($qualityMetrics[$breakdown['key']] === [])
+                            <p class="px-4 py-4 text-sm text-slate-600">{{ __('issues.admin.quality_empty') }}</p>
+                        @else
+                            <table class="w-full text-left text-sm">
+                                <thead class="sr-only"><tr><th>{{ __('issues.admin.quality_dimension') }}</th><th>{{ __('issues.admin.quality_error_count') }}</th></tr></thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    @foreach ($qualityMetrics[$breakdown['key']] as $row)
+                                        <tr><th scope="row" class="break-all px-4 py-3 font-semibold text-slate-700">{{ $row['label'] }}</th><td class="px-4 py-3 text-right font-black text-slate-900">{{ $row['count'] }}</td></tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        @endif
+                    </section>
+                @endforeach
+            </div>
+        @endif
+    </section>
+
     <section aria-labelledby="support-filters" class="rounded-panel border border-slate-200 bg-white p-4 shadow-panel sm:p-5">
         <div class="flex items-center justify-between gap-3"><h2 id="support-filters" class="font-black text-slate-900">{{ __('issues.admin.filters') }}</h2><button type="button" wire:click="clearFilters" class="min-h-11 rounded-control px-3 text-sm font-bold text-emerald-700">{{ __('issues.actions.clear_filters') }}</button></div>
         <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

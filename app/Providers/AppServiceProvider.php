@@ -32,6 +32,7 @@ use App\Services\Auth\AccountSettingsSchema;
 use App\Services\Catalog\CatalogRecommendationPreferenceQuery;
 use App\Services\Catalog\CatalogRecommendationPreferenceSchema;
 use App\Services\Catalog\PersonalLibrarySchema;
+use App\Services\Catalog\PlaybackQualitySchema;
 use App\Services\Collections\CatalogCollectionSchema;
 use App\Services\Comments\CommentSchema;
 use App\Services\ContentRequests\ContentRequestSchema;
@@ -91,6 +92,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->scopedIf(PersonalLibrarySchema::class);
         $this->app->scopedIf(CatalogRecommendationPreferenceSchema::class);
         $this->app->scopedIf(CatalogRecommendationPreferenceQuery::class);
+        $this->app->scopedIf(PlaybackQualitySchema::class);
         $this->app->scopedIf(PremiumAccessResolver::class);
         $this->app->singleton(PremiumPaymentGatewayRegistry::class, static fn (): PremiumPaymentGatewayRegistry => new PremiumPaymentGatewayRegistry);
         $this->app->scopedIf(TagSchema::class);
@@ -146,6 +148,39 @@ class AppServiceProvider extends ServiceProvider
                     429,
                     [...$headers, 'Cache-Control' => 'private, no-store, max-age=0'],
                 ));
+        });
+
+        RateLimiter::for('playback-quality', function (Request $request): array {
+            $requestId = (string) $request->input('request_id', 'missing');
+            $ipHash = hash('sha256', (string) $request->ip());
+            $response = static fn (Request $request, array $headers) => response()->json(
+                ['message' => __('catalog.player.quality_diagnostics.rate_limited')],
+                429,
+                [
+                    ...$headers,
+                    'Cache-Control' => 'private, no-store, max-age=0',
+                    'X-Content-Type-Options' => 'nosniff',
+                ],
+            );
+
+            return [
+                Limit::perMinute(max(1, (int) config('playback.quality.requests_per_minute', 30)))
+                    ->by('playback-quality:'.$ipHash)
+                    ->response($response),
+                Limit::perMinute(max(1, (int) config('playback.quality.sessions_per_minute', 12)))
+                    ->by('playback-quality-session:'.hash('sha256', $requestId))
+                    ->response($response),
+            ];
+        });
+
+        RateLimiter::for('playback-quality-network', function (Request $request): Limit {
+            return Limit::perMinute(max(1, (int) config('playback.quality.network_tests_per_minute', 6)))
+                ->by('playback-quality-network:'.hash('sha256', (string) $request->ip()))
+                ->response(static fn (Request $request, array $headers) => response('', 429, [
+                    ...$headers,
+                    'Cache-Control' => 'private, no-store, max-age=0',
+                    'X-Robots-Tag' => 'noindex, nofollow, noarchive',
+                ]));
         });
 
         RateLimiter::for('premium-webhooks', fn (Request $request): Limit => Limit::perMinute(

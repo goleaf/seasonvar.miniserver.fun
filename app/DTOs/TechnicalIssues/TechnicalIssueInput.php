@@ -30,6 +30,7 @@ final readonly class TechnicalIssueInput
         public ?int $viewportHeight,
         public ?string $timezone,
         public ?bool $networkOnline,
+        public string $playbackDiagnosticsToken,
         public string $submissionToken,
     ) {}
 }

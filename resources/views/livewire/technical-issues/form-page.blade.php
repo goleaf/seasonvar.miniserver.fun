@@ -118,6 +118,45 @@
                         <p><strong>{{ __('issues.diagnostics.operating_system') }}:</strong> <span data-diagnostic-label="os">{{ $operatingSystem ?: __('issues.create.not_detected') }}</span></p>
                         <p><strong>{{ __('issues.diagnostics.device') }}:</strong> <span data-diagnostic-label="device">{{ $deviceCategory ?: __('issues.create.not_detected') }}</span></p>
                         <p><strong>{{ __('issues.diagnostics.viewport') }}:</strong> <span data-diagnostic-label="viewport">{{ $viewportWidth && $viewportHeight ? $viewportWidth.' × '.$viewportHeight : __('issues.create.not_detected') }}</span></p>
+                        @if ($playbackDiagnostic !== [])
+                            <section aria-labelledby="playback-diagnostic-preview" class="rounded-control border border-emerald-200 bg-white p-4 sm:col-span-2">
+                                <h3 id="playback-diagnostic-preview" class="font-black text-slate-900">{{ __('issues.diagnostics.playback_title') }}</h3>
+                                <p class="mt-1 text-xs leading-5 text-slate-600">{{ __('issues.diagnostics.playback_preview_notice') }}</p>
+                                <dl class="mt-3 grid gap-3 sm:grid-cols-2">
+                                    <div><dt class="text-slate-500">{{ __('issues.diagnostics.playback_request_id') }}</dt><dd class="mt-1 break-all font-bold text-slate-800">{{ $playbackDiagnostic['playback_request_id'] }}</dd></div>
+                                    @if ($playbackDiagnostic['video_variant_code'] ?? null)<div><dt class="text-slate-500">{{ __('issues.diagnostics.video_variant') }}</dt><dd class="mt-1 break-words font-bold text-slate-800">{{ $playbackDiagnostic['video_variant_code'] }}</dd></div>@endif
+                                    @if ($playbackDiagnostic['video_quality_code'] ?? null)<div><dt class="text-slate-500">{{ __('issues.diagnostics.video_quality') }}</dt><dd class="mt-1 break-words font-bold text-slate-800">{{ $playbackDiagnostic['video_quality_code'] }}</dd></div>@endif
+                                    @if ($playbackDiagnostic['video_translation_name'] ?? null)<div><dt class="text-slate-500">{{ __('issues.diagnostics.video_translation') }}</dt><dd class="mt-1 break-words font-bold text-slate-800">{{ $playbackDiagnostic['video_translation_name'] }}</dd></div>@endif
+                                    @if ($playbackDiagnostic['video_format_code'] ?? null)<div><dt class="text-slate-500">{{ __('issues.diagnostics.video_format') }}</dt><dd class="mt-1 break-words font-bold text-slate-800">{{ $playbackDiagnostic['video_format_code'] }}</dd></div>@endif
+                                    @if ($playbackDiagnostic['video_provider_code'] ?? null)<div><dt class="text-slate-500">{{ __('issues.diagnostics.video_provider') }}</dt><dd class="mt-1 break-all font-bold text-slate-800">{{ $playbackDiagnostic['video_provider_code'] }}</dd></div>@endif
+                                    @if ($playbackDiagnostic['browser_family'] ?? null)<div><dt class="text-slate-500">{{ __('issues.diagnostics.browser') }}</dt><dd class="mt-1 break-words font-bold text-slate-800">{{ $playbackDiagnostic['browser_family'] }}@if ($playbackDiagnostic['browser_major'] ?? null) {{ $playbackDiagnostic['browser_major'] }}@endif</dd></div>@endif
+                                    @if ($playbackDiagnostic['operating_system'] ?? null)<div><dt class="text-slate-500">{{ __('issues.diagnostics.operating_system') }}</dt><dd class="mt-1 break-words font-bold text-slate-800">{{ $playbackDiagnostic['operating_system'] }}</dd></div>@endif
+                                    @if ($playbackDiagnostic['hls_support'] ?? null)<div><dt class="text-slate-500">{{ __('issues.diagnostics.hls_support') }}</dt><dd class="mt-1 break-words font-bold text-slate-800">{{ __('issues.diagnostics.hls_'.$playbackDiagnostic['hls_support']) }}</dd></div>@endif
+                                    @if ($playbackDiagnostic['playback_error_type'] ?? null)<div><dt class="text-slate-500">{{ __('issues.diagnostics.playback_error_type') }}</dt><dd class="mt-1 break-words font-bold text-slate-800">{{ __('issues.diagnostics.error_'.$playbackDiagnostic['playback_error_type']) }}</dd></div>@endif
+                                    @if ($playbackDiagnostic['playback_error_source'] ?? null)<div><dt class="text-slate-500">{{ __('issues.diagnostics.playback_error_source') }}</dt><dd class="mt-1 break-words font-bold text-slate-800">{{ __('issues.diagnostics.source_'.$playbackDiagnostic['playback_error_source']) }}</dd></div>@endif
+                                    @if (($playbackDiagnostic['startup_time_ms'] ?? null) !== null)<div><dt class="text-slate-500">{{ __('issues.diagnostics.startup_time') }}</dt><dd class="mt-1 font-bold text-slate-800">{{ number_format($playbackDiagnostic['startup_time_ms'], 0, ',', ' ') }} {{ __('issues.admin.milliseconds') }}</dd></div>@endif
+                                    <div><dt class="text-slate-500">{{ __('issues.diagnostics.playback_time') }}</dt><dd class="mt-1 font-bold text-slate-800">{{ number_format($playbackDiagnostic['playback_time_ms'], 0, ',', ' ') }} {{ __('issues.admin.milliseconds') }}</dd></div>
+                                    <div><dt class="text-slate-500">{{ __('issues.diagnostics.buffering_time') }}</dt><dd class="mt-1 font-bold text-slate-800">{{ number_format($playbackDiagnostic['buffering_time_ms'], 0, ',', ' ') }} {{ __('issues.admin.milliseconds') }}</dd></div>
+                                    <div><dt class="text-slate-500">{{ __('issues.diagnostics.buffering_count') }}</dt><dd class="mt-1 font-bold text-slate-800">{{ $playbackDiagnostic['buffering_count'] }}</dd></div>
+                                    <div><dt class="text-slate-500">{{ __('issues.diagnostics.fallback_state') }}</dt><dd class="mt-1 font-bold text-slate-800">{{ ($playbackDiagnostic['fallback_succeeded'] ?? false) ? __('issues.diagnostics.fallback_succeeded') : (($playbackDiagnostic['fallback_attempted'] ?? false) ? __('issues.diagnostics.fallback_failed') : __('issues.diagnostics.fallback_not_used')) }}</dd></div>
+                                    <div>
+                                        <dt class="text-slate-500">{{ __('issues.diagnostics.source_failure_state') }}</dt>
+                                        <dd class="mt-1 font-bold text-slate-800">
+                                            @if (($playbackDiagnostic['primary_failed'] ?? false) && ($playbackDiagnostic['fallback_failed'] ?? false))
+                                                {{ __('issues.diagnostics.both_sources_failed') }}
+                                            @elseif (($playbackDiagnostic['primary_failed'] ?? false) && ($playbackDiagnostic['fallback_succeeded'] ?? false))
+                                                {{ __('issues.diagnostics.primary_failed_fallback_succeeded') }}
+                                            @elseif ($playbackDiagnostic['primary_failed'] ?? false)
+                                                {{ __('issues.diagnostics.primary_failed') }}
+                                            @else
+                                                {{ __('issues.diagnostics.no_source_failure') }}
+                                            @endif
+                                        </dd>
+                                    </div>
+                                    @if ($playbackDiagnostic['network_test_status'] ?? null)<div><dt class="text-slate-500">{{ __('issues.diagnostics.network_test') }}</dt><dd class="mt-1 font-bold text-slate-800">{{ __('issues.diagnostics.network_'.$playbackDiagnostic['network_test_status']) }}@if (($playbackDiagnostic['network_latency_ms'] ?? null) !== null) · {{ number_format($playbackDiagnostic['network_latency_ms'], 0, ',', ' ') }} {{ __('issues.admin.milliseconds') }}@endif</dd></div>@endif
+                                </dl>
+                            </section>
+                        @endif
                     </div>
                 </x-ui.panel>
 

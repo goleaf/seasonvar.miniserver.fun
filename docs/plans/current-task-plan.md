@@ -10660,6 +10660,104 @@ package, configuration, queue, scheduler и production DML не добавляю
 
 ---
 
+## Task 87 — диагностика качества просмотра
+
+Статус: `delivery_ready`.
+
+Дата начала: 26.07.2026.
+
+Approved design:
+[`2026-07-26-playback-quality-telemetry-design.md`](../superpowers/specs/2026-07-26-playback-quality-telemetry-design.md).
+
+Detailed implementation plan:
+[`2026-07-26-playback-quality-telemetry.md`](../superpowers/plans/2026-07-26-playback-quality-telemetry.md).
+
+### Цель и root cause
+
+Existing `CatalogTitlePlayer` уже владеет canonical source resolution,
+bounded retry/fallback и progress lifecycle, а Task 20 — private technical
+issue context/diagnostics. Не хватает user-visible fallback stages,
+first-party playback denominator и согласованного request-specific diagnostic
+snapshot. Player/source resolver переписывать нельзя.
+
+Выбран один additive anonymous playback-session aggregate, same-origin
+CSRF/FormRequest responder, fixed click-only network probe, existing player
+lifecycle instrumentation и bounded staff aggregate query. Third-party
+analytics, raw UA/IP/source URL/user ID, client health verdict и новый
+player/cache/queue/provider отклонены.
+
+### Expected files и protected contracts
+
+Полный manifest находится в linked plan. Scope включает additive telemetry
+table/diagnostic columns, DTO/request/model/services/responders, existing
+player/issue/admin integration, RU/EN UI, tests и canonical docs.
+
+Защищены `titles.show`, `playback.source`, download/mobile API shapes,
+entitlement/signed grants, source health, progress/history identities,
+technical issue routes/policies/duplicate lifecycle, cache/SEO/import/
+Premium/region/legal boundaries и весь foreign staged/unstaged shared-tree
+scope.
+
+### Cross-feature, schema и rollout matrix
+
+| Domain | Статус | Решение / gate |
+| --- | --- | --- |
+| Player lifecycle | `critical_affected` | Расширить один `CatalogPlayerSession`; второй player запрещён |
+| Source fallback | `critical_affected` | Existing resolver/action; только accessible staged copy + telemetry |
+| Technical issues | `critical_affected` | Encrypted report token, revocable consent, snapshot columns |
+| Anonymous telemetry privacy | `critical_affected` | No user/IP/raw UA/URL/session; bounded retention |
+| Database | `critical_affected` | Additive reversible table/nullable columns and justified indexes |
+| Admin metrics | `critical_affected` | Existing support gate, max 30-day aggregates, no raw rows |
+| Routes/write validation | `critical_affected` | Thin responders, Form Request, CSRF, dual throttle |
+| Frontend/mobile/a11y | `affected` | RU/EN live status, 44px action, no double click/overflow |
+| Performance | `affected` | Cumulative bounded writes; 1 overview + 3 limited groups |
+| Cache/queue/scheduler | `not_applicable` | No new cache/domain/job/worker/schedule |
+| Dependencies/environment | `not_applicable` | No package or `.env` change |
+| Production/rollback | `affected` | Migration-before-code, schema guard, data-retention assessment |
+
+### Task-specific requirement-compliance matrix
+
+| Requirement/domain | Статус | Evidence / следующий gate |
+| --- | --- | --- |
+| Skills/root/index/canonical fresh read | `completed` | 26.07.2026 before application edit |
+| Runtime/packages/database | `completed` | PHP 8.5.8, Laravel 13.22.0, Livewire 4.3.3, Boost 2.4.13, PHPUnit 12.5.32, Pint 1.29.3, Tailwind 4.3.2, HLS.js 1.6.16, Plyr 3.8.4, SQLite |
+| Official version-dependent docs | `completed` | Laravel 13 rate limiter/FormRequest/migration/Livewire lifecycle through Boost |
+| Existing implementation first | `completed` | Player/source/fallback/progress/issues/source-health/admin/routes/schema/tests traced |
+| Alternatives and autonomous design | `completed` | Rewrite/ticket-only/third-party rejected; first-party bounded design selected |
+| Expected files/contracts/risks | `completed` | Linked unlimited plan and design |
+| Canonical owner rule change | `completed` | `technical-issues.md` и playback audit: click-only fixed-origin round-trip probe без bandwidth/provider/IP |
+| TDD RED/GREEN | `completed` | Focused RED зафиксировал отсутствующие schema/DTO/admin/form/retention contracts; финальный Task 87 + player-copy + translation-parity набор 20 тестов / 77 195 утверждений GREEN |
+| Migration/index/EXPLAIN | `completed` | Additive reversible SQLite schema; fresh disposable SQLite прошла apply → targeted rollback → re-apply, `integrity_check=ok`, пустой `foreign_key_check`; exact retention/browser/provider/quality indexes выбраны фактическим `EXPLAIN QUERY PLAN` |
+| Validation/auth/security/privacy | `completed` | FormRequest, CSRF, dual throttle, encrypted expiring contexts, server hierarchy, no user/IP/raw-UA/URL/token fields |
+| Player/report UX | `completed` | Один player lifecycle, staged fallback copy, click-only probe, double-click guard, exact revocable snapshot |
+| Admin aggregates | `completed` | Exact startup/rebuffer/error/fallback formulas; 1 overview + 3 limited groups; 1/7/30 periods |
+| Compatibility/full verification | `completed_with_foreign_failures` | Focused 49/1 165 + CatalogPage 85/859 GREEN; full 2 020: 2 004 passed, 11 skipped, 3 failures + 1 error only in concurrent header/terminology/account/importer scope |
+| Static/build/browser | `completed_with_foreign_findings` | Exact Pint, JS syntax, scoped PHPStan and Vite GREEN; browser 3 passed/3 expected skips; full Rector found only 2 foreign collection files; existing non-task CatalogTitlePlayer nullsafe notice retained |
+| Docs/README/CHANGELOG | `completed` | Frontend/admin/performance/security/data/deployment/issues/playback owners, visitor README and Russian technical history updated; docs-refresh check GREEN |
+| Final requirements/legacy/security audit | `completed` | Requirements/owners/plan reread; repository-wide duplicate route/service/copy search and exact debug/TODO/DOM-sink/identity/URL/secret scans reviewed; only intentional negative test fixtures matched forbidden identity/source fields |
+| Exact commit/push main | `pending` | Alternate-index task scope; external failure will remain honest |
+
+### Безлимитный execution order
+
+1. `[completed]` Fresh skills/requirements/versions/Git shared-tree audit.
+2. `[completed]` Existing player/fallback/issue/source-health/admin trace.
+3. `[completed]` Privacy/performance alternatives and approved design.
+4. `[completed]` Expected files/contracts/risks/compliance matrix.
+5. `[completed]` Canonical owner change before application implementation.
+6. `[completed]` Plan reread and focused RED tests.
+7. `[completed]` Additive schema/model/context/request/recorder/responders/routes.
+8. `[completed]` Technical issue trusted snapshot and retention integration.
+9. `[completed]` One-player JS telemetry/report/fallback UX.
+10. `[completed]` Bounded admin aggregate query and responsive UI.
+11. `[completed]` Focused GREEN, Pint/static/EXPLAIN/security/query budget.
+12. `[completed_with_foreign_failures]` Related/full suite, Vite and browser QA; four full-suite failures classified outside Task 87.
+13. `[completed]` Canonical docs, README and Russian CHANGELOG.
+14. `[completed]` Final requirement/legacy/debug/secret/exact diff audit.
+15. `[in_progress]` Exact Task 87 commit on existing `main`.
+16. `[pending]` Configured non-force push; external failure stays `unresolved`.
+
+---
+
 ## Task 86 — facet snapshot годовых подборок главной
 
 Статус: `completed_with_unresolved_push`.

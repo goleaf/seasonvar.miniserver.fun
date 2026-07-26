@@ -334,6 +334,7 @@ final class TechnicalIssueTypeRegistry
             viewportHeight: $diagnosticsConsent ? $input->viewportHeight : null,
             timezone: $diagnosticsConsent ? $input->timezone : null,
             networkOnline: $diagnosticsConsent ? $input->networkOnline : null,
+            playbackDiagnosticsToken: $input->playbackDiagnosticsToken,
             submissionToken: $input->submissionToken,
         );
     }

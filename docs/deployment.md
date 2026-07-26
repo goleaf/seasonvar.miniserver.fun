@@ -156,6 +156,16 @@ Media due sources по-прежнему выбирает importer finalizer, а 
 
 Production scheduler — внешний cron, который каждую минуту вызывает Laravel `schedule:run`. Entry установлен для пользователя `www` и проверен 15.07.2026 через `crontab -T`, ручной `schedule:run` и journal cron; cache-warm fallback запускается Laravel scheduler каждые десять минут. Admin UI не заменяет cron: он даёт ручной authorized старт/retry/cancel и recovery для `running` run без heartbeat и live claims. Threshold задаёт `SEASONVAR_QUEUE_STALE_AFTER_MINUTES=120`; перед ручным recovery нужно убедиться, что workers не остановлены на долгую maintenance-паузу.
 
+## Диагностика качества просмотра от 26.07.2026
+
+Migration `2026_07_26_233000_create_playback_quality_telemetry.php` additive и reversible: она создаёт обезличенную `playback_quality_sessions`, четыре query indexes и nullable playback snapshot columns в `technical_issue_diagnostics`. Backfill и массовая обработка существующих строк отсутствуют. До migration `PlaybackQualitySchema` не выводит telemetry attributes в player, не выполняет admin aggregates и оставляет существующее воспроизведение/обращения рабочими; write endpoint возвращает контролируемую validation error. Это rolling-deploy guard, но штатный порядок всё равно migration-before-activation.
+
+Перед rollout дождаться отсутствия активной SQLite migration/catalog transaction, остановить writers на короткое schema window и сделать проверяемую резервную копию. Затем установить точный commit и assets, выполнить `php artisan migrate --force`, собрать config/route/view caches штатным способом, graceful reload PHP-FPM и `php artisan queue:restart`. После активации проверить `php artisan route:list --name=playback.quality`, гостевой player без идентификаторов/URL в markup, authenticated переход «Видео не работает», fixed same-origin `204` network test, приватный `/admin/issues` за `support.tickets`, периоды 1/7/30 и `technical-issues:prune-private-data --limit=1` на безопасной тестовой записи. Глобальный cache flush, новая queue, scheduler или environment secret не нужны.
+
+Anonymous sessions удаляются существующей командой `technical-issues:prune-private-data` bounded batches после `playback.quality.retention_days` (по умолчанию 90 дней); согласованный snapshot приватного обращения следует отдельной Task 20 retention policy. При partial asset/code deploy вернуть совместимый manifest/code и reload: telemetry fail-open и не влияет на source health или playback. При неуспешной migration трафик новым кодом не активировать, сохранить backup и исходную ошибку; не применять `migrate:fresh`, ручной drop или cache/queue cleanup.
+
+Application rollback может вернуть прежний code/assets без немедленного DDL rollback: новая таблица и nullable columns старым кодом игнорируются. Если требуется schema rollback, сначала остановить writers и экспортировать нужные anonymous aggregates; `migrate:rollback` удалит их и diagnostic snapshot columns, но не технические обращения, каталог, media или source health. Stale config/route/view state восстанавливается повторной штатной сборкой соответствующего cache и reload, не store-wide flush.
+
 ## Rollout центра качества каталога от 26.07.2026
 
 Центр качества добавляет только производные таблицы

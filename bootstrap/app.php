@@ -96,7 +96,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ], 403);
 
         $exceptions->shouldRenderJsonWhen(
-            fn (Request $request) => $request->is('api/*'),
+            fn (Request $request) => $request->is('api/*') || $request->routeIs('playback.quality.store'),
         );
         $exceptions->render(function (ValidationException $exception, Request $request) {
             if (! $request->is('api/*')) {

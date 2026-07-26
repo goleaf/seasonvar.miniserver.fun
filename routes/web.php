@@ -6,6 +6,7 @@ use App\Enums\CatalogRecommendationType;
 use App\Enums\CatalogTopListCategory;
 use App\Http\Middleware\SetSignedAuthenticationLocale;
 use App\Http\Requests\MigrateAnonymousPreferencesRequest;
+use App\Http\Requests\StorePlaybackQualitySampleRequest;
 use App\Livewire\Administration\AdminAccessManagementPage;
 use App\Livewire\Administration\AdminAuditPage;
 use App\Livewire\Administration\AdministrationDashboardPage;
@@ -75,6 +76,8 @@ use App\Services\Catalog\CatalogDirectoryRegistry;
 use App\Services\Catalog\CatalogPlaybackSourceResponder;
 use App\Services\Catalog\CatalogSitemapResponder;
 use App\Services\Catalog\CatalogStatsPosterResponder;
+use App\Services\Catalog\PlaybackQualityNetworkTestResponder;
+use App\Services\Catalog\PlaybackQualityResponder;
 use App\Services\Comments\CommentDirectLinkResponder;
 use App\Services\Media\LicensedMediaDownloadResponder;
 use App\Services\Operations\InfrastructureHealthResponder;
@@ -362,6 +365,12 @@ Route::get('/playback/{licensedMedia}', fn (Request $request, LicensedMedia $lic
     ->middleware('signed')
     ->whereNumber('licensedMedia')
     ->name('playback.source');
+Route::post('/playback/quality', fn (StorePlaybackQualitySampleRequest $request, PlaybackQualityResponder $quality) => $quality->response($request))
+    ->middleware('throttle:playback-quality')
+    ->name('playback.quality.store');
+Route::get('/playback/network-test', fn (PlaybackQualityNetworkTestResponder $network) => $network->response())
+    ->middleware('throttle:playback-quality-network')
+    ->name('playback.quality.network');
 
 Route::get('/discover/{type}', CatalogDiscoveryPage::class)
     ->whereIn('type', $discoveryRouteTypes)

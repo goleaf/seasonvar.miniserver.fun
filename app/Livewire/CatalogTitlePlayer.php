@@ -26,6 +26,8 @@ use App\Services\Catalog\CatalogPlayerTransitionFactory;
 use App\Services\Catalog\CatalogPrimaryActionResolver;
 use App\Services\Catalog\CatalogTitlePlaybackQuery;
 use App\Services\Catalog\CatalogUserStateService;
+use App\Services\Catalog\PlaybackQualityContext;
+use App\Services\Catalog\PlaybackQualitySchema;
 use App\Services\Catalog\PlaybackTimeFormatter;
 use App\Services\Media\ExternalMediaFileType;
 use App\Services\Media\ExternalMediaMetadata;
@@ -107,6 +109,10 @@ class CatalogTitlePlayer extends Component
 
     protected TechnicalIssueContext $technicalIssueContext;
 
+    protected PlaybackQualityContext $playbackQualityContext;
+
+    protected PlaybackQualitySchema $playbackQualitySchema;
+
     protected ?AccountSettingsData $resolvedAccountSettings = null;
 
     protected ?CatalogTitle $resolvedTitle = null;
@@ -137,6 +143,8 @@ class CatalogTitlePlayer extends Component
         ExternalMediaFileType $mediaFileTypes,
         HumanFileSizeFormatter $fileSizes,
         TechnicalIssueContext $technicalIssueContext,
+        PlaybackQualityContext $playbackQualityContext,
+        PlaybackQualitySchema $playbackQualitySchema,
     ): void {
         $this->playback = $playback;
         $this->primaryActions = $primaryActions;
@@ -152,6 +160,8 @@ class CatalogTitlePlayer extends Component
         $this->mediaFileTypes = $mediaFileTypes;
         $this->fileSizes = $fileSizes;
         $this->technicalIssueContext = $technicalIssueContext;
+        $this->playbackQualityContext = $playbackQualityContext;
+        $this->playbackQualitySchema = $playbackQualitySchema;
     }
 
     public function mount(int $catalogTitleId): void
@@ -834,6 +844,11 @@ class CatalogTitlePlayer extends Component
         $technicalIssueUrl = (bool) config('technical-issues.enabled', true) && $user !== null
             ? $this->technicalIssueContext->playerUrl($title, $activeSeason, $selectedEpisode, $selectedMedia)
             : null;
+        $playbackQualityContext = $selectedMedia !== null
+            && $playbackSource->isPlayable()
+            && $this->playbackQualitySchema->ready()
+                ? $this->playbackQualityContext->captureToken($title)
+                : null;
         $routeLocale = request()->route('locale');
         $routeLocale = is_string($routeLocale) ? $routeLocale : null;
         $selectedProgress = $user !== null && $selectedEpisode !== null
@@ -908,6 +923,9 @@ class CatalogTitlePlayer extends Component
             'isAuthenticated' => $user !== null,
             'canInteract' => $user?->hasVerifiedEmail() === true,
             'technicalIssueUrl' => $technicalIssueUrl,
+            'playbackQualityContext' => $playbackQualityContext,
+            'playbackQualityUrl' => $playbackQualityContext !== null ? route('playback.quality.store') : null,
+            'playbackNetworkTestUrl' => $playbackQualityContext !== null ? route('playback.quality.network') : null,
             'playerHelpFeature' => HelpFeature::Player->value,
             'playerHelpContext' => $playbackSource->isPlayable() ? 'controls' : 'error',
             'playerHelpRouteLocale' => $routeLocale,

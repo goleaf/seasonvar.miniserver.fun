@@ -162,6 +162,28 @@ final readonly class TechnicalIssuePresenter
             'network_online' => $diagnostic?->network_online,
             'player_component' => $diagnostic?->player_component,
             'source_health' => $staff ? $diagnostic?->source_health_code : null,
+            'playback_request_id' => $diagnostic?->playback_request_id,
+            'video_variant' => $diagnostic?->video_variant_code,
+            'video_quality' => $diagnostic?->video_quality_code,
+            'video_translation' => $diagnostic?->video_translation_name,
+            'video_format' => $diagnostic?->video_format_code,
+            'video_provider' => $staff ? $diagnostic?->video_provider_code : null,
+            'hls_support' => $diagnostic?->hls_support !== null
+                ? __('issues.diagnostics.hls_'.$diagnostic->hls_support)
+                : null,
+            'playback_error_type' => $diagnostic?->playback_error_type !== null
+                ? __('issues.diagnostics.error_'.$diagnostic->playback_error_type)
+                : null,
+            'playback_error_source' => $diagnostic?->playback_error_source !== null
+                ? __('issues.diagnostics.source_'.$diagnostic->playback_error_source)
+                : null,
+            'startup_time' => $this->milliseconds($diagnostic?->startup_time_ms),
+            'playback_time' => $this->milliseconds($diagnostic?->playback_time_ms),
+            'buffering_time' => $this->milliseconds($diagnostic?->buffering_time_ms),
+            'buffering_count' => $diagnostic?->buffering_count,
+            'fallback_state' => $this->fallbackState($diagnostic),
+            'source_failure_state' => $this->sourceFailureState($diagnostic),
+            'network_test' => $this->networkTest($diagnostic),
             'affected_users' => $staff ? max(
                 (int) ($issue->occurrences_count ?? 0),
                 (int) ($issue->confirmations_count ?? 0) + ($issue->requester_id !== null ? 1 : 0),
@@ -198,6 +220,60 @@ final readonly class TechnicalIssuePresenter
             licensedMediaId: $staff ? $issue->licensed_media_id : null,
             relatedTickets: $staff ? $relatedTickets : [],
         );
+    }
+
+    private function milliseconds(?int $milliseconds): ?string
+    {
+        return $milliseconds !== null
+            ? number_format($milliseconds, 0, ',', ' ').' '.__('issues.admin.milliseconds')
+            : null;
+    }
+
+    private function fallbackState(?TechnicalIssueDiagnostic $diagnostic): ?string
+    {
+        if (! $diagnostic instanceof TechnicalIssueDiagnostic || $diagnostic->fallback_attempted === null) {
+            return null;
+        }
+
+        if ($diagnostic->fallback_succeeded) {
+            return __('issues.diagnostics.fallback_succeeded');
+        }
+
+        return $diagnostic->fallback_attempted
+            ? __('issues.diagnostics.fallback_failed')
+            : __('issues.diagnostics.fallback_not_used');
+    }
+
+    private function sourceFailureState(?TechnicalIssueDiagnostic $diagnostic): ?string
+    {
+        if (! $diagnostic instanceof TechnicalIssueDiagnostic || $diagnostic->primary_failed === null) {
+            return null;
+        }
+
+        if ($diagnostic->primary_failed && $diagnostic->fallback_failed) {
+            return __('issues.diagnostics.both_sources_failed');
+        }
+
+        if ($diagnostic->primary_failed && $diagnostic->fallback_succeeded) {
+            return __('issues.diagnostics.primary_failed_fallback_succeeded');
+        }
+
+        return $diagnostic->primary_failed
+            ? __('issues.diagnostics.primary_failed')
+            : __('issues.diagnostics.no_source_failure');
+    }
+
+    private function networkTest(?TechnicalIssueDiagnostic $diagnostic): ?string
+    {
+        if (! $diagnostic instanceof TechnicalIssueDiagnostic || $diagnostic->network_test_status === null) {
+            return null;
+        }
+
+        $result = __('issues.diagnostics.network_'.$diagnostic->network_test_status);
+
+        return $diagnostic->network_latency_ms !== null
+            ? $result.' · '.$this->milliseconds($diagnostic->network_latency_ms)
+            : $result;
     }
 
     private function targetLabel(TechnicalIssue $issue): string

@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Models\PlaybackQualitySession;
 use App\Models\TechnicalIssueAttachment;
 use App\Models\TechnicalIssueDiagnostic;
 use App\Models\TechnicalIssueOccurrence;
+use App\Services\Catalog\PlaybackQualitySchema;
 use App\Services\TechnicalIssues\TechnicalIssueSchema;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
@@ -15,19 +17,33 @@ use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 #[Signature('technical-issues:prune-private-data {--limit=200 : Maximum diagnostics and attachments handled per category}')]
-#[Description('Prunes expired optional technical-ticket diagnostics and closed-ticket screenshots in bounded batches')]
+#[Description('Prunes expired optional technical-ticket diagnostics, playback telemetry, and closed-ticket screenshots in bounded batches')]
 final class PruneTechnicalIssueData extends Command
 {
-    public function handle(TechnicalIssueSchema $schema): int
+    public function handle(TechnicalIssueSchema $schema, PlaybackQualitySchema $playbackQualitySchema): int
     {
+        $limit = filter_var($this->option('limit'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 500]]);
+        $limit = is_int($limit) ? $limit : 200;
+        $playbackTelemetryDeleted = 0;
+
+        if ($playbackQualitySchema->ready()) {
+            $playbackCutoff = now()->subDays(max(1, (int) config('playback.quality.retention_days', 90)));
+            $playbackSessionIds = PlaybackQualitySession::query()
+                ->where('started_at', '<=', $playbackCutoff)
+                ->oldest('started_at')
+                ->oldest('id')
+                ->limit($limit)
+                ->pluck('id');
+            $playbackTelemetryDeleted = PlaybackQualitySession::query()->whereKey($playbackSessionIds)->delete();
+        }
+
         if (! $schema->ready()) {
             $this->components->info('Technical issue schema is not installed. Nothing was pruned.');
+            $this->components->info("Playback telemetry deleted: {$playbackTelemetryDeleted}.");
 
             return self::SUCCESS;
         }
 
-        $limit = filter_var($this->option('limit'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 500]]);
-        $limit = is_int($limit) ? $limit : 200;
         $diagnosticCutoff = now()->subDays(max(1, (int) config('technical-issues.retention.diagnostics_days', 180)));
         $attachmentCutoff = now()->subDays(max(1, (int) config('technical-issues.retention.attachments_days_after_closed', 365)));
         $terminalStatuses = ['resolved', 'resolution_verified', 'closed', 'rejected', 'merged', 'withdrawn'];
@@ -85,6 +101,7 @@ final class PruneTechnicalIssueData extends Command
 
         $this->components->info("Diagnostics deleted: {$diagnosticsDeleted}.");
         $this->components->info("Duplicate occurrence diagnostics pruned: {$occurrencesPruned}.");
+        $this->components->info("Playback telemetry deleted: {$playbackTelemetryDeleted}.");
         $this->components->info("Closed-ticket screenshots deleted: {$attachmentsDeleted}; failed: {$attachmentsFailed}.");
 
         return $attachmentsFailed === 0 ? self::SUCCESS : self::FAILURE;

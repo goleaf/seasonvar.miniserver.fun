@@ -568,6 +568,14 @@ Uniqueness обеспечивает public UUID/number, idempotent submission, �
 
 Полная семантика identity, merge/account lifecycle, retention, rollback и query-plan evidence принадлежит [`technical-issues.md`](technical-issues.md).
 
+## Диагностика качества просмотра
+
+Additive migration `2026_07_26_233000_create_playback_quality_telemetry.php` создаёт обезличенную `playback_quality_sessions` и добавляет nullable playback snapshot columns в существующую `technical_issue_diagnostics`. Session использует случайный unique UUID `request_id`; nullable FKs на `catalog_titles`, `seasons`, `episodes` и initial/current `licensed_media` применяют `nullOnDelete`, чтобы удаление каталожной строки не удаляло агрегированное operational evidence. Связи server-side подтверждают hierarchy при каждой записи; таблица не имеет FK на user и не хранит IP/raw UA/source URL/grant.
+
+Provider/variant/quality/translation/format извлекаются из подтверждённой `licensed_media`, а browser/OS/HLS/error/network значения ограничены стабильными codes. Startup time nullable; playback/buffering/count/position монотонно увеличиваются либо сохраняют максимум. `reached_playback`, terminal failure, primary/fallback outcome и timestamps не требуют отдельной event table. Unique `request_id` исключает duplicate session; `(started_at,id)` обслуживает retention, три `(playback_failed,started_at,dimension…)` indexes — staff error aggregates по browser/provider/quality. SQLite query-plan tests подтверждают выбор всех четырёх индексов.
+
+Ticket snapshot не ссылается FK на telemetry row: после явного consent он копирует только bounded безопасные значения и остаётся понятным после 90-дневного удаления anonymous session. Отзыв consent оставляет все playback columns `null`. `down()` сначала удаляет nullable diagnostic columns, затем telemetry table; откат уничтожает только diagnostic aggregates, но не каталог, media, source health или technical tickets.
+
 ## File-size metadata `licensed_media`
 
 Additive migration `2026_07_16_190000_add_file_size_metadata_to_licensed_media.php` не меняет media IDs, relationships, playback URL или health columns. Она добавляет:

@@ -14,13 +14,17 @@ use App\Models\TechnicalIssue;
 use App\Models\TechnicalIssueMessage;
 use App\Models\TechnicalIssueOccurrence;
 use App\Models\User;
+use App\Services\Catalog\PlaybackQualitySchema;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Gate;
 
 final readonly class TechnicalIssueQuery
 {
-    public function __construct(private TechnicalIssuePresenter $presenter) {}
+    public function __construct(
+        private TechnicalIssuePresenter $presenter,
+        private PlaybackQualitySchema $playbackQualitySchema,
+    ) {}
 
     /** @return LengthAwarePaginator<int, TechnicalIssueCardData> */
     public function mine(
@@ -170,7 +174,7 @@ final readonly class TechnicalIssueQuery
                 'episode:id,season_id,number,kind,title',
                 'requester:id,name',
                 'mergedInto:id,public_id,public_number,status',
-                'diagnostic:id,technical_issue_id,browser_family,browser_major,operating_system,device_category,viewport_width,viewport_height,timezone,network_online,player_component,source_health_code',
+                'diagnostic' => fn ($query) => $query->select($this->diagnosticColumns()),
             ])
             ->withCount([
                 'attachments' => fn (Builder $query) => $query->when(! $staff, fn (Builder $query) => $query
@@ -254,6 +258,46 @@ final readonly class TechnicalIssueQuery
         }
 
         return $this->presenter->detail($loaded, $user, $staff, $related, $messagePages);
+    }
+
+    /** @return list<string> */
+    private function diagnosticColumns(): array
+    {
+        return [
+            'id',
+            'technical_issue_id',
+            'browser_family',
+            'browser_major',
+            'operating_system',
+            'device_category',
+            'viewport_width',
+            'viewport_height',
+            'timezone',
+            'network_online',
+            'player_component',
+            'source_health_code',
+            ...($this->playbackQualitySchema->ready() ? [
+                'playback_request_id',
+                'playback_error_type',
+                'playback_error_source',
+                'startup_time_ms',
+                'playback_time_ms',
+                'buffering_time_ms',
+                'buffering_count',
+                'fallback_attempted',
+                'fallback_succeeded',
+                'primary_failed',
+                'fallback_failed',
+                'network_test_status',
+                'network_latency_ms',
+                'video_variant_code',
+                'video_quality_code',
+                'video_translation_name',
+                'video_format_code',
+                'video_provider_code',
+                'hls_support',
+            ] : []),
+        ];
     }
 
     /** @return Builder<TechnicalIssue> */

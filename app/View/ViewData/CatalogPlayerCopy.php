@@ -33,6 +33,7 @@ final readonly class CatalogPlayerCopy
                 'captionsUnavailable' => $this->text('runtime.captions_unavailable'),
                 'offline' => $this->text('runtime.offline'),
                 'stalled' => $this->text('runtime.stalled'),
+                'sourceFailed' => $this->text('runtime.source_failed'),
                 'sourceFallback' => $this->text('runtime.source_fallback'),
                 'sourceChanged' => $this->text('runtime.source_changed'),
                 'authorizationRefreshed' => $this->text('runtime.authorization_refreshed'),

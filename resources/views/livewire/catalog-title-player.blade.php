@@ -108,6 +108,11 @@
                                 data-account-keyboard="{{ $accountPlaybackPreferences['keyboardShortcutsEnabled'] ? '1' : '0' }}"
                                 data-account-reduced-motion="{{ $accountPlaybackPreferences['reducedMotion'] ? '1' : '0' }}"
                                 data-account-authenticated="{{ $isAuthenticated ? '1' : '0' }}"
+                                @if ($playbackQualityContext)
+                                    data-playback-quality-context="{{ $playbackQualityContext }}"
+                                    data-playback-quality-url="{{ $playbackQualityUrl }}"
+                                    data-playback-network-test-url="{{ $playbackNetworkTestUrl }}"
+                                @endif
                                 data-media-title="{{ $mediaSession['title'] }}"
                                 data-media-artist="{{ $mediaSession['artist'] }}"
                                 data-media-album="{{ $mediaSession['album'] }}"
@@ -218,10 +223,11 @@
                         <a
                             href="{{ $technicalIssueUrl }}"
                             data-player-issue-link
+                            @if ($playbackQualityContext) data-player-quality-report @endif
                             class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 sm:w-auto"
                         >
                             <x-ui.icon name="fa-solid fa-triangle-exclamation" />
-                            <span>{{ __('issues.report_problem') }}</span>
+                            <span>{{ __('issues.video_not_working') }}</span>
                         </a>
                     @endif
                 </div>

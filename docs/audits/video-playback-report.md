@@ -205,7 +205,13 @@ Player различает preparing/loading/ready/playing/paused/seeking/bufferi
 
 Существующий Task 20 report flow принимает stable title/season/episode и opaque source ID, category/reason/quality и bounded browser diagnostics. URL источника, grant, credentials, cookies, tokens, raw provider response и stack trace в issue context не входят. Duplicate detection и rate limits принадлежат canonical technical-issue service; player не создаёт второй тикет-контур.
 
-Новая playback analytics не добавлена. История/progress остаются private; source URL не логируется. Existing meaningful progress/recommendation signals используются по прежнему назначению, без события на каждую секунду и без fingerprinting.
+Playback quality telemetry расширяет существующий `CatalogPlayerSession`, а не создаёт второй player lifecycle. Одна обезличенная first-party playback session получает случайный request ID; сервер заново разрешает media внутри зашифрованного expiring title context и сам добавляет season/episode/provider/variant/quality/translation/format. Клиент передаёт только cumulative bounded startup/playback/buffering metrics, buffering count, HLS capability, allowlisted browser/OS, stable error category и fallback outcome. События не отправляются каждую секунду, не блокируют playback, не повторяются при telemetry failure и не содержат `user_id`, IP, raw UA, session/cookie/token, source/grant URL или storage path.
+
+Кнопка «Видео не работает» выполняет единственный фиксированный same-origin anonymous network probe после явного клика. Измеряется только bounded round-trip со статусом `ok|failed|offline|timeout`; Network Information API, provider lookup, произвольный URL/payload, bandwidth test и background retry запрещены. Затем server-issued expiring report token привязывает текущий playback snapshot к существующей форме Task 20; diagnostic consent заранее отмечен, но пользователь может снять его до отправки.
+
+При исчерпании bounded retry player показывает отдельные локализованные live-region состояния «Источник 1 не ответил» и «Переключаю на источник 2», после чего использует существующий server-authorized fallback. Client error никогда сам не меняет global source health. Staff dashboard строит bounded server-side aggregates startup time, rebuffer ratio, playback error rate, fallback success и error breakdown по allowlisted browser/provider/quality; private/no-store ответ не показывает пользователей, request/session identity или source URL.
+
+История/progress остаются private; source URL не логируется. Existing meaningful progress/recommendation signals используются по прежнему назначению, без fingerprinting. Playback telemetry и согласованный ticket snapshot имеют отдельные additive schemas, fail-open для воспроизведения и bounded retention.
 
 ## Cache, database, import и administration
 
@@ -243,12 +249,15 @@ Player различает preparing/loading/ready/playing/paused/seeking/bufferi
 - RU/EN dictionary parity, отсутствие raw keys/hardcoded labels;
 - global `Space`/`K` и `-10/+10` arrow seek, отсутствие double action внутри Plyr, keyboard preference/editable/interactive/modifier/dialog exclusions, focus/live regions/reduced motion и cleanup после Livewire navigation;
 - phone/tablet/desktop overflow, coarse touch, captions, iOS/Android feature boundaries;
-- error/help/report context без URLs/secrets;
+- error/help/report context без URLs/secrets, exact playback snapshot preview и revocable consent;
+- состояния «Источник 1 не ответил»/«Переключаю на источник 2», один fallback и отсутствие client health mutation;
+- фиксированный same-origin network probe только после клика, double-submit guard и safe issue URL fallback;
+- admin periods 1/7/30, точные четыре формулы/query budget и отсутствие request IDs/raw rows;
 - selected-episode-only source query, existing indexes/query plans and no N+1;
 - importer duplicate/health/editorial preservation and admin management;
 - CSP provider origins and required upstream CORS/Range/MIME.
 
-Rollback — revert Task 07 code/assets/translations/docs. Database rollback и data repair не нужны: migration отсутствует, IDs/rows/routes/preferences/cache keys/API fields не переименованы, а выданные grants истекут максимум через configured TTL.
+Rollback исходного Task 07 — revert его code/assets/translations/docs. Для additive Task 87 безопаснее сначала вернуть telemetry code/assets и оставить новую таблицу/nullable columns неиспользуемыми; старый код их игнорирует. Если требуется DDL rollback, после остановки writers и экспорта нужных anonymous aggregates откатывается только `2026_07_26_233000_create_playback_quality_telemetry.php`: она удаляет playback session rows и diagnostic snapshot columns, но не tickets, catalog/media, source health, progress или существующие routes. Expiring capture/report tokens после возврата кода становятся бесполезными без отдельного отзыва.
 
 Автоматизированные tests для Task 07 не создаются и не запускаются по прямому требованию. Разрешённые evidence gates: PHP/JS syntax, Pint, Blade compilation, route/schema/query/index inspection, translation parity, Vite production build, static secret/URL/DOM-sink scans и browser smoke с console/network/viewport inspection.
 

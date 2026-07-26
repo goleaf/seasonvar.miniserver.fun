@@ -23,7 +23,7 @@ final class CatalogPlayerCopyTest extends TestCase
                 'preparing', 'loading', 'ready', 'playing', 'paused', 'seeking',
                 'buffering', 'retryingNetwork', 'retryingMedia', 'expired',
                 'playbackError', 'fatal', 'ended', 'captionsUnavailable',
-                'offline', 'stalled', 'sourceFallback', 'sourceChanged',
+                'offline', 'stalled', 'sourceFailed', 'sourceFallback', 'sourceChanged',
                 'authorizationRefreshed', 'fallbackUnavailable', 'finalEpisode',
                 'restartFailed', 'loadingTransition',
                 'transitionUnavailable', 'transitionLimited',

@@ -104,7 +104,11 @@ Dropdown ограничивает количество строк по дост�
 
 ## Граница текущего продукта
 
-Локализованные записи контента и QoE telemetry отсутствуют как продуктовые возможности, а не являются незавершёнными frontend-задачами. Текущая locale переводит только UI/page metadata и не создаёт отдельные версии названий, описаний, аудио или субтитров; player показывает bounded локальные состояния без отправки пользовательской телеметрии качества воспроизведения. Добавление таких возможностей требует отдельных schema/privacy/retention contracts и измеримого rollout, а не скрытого JavaScript-сбора.
+Локализованные записи контента по-прежнему отсутствуют как продуктовая возможность: locale переводит только UI/page metadata и не создаёт отдельные версии названий, описаний, аудио или субтитров.
+
+Диагностика качества просмотра встроена в единственный `CatalogPlayerSession`. Она неблокирующе отправляет только bounded cumulative startup/playback/buffering counters, HLS capability, сокращённые allowlisted browser/OS codes, stable error category и fallback outcome. Случайный request ID живёт в пределах одной логической playback session; server сам связывает media с сериалом, сезоном, серией, provider, вариантом, качеством, переводом и форматом. Client не отправляет `user_id`, IP, raw user agent, source/storage URL, grant, cookie или token. События отправляются на ready/heartbeat/error/fallback/ended/report boundaries, а не каждую секунду; failure telemetry не влияет на playback или global source health.
+
+Кнопка «Видео не работает» после явного клика выполняет один фиксированный same-origin round-trip probe и переходит в существующую приватную форму технического обращения. Пользователь заранее видит точный безопасный diagnostic snapshot и может отозвать consent. Произвольный URL, bandwidth test, Network Information API, background probe и provider lookup не используются.
 
 Mobile-клиент создаёт playback session через API и использует выданный same-origin `playback_url` как opaque URL: он следует разрешённому redirect/HLS-потоку, не извлекает и не сохраняет provider URL и не добавляет Bearer token в query. Для progress клиент хранит отдельный `progress_session_token` только на время просмотра и отправляет возрастающий `event_sequence`; server response остаётся единственным каноническим состоянием позиции. Web Plyr/Livewire продолжает использовать существующий signed `/playback/{licensedMedia}` и этим mobile contract не заменяется.
 

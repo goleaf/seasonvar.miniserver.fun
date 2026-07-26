@@ -33,4 +33,11 @@ return [
         'requests_per_minute' => 12,
         'media_requests_per_minute' => 4,
     ],
+    'quality' => [
+        'context_ttl_minutes' => 120,
+        'retention_days' => 90,
+        'requests_per_minute' => 30,
+        'sessions_per_minute' => 12,
+        'network_tests_per_minute' => 6,
+    ],
 ];

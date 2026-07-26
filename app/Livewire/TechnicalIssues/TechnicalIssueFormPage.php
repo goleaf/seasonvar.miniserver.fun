@@ -11,6 +11,7 @@ use App\Enums\TechnicalIssueType;
 use App\Exceptions\TechnicalIssues\TechnicalIssueActionException;
 use App\Models\TechnicalIssue;
 use App\Models\User;
+use App\Services\Catalog\PlaybackQualityReportSnapshot;
 use App\Services\HelpCenter\HelpContextualLinkService;
 use App\Services\TechnicalIssues\TechnicalIssueDuplicateService;
 use App\Services\TechnicalIssues\TechnicalIssueSchema;
@@ -49,6 +50,9 @@ final class TechnicalIssueFormPage extends Component
 
     #[Locked]
     public bool $contextInvalid = false;
+
+    #[Locked]
+    public string $playbackDiagnosticsToken = '';
 
     public string $type = '';
 
@@ -103,8 +107,11 @@ final class TechnicalIssueFormPage extends Component
         $this->text = $text;
     }
 
-    public function mount(TechnicalIssueTargetResolver $targets, TechnicalIssueTypeRegistry $types): void
-    {
+    public function mount(
+        TechnicalIssueTargetResolver $targets,
+        TechnicalIssueTypeRegistry $types,
+        PlaybackQualityReportSnapshot $playbackDiagnostics,
+    ): void {
         $user = auth()->user();
         abort_unless($user instanceof User, 403);
         Gate::forUser($user)->authorize('create', TechnicalIssue::class);
@@ -112,7 +119,9 @@ final class TechnicalIssueFormPage extends Component
         $context = request()->query('context');
         $feature = request()->query('feature');
         $type = request()->query('type');
+        $diagnostics = request()->query('diagnostics');
         $this->contextToken = is_string($context) ? mb_substr($context, 0, 4096) : '';
+        $this->playbackDiagnosticsToken = is_string($diagnostics) ? mb_substr($diagnostics, 0, 4096) : '';
         $this->featureCode = is_string($feature) && in_array($feature, config('technical-issues.feature_codes', []), true) ? $feature : 'general';
         $this->type = is_string($type) && in_array($type, TechnicalIssueType::values(), true) ? $type : '';
         $position = filter_var(request()->query('position'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 86400]]);
@@ -125,6 +134,7 @@ final class TechnicalIssueFormPage extends Component
             $this->qualityCode = (string) $target->selectedQualityCode;
             $this->audioLanguage = (string) $target->selectedAudioLanguage;
             $this->subtitleLanguage = (string) $target->selectedSubtitleLanguage;
+            $this->diagnosticsConsent = $playbackDiagnostics->resolve($this->playbackDiagnosticsToken, $target) !== null;
         } catch (TechnicalIssueActionException $exception) {
             $this->contextInvalid = true;
             $this->actionError = __($exception->translationKey, $exception->replace);
@@ -231,12 +241,15 @@ final class TechnicalIssueFormPage extends Component
         TechnicalIssueSchema $schema,
         TechnicalIssueTargetResolver $targets,
         TechnicalIssueTypeRegistry $types,
+        HelpContextualLinkService $helpLinks,
+        PlaybackQualityReportSnapshot $playbackDiagnostics,
     ): View {
         $user = auth()->user();
         abort_unless($user instanceof User, 403);
         Gate::forUser($user)->authorize('create', TechnicalIssue::class);
         $schemaReady = $schema->ready();
         $target = null;
+        $playbackDiagnostic = [];
 
         if ($schemaReady && ! $this->contextInvalid) {
             try {
@@ -248,6 +261,16 @@ final class TechnicalIssueFormPage extends Component
                 report($exception);
                 $this->contextInvalid = true;
                 $this->actionError = __('issues.errors.query_failed');
+            }
+        }
+
+        if ($target !== null && $this->playbackDiagnosticsToken !== '') {
+            try {
+                $playbackDiagnostic = $playbackDiagnostics->values(
+                    $playbackDiagnostics->resolve($this->playbackDiagnosticsToken, $target),
+                );
+            } catch (Throwable $exception) {
+                report($exception);
             }
         }
 
@@ -264,6 +287,7 @@ final class TechnicalIssueFormPage extends Component
         return view('livewire.technical-issues.form-page', [
             'schemaReady' => $schemaReady,
             'target' => $target,
+            'playbackDiagnostic' => $playbackDiagnostic,
             'availableTypes' => $availableTypes,
             'selectedType' => $selected,
             'requiresActual' => (bool) ($selectedRule['requires_actual'] ?? false),
@@ -341,6 +365,7 @@ final class TechnicalIssueFormPage extends Component
             viewportHeight: $this->diagnosticsConsent ? $this->viewportHeight : null,
             timezone: $this->diagnosticsConsent ? $this->nullable($this->timezone) : null,
             networkOnline: $this->diagnosticsConsent ? $this->networkOnline : null,
+            playbackDiagnosticsToken: $this->playbackDiagnosticsToken,
             submissionToken: $this->submissionToken,
         );
     }

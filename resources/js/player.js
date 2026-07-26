@@ -7,6 +7,7 @@ import {
     removeAnonymousProgress,
 } from './anonymous-playback-progress.js';
 import { CatalogPlayerMenu } from './player-menu.js';
+import { browserSummary, operatingSystem } from './client-diagnostics.js';
 
 const PROGRESS_HEARTBEAT_MS = 30_000;
 const PROGRESS_HEARTBEAT_MIN_DELTA_SECONDS = 10;
@@ -21,6 +22,7 @@ const TRANSITION_READY_TIMEOUT_MS = 15_000;
 const AUTO_NEXT_PREFETCH_SECONDS = 60;
 const TRANSIENT_RESUME_PREFIX = 'seasonvar.player-resume.v1:';
 const SUPPORTED_PLAYBACK_SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+const PLAYBACK_QUALITY_NETWORK_TIMEOUT_MS = 5_000;
 
 const playerSessions = new WeakMap();
 
@@ -46,7 +48,7 @@ const playerCopyShape = {
         'preparing', 'loading', 'ready', 'playing', 'paused', 'seeking',
         'buffering', 'retryingNetwork', 'retryingMedia', 'expired',
         'playbackError', 'fatal', 'ended', 'captionsUnavailable',
-        'offline', 'stalled', 'sourceFallback', 'sourceChanged',
+        'offline', 'stalled', 'sourceFailed', 'sourceFallback', 'sourceChanged',
         'authorizationRefreshed', 'fallbackUnavailable', 'finalEpisode',
         'restartFailed', 'loadingTransition',
         'transitionUnavailable', 'transitionLimited',
@@ -221,6 +223,21 @@ const boundedInteger = (value, minimum = 0, maximum = MAX_PROGRESS_DURATION_SECO
     return Number.isInteger(number) && number >= minimum && number <= maximum ? number : null;
 };
 
+const qualityRequestId = () => {
+    if (typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+    }
+
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+    return [...bytes].map((byte, index) => (
+        [4, 6, 8, 10].includes(index) ? `-${byte.toString(16).padStart(2, '0')}` : byte.toString(16).padStart(2, '0')
+    )).join('');
+};
+
 const transientResumeKey = (episodeId) => `${TRANSIENT_RESUME_PREFIX}${episodeId}`;
 
 const takeTransientResume = (episodeId) => {
@@ -251,6 +268,17 @@ const takeTransientResume = (episodeId) => {
         return {
             position,
             notice: ['sourceChanged', 'authorizationRefreshed'].includes(value?.notice) ? value.notice : null,
+            playbackRequestId: typeof value?.playback_request_id === 'string'
+                && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.playback_request_id)
+                ? value.playback_request_id
+                : null,
+            quality: value?.quality && typeof value.quality === 'object' ? {
+                startupTimeMs: boundedInteger(value.quality.startup_time_ms, 0, 300_000),
+                playbackTimeMs: boundedInteger(value.quality.playback_time_ms, 0, 86_400_000) ?? 0,
+                bufferingTimeMs: boundedInteger(value.quality.buffering_time_ms, 0, 86_400_000) ?? 0,
+                bufferingCount: boundedInteger(value.quality.buffering_count, 0, 65_535) ?? 0,
+                lastErrorType: typeof value.quality.error_type === 'string' ? value.quality.error_type : null,
+            } : null,
         };
     } catch {
         return null;
@@ -348,6 +376,20 @@ class CatalogPlayerSession {
         this.centerControls = null;
         this.centerPlaybackButton = null;
         this.centerPlaybackIcon = null;
+        this.qualityContext = video.dataset.playbackQualityContext || '';
+        this.qualityUrl = video.dataset.playbackQualityUrl || '';
+        this.networkTestUrl = video.dataset.playbackNetworkTestUrl || '';
+        this.qualityRequestId = this.transientResume?.playbackRequestId || qualityRequestId();
+        this.qualityStartedAt = performance.now();
+        this.qualityStartupTimeMs = this.transientResume?.quality?.startupTimeMs ?? null;
+        this.qualityPlaybackTimeMs = this.transientResume?.quality?.playbackTimeMs ?? 0;
+        this.qualityBufferingTimeMs = this.transientResume?.quality?.bufferingTimeMs ?? 0;
+        this.qualityBufferingCount = this.transientResume?.quality?.bufferingCount ?? 0;
+        this.qualityPlaybackStartedAt = null;
+        this.qualityBufferingStartedAt = null;
+        this.qualityReadySent = false;
+        this.qualityReportPending = false;
+        this.lastPlaybackErrorType = this.transientResume?.quality?.lastErrorType || null;
         this.menu = null;
         this.menuGeneration = 0;
         this.transitionGeneration = 0;
@@ -808,6 +850,7 @@ class CatalogPlayerSession {
         }
 
         this.flushProgress(`transition-${reason}`);
+        void this.sendQualitySample('heartbeat');
         this.transitioning = true;
         this.stopHeartbeat();
         this.clearSeekTimer();
@@ -818,6 +861,7 @@ class CatalogPlayerSession {
         this.sessionKey = transition.contextKey;
         this.episodeId = episodeId;
         this.mediaId = mediaId;
+        this.resetQualitySession();
         this.playbackSessionToken = transition.progress?.token || '';
         this.progressSequence = Number(transition.progress?.sequence) || 0;
         this.completed = false;
@@ -1070,6 +1114,8 @@ class CatalogPlayerSession {
 
     handlePlay() {
         this.clearBufferingTimer();
+        this.finishQualityBuffering();
+        this.startQualityPlayback();
         this.hasStartedPlayback = true;
         this.syncCenterPlaybackControl();
         this.hls?.startLoad?.();
@@ -1081,6 +1127,8 @@ class CatalogPlayerSession {
     }
 
     handlePause() {
+        this.finishQualityPlayback();
+        this.finishQualityBuffering();
         this.stopHeartbeat();
         this.persistDevicePreferences();
         this.syncCenterPlaybackControl();
@@ -1128,6 +1176,9 @@ class CatalogPlayerSession {
         }
 
         this.completed = true;
+        this.finishQualityPlayback();
+        this.finishQualityBuffering();
+        void this.sendQualitySample('ended');
         this.stopHeartbeat();
         this.syncCenterPlaybackControl();
         this.dispatchProgress(true, true, 'ended');
@@ -1222,10 +1273,17 @@ class CatalogPlayerSession {
 
     handleCanPlay() {
         this.clearBufferingTimer();
+        this.finishQualityBuffering();
+        this.recordQualityReady();
         this.setStatus('ready', 'ready');
     }
 
     handleBuffering() {
+        if (this.hasStartedPlayback && this.qualityBufferingStartedAt === null) {
+            this.finishQualityPlayback();
+            this.qualityBufferingStartedAt = performance.now();
+            this.qualityBufferingCount = Math.min(65_535, this.qualityBufferingCount + 1);
+        }
         this.setStatus('buffering', 'buffering');
         this.clearBufferingTimer();
         this.bufferingTimer = window.setTimeout(() => {
@@ -1254,7 +1312,9 @@ class CatalogPlayerSession {
             return;
         }
 
-        this.setFailure(false);
+        const category = this.video.error?.code === 3 ? 'decode' : 'media';
+
+        this.setFailure(false, category);
     }
 
     handleHlsError(data) {
@@ -1265,7 +1325,7 @@ class CatalogPlayerSession {
         const responseCode = Number(data.response?.code || data.networkDetails?.status || 0);
 
         if ([401, 403, 410].includes(responseCode)) {
-            this.setFailure(true);
+            this.setFailure(true, 'authorization');
 
             return;
         }
@@ -1291,13 +1351,34 @@ class CatalogPlayerSession {
             return;
         }
 
-        this.setFailure(false);
+        const details = String(data?.details || '').toLowerCase();
+        const category = data.type === this.Hls.ErrorTypes.NETWORK_ERROR
+            ? (details.includes('manifest') ? 'manifest' : (details.includes('frag') ? 'segment' : 'network'))
+            : (data.type === this.Hls.ErrorTypes.MEDIA_ERROR ? 'media' : 'unknown');
+
+        this.setFailure(false, category);
     }
 
     handleRootClick(event) {
         const target = event.target instanceof Element ? event.target : null;
+        const qualityReport = target?.closest('[data-player-quality-report]');
         const transition = target?.closest('[data-player-transition-episode]');
         const mediaOption = target?.closest('[data-player-media-option]');
+
+        if (
+            qualityReport instanceof HTMLAnchorElement
+            && event.button === 0
+            && !event.altKey
+            && !event.ctrlKey
+            && !event.metaKey
+            && !event.shiftKey
+        ) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            void this.requestQualityReport(qualityReport);
+
+            return;
+        }
 
         if (
             transition instanceof HTMLAnchorElement
@@ -1646,7 +1727,219 @@ class CatalogPlayerSession {
         }
     }
 
+    startQualityPlayback() {
+        if (this.qualityPlaybackStartedAt === null && this.qualityBufferingStartedAt === null) {
+            this.qualityPlaybackStartedAt = performance.now();
+        }
+    }
+
+    finishQualityPlayback() {
+        if (this.qualityPlaybackStartedAt === null) {
+            return;
+        }
+
+        this.qualityPlaybackTimeMs = Math.min(
+            86_400_000,
+            this.qualityPlaybackTimeMs + Math.max(0, Math.round(performance.now() - this.qualityPlaybackStartedAt)),
+        );
+        this.qualityPlaybackStartedAt = null;
+    }
+
+    finishQualityBuffering() {
+        if (this.qualityBufferingStartedAt === null) {
+            return;
+        }
+
+        this.qualityBufferingTimeMs = Math.min(
+            86_400_000,
+            this.qualityBufferingTimeMs + Math.max(0, Math.round(performance.now() - this.qualityBufferingStartedAt)),
+        );
+        this.qualityBufferingStartedAt = null;
+
+        if (!this.video.paused && !this.video.ended) {
+            this.startQualityPlayback();
+        }
+    }
+
+    captureQualityDurations() {
+        const wasBuffering = this.qualityBufferingStartedAt !== null;
+        const wasPlaying = this.qualityPlaybackStartedAt !== null;
+
+        this.finishQualityPlayback();
+        this.finishQualityBuffering();
+
+        if (wasBuffering && !this.video.ended) {
+            this.finishQualityPlayback();
+            this.qualityBufferingStartedAt = performance.now();
+        } else if (wasPlaying && !this.video.paused && !this.video.ended) {
+            this.startQualityPlayback();
+        }
+    }
+
+    recordQualityReady() {
+        if (this.qualityStartupTimeMs === null) {
+            this.qualityStartupTimeMs = Math.min(300_000, Math.max(0, Math.round(performance.now() - this.qualityStartedAt)));
+        }
+
+        if (!this.qualityReadySent) {
+            this.qualityReadySent = true;
+            void this.sendQualitySample('ready');
+        }
+    }
+
+    hlsSupport() {
+        if (this.video.canPlayType('application/vnd.apple.mpegurl')) {
+            return 'native';
+        }
+
+        return this.Hls?.isSupported?.() ? 'mse' : 'unsupported';
+    }
+
+    async sendQualitySample(event, extra = {}) {
+        if (
+            !this.qualityContext
+            || !this.qualityUrl
+            || !Number.isInteger(this.mediaId)
+            || this.mediaId < 1
+            || this.destroyed
+        ) {
+            return null;
+        }
+
+        this.captureQualityDurations();
+        const browser = browserSummary();
+        const position = Number.isFinite(this.video.currentTime)
+            ? Math.max(0, Math.min(MAX_PROGRESS_DURATION_SECONDS, Math.floor(this.video.currentTime)))
+            : 0;
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+        try {
+            const response = await fetch(this.qualityUrl, {
+                method: 'POST',
+                credentials: 'same-origin',
+                cache: 'no-store',
+                keepalive: true,
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrf,
+                },
+                body: JSON.stringify({
+                    context: this.qualityContext,
+                    request_id: this.qualityRequestId,
+                    event,
+                    media_id: this.mediaId,
+                    browser_family: browser.family,
+                    browser_major: browser.major,
+                    operating_system: operatingSystem(),
+                    hls_support: this.hlsSupport(),
+                    startup_time_ms: this.qualityStartupTimeMs,
+                    playback_time_ms: this.qualityPlaybackTimeMs,
+                    buffering_time_ms: this.qualityBufferingTimeMs,
+                    buffering_count: this.qualityBufferingCount,
+                    playback_position_seconds: position,
+                    ...extra,
+                }),
+            });
+
+            return response.ok ? await response.json() : null;
+        } catch {
+            return null;
+        }
+    }
+
+    async networkTest() {
+        if (!this.networkTestUrl) {
+            return { status: 'failed', latency: 0 };
+        }
+
+        if (navigator.onLine === false) {
+            return { status: 'offline', latency: 0 };
+        }
+
+        const controller = new AbortController();
+        const timeout = window.setTimeout(() => controller.abort(), PLAYBACK_QUALITY_NETWORK_TIMEOUT_MS);
+        const startedAt = performance.now();
+
+        try {
+            const response = await fetch(this.networkTestUrl, {
+                method: 'GET',
+                credentials: 'same-origin',
+                cache: 'no-store',
+                signal: controller.signal,
+                headers: { Accept: 'application/json' },
+            });
+
+            return {
+                status: response.ok ? 'ok' : 'failed',
+                latency: Math.min(30_000, Math.max(0, Math.round(performance.now() - startedAt))),
+            };
+        } catch (error) {
+            return {
+                status: error?.name === 'AbortError' ? 'timeout' : 'failed',
+                latency: Math.min(30_000, Math.max(0, Math.round(performance.now() - startedAt))),
+            };
+        } finally {
+            window.clearTimeout(timeout);
+        }
+    }
+
+    async requestQualityReport(link) {
+        if (this.qualityReportPending) {
+            return;
+        }
+
+        this.qualityReportPending = true;
+        link.setAttribute('aria-busy', 'true');
+        link.setAttribute('aria-disabled', 'true');
+        const fallbackUrl = new URL(link.href, window.location.href);
+        const position = Number.isFinite(this.video.currentTime)
+            ? Math.max(0, Math.floor(this.video.currentTime))
+            : 0;
+
+        fallbackUrl.searchParams.set('position', String(position));
+
+        try {
+            const network = await this.networkTest();
+            const payload = await this.sendQualitySample('report', {
+                error_type: this.lastPlaybackErrorType || 'unknown',
+                network_test_status: network.status,
+                network_latency_ms: network.latency,
+            });
+            const issueUrl = new URL(payload?.issue_url || '', window.location.href);
+
+            if (issueUrl.origin !== window.location.origin || !issueUrl.pathname.includes('/issues/new')) {
+                throw new Error('Unsafe issue URL.');
+            }
+
+            window.location.assign(issueUrl.toString());
+        } catch {
+            window.location.assign(fallbackUrl.toString());
+        } finally {
+            this.qualityReportPending = false;
+            link.removeAttribute('aria-busy');
+            link.removeAttribute('aria-disabled');
+        }
+    }
+
+    resetQualitySession() {
+        this.qualityRequestId = qualityRequestId();
+        this.qualityStartedAt = performance.now();
+        this.qualityStartupTimeMs = null;
+        this.qualityPlaybackTimeMs = 0;
+        this.qualityBufferingTimeMs = 0;
+        this.qualityBufferingCount = 0;
+        this.qualityPlaybackStartedAt = null;
+        this.qualityBufferingStartedAt = null;
+        this.qualityReadySent = false;
+        this.lastPlaybackErrorType = null;
+    }
+
     queueTransientResume(notice = null) {
+        if (notice === 'sourceChanged') {
+            this.captureQualityDurations();
+        }
+
         const storage = safeStorage('sessionStorage');
         const position = Number.isFinite(this.video.currentTime)
             ? Math.max(0, Math.floor(this.video.currentTime))
@@ -1660,6 +1953,14 @@ class CatalogPlayerSession {
             storage.setItem(transientResumeKey(this.episodeId), JSON.stringify({
                 position,
                 notice,
+                playback_request_id: notice === 'sourceChanged' ? this.qualityRequestId : null,
+                quality: notice === 'sourceChanged' ? {
+                    startup_time_ms: this.qualityStartupTimeMs,
+                    playback_time_ms: this.qualityPlaybackTimeMs,
+                    buffering_time_ms: this.qualityBufferingTimeMs,
+                    buffering_count: this.qualityBufferingCount,
+                    error_type: this.lastPlaybackErrorType,
+                } : null,
                 expires_at: Date.now() + 5 * 60 * 1_000,
             }));
         } catch {
@@ -1851,6 +2152,7 @@ class CatalogPlayerSession {
         this.heartbeatTimer = window.setInterval(() => {
             if (!this.video.paused && !this.video.ended && document.visibilityState === 'visible') {
                 this.dispatchProgress(false, false, 'heartbeat');
+                void this.sendQualitySample('heartbeat');
             }
         }, PROGRESS_HEARTBEAT_MS);
     }
@@ -2063,19 +2365,24 @@ class CatalogPlayerSession {
             && playerSessions.get(this.video) === this;
     }
 
-    setFailure(expired) {
+    setFailure(expired, errorType = 'unknown') {
         this.expired = expired;
+        this.lastPlaybackErrorType = errorType;
+        this.finishQualityPlayback();
+        this.finishQualityBuffering();
         this.stopHeartbeat();
         this.clearRecoveryTimer();
         this.clearBufferingTimer();
         const offline = !expired && navigator.onLine === false;
         this.setStatus(
             expired ? 'expired' : 'error',
-            expired ? 'expired' : (offline ? 'offline' : 'playbackError'),
+            expired ? 'expired' : (offline ? 'offline' : 'sourceFailed'),
             true,
         );
+        void this.sendQualitySample('error', { error_type: errorType });
 
         if (!expired && !offline) {
+            this.showNotice('sourceFailed');
             this.requestSourceFallback();
         }
     }
@@ -2086,6 +2393,7 @@ class CatalogPlayerSession {
         }
 
         this.fallbackRequested = true;
+        void this.sendQualitySample('fallback');
         this.queueTransientResume('sourceChanged');
         this.setStatus('retrying', 'sourceFallback');
         this.video.dispatchEvent(new CustomEvent('catalog-source-fallback', {
@@ -2241,6 +2549,7 @@ class CatalogPlayerSession {
             this.flushProgress(reason);
         }
 
+        void this.sendQualitySample('heartbeat');
         this.persistDevicePreferences();
         this.destroyed = true;
         this.stopHeartbeat();

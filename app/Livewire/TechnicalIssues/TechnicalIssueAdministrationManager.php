@@ -17,6 +17,8 @@ use App\Livewire\Concerns\InteractsWithPaginationIslands;
 use App\Models\TechnicalIssue;
 use App\Models\User;
 use App\Services\Admin\AdminEligibleUserQuery;
+use App\Services\Catalog\PlaybackQualityMetricsQuery;
+use App\Services\Catalog\PlaybackQualitySchema;
 use App\Services\TechnicalIssues\TechnicalIssueQuery;
 use App\Services\TechnicalIssues\TechnicalIssueSchema;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -69,6 +71,9 @@ final class TechnicalIssueAdministrationManager extends Component
     #[Url(history: true, except: 'priority')]
     public string $sort = 'priority';
 
+    #[Url(history: true, except: '7')]
+    public string $qualityPeriod = '7';
+
     /** @var list<int> */
     public array $selectedIssues = [];
 
@@ -103,6 +108,12 @@ final class TechnicalIssueAdministrationManager extends Component
 
     public function updated(string $property): void
     {
+        if ($property === 'qualityPeriod') {
+            $this->normalizeQualityPeriod();
+
+            return;
+        }
+
         if (in_array($property, ['search', 'status', 'type', 'severity', 'priority', 'team', 'targetType', 'assignment', 'sourceHealth', 'sort'], true)) {
             $this->normalize();
             $this->selectedIssues = [];
@@ -142,14 +153,21 @@ final class TechnicalIssueAdministrationManager extends Component
         });
     }
 
-    public function render(TechnicalIssueQuery $query, TechnicalIssueSchema $schema, AdminEligibleUserQuery $eligibleAdministrators): View
-    {
+    public function render(
+        TechnicalIssueQuery $query,
+        TechnicalIssueSchema $schema,
+        AdminEligibleUserQuery $eligibleAdministrators,
+        PlaybackQualityMetricsQuery $qualityMetricsQuery,
+        PlaybackQualitySchema $qualitySchema,
+    ): View {
         Gate::authorize('manage-technical-issues');
         $this->normalize();
+        $this->normalizeQualityPeriod();
         $user = auth()->user();
         abort_unless($user instanceof User, 403);
         $issues = $this->emptyPaginator();
         $counts = [];
+        $qualityMetrics = $this->emptyQualityMetrics();
 
         if ($schema->ready()) {
             try {
@@ -173,6 +191,15 @@ final class TechnicalIssueAdministrationManager extends Component
             }
         }
 
+        if ($qualitySchema->ready()) {
+            try {
+                $qualityMetrics = $qualityMetricsQuery->summary((int) $this->qualityPeriod);
+            } catch (Throwable $exception) {
+                report($exception);
+                $this->actionError = __('issues.errors.query_failed');
+            }
+        }
+
         $visibleIds = collect($issues->items())->map(fn ($issue): int => $issue->id)->all();
         $this->visibleIssueIds = $visibleIds;
         $this->selectedIssues = array_values(array_intersect($this->selectedIssues, $visibleIds));
@@ -182,6 +209,12 @@ final class TechnicalIssueAdministrationManager extends Component
             'issues' => $issues,
             'schemaReady' => $schema->ready(),
             'counts' => $counts,
+            'qualityMetrics' => $qualityMetrics,
+            'qualitySchemaReady' => $qualitySchema->ready(),
+            'qualityPeriodOptions' => collect([1, 7, 30])->map(fn (int $days): array => [
+                'value' => (string) $days,
+                'label' => trans_choice('issues.admin.quality_period_days', $days, ['count' => $days]),
+            ])->all(),
             'statusOptions' => $this->options(TechnicalIssueStatus::cases()),
             'typeOptions' => $this->options(TechnicalIssueType::cases()),
             'severityOptions' => $this->options(TechnicalIssueSeverity::cases()),
@@ -248,6 +281,30 @@ final class TechnicalIssueAdministrationManager extends Component
         $this->sort = in_array($this->sort, array_column(TechnicalIssueSort::cases(), 'value'), true)
             ? $this->sort
             : TechnicalIssueSort::Priority->value;
+    }
+
+    private function normalizeQualityPeriod(): void
+    {
+        $this->qualityPeriod = in_array($this->qualityPeriod, ['1', '7', '30'], true)
+            ? $this->qualityPeriod
+            : '7';
+    }
+
+    /** @return array{overview: array<string, int|float|null>, errors_by_browser: list<array{label: string, count: int}>, errors_by_provider: list<array{label: string, count: int}>, errors_by_quality: list<array{label: string, count: int}>} */
+    private function emptyQualityMetrics(): array
+    {
+        return [
+            'overview' => [
+                'sessions' => 0,
+                'average_startup_time_ms' => null,
+                'rebuffer_ratio_percent' => 0.0,
+                'playback_error_rate_percent' => 0.0,
+                'fallback_success_rate_percent' => 0.0,
+            ],
+            'errors_by_browser' => [],
+            'errors_by_provider' => [],
+            'errors_by_quality' => [],
+        ];
     }
 
     /**

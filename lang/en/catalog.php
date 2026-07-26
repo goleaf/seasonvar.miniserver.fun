@@ -978,7 +978,8 @@ return [
             'captions_unavailable' => 'Captions are unavailable, but the video can continue playing.',
             'offline' => 'The browser reports no connection. Check your network and retry video loading.',
             'stalled' => 'Loading is taking longer than expected. You can retry or choose another source.',
-            'source_fallback' => 'Switching to another authorized source…',
+            'source_failed' => 'Source 1 did not respond.',
+            'source_fallback' => 'Switching to source 2…',
             'source_changed' => 'Playback continued from another authorized source.',
             'authorization_refreshed' => 'Playback authorization was refreshed.',
             'fallback_unavailable' => 'No other authorized source is currently available.',
@@ -989,6 +990,9 @@ return [
             'transition_limited' => 'Too many switches. Try again in one minute.',
             'preferred_translation_unavailable' => 'The preferred translation is unavailable. Another authorized option was selected.',
             'play_required' => 'The episode is selected. Press Play to continue.',
+        ],
+        'quality_diagnostics' => [
+            'rate_limited' => 'Too many diagnostic events. Playback will continue without telemetry.',
         ],
         'controls' => [
             'restart' => 'Restart',
