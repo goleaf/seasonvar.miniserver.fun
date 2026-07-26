@@ -187,6 +187,44 @@
         contain-intrinsic-size: 24rem;
     }
 
+    .title-card-action-primary {
+        @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-emerald-700 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200;
+    }
+
+    .title-card-action-secondary {
+        @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200;
+    }
+
+    .title-card-action-icon {
+        @apply inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 disabled:cursor-wait disabled:opacity-60;
+    }
+
+    .title-card-action-icon[aria-pressed='true'] {
+        @apply border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100;
+    }
+
+    .title-card-action-menu-item {
+        @apply flex min-h-11 items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200;
+    }
+
+    .title-card-action-menu-panel {
+        @apply fixed inset-x-4 bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] z-[80] max-h-[70vh] overflow-y-auto rounded-xl border border-slate-200 bg-white p-3 shadow-elevated;
+    }
+
+    .title-card-action-feedback-summary {
+        @apply flex min-h-11 items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-amber-50 hover:text-amber-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-200;
+    }
+
+    .title-card-action-feedback-reason {
+        @apply min-h-11 rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-amber-50 hover:text-amber-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-200 disabled:cursor-wait disabled:opacity-60;
+    }
+
+    @media (min-width: 640px) and (hover: hover) and (pointer: fine) {
+        .title-card-action-menu-panel {
+            @apply absolute inset-x-auto bottom-full right-0 mb-2 w-80;
+        }
+    }
+
     [data-catalog-alphabet-option] {
         @apply inline-flex min-h-11 min-w-11 items-center justify-center rounded-full px-2 text-xs font-bold text-slate-600 transition;
     }

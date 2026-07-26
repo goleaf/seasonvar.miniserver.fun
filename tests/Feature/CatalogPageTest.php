@@ -1622,8 +1622,9 @@ class CatalogPageTest extends TestCase
             )
             ->create();
 
-        $this->get(route('titles.index'))
+        $this->get(route('titles.index', ['view' => 'list']))
             ->assertOk()
+            ->assertSee('data-ui-poster-layout="list"', false)
             ->assertSeeText('3 серии')
             ->assertDontSeeText('Сезон 4');
     }

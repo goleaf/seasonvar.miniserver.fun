@@ -319,3 +319,13 @@ Livewire history и сбрасывает paginator. `grid` является defa
 API `/api/v1/titles` не принимает и не сериализует этот параметр. Grid выбирает
 только нужные карточке поля и не загружает `description`; list сохраняет
 прежнее описание и uncropped poster contract.
+
+Обе формы используют один `x-catalog.title-card`, но разные плотностные
+контракты. Grid показывает poster `2:3`, title до двух строк, original title
+в одну строку, год/сезоны, максимум два жанра и ровно один rating с приоритетом
+IMDb. List добавляет deterministic country, число серий, оба доступных rating
+и server-side excerpt максимум в три строки. `18+` и доступная новая серия
+подготавливаются одним page-bounded metadata query и накладываются на poster.
+Library/feedback actions повторно разрешают тайтл через public visibility и
+policy; private user state не влияет на публичный result ID set, count,
+pagination, canonical или shared cache.

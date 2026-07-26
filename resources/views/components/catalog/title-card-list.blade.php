@@ -5,56 +5,72 @@
     data-catalog-card
     {{ $attributes }}
 >
+    <x-slot:mediaOverlay>
+        @if ($hasNewEpisode || $isAdult)
+            <div class="pointer-events-none absolute inset-0 z-10 flex items-start justify-between gap-2 p-2">
+                @if ($hasNewEpisode)
+                    <span data-title-card-new-episode class="rounded-full bg-emerald-700 px-2 py-1 text-xs font-semibold text-white">
+                        {{ __('catalog.title.card_actions.new_episode') }}
+                    </span>
+                @else
+                    <span></span>
+                @endif
+
+                @if ($isAdult)
+                    <span data-title-card-age-rating class="rounded-full bg-slate-900/90 px-2 py-1 text-xs font-semibold text-white">18+</span>
+                @endif
+            </div>
+        @endif
+    </x-slot:mediaOverlay>
+
     <div class="min-w-0">
-        <h3 class="text-lg font-semibold leading-6">
-            <a href="{{ route('titles.show', $title) }}" class="block break-words text-slate-900 after:absolute after:inset-0 hover:text-emerald-800">
+        <h3 data-title-card-title class="line-clamp-2 text-lg font-semibold leading-6">
+            <a href="{{ route('titles.show', $title) }}" class="block break-words text-slate-900 after:absolute after:inset-0 hover:text-emerald-800 focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
                 {{ $displayTitle }}
             </a>
         </h3>
         @if ($title->display_original_title)
-            <span class="mt-1 block break-words text-sm leading-5 text-slate-600">{{ $title->display_original_title }}</span>
+            <span data-title-card-original-title class="mt-1 block line-clamp-1 text-sm leading-5 text-slate-600">{{ $title->display_original_title }}</span>
         @endif
     </div>
 
-    <div class="mt-2 flex flex-wrap gap-1.5 text-xs font-semibold">
-        @if ($title->year)
-            <span class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1 text-slate-600">
-                <x-ui.icon name="fa-solid fa-calendar-days text-[0.85em] text-slate-400" />
-                <span>{{ $title->year }}</span>
-            </span>
-        @endif
-        @if ($ratingLabel)
-            <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-amber-800">
-                <x-ui.icon name="fa-solid fa-star text-[0.85em]" />
-                <span>{{ $ratingLabel }}</span>
-            </span>
-        @endif
-        <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-1 text-sky-700">
-            <x-ui.icon name="fa-solid fa-circle-play text-[0.85em]" />
-            <span>{{ $episodesLabel }}</span>
-        </span>
-    </div>
+    <p class="mt-3 line-clamp-1 text-sm text-slate-600">
+        @foreach ($listMetadata as $metadata)
+            @if (! $loop->first)
+                <span aria-hidden="true"> · </span>
+            @endif
+            <span>{{ $metadata }}</span>
+        @endforeach
+    </p>
+
+    @if ($ratingLabels !== [])
+        <p class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm font-semibold text-amber-800">
+            @foreach ($ratingLabels as $label)
+                <span data-title-card-rating class="inline-flex items-center gap-1">
+                    <x-ui.icon name="fa-solid fa-star text-[0.85em]" />
+                    <span>{{ $label }}</span>
+                </span>
+            @endforeach
+        </p>
+    @endif
 
     @if ($cardGenres->isNotEmpty())
-        <div class="relative z-10 mt-3 flex flex-wrap gap-1.5">
+        <p class="relative z-10 mt-2 line-clamp-1 text-sm text-slate-600">
             @foreach ($cardGenres as $genre)
-                <x-ui.taxonomy-chip :taxonomy="$genre" />
+                @if (! $loop->first)
+                    <span aria-hidden="true"> · </span>
+                @endif
+                <a
+                    href="{{ route('titles.taxonomy', ['type' => 'genre', 'taxonomy' => $genre->slug]) }}"
+                    class="font-medium hover:text-emerald-800 focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
+                >{{ $genre->name }}</a>
             @endforeach
-        </div>
+        </p>
     @endif
 
     @if ($showDescription && $descriptionExcerpt)
-        <p data-title-card-description class="mt-2 line-clamp-3 break-words text-sm leading-6 text-slate-600">{{ $descriptionExcerpt }}</p>
+        <p data-title-card-description class="mt-3 line-clamp-3 break-words text-sm leading-6 text-slate-700">{{ $descriptionExcerpt }}</p>
     @endif
 
-    <a
-        data-title-card-details
-        href="{{ route('titles.show', $title) }}"
-        class="relative z-10 mt-2 inline-flex min-h-11 items-center gap-2 rounded-control px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-800"
-    >
-        <span>{{ __('catalog.title.more_details') }}</span>
-        <x-ui.icon name="fa-solid fa-arrow-right text-xs" />
-    </a>
-
-    @include('components.catalog.title-card-personal-state')
+    @include('components.catalog.title-card-actions')
 </x-ui.poster-card>

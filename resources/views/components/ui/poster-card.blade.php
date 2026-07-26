@@ -13,6 +13,9 @@
             :overscan="in_array($layout, ['grid', 'stats', 'home', 'spotlight', 'trend'], true)"
             class="h-full w-full"
         />
+        @isset($mediaOverlay)
+            {{ $mediaOverlay }}
+        @endisset
     </div>
     <div data-ui-poster-card-body class="{{ $bodyClasses() }}">
         {{ $slot }}

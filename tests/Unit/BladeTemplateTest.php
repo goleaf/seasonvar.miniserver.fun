@@ -152,6 +152,7 @@ class BladeTemplateTest extends TestCase
     {
         $compactCardExcerpts = [
             resource_path('views/components/catalog/latest-media-card.blade.php'),
+            resource_path('views/components/catalog/title-card-compact.blade.php'),
             resource_path('views/components/catalog/title-card-grid.blade.php'),
             resource_path('views/components/catalog/title-card-home.blade.php'),
             resource_path('views/components/catalog/title-card-list.blade.php'),

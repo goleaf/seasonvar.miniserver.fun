@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\View\Components\Catalog;
 
+use App\Enums\CatalogRecommendationFeedbackReason;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRating;
 use App\Models\Season;
@@ -40,6 +41,25 @@ class TitleCard extends Component
     public ?string $descriptionExcerpt;
 
     public ?string $ratingLabel;
+
+    /** @var list<string> */
+    public array $ratingLabels;
+
+    public ?string $countryName;
+
+    /** @var list<string> */
+    public array $listMetadata;
+
+    public bool $isAdult;
+
+    public bool $hasNewEpisode;
+
+    public ?string $playActionUrl;
+
+    public ?string $playActionLabel;
+
+    /** @var list<string> */
+    public array $feedbackReasons;
 
     public ?string $primaryReason;
 
@@ -87,6 +107,8 @@ class TitleCard extends Component
         ?int $userRating = null,
         ?int $userProgressPercent = null,
         ?array $userPrimaryAction = null,
+        public bool $interactive = false,
+        public bool $viewerAuthenticated = false,
     ) {
         $this->layout = in_array($layout, self::LAYOUTS, true) ? $layout : 'list';
         $this->displayTitle = filled($title->display_title)
@@ -101,9 +123,37 @@ class TitleCard extends Component
         $this->descriptionExcerpt = $showDescription && $title->hasAttribute('description')
             ? $this->boundedText($title->getAttribute('description'), self::DESCRIPTION_LIMIT)
             : null;
-        $this->ratingLabel = $this->ratingLabel($title);
+        $ratingLabels = $this->ratingLabels($title);
+        $this->ratingLabels = collect(['imdb', 'kinopoisk'])
+            ->map(fn (string $provider): ?string => $ratingLabels[$provider] ?? null)
+            ->filter()
+            ->values()
+            ->all();
+        $preferredRatingProviders = $this->layout === 'grid'
+            ? ['imdb', 'kinopoisk']
+            : ['kinopoisk', 'imdb'];
+        $this->ratingLabel = collect($preferredRatingProviders)
+            ->map(fn (string $provider): ?string => $ratingLabels[$provider] ?? null)
+            ->filter()
+            ->first();
         $this->primaryReason = $this->boundedText($reasonLabels[0] ?? null, self::REASON_LIMIT);
         $this->latestSeason = $title->relationLoaded('latestSeason') ? $title->latestSeason : null;
+        $this->countryName = $this->boundedText(
+            $title->hasAttribute('card_country_name')
+                ? $title->getAttribute('card_country_name')
+                : null,
+            80,
+        );
+        $this->listMetadata = collect([
+            $title->year === null ? null : (string) $title->year,
+            $this->countryName,
+            $this->seasonsCount > 0 ? $this->seasonsLabel : null,
+            $this->episodesCount > 0 ? $this->episodesLabel : null,
+        ])->filter(fn (?string $value): bool => $value !== null)->values()->all();
+        $this->isAdult = $title->hasAttribute('card_is_adult')
+            && (bool) $title->getAttribute('card_is_adult');
+        $this->hasNewEpisode = $title->hasAttribute('card_has_new_episode')
+            && (bool) $title->getAttribute('card_has_new_episode');
         $this->userInWatchlist = $userInWatchlist
             ?? ($title->hasAttribute('user_in_watchlist') && (bool) $title->getAttribute('user_in_watchlist'));
         $this->userRating = $userRating ?? $this->integerAttribute($title, 'user_rating');
@@ -123,9 +173,18 @@ class TitleCard extends Component
             || $this->userProgressPercent !== null
             || $this->userPrimaryAction !== null
             || $this->translationPreferenceState !== null;
-        $genreLimit = in_array($this->layout, ['grid', 'home', 'spotlight'], true) ? 2 : 3;
+        $genreLimit = in_array($this->layout, ['grid', 'list', 'home', 'spotlight'], true) ? 2 : 3;
         $this->cardGenres = ($title->relationLoaded('genres') ? $title->genres : collect())->take($genreLimit);
         $this->cardRelations = $this->cardGenres;
+        $this->playActionUrl = $this->userPrimaryAction['url']
+            ?? ($this->mediaCount > 0 ? route('titles.show', $title).'#player' : null);
+        $this->playActionLabel = $this->userPrimaryAction['label']
+            ?? ($this->playActionUrl !== null ? __('catalog.title.card_actions.watch') : null);
+        $this->feedbackReasons = collect(CatalogRecommendationFeedbackReason::cases())
+            ->reject(fn (CatalogRecommendationFeedbackReason $reason): bool => $reason->requiresSubject())
+            ->map(fn (CatalogRecommendationFeedbackReason $reason): string => $reason->value)
+            ->values()
+            ->all();
     }
 
     public function render(): View
@@ -135,6 +194,7 @@ class TitleCard extends Component
             'recommendation' => 'components.catalog.title-card-recommendation',
             'home', 'spotlight' => 'components.catalog.title-card-home',
             'trend' => 'components.catalog.title-card-trend',
+            'compact' => 'components.catalog.title-card-compact',
             default => 'components.catalog.title-card-list',
         });
     }
@@ -172,30 +232,42 @@ class TitleCard extends Component
         return Str::limit($text, $limit - 1, '…', preserveWords: true);
     }
 
-    private function ratingLabel(CatalogTitle $title): ?string
+    /** @return array<string, string> */
+    private function ratingLabels(CatalogTitle $title): array
     {
-        if (! $title->relationLoaded('ratings')) {
-            return null;
+        $ratings = [];
+
+        foreach (['imdb', 'kinopoisk'] as $provider) {
+            $attribute = 'card_'.$provider.'_rating';
+
+            if ($title->hasAttribute($attribute) && is_numeric($title->getAttribute($attribute))) {
+                $ratings[$provider] = (float) $title->getAttribute($attribute);
+            }
         }
 
-        $rating = $title->ratings->first(
-            fn (CatalogTitleRating $rating): bool => $rating->provider === 'kinopoisk' && $rating->rating !== null,
-        ) ?? $title->ratings->first(
-            fn (CatalogTitleRating $rating): bool => $rating->provider === 'imdb' && $rating->rating !== null,
-        );
-
-        if (! $rating instanceof CatalogTitleRating) {
-            return null;
+        if ($title->relationLoaded('ratings')) {
+            $title->ratings
+                ->filter(
+                    fn (CatalogTitleRating $rating): bool => in_array($rating->provider, ['imdb', 'kinopoisk'], true)
+                        && $rating->rating !== null,
+                )
+                ->each(function (CatalogTitleRating $rating) use (&$ratings): void {
+                    $ratings[$rating->provider] ??= (float) $rating->rating;
+                });
         }
 
-        return __('catalog.title.card_rating', [
-            'provider' => __("catalog.title.rating_providers.{$rating->provider}"),
-            'rating' => Number::format(
-                (float) $rating->rating,
-                precision: 1,
-                locale: app()->currentLocale(),
-            ),
-        ]);
+        return collect($ratings)
+            ->mapWithKeys(fn (float $rating, string $provider): array => [
+                $provider => __('catalog.title.card_rating', [
+                    'provider' => __("catalog.title.rating_providers.{$provider}"),
+                    'rating' => Number::format(
+                        $rating,
+                        precision: 1,
+                        locale: app()->currentLocale(),
+                    ),
+                ]),
+            ])
+            ->all();
     }
 
     /** @return array{type: string, label: string, url: string}|null */

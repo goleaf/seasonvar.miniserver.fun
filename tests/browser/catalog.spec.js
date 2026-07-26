@@ -72,6 +72,11 @@ const assertTouchTargets = async (page) => {
         '[data-catalog-sort-option]',
         '[data-catalog-page-size-option]',
         '[data-catalog-alphabet-option]',
+        '[data-title-card-watch]',
+        '[data-title-card-library]',
+        '[data-title-card-details]',
+        '[data-title-card-menu] > summary',
+        '[data-title-card-menu] button',
     ].join(',')).evaluateAll((controls) => controls
         .filter((control) => control.getClientRects().length > 0)
         .map((control) => ({
@@ -181,6 +186,22 @@ test('catalog keeps URL state, unified filters and responsive geometry', async (
     await expect(page.locator('[data-ui-poster-layout="grid"]')).toHaveCount(1);
     await expect(page.locator('[data-catalog-view-option]')).toHaveCount(2);
 
+    const gridCard = page.locator('[data-catalog-card]').first();
+
+    await expect(gridCard.locator('[data-title-card-title]')).toContainText('Browser Smoke');
+    await expect(gridCard.locator('[data-title-card-original-title]')).toHaveText('Browser Smoke Original');
+    await expect(gridCard).toContainText('2025');
+    await expect(gridCard).toContainText('1 сезон');
+    await expect(gridCard.locator('[data-title-card-rating]')).toHaveCount(1);
+    await expect(gridCard.locator('[data-title-card-rating]')).toContainText('КиноПоиск 8,4');
+    await expect(gridCard.locator('a[href*="/titles/genre/"]')).toHaveCount(2);
+    await expect(gridCard.locator('[data-title-card-description]')).toHaveCount(0);
+    await expect(gridCard.locator('[data-title-card-watch]')).toBeVisible();
+    await expect(gridCard.locator('[data-title-card-library]')).toBeVisible();
+    await gridCard.locator('[data-title-card-library]').focus();
+    await expect(gridCard.locator('[data-title-card-library]')).toBeFocused();
+    await page.screenshot({ path: testInfo.outputPath('catalog-grid-card.png') });
+
     const filters = page.locator('#catalog-filters');
 
     if (testInfo.project.name === 'Desktop Chromium') {
@@ -195,6 +216,84 @@ test('catalog keeps URL state, unified filters and responsive geometry', async (
 
     await assertPageGeometry(page);
     await assertTouchTargets(page);
+    await assertAccessibility(page);
+
+    await page.goto('/titles?q=Browser%20Smoke&view=list');
+
+    const listCard = page.locator('[data-catalog-card]').first();
+
+    await expect(listCard).toHaveAttribute('data-ui-poster-layout', 'list');
+    await expect(listCard).toContainText('2025 · Россия · 1 сезон · 3 серии');
+    await expect(listCard.locator('[data-title-card-rating]')).toContainText('КиноПоиск 8,4');
+    await expect(listCard.locator('[data-title-card-description]')).toHaveClass(/line-clamp-3/);
+    await expect(listCard.locator('[data-title-card-watch]')).toBeVisible();
+    await expect(listCard.locator('[data-title-card-library]')).toBeVisible();
+    await expect(listCard.locator('[data-title-card-details]')).toBeVisible();
+    await assertTouchTargets(page);
+    await assertPageGeometry(page);
+    await assertAccessibility(page);
+    await page.screenshot({ path: testInfo.outputPath('catalog-list-card.png') });
+    expect(browserErrors.localAssetFailures).toEqual([]);
+    expect(browserErrors.consoleErrors).toEqual([]);
+    expect(browserErrors.pageErrors).toEqual([]);
+});
+
+test('authenticated catalog card actions work by keyboard and remain available on touch', async ({ page, baseURL }, testInfo) => {
+    const browserErrors = await installNetworkGuard(page, baseURL);
+
+    await page.goto('/login');
+    await page.getByLabel('Электронная почта').fill('browser@example.com');
+    await page.getByLabel('Пароль', { exact: true }).fill('Browser-Strong-Password-42!');
+    await page.getByRole('button', { name: 'Войти' }).click();
+    await expect(page).toHaveURL(/\/library(?:\/|$)/);
+    await page.goto('/titles?q=Browser%20Smoke');
+
+    const card = page.locator('[data-catalog-card]').first();
+    const library = card.locator('[data-title-card-library]');
+
+    await expect(card.locator('[data-title-card-watch]')).toBeVisible();
+    const initiallyInLibrary = await library.getAttribute('aria-pressed') === 'true';
+    const expectedLibraryState = initiallyInLibrary ? 'false' : 'true';
+    const expectedLibraryNotice = initiallyInLibrary
+        ? 'Сериал удалён из библиотеки'
+        : 'Сериал добавлен в библиотеку';
+    await library.focus();
+    await expect(library).toBeFocused();
+    await library.press('Enter');
+    await expect(library).toHaveAttribute('aria-pressed', expectedLibraryState);
+    await expect(page.locator('[data-card-action-notice]')).toContainText(expectedLibraryNotice);
+
+    const menu = card.locator('[data-title-card-menu]');
+    const menuTrigger = menu.locator(':scope > summary');
+
+    await menuTrigger.focus();
+    await expect(menuTrigger).toBeFocused();
+    await menuTrigger.press('Enter');
+    await expect(menu).toHaveAttribute('open', '');
+
+    const menuPanel = menu.locator(':scope > div');
+    const panelPosition = await menuPanel.evaluate((element) => window.getComputedStyle(element).position);
+    const touchSheetExpected = await page.evaluate(() => (
+        window.innerWidth < 640
+        || window.matchMedia('(hover: none), (pointer: coarse)').matches
+    ));
+
+    expect(panelPosition).toBe(touchSheetExpected ? 'fixed' : 'absolute');
+    await page.screenshot({ path: testInfo.outputPath('catalog-card-actions.png') });
+
+    const feedback = menu.locator('details');
+
+    await feedback.locator('summary').press('Enter');
+    await expect(feedback).toHaveAttribute('open', '');
+
+    const reason = feedback.getByRole('button', { name: 'Уже смотрел в другом месте' });
+
+    await reason.focus();
+    await expect(reason).toBeFocused();
+    await reason.press('Enter');
+    await expect(page.locator('[data-card-action-notice]')).toContainText('Причина учтена');
+    await assertTouchTargets(page);
+    await assertPageGeometry(page);
     await assertAccessibility(page);
     expect(browserErrors.localAssetFailures).toEqual([]);
     expect(browserErrors.consoleErrors).toEqual([]);

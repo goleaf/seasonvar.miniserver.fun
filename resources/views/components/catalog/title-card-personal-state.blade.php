@@ -4,7 +4,11 @@
         data-user-in-watchlist="{{ $userInWatchlist ? '1' : '0' }}"
         @if ($userRating !== null) data-user-rating="{{ $userRating }}" @endif
         @if ($userProgressPercent !== null) data-user-progress="{{ $userProgressPercent }}" @endif
-        class="relative z-10 mt-3 border-t border-slate-100 pt-3"
+        @class([
+            'relative z-10',
+            'sr-only' => in_array($layout, ['grid', 'list'], true),
+            'mt-3 border-t border-slate-100 pt-3' => ! in_array($layout, ['grid', 'list'], true),
+        ])
     >
         <div class="flex flex-wrap gap-1.5 text-xs font-bold">
             @if ($userInWatchlist)
@@ -36,7 +40,7 @@
             @endif
         </div>
 
-        @if ($userPrimaryAction)
+        @if ($userPrimaryAction && ! in_array($layout, ['grid', 'list'], true))
             <a href="{{ $userPrimaryAction['url'] }}" class="mt-2 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800">
                 <x-ui.icon name="fa-solid fa-play" />
                 <span>{{ $userPrimaryAction['label'] }}</span>

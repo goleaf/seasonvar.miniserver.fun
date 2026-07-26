@@ -1,108 +1,153 @@
-# Текущая задача — Task 102: безопасный workflow общей `main`
+# Текущая задача — Task 103: новая карточка сериала
 
 Дата: 26.07.2026.
 
-Owner: `task-102-shared-main-workflow`.
+Owner: `task-103-catalog-title-card-actions`.
 
-Текущий этап: `in_progress` — implementation и scoped verification завершены;
-точный изолированный index пересобран поверх актуального `HEAD`, следующий
-gate — cached diff/security review и index approval.
+Текущий этап: `in_progress` — реализация и доступные проверки завершены;
+подготовлен exact isolated delivery в `main`.
 
 ## Реестр активных workstreams
 
 | Workstream | Status | Evidence |
 | --- | --- | --- |
-| Task 102 — owner/manifest/index/registry activation | `in_progress: approved commit gate` | [Design](../superpowers/specs/2026-07-26-shared-main-workflow-design.md), [план](../superpowers/plans/2026-07-26-shared-main-workflow.md) |
+| Task 103 — grid/list карточка, действия и metadata projection | `in_progress: ready for delivery` | [Design](../superpowers/specs/2026-07-26-catalog-title-card-actions-design.md), [план](../superpowers/plans/2026-07-26-catalog-title-card-actions.md), [evidence](archive/2026-07-26-catalog-title-card-actions-evidence.md) |
 
 ## Реестр blocked/unresolved
 
 | Workstream | Status | Evidence |
 | --- | --- | --- |
-| Pre-existing Tasks 98/100/101 и другие shared-tree scopes | `unresolved: нет commit-backed handoff` | Полные тела сохранены в [lossless archive](archive/2026-07-26-shared-main-workflow-evidence.md); Task 102 не включает их application files |
-| Remote delivery накопленной `main` | `unresolved: ahead 111 до Task 102` | Во время active lease внешний процесс добавил `6660dac` и `8f12e95`; Task 102 сохраняет их и запишет точный push результат после approved commit |
-| Production activation | `not_applicable: repository tooling only` | Runtime, БД, cache, queue, assets и production services не изменяются |
+| Shared worktree чужих задач | `unresolved: preserved` | Task 103 использует owner lease, declared paths и изолированный Git index; чужие staged/unstaged/untracked изменения не входят в scope |
+| Remote delivery накопленной `main` | `unresolved: ahead 112 до Task 103` | Обычный push выполняется только после exact commit; результат фиксируется фактически в финальном отчёте |
+| Production activation | `not_applicable` | Нет migration, package, env, cache-key, queue, scheduler или production DML |
 
 ## Task-specific compliance matrix
 
 | Requirement | Status | Evidence |
 | --- | --- | --- |
-| Root `AGENTS.md` и requirements index прочитаны до edits | `completed` | Обязательные owners перечитаны 26.07.2026 |
-| Applicable maintenance/production/integration docs прочитаны | `completed` | Scope признан build-tooling-only; runtime/data rollout не применяется |
-| Фактические версии и stack проверены | `completed` | PHP 8.5.8, Laravel 13.22.0, Boost 2.4.13, Livewire 4.3.3, PHPUnit 12.5.32, Pint 1.29.3, Node 26.4.0, npm 12.0.1, SQLite |
-| Branch/status/upstream/index baseline | `completed` | Pre-edit: `main`, HEAD `d9c2c71957ec17f188e8d834c9e35958dca97cd1`, `origin/main`, ahead 109, shared index tree `b6703cc571906542b69cd394eab7d89af1b1659e`; перед delivery обнаружен новый HEAD `8f12e954709732b07720e0093adfacfe88843fff`, ahead 111 |
-| Один task owner | `completed` | Active lease `task-102-shared-main-workflow`; safe status не раскрывает token/digest |
-| Exact total file scope объявлен до edits | `completed` | NUL-safe manifest из 19 путей; `paths_declared=yes`, `index_approved=no` |
-| Existing implementation audited before replacement | `completed` | Standalone Tasks 30/32/33/34 reused; новый parallel workflow не создаётся |
-| Design alternatives и rollback | `completed` | [Task 102 design](../superpowers/specs/2026-07-26-shared-main-workflow-design.md) |
-| Detailed prioritized plan reread | `completed` | [Task 102 implementation plan](../superpowers/plans/2026-07-26-shared-main-workflow.md) |
-| Historical evidence preserved | `completed` | Source: 1 195 905 bytes, SHA-256 `181ee22258c05ae5a99bd6e8d5117e859b1b3b475d1397c8cffdb3ff90776a49`; после механической нормализации 176 relative link targets archive SHA-256 `a12519c9cc789dcd0ed7e740c15fb43df8ac6f1f9cad39d82045eb40d4b2ea9e` |
-| Hook integration | `completed` | Owner проверяется до updater; exact paths и index — после updater; final index повторно проверяется после docs policies |
-| Current-plan policy activation | `completed` | Repository current file GREEN; policy выполняется первой в docs profile |
-| Security review | `completed` | Missing/wrong owner fail closed до mutation; token/digest не выводятся; symlink/NUL/metadata/index regressions GREEN |
-| Compatibility review | `already_compliant` | Public routes/API/schema/DB/cache/frontend/translations не входят в scope |
-| README/CHANGELOG/canonical docs | `completed` | Development owner обновлён первым; AGENTS содержит только mandatory boundary; README roadmap и docs map синхронизированы |
-| Existing CHANGELOG policy debt | `completed` | В staged-варианте от актуального `HEAD` нормализовано только оформление технических терминов в трёх ранее commit-backed записях; факты/пункты не удалены, foreign working hunks исключены, `check-changelog-policy.sh --staged` GREEN |
-| Focused verification | `completed` | 84 tests / 453 assertions; Pint, PHP/shell syntax, current-plan policy, docs profile и PHPStan GREEN |
-| Broad verification | `completed: foreign blockers recorded` | Unit 573/574: чужой PWA Blade failure; full suite memory exhaustion в чужом PWA middleware; Rector — только два чужих collection-файла |
-| Managed docs in shared tree | `unresolved: foreign PWA migration` | Временный managed refresh/docs profile GREEN; `docs/MAINTENANCE_LOG.md` восстановлен с SHA-256 `49803a8a17684d0affb459164c3b1bb7f417f04aa281da7484a3f1a2aabbfda3` и не входит в scope |
-| Concurrent commit reconciliation | `completed` | Commits `6660dac` и `8f12e95` проверены по path list; пересекающиеся `README.md`, `CHANGELOG.md` и current plan сохранены, isolated index содержит ровно 19 объявленных Task 102 paths относительно нового HEAD |
-| Shared index recovery evidence | `completed` | После диагностической ошибки выбора index shared index немедленно восстановлен в исходное дерево `b6703cc571906542b69cd394eab7d89af1b1659e`; worktree не изменялся, дальнейшие staging-команды выполняются только с явным `GIT_INDEX_FILE` |
-| Commit exact approved index | `planned` | Только `main`, без force, reset, stash, worktree или foreign paths |
-| Push configured remote | `planned` | Обычный push; фактический внешний отказ останется `unresolved` |
-
-## Exact declared files
-
-1. `.githooks/lib/git-guard.sh`
-2. `.githooks/pre-commit`
-3. `.githooks/pre-push`
-4. `AGENTS.md`
-5. `CHANGELOG.md`
-6. `README.md`
-7. `docs/README.md`
-8. `docs/development.md`
-9. `docs/plans/archive/2026-07-26-shared-main-workflow-evidence.md`
-10. `docs/plans/archive/README.md`
-11. `docs/plans/current-task-plan.md`
-12. `docs/superpowers/plans/2026-07-24-system-maintenance-and-optimization-master-plan.md`
-13. `docs/superpowers/plans/2026-07-26-shared-main-workflow.md`
-14. `docs/superpowers/specs/2026-07-26-shared-main-workflow-design.md`
-15. `scripts/ci-check.sh`
-16. `scripts/task-workspace-lease.sh`
-17. `tests/Unit/CiQualityGateContractTest.php`
-18. `tests/Unit/CurrentPlanPolicyScriptTest.php`
-19. `tests/Unit/GitWorkspaceLeaseScriptTest.php`
-
-Discovery, меняющее этот список, требует явной повторной declaration; она
-инвалидирует старый index approval.
-
-## Protected compatibility contracts
-
-- существующая ветка и direct-to-`main` history;
-- foreign staged/unstaged/untracked files и shared index baseline;
-- `SEASONVAR_SKIP_GIT_GUARD=1` только как существующая аварийная boundary;
-- branch/conflict/sensitive/temporary/README/CHANGELOG/docs/clean-tree gates;
-- публичные routes, route names, JSON shapes, models/relations, migrations,
-  translations, cache keys и application behavior;
-- production DB, storage, queues, workers, scheduler, cache и built assets;
-- raw lease token, credentials, private paths и file contents не выводятся и
-  не попадают в tracked evidence.
-
-## Cross-feature impact
-
-| Domain | Status | Evidence |
-| --- | --- | --- |
-| Git ownership/staging/commit/push | `in_progress` | Единственный affected domain |
-| Documentation/CI | `in_progress` | Current registry и docs profile activation |
-| Authentication/authorization/privacy | `not_applicable` | Нет application request/user data |
-| Search/SEO/sitemap/notifications | `not_applicable` | Нет runtime/public content change |
-| Import/player/Premium/payments/ads/region/legal | `already_compliant` | Public contracts не меняются |
-| Database/migrations/indexes/queries | `not_applicable` | Нет DDL/DML/Eloquent/SQL |
-| Cache/session/queue/scheduler | `not_applicable` | Нет config/runtime mutation |
-| Frontend/mobile/accessibility/translations | `not_applicable` | Нет UI/assets |
-| Dependencies/runtime versions | `already_compliant` | Инвентаризированы, не обновляются |
-| Production operations | `not_applicable` | Rollout/data/backup не требуются |
+| Root `AGENTS.md` и requirements index прочитаны до edits | `completed` | Повторно прочитаны 26.07.2026 после commit Task 102 |
+| Applicable canonical и feature Markdown прочитаны | `completed` | Architecture, development, multilingual, security, performance/cache, UI/frontend, authorization, production, maintenance, integration, catalog-search, views и прежний card design |
+| Фактический stack и version-specific docs проверены | `completed` | PHP 8.5, Laravel 13.22.0, Livewire 4.3.3, Boost 2.4.13, PHPUnit 12.5.32, Tailwind CSS 4.3.2; Laravel 13/Livewire 4 docs проверены через Boost |
+| Branch/status/upstream baseline | `completed` | `main`, HEAD `ab9aa3e`, `origin/main`, ahead 112; shared changes инвентаризированы без reset/stash/restore |
+| Один task owner и exact path manifest | `completed` | Lease `task-103-catalog-title-card-actions`; final manifest содержит 35 NUL-safe paths после исключения двух unchanged verification-only tests |
+| Existing implementation audited before replacement | `completed` | Canonical `TitleCard`, `PosterCard`, `/titles` Livewire owner, builders/loaders, policy, library and recommendation services, tests and browser contract traced |
+| Alternatives, data flow, errors и rollback | `completed` | [Task 103 design](../superpowers/specs/2026-07-26-catalog-title-card-actions-design.md) |
+| Detailed prioritized plan reread | `completed` | [Task 103 implementation plan](../superpowers/plans/2026-07-26-catalog-title-card-actions.md) |
+| TDD presentation | `completed` | Focused RED → GREEN: 15 tests, 118 assertions for grid/list density, ratings, overlays, metadata and actions |
+| Bounded metadata query | `completed` | One page-ID-bounded `UNION ALL`; SQLite title-first rating index and publication visibility index confirmed through `EXPLAIN QUERY PLAN` |
+| Library and feedback actions | `completed` | Existing services/policy plus server-side scalar normalization and visible-title re-resolution |
+| Accessibility and responsive browser QA | `completed` | 31 Playwright passed, 2 intentional reduced-motion skips across desktop/mobile/tablet; Axe, focus, 44 px targets, geometry, console/network and reviewed screenshots |
+| Security and authorization review | `completed` | Guest redirect, verified add/remove and feedback, unverified denial, invalid scalar/reason and hidden-title IDOR regression |
+| Query plan and performance verification | `completed` | One query for 1/96 cards; existing rating/pivot/season indexes confirmed through `EXPLAIN`; catalog initial/deferred/update budget passed |
+| Translations RU/EN parity | `completed` | New visible/action/error labels in `catalog.php`; `TranslationCatalogParityTest`: 3 passed, 80 162 assertions |
+| Canonical docs/README/CHANGELOG | `completed` | UI, views, frontend, performance, architecture, catalog-search, docs map, visitor README and Russian CHANGELOG updated and reread |
+| Final requirements/legacy scan | `completed` | Applicable owners reread; related repository scan found no Blade queries, debug/TODO, hover-only Task 103 actions or duplicate metadata loader |
+| Exact commit/push in `main` | `unresolved` | Alternate isolated index, exact staged manifest and ordinary push remain delivery actions after this evidence snapshot |
 
 ## Последнее подтверждённое evidence
 
-- [Lossless pre-Task-102 current-plan snapshot](archive/2026-07-26-shared-main-workflow-evidence.md)
-- [Archive index с размером и SHA-256](archive/README.md)
+- Focused Task 103 suite после final DI correction: 100 passed,
+  980 assertions. Итоговый связанный catalog набор: 172 passed,
+  81 689 assertions.
+- Browser matrix: 31 passed, 2 intentional reduced-motion skips, 0 failed;
+  desktop/mobile/tablet screenshots просмотрены.
+- Vite build, exact-scope Pint и production-scope PHPStan passed.
+- Full diagnostic PHPUnit выполнил 2162 tests: 2130 passed, 11 skipped,
+  18 failed и 3 errors. Ни один focused Task 103 test не упал; failures
+  принадлежат foreign PWA, collection quality, auth/import/shared-workflow
+  workstreams и известному чужому title-detail schema-query росту.
+- Стандартный full run упёрся в project `memory_limit=256M`; повторный
+  diagnostic с 1 GiB завершился приведённой выше полной матрицей.
+- `project:docs-refresh --check` остаётся `unresolved` только из-за чужого
+  unstaged `docs/MAINTENANCE_LOG.md`; этот файл не изменялся Task 103.
+- Подробный журнал: [Task 103 evidence](archive/2026-07-26-catalog-title-card-actions-evidence.md).
+
+## Exact declared files
+
+1. `app/Livewire/CatalogSeries.php`
+2. `app/Services/Catalog/CatalogTitleCardMetadataLoader.php`
+3. `app/Services/Catalog/CatalogTitlesPageBuilder.php`
+4. `app/View/Components/Catalog/TitleCard.php`
+5. `app/View/Components/Ui/PosterCard.php`
+6. `resources/views/catalog/titles.blade.php`
+7. `resources/views/components/ui/poster-card.blade.php`
+8. `resources/views/components/catalog/title-card-actions.blade.php`
+9. `resources/views/components/catalog/title-card-compact.blade.php`
+10. `resources/views/components/catalog/title-card-grid.blade.php`
+11. `resources/views/components/catalog/title-card-list.blade.php`
+12. `resources/views/components/catalog/title-card-personal-state.blade.php`
+13. `lang/ru/catalog.php`
+14. `lang/en/catalog.php`
+15. `tests/Feature/CatalogCompactTitleCardTest.php`
+16. `tests/Feature/CatalogVisualSystemTest.php`
+17. `tests/Feature/CatalogTitleCardActionTest.php`
+18. `tests/Feature/CatalogTitleCardMetadataLoaderTest.php`
+19. `tests/browser/catalog.spec.js`
+20. `docs/plans/current-task-plan.md`
+21. `docs/plans/archive/2026-07-26-catalog-title-card-actions-evidence.md`
+22. `docs/superpowers/specs/2026-07-26-catalog-title-card-actions-design.md`
+23. `docs/superpowers/plans/2026-07-26-catalog-title-card-actions.md`
+24. `docs/UI_STANDARDS.md`
+25. `docs/views.md`
+26. `docs/frontend.md`
+27. `docs/performance.md`
+28. `docs/architecture.md`
+29. `docs/catalog-search.md`
+30. `docs/README.md`
+31. `README.md`
+32. `CHANGELOG.md`
+33. `resources/css/app.css`
+34. `tests/Feature/CatalogPageTest.php`
+35. `tests/Unit/BladeTemplateTest.php`
+
+Discovery, меняющее список, немедленно обновляет plan и повторную declaration.
+
+## Protected compatibility contracts
+
+- ветка `main`, existing `/titles` routes/names, localized URLs, query
+  parameters, pagination, sort/filter/view state и browser back/forward;
+- один full-page Livewire owner `CatalogSeries`; новые HTML routes,
+  controllers, frontend framework и dependencies не создаются;
+- `CatalogTitle` route binding по `slug`, canonical visibility/entitlement,
+  `CatalogTitlePolicy::interact`, user-state and recommendation services;
+- layouts `compact`, `recommendation`, `home`, `spotlight`, `trend` и их
+  existing consumers; redesign ограничен canonical `grid`/`list`;
+- prepared Blade data only: queries, authorization и writes отсутствуют в
+  templates;
+- scalar Livewire state, current payload/query budgets, no source/private URL
+  serialization и no client-trusted access decision;
+- RU/EN key parity, Russian visible UI, local icons/assets, 44 px controls,
+  visible keyboard focus и отсутствие hover-only actions;
+- SQLite schema, migrations, indexes, cache keys, API Resources, sitemap,
+  importer, player, Premium, regional/legal and administration contracts;
+- чужие staged/unstaged/untracked изменения и shared index baseline.
+
+## Cross-feature impact
+
+| Domain | Status | Strategy / verification |
+| --- | --- | --- |
+| Catalog `/titles` UI | `affected` | New grid/list templates, one visual hierarchy and responsive actions |
+| Search/filter/sort/pagination | `affected-compatible` | Public state unchanged; focused old-regression and browser back/forward checks |
+| Personal library | `affected` | Idempotent desired-state write through existing service/policy |
+| Recommendations | `affected` | Existing non-subject feedback reasons/service only; no new persisted identity |
+| Authentication/authorization/privacy | `affected` | Guest login redirect, visible-title re-resolution, policy-enforced mutation, no user ID from client |
+| Database/query performance | `affected` | One bounded metadata union; no DDL/index until measured plan evidence |
+| Mobile/accessibility | `affected` | Visible actions or native `details` sheet, safe-area-aware placement, keyboard/touch/focus tests |
+| Translations | `affected` | RU/EN parity in existing catalog domain; existing reason labels reused |
+| SEO/sitemap/API/routes | `already_compliant` | No public contract or response-shape change |
+| Caching/notifications/audit | `already_compliant` | Existing service invalidation/event behavior preserved; no new cache owner |
+| Importer/player/Premium/region/legal/admin | `unaffected` | No source, playback, entitlement schema or admin boundary change |
+| Migrations/dependencies/env/assets | `not_applicable` | No DDL/package/config/build-tool addition |
+| Production operations | `not_applicable` | Code/assets/docs rollback only; ordinary deploy/build contract unchanged |
+
+## Verification and rollback
+
+- RED → GREEN focused PHPUnit for presentation, actions, metadata and budgets;
+- Pint after PHP edits, translation parity, relevant static/architecture
+  tests, full PHPUnit where environment permits, Vite build;
+- SQLite `EXPLAIN QUERY PLAN` on actual generated bounded metadata SQL;
+- Playwright desktop/mobile/tablet with keyboard, touch, Axe, console/network
+  and screenshot review;
+- exact diff/stat/status/untracked/secrets/debug/formatting review;
+- rollback is revert of Task 103 commit: no schema/data/cache/provider action is
+  needed, existing card/service contracts remain available.

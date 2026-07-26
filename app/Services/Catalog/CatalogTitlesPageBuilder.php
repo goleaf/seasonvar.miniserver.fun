@@ -49,6 +49,7 @@ class CatalogTitlesPageBuilder
         private readonly CatalogTitleSearch $titleSearch,
         private readonly CatalogSearchSuggestion $searchSuggestions,
         private readonly CatalogTitleCardCountLoader $cardCounts,
+        private readonly CatalogTitleCardMetadataLoader $cardMetadata,
         private readonly CatalogUserCardStateLoader $cardStates,
         private readonly CatalogCollectionQuery $collections,
         private readonly TagPagePresenter $tagPages,
@@ -90,7 +91,9 @@ class CatalogTitlesPageBuilder
         $paginationQuery = $context->paginationQuery;
         $filterView = $context->filterView;
 
-        $cardLoads = $this->taxonomies->cardSummaryLoads();
+        $cardLoads = collect($this->taxonomies->cardSummaryLoads())
+            ->except('ratings')
+            ->all();
         $cardColumns = ['id', 'slug', 'title', 'original_title', 'type', 'year', 'poster_url', 'indexed_at'];
 
         if ($includeDescription) {
@@ -160,6 +163,13 @@ class CatalogTitlesPageBuilder
             $this->cardCounts->load($catalogTitles->getCollection(), $request->user()),
         );
         $catalogTitles->setCollection(
+            $this->cardMetadata->load(
+                $catalogTitles->getCollection(),
+                $request->user(),
+                includeCountry: $view === 'list',
+            ),
+        );
+        $catalogTitles->setCollection(
             $this->cardStates->load($catalogTitles->getCollection(), $request->user()),
         );
         $suggestions = $catalogTitles->total() === 0 && ! $invalidInput && $titleContext === null
@@ -215,6 +225,7 @@ class CatalogTitlesPageBuilder
             'search' => $search,
             'sort' => $sort,
             'view' => $view,
+            'viewerAuthenticated' => $request->user() !== null,
             'perPage' => $perPage,
             'year' => $year,
             'requestedYear' => $requestedYear,

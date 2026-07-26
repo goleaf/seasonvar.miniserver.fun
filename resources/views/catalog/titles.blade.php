@@ -164,6 +164,16 @@
                     </div>
 
                     @island(name: 'catalog-pagination', always: true, with: $this->catalogPage)
+                        @if ($cardActionNotice !== null)
+                            <div data-card-action-notice role="status" aria-live="polite" class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
+                                {{ $cardActionNotice }}
+                            </div>
+                        @endif
+                        @error('cardAction')
+                            <div role="alert" class="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                                {{ $message }}
+                            </div>
+                        @enderror
                         <x-ui.pagination-region name="catalog-results" data-catalog-results>
                             <div
                                 data-catalog-results-list
@@ -182,6 +192,8 @@
                                         :title="$catalogTitle"
                                         :layout="$view"
                                         :show-description="$view === 'list'"
+                                        interactive
+                                        :viewer-authenticated="$viewerAuthenticated"
                                         readable
                                     />
                                 @empty

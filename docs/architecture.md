@@ -501,11 +501,20 @@ Presentation сохраняет полный ordered evidence list внутри 
 
 `x-catalog.title-card` является единственной query-free presentation boundary
 для `/titles`, главной и recommendation rows. Class component получает только
-attributes, batch counts и eager-loaded genres/ratings, формирует escaped
-plain-text excerpt до 240 Unicode-символов и выбирает КиноПоиск с fallback на
-IMDb. Blade не получает скрытое полное описание, не выполняет lazy loading и
-сохраняет canonical `titles.show` через stretched title link и отдельную
-доступную ссылку «Подробнее».
+attributes, batch counts, prepared metadata и eager-loaded relations, формирует
+escaped plain-text excerpt до 240 Unicode-символов и выбирает rating по
+layout-contract. Blade не получает скрытое полное описание, не выполняет lazy
+loading и сохраняет canonical `titles.show` через stretched title link и
+отдельную доступную ссылку «Подробнее».
+
+Интерактивные действия grid/list остаются внутри full-page
+`CatalogSeries`. Компонент принимает только scalar title ID, boolean или
+allowlisted enum reason, повторно получает тайтл через
+`CatalogTitleQuery::visibleTo()` и передаёт запись существующим
+`CatalogUserStateService`/`CatalogRecommendationFeedbackService`.
+`CatalogTitlePolicy::interact` остаётся server-side boundary; уведомление и
+ошибка рендерятся в том же `catalog-pagination` island, что и кнопки, поэтому
+Livewire round-trip не оставляет соседний DOM устаревшим.
 
 `CatalogDiscoveryPage` выполняет один `discover()` на interaction. При явном
 обновлении новый seed и page 1 устанавливаются до запроса, а защищённый

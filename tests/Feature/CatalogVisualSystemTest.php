@@ -622,8 +622,14 @@ class CatalogVisualSystemTest extends TestCase
         }
 
         $content = $this->get(route('titles.index'))->assertOk()->getContent();
+        $filterStart = strpos($content, 'id="catalog-filters"');
+        $filterEnd = $filterStart === false ? false : strpos($content, '</aside>', $filterStart);
+        $filterContent = $filterStart === false || $filterEnd === false
+            ? ''
+            : substr($content, $filterStart, $filterEnd - $filterStart);
 
         $this->assertSame(2, substr_count($content, 'role="search"'));
+        $this->assertNotSame('', $filterContent);
         $this->assertStringContainsString('aria-label="Поиск по каталогу"', $content);
         $this->assertStringContainsString('aria-label="Поиск по названию"', $content);
         $this->assertStringContainsString('id="site-search"', $content);
@@ -636,7 +642,7 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertStringNotContainsString('data-catalog-filter-dialog-open', $content);
         $this->assertStringNotContainsString('data-catalog-filter-dialog-close', $content);
         $this->assertStringNotContainsString('max-h-dvh', $content);
-        $this->assertStringNotContainsString('overflow-y-auto', $content);
+        $this->assertStringNotContainsString('overflow-y-auto', $filterContent);
         $this->assertStringNotContainsString('lg:grid-cols-[260px_minmax(0,1fr)]', $content);
         $this->assertStringContainsString('data-catalog-mobile-filter-trigger', $content);
         $this->assertStringContainsString('data-catalog-view-option', $content);

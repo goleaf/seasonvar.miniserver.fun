@@ -6,13 +6,19 @@ namespace App\Livewire;
 
 use App\Enums\CatalogFilterType;
 use App\Enums\CatalogPublicationType;
+use App\Enums\CatalogRecommendationFeedbackReason;
 use App\Enums\CatalogSort;
 use App\Enums\CatalogView;
 use App\Http\Requests\CatalogTitlesRequest;
 use App\Livewire\Forms\CatalogSeriesFilters;
+use App\Models\User;
 use App\Rules\CatalogFilterSlug;
+use App\Services\Catalog\CatalogRecommendationFeedbackService;
+use App\Services\Catalog\CatalogTitleQuery;
 use App\Services\Catalog\CatalogTitlesPageBuilder;
+use App\Services\Catalog\CatalogUserStateService;
 use App\Services\Catalog\VisibleCatalogTitleCacheWarmScheduler;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
@@ -21,6 +27,7 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithPagination;
+use Throwable;
 
 /**
  * @property-read array<string, mixed> $catalogPage
@@ -38,6 +45,8 @@ class CatalogSeries extends Component
         'director' => '',
     ];
 
+    public ?string $cardActionNotice = null;
+
     #[Locked]
     public ?int $routeYear = null;
 
@@ -51,12 +60,24 @@ class CatalogSeries extends Component
 
     protected VisibleCatalogTitleCacheWarmScheduler $titleCacheWarm;
 
+    protected CatalogTitleQuery $titles;
+
+    protected CatalogUserStateService $userStates;
+
+    protected CatalogRecommendationFeedbackService $feedback;
+
     public function boot(
         CatalogTitlesPageBuilder $pages,
         VisibleCatalogTitleCacheWarmScheduler $titleCacheWarm,
+        CatalogTitleQuery $titles,
+        CatalogUserStateService $userStates,
+        CatalogRecommendationFeedbackService $feedback,
     ): void {
         $this->pages = $pages;
         $this->titleCacheWarm = $titleCacheWarm;
+        $this->titles = $titles;
+        $this->userStates = $userStates;
+        $this->feedback = $feedback;
     }
 
     public function mount(?int $year = null, ?string $type = null, ?string $taxonomy = null): void
@@ -162,6 +183,92 @@ class CatalogSeries extends Component
         $this->filters->view = $option->value;
         $this->resetErrorBag('view');
         $this->resetPage();
+    }
+
+    public function setCardWatchlist(mixed $catalogTitleId, mixed $inWatchlist): void
+    {
+        $user = request()->user();
+
+        if (! $user instanceof User) {
+            $this->redirectRoute('login', navigate: true);
+
+            return;
+        }
+
+        $titleId = $this->positiveInteger($catalogTitleId);
+        $desiredState = $this->booleanValue($inWatchlist);
+
+        if ($titleId === null || $desiredState === null) {
+            $this->invalidCardAction();
+
+            return;
+        }
+
+        $title = $this->titles
+            ->visibleTo($user)
+            ->select(['catalog_titles.id', 'catalog_titles.slug'])
+            ->findOrFail($titleId);
+
+        try {
+            $this->userStates->setWatchlist($user, $title, $desiredState);
+            $this->cardActionNotice = $desiredState
+                ? __('catalog.title.card_actions.added_to_library')
+                : __('catalog.title.card_actions.removed_from_library');
+            $this->resetErrorBag('cardAction');
+        } catch (AuthorizationException $exception) {
+            throw $exception;
+        } catch (Throwable $exception) {
+            report($exception);
+            $this->addError('cardAction', __('catalog.title.card_actions.failed'));
+        }
+    }
+
+    public function setCardFeedbackReason(mixed $catalogTitleId, mixed $reason): void
+    {
+        $user = request()->user();
+
+        if (! $user instanceof User) {
+            $this->redirectRoute('login', navigate: true);
+
+            return;
+        }
+
+        $titleId = $this->positiveInteger($catalogTitleId);
+        $reason = is_string($reason)
+            ? CatalogRecommendationFeedbackReason::tryFrom($reason)
+            : null;
+
+        if ($titleId === null
+            || ! $reason instanceof CatalogRecommendationFeedbackReason
+            || $reason->requiresSubject()) {
+            $this->invalidCardAction();
+
+            return;
+        }
+
+        $title = $this->titles
+            ->visibleTo($user)
+            ->select(['catalog_titles.id', 'catalog_titles.slug'])
+            ->findOrFail($titleId);
+
+        try {
+            $this->feedback->save($user, $title, $reason);
+            $this->cardActionNotice = __('recommendations.feedback.saved_reason');
+            $this->resetErrorBag('cardAction');
+        } catch (AuthorizationException $exception) {
+            throw $exception;
+        } catch (ValidationException $exception) {
+            $this->addError(
+                'cardAction',
+                (string) (
+                    $exception->errors()['recommendationFeedback'][0]
+                    ?? __('recommendations.feedback.error')
+                ),
+            );
+        } catch (Throwable $exception) {
+            report($exception);
+            $this->addError('cardAction', __('recommendations.feedback.error'));
+        }
     }
 
     public function setLetter(mixed $letter): void
@@ -603,5 +710,30 @@ class CatalogSeries extends Component
             ->map(fn (mixed $term): string => Str::limit(Str::squish((string) $term), 80, ''))
             ->filter(fn (string $term): bool => mb_strlen($term) >= 2)
             ->all();
+    }
+
+    private function positiveInteger(mixed $value): ?int
+    {
+        $value = filter_var($value, FILTER_VALIDATE_INT, [
+            'options' => ['min_range' => 1],
+        ]);
+
+        return is_int($value) ? $value : null;
+    }
+
+    private function booleanValue(mixed $value): ?bool
+    {
+        return match (true) {
+            is_bool($value) => $value,
+            $value === 1, $value === '1' => true,
+            $value === 0, $value === '0' => false,
+            default => null,
+        };
+    }
+
+    private function invalidCardAction(): void
+    {
+        $this->cardActionNotice = null;
+        $this->addError('cardAction', __('catalog.title.card_actions.invalid'));
     }
 }
