@@ -192,18 +192,18 @@ Design:
 
 ## Этап 11 — Git delivery
 
-66. `[in_progress][critical]` Check branch `main`, status, unstaged/staged/
+66. `[completed][critical]` Check branch `main`, status, unstaged/staged/
     untracked, remote/upstream, diff/stat and task file inventory.
-67. `[pending][critical]` Scan task diff for secrets, debug, binary,
+67. `[completed][critical]` Scan task diff for secrets, debug, binary,
     formatter noise and foreign files.
-68. `[pending][critical]` Stage exact task hunks/files only through isolated
+68. `[completed][critical]` Stage exact task hunks/files only through isolated
     index; review `git diff --cached`.
-69. `[pending][critical]` Commit logical smart collection implementation
+69. `[completed][critical]` Commit logical smart collection implementation
     and docs in `main` with factual message.
-70. `[pending][critical]` Attempt configured non-force push to current remote
+70. `[completed_unresolved_authentication][critical]` Attempt configured non-force push to current remote
     branch; preserve local commit and exact error if authentication/network/
     protection rejects.
-71. `[pending][critical]` Final report: analyzed problems, exact files,
+71. `[in_progress][critical]` Final report: analyzed problems, exact files,
     migration/index/query/security/tests/commands/plan statuses, branch,
     hashes/messages, push and remaining risks.
 
@@ -232,3 +232,8 @@ Design:
   errors. Browser QA found duplicate smart badges; a RED count assertion
   reproduced `2`, implementation now renders one smart badge plus the normal
   uncategorized label, and focused/browser checks are GREEN.
+- Exact 48-file hook-enabled commit `1dc2313`
+  (`feat: add dynamic smart collections`) создан в существующей `main`.
+  `GIT_TERMINAL_PROMPT=0 git push origin main` завершился с кодом `128` до
+  передачи данных: `fatal: could not read Username for
+  'https://github.com': terminal prompts disabled`.

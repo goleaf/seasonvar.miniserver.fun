@@ -10143,7 +10143,7 @@ Detailed implementation plan:
 
 ## Task 76 — умные личные подборки
 
-Статус: `verification_complete_git_in_progress`.
+Статус: `implementation_committed_push_unresolved_authentication`.
 
 Дата начала: 26.07.2026.
 
@@ -10234,7 +10234,7 @@ race conditions и зависимости correctness от отсутствую�
 | Focused/full/static/build/browser | `completed_with_independent_blockers` | Smart `31/114`, related `90/2 594`, all 359 files isolated; only missing importer class and stale account flash remain unrelated. Pint/PHPStan/Rector/Vite/docs/Chromium GREEN |
 | Canonical docs/README/CHANGELOG | `completed` | Architecture/data/security/performance/cache/frontend/map/audit plus visitor README and dated Russian CHANGELOG updated |
 | Final requirements reread/diff audit | `completed` | Canonical owners/design/task перечитаны; repository-wide smart legacy/duplicate/dead/debug/secret scan завершён, task diff изолируется отдельным index |
-| Commit/push in `main` | `in_progress` | Exact task scope; external failures honest |
+| Commit/push in `main` | `completed_commit_unresolved_push_authentication` | Exact 48-file commit `1dc2313`; `git push origin main` exited 128 before transfer because configured GitHub HTTPS credentials are unavailable |
 
 ### Безлимитный execution order
 
@@ -10253,9 +10253,10 @@ compliance evidence. Текущий ближайший порядок:
 9. `[completed]` Security/performance/EXPLAIN/dead-code review.
 10. `[completed]` Focused/full/static/build/browser verification; duplicate smart badge found by Chromium, reproduced by RED test and fixed.
 11. `[completed]` Final canonical requirements/compliance reread after verification.
-12. `[in_progress]` Exact task-only commit on `main`.
-13. `[pending]` Configured non-force push; any external failure stays
-    `unresolved`.
+12. `[completed]` Exact 48-file task-only commit `1dc2313` on `main`.
+13. `[completed_unresolved_authentication]` Configured non-force push exited
+    128 before transfer: `fatal: could not read Username for
+    'https://github.com': terminal prompts disabled`.
 
 ## Task 81 — группировка пакетных событий календаря релизов
 
