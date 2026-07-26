@@ -1,6 +1,6 @@
 # Стандарты интерфейса
 
-Обновлено: 25.07.2026
+Обновлено: 26.07.2026
 
 ## Финальная cross-system UI verification
 
@@ -15,6 +15,26 @@
 - Fake controls и dead actions запрещены. Tailwind и реально установленный Flux component set переиспользуются; arbitrary visual system и inline CSS запрещены.
 - Tables адаптируются карточками или получают accessible scrolling без page overflow. Charts всегда имеют textual summary.
 - Administration обязана оставаться usable на tablets и меньших экранах, где practically возможен emergency workflow, без потери desktop capability.
+
+## Адаптивная оболочка и large-display
+
+- Каноническая browser-матрица интерфейса охватывает `320×720`,
+  `390×844`, `844×390`, `768×1024`, `1024×768`, `1440×1200` и
+  `1920×1080`. Первые три проекта Playwright остаются default gate, четыре
+  дополнительных запускаются через `PLAYWRIGHT_DEVICE_MATRIX=extended`.
+- При ширине меньше `64rem` основная навигация остаётся в native
+  `details` disclosure. Полная строка навигации появляется с `lg`, чтобы
+  телефон landscape и планшет portrait не получали тесную desktop-композицию.
+  Оба варианта используют один server-prepared список ссылок и сохраняют
+  обычные `href` без JavaScript.
+- На large-display от `120rem` корневой размер шрифта равен `112.5%`,
+  общий keyboard focus использует контур не тоньше `3px`, а controls
+  проигрывателя — область не меньше `44×44px`. Это общий
+  content-driven режим большого экрана, а не определение устройства по
+  User-Agent и не доказательство поддержки конкретного Smart TV/remote.
+- Интерактивная область `summary` FAQ и само поле поиска внутри фасетной
+  группы имеют высоту не меньше `44px`; высота декоративной внешней рамки
+  не считается областью нажатия input.
 
 ## Frontend dependency upgrades
 

@@ -607,6 +607,11 @@
     display: none;
 }
 
+.catalog-player-menu__opener {
+    min-block-size: 2.75rem;
+    min-inline-size: 2.75rem;
+}
+
 [data-site-header] {
     padding-block-start: var(--app-safe-top);
 }
@@ -936,6 +941,29 @@ video.js-catalog-player::backdrop {
 
     .plyr__menu__container [role='menuitem'],
     .plyr__menu__container [role='menuitemradio'] {
+        min-block-size: 2.75rem;
+    }
+}
+
+@media (min-width: 120rem) {
+    html {
+        font-size: 112.5%;
+    }
+
+    :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+        outline-width: 3px;
+        outline-offset: 3px;
+        box-shadow: 0 0 0 6px var(--color-emerald-100);
+    }
+
+    .plyr__control {
+        min-block-size: 2.75rem;
+        min-inline-size: 2.75rem;
+    }
+
+    .plyr__progress__container,
+    .plyr__progress,
+    .plyr__progress input[type='range'] {
         min-block-size: 2.75rem;
     }
 }

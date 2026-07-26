@@ -351,7 +351,7 @@
                     <div class="divide-y divide-slate-200">
                         @foreach ($seo['faq'] as $faqItem)
                             <details class="group px-4 py-3">
-                                <summary class="flex cursor-pointer list-none items-center justify-between gap-3 font-bold text-slate-700">
+                                <summary class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 font-bold text-slate-700">
                                     <span>{{ $faqItem['question'] }}</span>
                                     <x-ui.icon name="fa-solid fa-chevron-down text-slate-400 transition group-open:rotate-180" />
                                 </summary>

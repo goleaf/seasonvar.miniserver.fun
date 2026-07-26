@@ -122,7 +122,7 @@
                 @if (in_array($filterType, ['actor', 'director'], true))
                     <div class="relative mb-2">
                         <label class="sr-only" for="catalog-filter-search-{{ $filterType }}">{{ __('catalog.catalog.filters.search_group', ['group' => $label]) }}</label>
-                        <div data-focus-frame class="flex min-h-11 items-center gap-2 rounded-control border border-transparent bg-slate-50 px-3 py-2 text-sm text-slate-500">
+                        <div data-focus-frame class="flex min-h-11 items-center gap-2 rounded-control border border-transparent bg-slate-50 px-3 text-sm text-slate-500">
                             <x-ui.icon name="fa-solid fa-magnifying-glass text-slate-400" />
                             <input
                                 id="catalog-filter-search-{{ $filterType }}"
@@ -131,7 +131,7 @@
                                 maxlength="80"
                                 placeholder="{{ __('catalog.catalog.filters.person_placeholder') }}"
                                 wire:model.live.debounce.300ms="optionSearch.{{ $filterType }}"
-                                class="min-w-0 flex-1 bg-transparent text-sm font-semibold text-slate-700 placeholder:text-slate-500 focus:outline-none"
+                                class="min-h-11 min-w-0 flex-1 bg-transparent text-sm font-semibold text-slate-700 placeholder:text-slate-500 focus:outline-none"
                             >
                             <span wire:loading.delay wire:target="optionSearch.{{ $filterType }}" role="status" aria-live="polite" class="shrink-0 text-emerald-700">
                                 <x-ui.icon name="fa-solid fa-spinner fa-spin" />
@@ -141,14 +141,14 @@
                     </div>
                 @elseif ($filterTaxonomies->get($filterType, collect())->count() > 8)
                     <label class="sr-only" for="catalog-filter-search-{{ $filterType }}">{{ __('catalog.catalog.filters.search_group', ['group' => $label]) }}</label>
-                    <div data-focus-frame class="mb-2 flex min-h-11 items-center gap-2 rounded-control border border-transparent bg-slate-50 px-3 py-2 text-sm text-slate-500">
+                    <div data-focus-frame class="mb-2 flex min-h-11 items-center gap-2 rounded-control border border-transparent bg-slate-50 px-3 text-sm text-slate-500">
                         <x-ui.icon name="fa-solid fa-magnifying-glass text-slate-400" />
                         <input
                             id="catalog-filter-search-{{ $filterType }}"
                             type="search"
                             autocomplete="off"
                             placeholder="{{ __('catalog.catalog.filters.group_placeholder') }}"
-                            class="min-w-0 flex-1 bg-transparent text-sm font-semibold text-slate-700 placeholder:text-slate-500 focus:outline-none"
+                            class="min-h-11 min-w-0 flex-1 bg-transparent text-sm font-semibold text-slate-700 placeholder:text-slate-500 focus:outline-none"
                             data-catalog-filter-search
                         >
                     </div>

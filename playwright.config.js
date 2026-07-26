@@ -7,6 +7,70 @@ const databasePath = path.resolve(`output/playwright/${runtimeName}.sqlite`);
 const configCachePath = path.resolve(`output/playwright/${runtimeName}-config.php`);
 const routesCachePath = path.resolve(`output/playwright/${runtimeName}-routes-v7.php`);
 const baseURL = `http://127.0.0.1:${browserPort}`;
+const deviceMatrix = process.env.PLAYWRIGHT_DEVICE_MATRIX || 'default';
+
+const defaultProjects = [
+    {
+        name: 'Desktop Chromium',
+        use: {
+            browserName: 'chromium',
+            viewport: { width: 1440, height: 1200 },
+        },
+    },
+    {
+        name: 'Mobile Chromium',
+        use: {
+            browserName: 'chromium',
+            viewport: { width: 390, height: 844 },
+            hasTouch: true,
+            isMobile: true,
+        },
+    },
+    {
+        name: 'Tablet Chromium',
+        use: {
+            browserName: 'chromium',
+            viewport: { width: 768, height: 1024 },
+            hasTouch: true,
+        },
+    },
+];
+
+const extendedProjects = [
+    {
+        name: 'Narrow Phone Chromium',
+        use: {
+            browserName: 'chromium',
+            viewport: { width: 320, height: 720 },
+            hasTouch: true,
+            isMobile: true,
+        },
+    },
+    {
+        name: 'Phone Landscape Chromium',
+        use: {
+            browserName: 'chromium',
+            viewport: { width: 844, height: 390 },
+            hasTouch: true,
+            isMobile: true,
+        },
+    },
+    {
+        name: 'Tablet Landscape Chromium',
+        use: {
+            browserName: 'chromium',
+            viewport: { width: 1024, height: 768 },
+            hasTouch: true,
+        },
+    },
+    {
+        name: 'TV-like Chromium',
+        use: {
+            browserName: 'chromium',
+            viewport: { width: 1920, height: 1080 },
+        },
+    },
+];
 
 export default defineConfig({
     testDir: './tests/browser',
@@ -58,30 +122,7 @@ export default defineConfig({
             SESSION_DRIVER: 'database',
         },
     },
-    projects: [
-        {
-            name: 'Desktop Chromium',
-            use: {
-                browserName: 'chromium',
-                viewport: { width: 1440, height: 1200 },
-            },
-        },
-        {
-            name: 'Mobile Chromium',
-            use: {
-                browserName: 'chromium',
-                viewport: { width: 390, height: 844 },
-                hasTouch: true,
-                isMobile: true,
-            },
-        },
-        {
-            name: 'Tablet Chromium',
-            use: {
-                browserName: 'chromium',
-                viewport: { width: 768, height: 1024 },
-                hasTouch: true,
-            },
-        },
-    ],
+    projects: deviceMatrix === 'extended'
+        ? [...defaultProjects, ...extendedProjects]
+        : defaultProjects,
 });

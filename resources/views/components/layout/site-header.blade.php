@@ -26,7 +26,7 @@
 
     <div class="border-t border-slate-200 bg-slate-50">
         <div class="app-safe-inline mx-auto max-w-[1760px] py-2">
-            <details data-mobile-navigation class="group sm:hidden">
+            <details data-mobile-navigation class="group lg:hidden">
                 <summary class="flex min-h-11 list-none items-center justify-between gap-3 rounded-control bg-white px-3 py-2 text-sm font-black text-slate-700 marker:hidden">
                     <span class="inline-flex items-center gap-2">
                         <x-ui.icon name="fa-solid fa-bars text-emerald-700" />
@@ -44,7 +44,7 @@
                 </nav>
             </details>
 
-            <nav data-site-header-navigation aria-label="{{ __('catalog.layout.primary_navigation') }}" class="hidden flex-wrap items-center gap-1.5 text-sm font-bold sm:flex">
+            <nav data-site-header-navigation aria-label="{{ __('catalog.layout.primary_navigation') }}" class="hidden flex-wrap items-center gap-1.5 text-sm font-bold lg:flex">
                 @foreach ($header['navigation'] as $item)
                     <a href="{{ $item->url }}" class="{{ $item->className }}" @if ($item->ariaCurrent !== null) aria-current="{{ $item->ariaCurrent }}" @endif>
                         <x-ui.icon :name="$item->icon" />

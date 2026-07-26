@@ -8803,29 +8803,110 @@ database row, storage object, queue или production DML не планируе�
 12. `[pending]` Configured non-force push or honest external failure.
 ## Task 65 — качество телефона, планшета и TV
 
-Статус: `queued_for_repository_wide_discovery_and_design`.
+Статус: `foundation_and_first_cross_device_fixes_verified_delivery_in_progress`.
 
 Дата постановки: 26.07.2026.
 
-Task 65 не смешивается с механическим Task 64 diff. Он начнётся с отдельного
-repository-wide аудита существующего Task 23 responsive shell, viewport
-matrix, high-traffic public/private/admin surfaces, player lifecycle,
-keyboard/focus/remote-like navigation, long translations, query/payload
-budgets и browser evidence. Затем будут созданы отдельные design и
-безлимитный master plan с независимо проверяемыми фазами:
+Approved design:
+[`2026-07-26-cross-device-quality-program-design.md`](../superpowers/specs/2026-07-26-cross-device-quality-program-design.md).
 
-1. shell/header/search/navigation/footer;
-2. home/catalog/discover/collections;
-3. title/player/seasons/episodes;
-4. auth/library/profile/settings/calendar;
-5. administration/support/premium;
-6. narrow-phone, phone, tablet portrait/landscape, desktop и TV-like
-   Playwright matrix;
-7. performance, accessibility, documentation, rollout и rollback.
+Unlimited master plan:
+[`2026-07-26-cross-device-quality-program.md`](../superpowers/plans/2026-07-26-cross-device-quality-program.md).
 
-Конкретные UI-файлы и изменения не считаются утверждёнными до завершения
-этого evidence-first design gate.
+Task 65 не смешивает application/UI diff с механическим Task 64 diff.
+Repository-wide аудит существующего Task 23 responsive shell, viewport
+matrix, public/private/admin surfaces, player lifecycle, focus,
+remote-like keyboard path, long translations, query/payload budgets и
+browser evidence выполнен для design gate.
 
+### Baseline и решение
+
+- Existing shell already has mobile-first CSS, safe areas, dynamic viewport,
+  `44px` controls, native disclosure, visible focus and three browser
+  projects.
+- Default matrix covers `390×844`, `768×1024`, `1440×1200`; отдельные
+  catalog cases меняют ширину до `375`, `1280`, `1920`.
+- Missing general gates: `320×720`, phone landscape, `1024×768`, `200%`
+  zoom, pointer/hover capabilities, long RU/EN labels and keyboard-only
+  TV-like `1920×1080`.
+- Header switches to a full wrapping navigation at `640px`, although tablet
+  width/content/translation can require the compact disclosure.
+- Chosen approach is one content-driven adaptive shell. No mobile/TV route,
+  Blade copy, user-agent authority, device cache dimension or custom spatial
+  navigation engine is added.
+
+### Expected changed files
+
+Foundation phase:
+
+- `playwright.config.js`;
+- new `tests/browser/cross-device-quality.spec.js`;
+- `resources/css/app.css`;
+- `resources/views/components/layout/site-header.blade.php`;
+- `resources/views/components/catalog/title-filters.blade.php`;
+- `resources/views/livewire/catalog-title-detail.blade.php`;
+- browser/test/frontend documentation and both linked plan documents.
+
+Later phases change only evidence-backed existing shell, public discovery,
+title/player, private and admin components listed in the master plan. No
+migration, route, API schema, dependency, env key, cache key, permission or
+production DML is planned.
+
+### Protected contracts
+
+- named/localized routes, route model binding and public URL state;
+- policies/gates/middleware, private/no-store/noindex;
+- title/media visibility, player/download grants and lifecycle;
+- RU/EN keys/fallback/Livewire locale;
+- cache domains/keys/invalidation, search and SEO;
+- text-only collection cards and `/discover` category/subcategory behavior;
+- API/database/import/queue/storage contracts;
+- existing `main` history and foreign shared-tree scope.
+
+### Compliance matrix
+
+| Requirement/domain | Статус | Evidence / следующий gate |
+| --- | --- | --- |
+| Root/index/canonical requirements | `completed_preparation` | Fresh read 26.07.2026; repeat per independently delivered phase |
+| Existing implementation first | `completed` | Shell/CSS/route/view/browser inventory and responsive-risk scan |
+| Installed versions | `completed` | PHP 8.5.8, Laravel 13.22.0, Livewire 4.3.3, Tailwind 4.3.2, Vite 8.1.4, PHPUnit 12.5.32 |
+| Official frontend docs | `completed` | Boost Tailwind 4 docs: mobile-first ranges, container queries, pointer/orientation/motion/contrast variants |
+| Design + unlimited plan | `completed` | Linked context-specific design and six-phase master plan |
+| Migrations/routes/API/env/dependencies | `not_applicable_foundation` | No changes planned |
+| Translations | `affected_validation` | RU/EN long labels and raw-key absence in extended matrix |
+| Authorization/privacy | `protected_review` | Device/input/browser state never grants access |
+| Cache/search/SEO | `protected_review` | No device identity or second response system |
+| Performance | `affected_measured` | Query/Livewire/assets/browser budgets per phase |
+| Production/rollback | `completed_preparation` | Code/assets revert + Vite rebuild; no data restore |
+| Physical phone/tablet/TV | `unresolved_external` | Chromium evidence cannot represent real hardware/remote |
+| Implementation | `completed_first_tranche` | Extended matrix, `lg` navigation gate, `44px` filters/FAQ/player opener and large-display scale/focus implemented |
+| Browser verification | `completed_first_tranche` | Clean default 15 passed/3 skipped; extra viewports 21 passed/3 skipped; visible TV-like focus 1/1. Combined all-project run also reached 36 passed/6 skipped before the command wrapper received SIGTERM after its final report |
+| Commit/push | `pending` | Exact phase commits in existing `main` |
+
+### Первый implementation tranche
+
+- Default Playwright matrix сохранена без умножения обычного CI; opt-in
+  `extended` добавляет narrow phone, phone landscape, tablet landscape и
+  TV-like Chromium.
+- RED baseline зафиксировал прежний `sm` switch, `24px` FAQ summary,
+  `20px` facet input и `32px` TV-like Plyr controls. Эти contracts не
+  исключены из теста: навигация перенесена на `lg`, интерактивные области
+  доведены до `44px`, а large-display получил `112.5%` root scale и
+  усиленный focus.
+- Landscape timeout оказался не product regression, а корректной
+  `wire:intersect` границей ниже viewport. Browser test атомарно прокручивает
+  placeholder и ожидает hydrated `summary`, не отключая lazy loading.
+- Vite после CSS/UI изменений собирает 25 modules; app CSS изменился с
+  `200.31 kB / 43.40 kB gzip` на `200.75 kB / 43.46 kB gzip`. JavaScript
+  application bundle остался `24.05 kB / 8.15 kB gzip`.
+- Финальные browser пакеты имеют чистые exit codes: default matrix —
+  15 passed/3 expected project skips, четыре дополнительные viewport —
+  21 passed/3 expected project skips; отдельный видимый TV-like focus —
+  1/1. Соседняя PHP UI-матрица прошла 46 тестов/513 проверок.
+- Routes, API, schema/data, permissions, translations, cache keys,
+  dependencies, environment, importer и server query paths не менялись.
+  Physical phone/tablet/Smart TV/remote evidence остаётся
+  `unresolved_external`.
 ## Task 66 — SQLite order path для `recently_added` на главной
 
 Статус: `implementation_verified_committed_push_unresolved_authentication`.

@@ -16,6 +16,27 @@ Production asset и operational UI changes дополнительно следу
 - Livewire 4 используется для интерактивного каталога `/titles`, одиннадцати directory hubs, полной динамической оболочки и playback-island карточки `/titles/{slug}`, регистрации/входа, профиля, безопасности, личной библиотеки `/library/*` и live-страницы `/stats`; styles/scripts подключаются layout один раз на всех routes и не дублируются в компонентах.
 - Volt не установлен и не используется. Все Livewire-компоненты conventional class-based, а Blade остаётся presentation-only без PHP tags, database/cache/service calls.
 
+## Адаптивная оболочка
+
+`x-layout.site-header` использует один подготовленный набор navigation/action
+DTO и один progressive GET search для всех устройств. До `lg` показывается
+native `details` disclosure, с `lg` — полная переносимая строка ссылок.
+Отдельных mobile/TV routes, Blade copies, User-Agent ветвления, device cache
+identity и client-side прав доступа нет.
+
+`resources/css/app.css` сохраняет mobile-first safe-area/dynamic-viewport
+контракт. На large-display от `120rem` общий UI масштабируется до
+`112.5%`, keyboard focus усиливается до `3px`, а controls Plyr и opener
+меню серий получают минимум `44×44px`. На обычном desktop с fine pointer
+нативная плотность Plyr сохраняется; phone/tablet coarse-pointer и
+large-display получают увеличенные цели. Это Chromium TV-like evidence, а
+не заявление о physical Smart TV, codecs или remote spatial navigation.
+
+Поиск фасетов и FAQ используют реальную интерактивную область не меньше
+`44px`. Lazy catalog filter island остаётся `wire:intersect`:
+предварительная загрузка ниже landscape viewport не добавляется только ради
+теста.
+
 ## Livewire pagination islands
 
 Все web-пагинаторы используют единый progressive-enhancement contract: named `@island(always: true, with: $this->...Page)`, query-free `x-ui.pagination-region` и опубликованный `vendor.livewire.tailwind`. Region передаёт имя controls через `links(data: ['region' => '...'])`, сохраняет обычные `href`/`rel`, URL page name и прежнее содержимое во время запроса. `resources/js/app.js` централизованно связывает ближайший control только с его region, выполняет initial и post-morph scroll, очищает pending state при failure/navigation и не дублируется в доменных шаблонах. Завершение Livewire message очищает pending state только при совпадении `component.id`; параллельная загрузка lazy-island или другого компонента не может преждевременно снять `aria-busy` и spinner текущей пагинации.
