@@ -11,6 +11,7 @@ class PosterCard extends Component
      * @var array<string, string>
      */
     private const ROOT_CLASSES = [
+        'grid' => 'flex h-full flex-col rounded-panel border border-slate-200 bg-white p-3 hover:border-emerald-200',
         'list' => 'grid grid-cols-[4rem_minmax(0,1fr)] gap-3 p-3 hover:bg-emerald-50/60 sm:grid-cols-[5rem_minmax(0,1fr)] sm:gap-4 sm:p-4 md:grid-cols-[6rem_minmax(0,1fr)]',
         'compact' => 'grid grid-cols-[3.5rem_minmax(0,1fr)] gap-3 p-3 hover:bg-emerald-50/60 sm:grid-cols-[4rem_minmax(0,1fr)]',
         'recommendation' => 'grid grid-cols-[4rem_minmax(0,1fr)] gap-3 p-3 hover:bg-emerald-50/60 sm:grid-cols-[5rem_minmax(0,1fr)] sm:gap-4 sm:p-4 md:grid-cols-[6rem_minmax(0,1fr)]',
@@ -24,6 +25,7 @@ class PosterCard extends Component
      * @var array<string, string>
      */
     private const MEDIA_CLASSES = [
+        'grid' => 'relative aspect-[2/3] w-full overflow-hidden rounded-lg bg-slate-100',
         'list' => 'relative aspect-[2/3] w-16 self-start overflow-hidden rounded-control sm:w-20 md:w-24',
         'compact' => 'relative aspect-[2/3] w-14 self-start overflow-hidden rounded-control sm:w-16',
         'recommendation' => 'relative aspect-[2/3] w-16 self-start overflow-hidden rounded-control sm:w-20 md:w-24',
@@ -37,6 +39,7 @@ class PosterCard extends Component
      * @var array<string, string>
      */
     private const BODY_CLASSES = [
+        'grid' => 'flex min-w-0 flex-1 flex-col pt-3',
         'list' => 'min-w-0',
         'compact' => 'min-w-0',
         'recommendation' => 'min-w-0',

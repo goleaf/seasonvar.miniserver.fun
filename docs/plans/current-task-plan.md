@@ -12197,3 +12197,40 @@ config и environment change не планируются.
 13. `[completed]` Exact logical Task 99 commits on existing `main`.
 14. `[completed]` Ordinary configured push attempted; external HTTPS
     authentication failure remains `unresolved`.
+
+## Task 98 — полный UX-редизайн каталога `/titles`
+
+Статус: `in_progress`.
+
+Канонический design и безлимитный живой checklist:
+[`2026-07-26-catalog-titles-ux-redesign-design.md`](../superpowers/specs/2026-07-26-catalog-titles-ux-redesign-design.md)
+и
+[`2026-07-26-catalog-titles-ux-redesign.md`](../superpowers/plans/2026-07-26-catalog-titles-ux-redesign.md).
+
+### Scope
+
+- desktop heading/search + sticky filter sidebar + output toolbar;
+- mobile full-width filter page in one document scroll;
+- четыре primary sort и сохранённые secondary варианты;
+- collapsed Cyrillic/Latin alphabet;
+- visible active chips, exact condition count and reset;
+- validated URL-backed `grid|list` with compact poster `2:3` grid;
+- unchanged filter/search/query/API/database/security contracts;
+- TDD, SQL/browser/accessibility audit, docs, isolated commit and push.
+
+### Compliance snapshot
+
+| Contract | Status | Evidence |
+|---|---|---|
+| Requirements/design gate | `completed` | Root/index/owners/Boost inventory; Task 98 design |
+| Existing implementation first | `completed` | Full-page Livewire, Form Request, query/facet builder, view-model/cards/tests traced |
+| TDD RED/GREEN | `completed` | Отсутствующие request/view-model/page contracts сначала дали RED; итоговый scoped GREEN — 218 + 2 теста |
+| Implementation | `completed` | Enum-backed view, единый Livewire state, desktop/mobile layout, controls/chips/cards реализованы |
+| Database/index | `not_applicable` | UI state and bounded select only |
+| Validation/API/security | `completed` | Request normalization, API isolation, escaped query-free Blade и прежние visibility boundaries проверены |
+| Query/performance | `completed` | Grid исключает `description`; query budgets и SQLite FTS `EXPLAIN` прошли; новый индекс не нужен |
+| Browser/accessibility | `completed` | Финальные 6/6 Playwright desktop/mobile/tablet; исправлены mobile lazy open-intent и accessible search name |
+| Verification | `unresolved` | 218 + 2 scoped PHPUnit GREEN, Pint/PHPStan/Rector/build GREEN; полный suite имеет foreign PWA/offline/session/importer failures, повторный монолит прерван `SIGTERM 143` |
+| Docs/README/CHANGELOG | `completed` | Канонические UI/frontend/views/catalog/architecture/performance docs и visitor/technical history обновлены |
+| Final audit | `completed` | Requirements/spec/plan reread; legacy/debug/secret/diff scan выполнен |
+| Git delivery | `pending` | Exact task hunks on existing `main`; ordinary push |

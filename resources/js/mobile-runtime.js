@@ -10,6 +10,8 @@ let connectionStatusTimer = null;
 let viewportFrame = null;
 let headerScrollFrame = null;
 let filterAwaitingApply = null;
+let filterOpenRequested = false;
+let filterOpenRequestTimer = null;
 
 const compactLayout = window.matchMedia('(max-width: 63.999rem)');
 
@@ -187,8 +189,19 @@ const initializeResponsiveFilter = (details) => {
             details.open = false;
             details.querySelector('summary')?.focus({ preventScroll: true });
         });
+        details.addEventListener('keydown', (event) => {
+            if (event.key !== 'Escape' || !compactLayout.matches || !details.open) {
+                return;
+            }
 
-        if (compactLayout.matches && Number(details.dataset.activeFilterCount || 0) === 0) {
+            event.preventDefault();
+            details.open = false;
+            document.querySelector('[data-catalog-mobile-filter-trigger]')?.focus({ preventScroll: true });
+        });
+
+        if (compactLayout.matches && filterOpenRequested) {
+            details.open = true;
+        } else if (compactLayout.matches && Number(details.dataset.activeFilterCount || 0) === 0) {
             details.open = false;
         }
     }
@@ -198,6 +211,14 @@ const initializeResponsiveFilter = (details) => {
         details.open = false;
         filterAwaitingApply = null;
         details.querySelector('summary')?.focus({ preventScroll: true });
+    }
+
+    const resultSource = document.querySelector('[data-catalog-current-result-label]');
+    const submitLabel = details.querySelector('[data-catalog-filter-submit-label]');
+
+    if (resultSource instanceof HTMLElement && submitLabel instanceof HTMLElement) {
+        submitLabel.textContent = (details.dataset.filterSubmitTemplate || ':results')
+            .replace(':results', resultSource.dataset.catalogCurrentResultLabel || '');
     }
 };
 
@@ -305,6 +326,33 @@ const initializeRuntime = () => {
         });
     });
     document.addEventListener('livewire:navigated', announceRoute);
+    document.addEventListener('click', (event) => {
+        const target = event.target instanceof Element ? event.target : null;
+        const trigger = target?.closest('[data-catalog-mobile-filter-trigger]');
+
+        if (!(trigger instanceof HTMLAnchorElement) || !compactLayout.matches) {
+            return;
+        }
+
+        event.preventDefault();
+        filterOpenRequested = true;
+        window.clearTimeout(filterOpenRequestTimer);
+        filterOpenRequestTimer = window.setTimeout(() => {
+            filterOpenRequested = false;
+        }, 2_000);
+
+        const details = document.getElementById('catalog-filters');
+
+        if (!(details instanceof HTMLDetailsElement)) {
+            details?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+            return;
+        }
+
+        details.open = true;
+        details.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        window.requestAnimationFrame(() => details.querySelector('summary')?.focus({ preventScroll: true }));
+    });
     window.addEventListener('pageshow', (event) => {
         if (event.persisted && document.body.dataset.privatePage === '1') {
             window.location.reload();

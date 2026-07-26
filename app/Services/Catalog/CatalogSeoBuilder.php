@@ -575,6 +575,7 @@ class CatalogSeoBuilder
             'letter',
             'per_page',
             'sort',
+            'view',
             'publication_type',
             'decade',
         ];

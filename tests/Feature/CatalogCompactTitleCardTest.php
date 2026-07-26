@@ -145,7 +145,8 @@ final class CatalogCompactTitleCardTest extends TestCase
         $response
             ->assertSeeText('КиноПоиск 7,6')
             ->assertSeeText('2 серии')
-            ->assertSeeText('Подробнее');
+            ->assertSee('data-ui-poster-layout="grid"', false)
+            ->assertDontSeeText('Подробнее');
         $this->assertCount(1, $ratingQueries);
         $this->assertStringContainsString(
             'select "catalog_title_ratings"."catalog_title_id", "catalog_title_ratings"."provider", "catalog_title_ratings"."rating"',

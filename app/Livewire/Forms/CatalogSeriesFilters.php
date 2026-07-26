@@ -148,6 +148,9 @@ class CatalogSeriesFilters extends Form
     #[Url(history: true, except: 'updated')]
     public string $sort = 'updated';
 
+    #[Url(history: true, except: 'grid')]
+    public string $view = 'grid';
+
     #[Url(as: 'per_page', history: true, except: 24)]
     public string|int $perPage = 24;
 
@@ -176,6 +179,7 @@ class CatalogSeriesFilters extends Form
             'updated' => $this->updated,
             'letter' => $this->letter,
             'sort' => $this->sort,
+            'view' => $this->view,
             'per_page' => $this->perPage,
         ];
 
@@ -211,6 +215,7 @@ class CatalogSeriesFilters extends Form
         $this->updated = $request->updatedPeriod() ?? '';
         $this->letter = $request->letter() ?? '';
         $this->sort = $request->sort()->value;
+        $this->view = $request->view()->value;
         $this->perPage = $request->perPage();
 
         foreach (self::TAXONOMY_PROPERTIES as $requestKey => $property) {
@@ -323,6 +328,7 @@ class CatalogSeriesFilters extends Form
             || $value === ''
             || $value === []
             || ($key === 'sort' && $value === 'updated')
+            || ($key === 'view' && $value === 'grid')
             || ($key === 'per_page' && (int) $value === 24);
     }
 }

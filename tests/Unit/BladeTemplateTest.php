@@ -152,6 +152,7 @@ class BladeTemplateTest extends TestCase
     {
         $compactCardExcerpts = [
             resource_path('views/components/catalog/latest-media-card.blade.php'),
+            resource_path('views/components/catalog/title-card-grid.blade.php'),
             resource_path('views/components/catalog/title-card-home.blade.php'),
             resource_path('views/components/catalog/title-card-list.blade.php'),
             resource_path('views/components/catalog/title-card-recommendation.blade.php'),
@@ -241,9 +242,9 @@ class BladeTemplateTest extends TestCase
             ->assertDontSee('data-ui-poster-image', false);
     }
 
-    public function test_poster_card_exposes_list_layouts_without_a_public_grid_layout(): void
+    public function test_poster_card_exposes_supported_public_layouts_and_rejects_unknown_layouts(): void
     {
-        foreach (['list', 'compact', 'recommendation', 'stats'] as $layout) {
+        foreach (['grid', 'list', 'compact', 'recommendation', 'stats'] as $layout) {
             $this->blade(
                 '<x-ui.poster-card :layout="$layout" alt="Постер"><p>Описание</p></x-ui.poster-card>',
                 ['layout' => $layout],
@@ -258,11 +259,8 @@ class BladeTemplateTest extends TestCase
         $this->blade('<x-ui.poster-card layout="unsupported" alt="Постер">Описание</x-ui.poster-card>')
             ->assertSee('data-ui-poster-layout="list"', false);
 
-        $this->blade('<x-ui.poster-card layout="grid" alt="Постер">Описание</x-ui.poster-card>')
-            ->assertSee('data-ui-poster-layout="list"', false);
-
         $this->assertFileExists(resource_path('views/components/catalog/title-card-list.blade.php'));
-        $this->assertFileDoesNotExist(resource_path('views/components/catalog/title-card-grid.blade.php'));
+        $this->assertFileExists(resource_path('views/components/catalog/title-card-grid.blade.php'));
     }
 
     public function test_catalog_count_translations_follow_russian_and_english_plural_rules(): void

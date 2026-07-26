@@ -5,8 +5,8 @@
             <span>{{ __('catalog.catalog.filters.updating') }}</span>
         </span>
     </div>
-    <div data-catalog-filter-groups class="columns-1 gap-3 lg:columns-2 2xl:columns-3">
-        <section class="mb-3 inline-block w-full break-inside-avoid rounded-control border border-slate-200 bg-white p-3 align-top">
+    <div data-catalog-filter-groups class="space-y-3">
+        <section class="border-b border-slate-200 pb-3">
             <div class="mb-2 flex items-center justify-between gap-2">
                 <div class="inline-flex items-center gap-2 text-xs font-semibold text-slate-600">
                     <x-ui.icon name="fa-solid fa-calendar-days text-slate-400" />
@@ -43,7 +43,7 @@
             </div>
         </section>
 
-        <section class="mb-3 inline-block w-full break-inside-avoid rounded-control border border-slate-200 bg-white p-3 align-top">
+        <section class="border-b border-slate-200 pb-3">
             <div class="mb-2 flex items-center justify-between gap-2">
                 <div class="inline-flex items-center gap-2 text-xs font-semibold text-slate-600">
                     <x-ui.icon name="fa-solid fa-clapperboard text-slate-400" />
@@ -75,7 +75,7 @@
             </div>
         </section>
 
-        <section class="mb-3 inline-block w-full break-inside-avoid rounded-control border border-slate-200 bg-white p-3 align-top">
+        <section class="border-b border-slate-200 pb-3">
             <div class="mb-2 flex items-center justify-between gap-2">
                 <div class="inline-flex items-center gap-2 text-xs font-semibold text-slate-600">
                     <x-ui.icon name="fa-solid fa-closed-captioning text-slate-400" />
@@ -106,19 +106,30 @@
         </section>
 
         @foreach ($filterView->typeLabels as $filterType => $label)
-            <section data-catalog-filter-group class="mb-3 inline-block w-full break-inside-avoid rounded-control border border-slate-200 bg-white p-3 align-top">
-                <div class="mb-2 flex items-center justify-between gap-2">
-                    <div class="inline-flex min-w-0 items-center gap-2 text-xs font-semibold text-slate-600">
+            <details
+                data-catalog-filter-group
+                @if ($filterView->isFilterGroupExpanded($filterType)) open @endif
+                class="group border-b border-slate-200 pb-3"
+            >
+                <summary class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-lg px-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
+                    <span class="inline-flex min-w-0 items-center gap-2">
                         <x-ui.icon name="{{ $filterView->icon($filterType) }} text-slate-400" />
                         <span>{{ $label }}</span>
-                    </div>
+                    </span>
+                    <span class="inline-flex shrink-0 items-center gap-2">
+                        @if ($selectedTaxonomies->get($filterType, collect())->isNotEmpty())
+                            <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-800">{{ $selectedTaxonomies->get($filterType)->count() }}</span>
+                        @endif
+                        <x-ui.icon name="fa-solid fa-chevron-down text-xs text-slate-600 transition group-open:rotate-180" />
+                    </span>
+                </summary>
+                <div class="pt-2">
                     @if ($selectedTaxonomies->get($filterType, collect())->isNotEmpty())
-                        <a href="{{ route('titles.index', $filterView->filterQuery($filterType, null)) }}" rel="nofollow" wire:click.prevent="resetGroup('{{ $filterType }}')" class="inline-flex min-h-11 shrink-0 items-center gap-1 px-1 text-xs font-bold text-emerald-700 hover:text-emerald-800">
+                        <a href="{{ route('titles.index', $filterView->filterQuery($filterType, null)) }}" rel="nofollow" wire:click.prevent="resetGroup('{{ $filterType }}')" class="mb-2 inline-flex min-h-11 items-center gap-1 px-2 text-xs font-bold text-emerald-700 hover:text-emerald-800">
                             <x-ui.icon name="fa-solid fa-rotate-left" />
                             <span>{{ __('catalog.catalog.filters.reset') }}</span>
                         </a>
                     @endif
-                </div>
                 @if (in_array($filterType, ['actor', 'director'], true))
                     <div class="relative mb-2">
                         <label class="sr-only" for="catalog-filter-search-{{ $filterType }}">{{ __('catalog.catalog.filters.search_group', ['group' => $label]) }}</label>
@@ -176,7 +187,8 @@
                     @endforelse
                 </div>
                 <p class="hidden px-3 py-2 text-sm text-slate-500" data-catalog-filter-empty>{{ __('catalog.catalog.filters.group_empty') }}</p>
-            </section>
+                </div>
+            </details>
         @endforeach
     </div>
 </div>

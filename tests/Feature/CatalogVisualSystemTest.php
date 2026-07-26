@@ -598,12 +598,12 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertStringContainsString('wire:submit="applyFilters"', $content);
         $this->assertStringContainsString('wire:loading.delay', $content);
         $this->assertStringNotContainsString('wire:loading.delay.flex', $content);
-        $this->assertStringContainsString('wire:target="filters.search,applySearch,applyFilters,sortBy,setPerPage,setLetter,resetGroup,resetAdvanced,resetAdvancedFilters,clearSearch,resetAll"', $content);
+        $this->assertStringContainsString('wire:target="filters.search,applySearch,applyFilters,sortBy,setView,setPerPage,setLetter,resetGroup,resetAdvanced,resetAdvancedFilters,clearSearch,resetAll"', $content);
         $this->assertStringContainsString('wire:loading', $content);
         $this->assertStringContainsString('wire:key="catalog-title-', $content);
         $this->assertStringContainsString('wire:click.prevent="nextPage(\'page\')"', $content);
         $this->assertStringContainsString(
-            'wire:loading.delay wire:target="filters.search,applySearch,applyFilters,sortBy,setPerPage,setLetter,resetGroup,resetAdvanced,resetAdvancedFilters,clearSearch,resetAll" class="hidden absolute',
+            'wire:loading.delay wire:target="filters.search,applySearch,applyFilters,sortBy,setView,setPerPage,setLetter,resetGroup,resetAdvanced,resetAdvancedFilters,clearSearch,resetAll"',
             $content,
         );
     }
@@ -638,10 +638,10 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertStringNotContainsString('max-h-dvh', $content);
         $this->assertStringNotContainsString('overflow-y-auto', $content);
         $this->assertStringNotContainsString('lg:grid-cols-[260px_minmax(0,1fr)]', $content);
-        $this->assertStringNotContainsString('data-catalog-mobile-view-controls', $content);
-        $this->assertStringNotContainsString('data-catalog-view-option', $content);
-        $this->assertStringContainsString('data-catalog-mobile-page-size-controls', $content);
-        $this->assertStringNotContainsString('setView', $content);
+        $this->assertStringContainsString('data-catalog-mobile-filter-trigger', $content);
+        $this->assertStringContainsString('data-catalog-view-option', $content);
+        $this->assertStringContainsString('data-catalog-page-size-menu', $content);
+        $this->assertStringContainsString('setView', $content);
         $this->assertStringContainsString('data-catalog-results-list', $content);
         $this->assertStringContainsString('wire:click.prevent="setPerPage(48)"', $content);
         $this->assertStringContainsString('wire:intersect.once="__lazyLoadIsland"', $content);
@@ -664,8 +664,8 @@ class CatalogVisualSystemTest extends TestCase
 
         $this->assertIsString($filterTemplate);
         $this->assertStringContainsString('data-catalog-filter-groups', $filterTemplate);
-        $this->assertStringContainsString('columns-1', $filterTemplate);
-        $this->assertStringContainsString('break-inside-avoid rounded-control border border-slate-200 bg-white p-3', $filterTemplate);
+        $this->assertStringContainsString('data-catalog-filter-groups class="space-y-3"', $filterTemplate);
+        $this->assertStringContainsString('border-b border-slate-200 pb-3', $filterTemplate);
         $this->assertStringContainsString("__('catalog.catalog.filters.years')", $filterTemplate);
         $this->assertStringContainsString("__('catalog.catalog.filters.publication_type')", $filterTemplate);
         $this->assertStringContainsString("__('catalog.catalog.filters.subtitles')", $filterTemplate);
@@ -768,9 +768,9 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertStringContainsString('data-catalog-advanced-group="volume"', $content);
         $this->assertStringContainsString('data-catalog-advanced-group="rating"', $content);
         $this->assertStringContainsString('data-catalog-advanced-group="video"', $content);
-        $this->assertStringContainsString('Точный подбор', $content);
+        $this->assertStringContainsString('Фильтры каталога', $content);
         $this->assertStringContainsString('Уточните годы, тип, жанры, страны, актёров, рейтинг и доступность видео', $content);
-        $this->assertStringContainsString('Показать результаты', $content);
+        $this->assertStringContainsString('data-catalog-filter-submit-label', $content);
         $this->assertStringContainsString('Сбросить фильтры', $content);
         $this->assertStringContainsString('wire:model.live="filters.updated"', $content);
         $this->assertStringContainsString('wire:model.live="filters.ratingSource"', $content);
@@ -784,9 +784,10 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertIsString($facetTemplate);
         $this->assertDoesNotMatchRegularExpression('/wire:model\.live=.*@checked/m', $template);
         $this->assertSame(4, substr_count($facetTemplate, 'wire:replace.self'));
+        $this->assertGreaterThanOrEqual(3, substr_count($template, 'grid grid-cols-2 gap-2'));
 
         foreach (['year_from', 'year_to', 'seasons_min', 'seasons_max', 'episodes_min', 'episodes_max', 'rating_min', 'votes_min'] as $name) {
-            $this->assertMatchesRegularExpression('/name="'.preg_quote($name, '/').'"[^>]*class="[^"]*w-full[^"]*sm:w-/s', $content);
+            $this->assertMatchesRegularExpression('/name="'.preg_quote($name, '/').'"[^>]*class="[^"]*w-full/s', $content);
         }
     }
 

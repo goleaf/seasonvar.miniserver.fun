@@ -4,6 +4,7 @@ namespace App\View\ViewModels;
 
 use App\Enums\CatalogPublicationType;
 use App\Enums\CatalogSort;
+use App\Enums\CatalogView;
 use App\Livewire\Forms\CatalogSeriesFilters;
 use App\Models\CatalogTitle;
 use App\Support\CatalogAlphabet;
@@ -105,6 +106,7 @@ class CatalogTitlesViewModel
         public readonly int $perPage = 24,
         array $catalogQueryState = [],
         ?Collection $excludedTaxonomies = null,
+        public readonly string $view = 'grid',
     ) {
         $this->typeLabels = collect([
             'genre', 'country', 'actor', 'director', 'age_rating',
@@ -186,6 +188,84 @@ class CatalogTitlesViewModel
     public function isActiveSort(string $sort): bool
     {
         return $this->sort === $sort;
+    }
+
+    /** @return array<string, string> */
+    public function primarySortOptions(): array
+    {
+        return collect([
+            CatalogSort::Popularity,
+            CatalogSort::Updated,
+            CatalogSort::YearDesc,
+            CatalogSort::ImdbRating,
+        ])->mapWithKeys(fn (CatalogSort $sort): array => [
+            $sort->value => $this->sortLabel($sort->value),
+        ])->all();
+    }
+
+    /** @return array<string, string> */
+    public function secondarySortOptions(): array
+    {
+        return collect([
+            CatalogSort::Relevance,
+            CatalogSort::TitleAsc,
+            CatalogSort::TitleDesc,
+            CatalogSort::SeasonsDesc,
+            CatalogSort::EpisodesDesc,
+            CatalogSort::VideoDesc,
+            CatalogSort::YearAsc,
+            CatalogSort::KinopoiskRating,
+        ])->mapWithKeys(fn (CatalogSort $sort): array => [
+            $sort->value => $this->sortLabel($sort->value),
+        ])->all();
+    }
+
+    public function currentSortLabel(): string
+    {
+        return $this->sortLabel($this->sort);
+    }
+
+    public function isActiveView(string $view): bool
+    {
+        return $this->view === $view;
+    }
+
+    /** @return list<array{value: string, label: string, icon: string}> */
+    public function viewOptions(): array
+    {
+        return collect(CatalogView::cases())
+            ->map(fn (CatalogView $view): array => [
+                'value' => $view->value,
+                'label' => $view->label(),
+                'icon' => $view->icon(),
+            ])
+            ->all();
+    }
+
+    public function isPrimaryFilterType(string $filterType): bool
+    {
+        return in_array($filterType, ['genre', 'country', 'translation', 'status'], true);
+    }
+
+    public function isFilterGroupExpanded(string $filterType): bool
+    {
+        return $this->isPrimaryFilterType($filterType)
+            || $this->selectedTaxonomies->get($filterType, collect())->isNotEmpty();
+    }
+
+    /** @return array<string, mixed> */
+    public function viewQuery(string $view): array
+    {
+        $option = CatalogView::tryFrom($view) ?? CatalogView::Grid;
+        $query = $this->sortQuery($this->sort);
+
+        if ($option === CatalogView::Grid) {
+            unset($query['view']);
+        } else {
+            $query['view'] = $option->value;
+        }
+
+        return $query;
     }
 
     public function isActiveLetter(string $letter): bool
@@ -423,6 +503,69 @@ class CatalogTitlesViewModel
             ->filter(fn (array $chip): bool => $chip['value'] !== '')
             ->values()
             ->all();
+    }
+
+    /**
+     * @return list<array{keys: list<string>, label: string, icon: string}>
+     */
+    public function summaryFilterChips(): array
+    {
+        $chips = [];
+        $yearFrom = $this->scalarState('year_from');
+        $yearTo = $this->scalarState('year_to');
+        $ratingSource = $this->scalarState('rating_source');
+        $ratingMin = $this->scalarState('rating_min');
+
+        if ($yearFrom !== '' || $yearTo !== '') {
+            $label = match (true) {
+                $yearFrom !== '' && $yearTo !== '' => $yearFrom.'–'.$yearTo,
+                $yearFrom !== '' => __('catalog.catalog.chips.year_from', ['year' => $yearFrom]),
+                default => __('catalog.catalog.chips.year_to', ['year' => $yearTo]),
+            };
+            $chips[] = [
+                'keys' => array_values(array_filter([
+                    $yearFrom !== '' ? 'year_from' : null,
+                    $yearTo !== '' ? 'year_to' : null,
+                ])),
+                'label' => (string) $label,
+                'icon' => 'fa-solid fa-calendar-days',
+            ];
+        }
+
+        if ($ratingSource !== '' || $ratingMin !== '') {
+            $source = match ($ratingSource) {
+                'imdb' => 'IMDb',
+                'kinopoisk' => 'КиноПоиск',
+                default => (string) __('catalog.catalog.chips.rating'),
+            };
+            $label = $ratingMin === ''
+                ? $source
+                : __('catalog.catalog.chips.rating_from', ['source' => $source, 'rating' => $ratingMin]);
+            $chips[] = [
+                'keys' => array_values(array_filter([
+                    $ratingSource !== '' ? 'rating_source' : null,
+                    $ratingMin !== '' ? 'rating_min' : null,
+                ])),
+                'label' => (string) $label,
+                'icon' => 'fa-solid fa-star',
+            ];
+        }
+
+        return $chips;
+    }
+
+    /** @param list<string> $keys
+     * @return array<string, mixed>
+     */
+    public function withoutCatalogStates(array $keys): array
+    {
+        $query = $this->sortQuery($this->sort);
+
+        foreach ($keys as $key) {
+            unset($query[$key]);
+        }
+
+        return $query;
     }
 
     private function advancedFilterValue(string $key, mixed $value): string

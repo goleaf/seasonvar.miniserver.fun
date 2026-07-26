@@ -78,6 +78,7 @@ class CatalogTitlesPageBuilder
         $criteria = $context->criteria;
         $sortOption = $context->sortOption;
         $sort = $context->sort;
+        $view = $context->view;
         $perPage = $context->perPage;
         $filterTypes = $context->filterTypes;
         $activeTaxonomies = $context->activeTaxonomies;
@@ -213,6 +214,7 @@ class CatalogTitlesPageBuilder
             'titles' => $catalogTitles,
             'search' => $search,
             'sort' => $sort,
+            'view' => $view,
             'perPage' => $perPage,
             'year' => $year,
             'requestedYear' => $requestedYear,
@@ -289,6 +291,8 @@ class CatalogTitlesPageBuilder
         $years = $criteria->years;
         $sortOption = $criteria->sort;
         $sort = $sortOption->value;
+        $viewOption = $request->view();
+        $view = $viewOption->value;
         $perPage = $criteria->perPage;
         $filterTypes = $this->taxonomies->filterTypes();
         $legacyType = $request->legacyType($filterTypes);
@@ -396,6 +400,7 @@ class CatalogTitlesPageBuilder
         $filterView = new CatalogTitlesViewModel(
             search: $search,
             sort: $sort,
+            view: $view,
             year: $year,
             requestedYear: $requestedYear,
             invalidYear: $invalidYear,
@@ -422,6 +427,8 @@ class CatalogTitlesPageBuilder
             years: $years,
             sortOption: $sortOption,
             sort: $sort,
+            viewOption: $viewOption,
+            view: $view,
             perPage: $perPage,
             filterTypes: $filterTypes,
             routeTaxonomyFilterType: $routeTaxonomyFilterType,

@@ -7,6 +7,7 @@ namespace App\Http\Requests;
 use App\Enums\CatalogFilterType;
 use App\Enums\CatalogPublicationType;
 use App\Enums\CatalogSort;
+use App\Enums\CatalogView;
 use App\Rules\CatalogFilterSlug;
 use App\Services\Catalog\Search\CatalogSearchNormalizer;
 use Closure;
@@ -36,6 +37,7 @@ class CatalogTitlesRequest extends FormRequest
             'year.*' => ['integer', 'distinct', 'between:1900,'.((int) now()->format('Y') + 1)],
             'title' => $this->slugRules(),
             'sort' => ['nullable', Rule::enum(CatalogSort::class)],
+            'view' => ['nullable', Rule::enum(CatalogView::class)],
             'type' => ['nullable', Rule::enum(CatalogFilterType::class)],
             'taxonomy' => $this->slugRules(),
             'exclude_country' => $this->slugListRules(),
@@ -85,6 +87,7 @@ class CatalogTitlesRequest extends FormRequest
             'year.*.integer' => __('catalog.search.validation.year_integer'),
             'year.*.between' => __('catalog.search.validation.year_supported'),
             'sort.enum' => __('catalog.search.validation.sort_supported'),
+            'view.enum' => __('catalog.search.validation.view_supported'),
             'type.enum' => __('catalog.search.validation.type_supported'),
             '*.array' => __('catalog.search.validation.filter_array'),
             '*.max' => __('catalog.search.validation.filter_limit'),
@@ -105,6 +108,7 @@ class CatalogTitlesRequest extends FormRequest
             'year' => __('catalog.search.attributes.year'),
             'title' => __('catalog.search.attributes.title'),
             'sort' => __('catalog.search.attributes.sort'),
+            'view' => __('catalog.search.attributes.view'),
             'type' => __('catalog.search.attributes.type'),
             'taxonomy' => __('catalog.search.attributes.taxonomy'),
             'publication_type' => __('catalog.search.attributes.publication_type'),
@@ -136,7 +140,7 @@ class CatalogTitlesRequest extends FormRequest
             $normalized[$key] = $this->normalizeRepeatedValues($values);
         }
 
-        foreach (['q', 'title', 'sort', 'type', 'taxonomy', 'year_from', 'year_to', 'seasons_min', 'seasons_max', 'episodes_min', 'episodes_max', 'rating_source', 'rating_min', 'votes_min', 'video', 'updated', 'letter', 'per_page'] as $key) {
+        foreach (['q', 'title', 'sort', 'view', 'type', 'taxonomy', 'year_from', 'year_to', 'seasons_min', 'seasons_max', 'episodes_min', 'episodes_max', 'rating_source', 'rating_min', 'votes_min', 'video', 'updated', 'letter', 'per_page'] as $key) {
             if (! $this->query->has($key)) {
                 continue;
             }
@@ -144,7 +148,11 @@ class CatalogTitlesRequest extends FormRequest
             $value = $this->query($key);
 
             if (! is_scalar($value)) {
-                $normalized[$key] = $key === 'sort' ? CatalogSort::Updated->value : '';
+                $normalized[$key] = match ($key) {
+                    'sort' => CatalogSort::Updated->value,
+                    'view' => CatalogView::Grid->value,
+                    default => '',
+                };
 
                 continue;
             }
@@ -153,6 +161,7 @@ class CatalogTitlesRequest extends FormRequest
             $normalized[$key] = match ($key) {
                 'q' => app(CatalogSearchNormalizer::class)->display($value),
                 'sort' => $this->normalizedSort($value),
+                'view' => (CatalogView::tryFrom($value) ?? CatalogView::Grid)->value,
                 default => $value,
             };
         }
@@ -195,6 +204,11 @@ class CatalogTitlesRequest extends FormRequest
     public function sort(): CatalogSort
     {
         return CatalogSort::tryFrom($this->stringQuery('sort')) ?? CatalogSort::Updated;
+    }
+
+    public function view(): CatalogView
+    {
+        return CatalogView::tryFrom($this->stringQuery('view')) ?? CatalogView::Grid;
     }
 
     /** @return list<int> */
@@ -315,12 +329,13 @@ class CatalogTitlesRequest extends FormRequest
         $keys = array_merge(
             ['year', 'exclude_country', 'exclude_genre', 'quality', 'publication_type', 'subtitles'],
             CatalogFilterType::values(),
-            ['year_from', 'year_to', 'seasons_min', 'seasons_max', 'episodes_min', 'episodes_max', 'rating_source', 'rating_min', 'votes_min', 'video', 'updated', 'letter', 'per_page'],
+            ['year_from', 'year_to', 'seasons_min', 'seasons_max', 'episodes_min', 'episodes_max', 'rating_source', 'rating_min', 'votes_min', 'video', 'updated', 'letter', 'view', 'per_page'],
         );
 
         return collect($keys)
             ->filter(fn (string $key): bool => $this->query->has($key))
             ->mapWithKeys(fn (string $key): array => [$key => $this->query($key)])
+            ->reject(fn (mixed $value, string $key): bool => $key === 'view' && $value === CatalogView::Grid->value)
             ->all();
     }
 

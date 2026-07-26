@@ -1,11 +1,11 @@
-<section class="space-y-5">
-        @island(name: 'catalog-live', with: $this->catalogPage)
+<section class="space-y-6">
+    @island(name: 'catalog-live', with: $this->catalogPage)
         @if ($errors->any())
-            <div role="alert" class="col-span-full rounded-panel border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            <div role="alert" class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
                 <div class="flex items-start gap-3">
                     <x-ui.icon name="fa-solid fa-triangle-exclamation" align="start" />
                     <div>
-                        <div class="font-bold">{{ __('catalog.catalog.validation_summary') }}</div>
+                        <div class="font-semibold">{{ __('catalog.catalog.validation_summary') }}</div>
                         <ul class="mt-2 list-disc space-y-1 pl-5">
                             @foreach ($errors->all() as $message)
                                 <li>{{ $message }}</li>
@@ -15,242 +15,66 @@
                 </div>
             </div>
         @endif
-        @endisland
-        <div class="min-w-0 space-y-5">
-            <x-ui.panel>
-                @island(name: 'catalog-live', with: $this->catalogPage)
-                <div class="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-                    <div>
-                        <h1 class="inline-flex items-center gap-2 text-3xl font-semibold text-slate-900">
-                            <x-ui.icon name="fa-solid fa-clapperboard text-emerald-700" />
-                            <span>{{ $seo['h1'] ?? __('catalog.navigation.all_titles') }}</span>
-                        </h1>
+    @endisland
 
-                        @if ($search !== '' || $filterView->hasActiveFilters() || $excludedTaxonomies->isNotEmpty() || $titleContext !== null || $invalidYear)
-                            <div class="mt-3 space-y-3 text-sm">
-                                <div class="hidden flex-wrap items-center gap-2 sm:flex">
-                                    @if ($search !== '')
-                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->withoutSearchQuery)" rel="nofollow" wire:click.prevent="clearSearch" active icon="fa-solid fa-magnifying-glass">{{ __('catalog.catalog.chips.search', ['query' => $search]) }}</x-ui.taxonomy-chip>
-                                    @endif
-                                    @if ($titleContext !== null)
-                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->withoutTitleQuery)" rel="nofollow" wire:click.prevent="clearTitleContext" active icon="fa-solid fa-clapperboard">{{ __('catalog.catalog.chips.title', ['title' => $titleContext->display_title]) }}</x-ui.taxonomy-chip>
-                                    @endif
-                                    @foreach ($filterView->selectedYears() as $selectedYear)
-                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->yearQuery($selectedYear))" rel="nofollow" wire:click.prevent="removeYear({{ $selectedYear }})" active icon="fa-solid fa-calendar-days">{{ __('catalog.catalog.chips.year', ['year' => $selectedYear]) }}</x-ui.taxonomy-chip>
-                                    @endforeach
-                                    @if ($invalidYear)
-                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->withoutYearQuery)" rel="nofollow" wire:click.prevent="resetGroup('year')" active icon="fa-solid fa-calendar-days">{{ __('catalog.catalog.chips.invalid_year', ['year' => $requestedYear]) }}</x-ui.taxonomy-chip>
-                                    @endif
-                                    @foreach ($selectedTaxonomies as $filterType => $taxonomies)
-                                        @foreach ($taxonomies as $taxonomy)
-                                            <x-ui.taxonomy-chip :href="route('titles.index', $filterView->filterQuery($filterType, $taxonomy->slug))" rel="nofollow" wire:click.prevent="removeTaxonomy('{{ $filterType }}', '{{ $taxonomy->slug }}')" :icon="$filterView->icon($filterType)" active>{{ __('catalog.catalog.chips.remove', ['label' => $filterView->taxonomyContextLabel($filterType, $taxonomy)]) }}</x-ui.taxonomy-chip>
-                                        @endforeach
-                                    @endforeach
-                                    @foreach ($excludedTaxonomies as $filterType => $taxonomies)
-                                        @foreach ($taxonomies as $taxonomy)
-                                            <x-ui.taxonomy-chip :href="route('titles.index', $filterView->exclusionQuery($filterType, $taxonomy->slug))" rel="nofollow" wire:click.prevent="removeExcluded('{{ $filterType }}', '{{ $taxonomy->slug }}')" active icon="fa-solid fa-minus">{{ __('catalog.catalog.chips.remove', ['label' => $filterView->excludedTaxonomyLabel($filterType, $taxonomy)]) }}</x-ui.taxonomy-chip>
-                                        @endforeach
-                                    @endforeach
-                                    @foreach ($filterView->listState('publication_type') as $publicationType)
-                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->choiceQuery('publication_type', $publicationType))" rel="nofollow" wire:click.prevent="removeChoice('publication_type', '{{ $publicationType }}')" active icon="fa-solid fa-clapperboard">{{ __('catalog.catalog.chips.publication_type', ['value' => $filterView->publicationTypeLabel($publicationType)]) }}</x-ui.taxonomy-chip>
-                                    @endforeach
-                                    @foreach ($filterView->listState('subtitles') as $subtitleValue)
-                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->choiceQuery('subtitles', $subtitleValue))" rel="nofollow" wire:click.prevent="removeChoice('subtitles', '{{ $subtitleValue }}')" active icon="fa-solid fa-closed-captioning">{{ __('catalog.catalog.chips.subtitles', ['value' => $filterView->subtitleLabel($subtitleValue)]) }}</x-ui.taxonomy-chip>
-                                    @endforeach
-                                    @foreach ($filterView->listState('quality') as $quality)
-                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->choiceQuery('quality', $quality))" rel="nofollow" wire:click.prevent="removeChoice('quality', '{{ $quality }}')" active icon="fa-solid fa-display">{{ __('catalog.catalog.chips.quality', ['value' => $quality]) }}</x-ui.taxonomy-chip>
-                                    @endforeach
-                                    @foreach ($filterView->advancedFilterChips() as $chip)
-                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->withoutCatalogState($chip['key']))" rel="nofollow" wire:click.prevent="resetAdvanced('{{ $chip['key'] }}')" active icon="fa-solid fa-sliders">
-                                            {{ __('catalog.catalog.chips.advanced', ['label' => $chip['label'], 'value' => $chip['value']]) }}
-                                        </x-ui.taxonomy-chip>
-                                    @endforeach
-                                </div>
-                                <div class="flex flex-wrap gap-3 text-slate-600">
-                                    <span class="hidden sm:inline"><x-ui.icon name="fa-solid fa-diagram-project text-slate-400" /> {{ $filterView->activeFilterCountLabel() }}</span>
-                                    @if ($invalidYear)
-                                        <span class="hidden sm:inline"><x-ui.icon name="fa-solid fa-calendar-xmark text-amber-600" /> {{ __('catalog.catalog.invalid_year_summary', ['year' => $requestedYear]) }}</span>
-                                    @endif
-                                    @if ($filterView->selectedYears() !== [])
-                                        <span class="hidden sm:inline"><x-ui.icon name="fa-solid fa-calendar-days text-slate-400" /> {{ __('catalog.catalog.selected_years_summary', ['years' => implode(', ', $filterView->selectedYears())]) }}</span>
-                                    @endif
-                                    @if ($titleContext !== null)
-                                        <span class="hidden sm:inline"><x-ui.icon name="fa-solid fa-clapperboard text-slate-400" /> {{ __('catalog.catalog.title_context_summary', ['title' => $titleContext->display_title]) }}</span>
-                                    @endif
-                                    <span><x-ui.icon name="fa-solid fa-magnifying-glass text-slate-400" /> {{ __('catalog.catalog.found_now', ['results' => $filterView->resultCountLabel($titles->total())]) }}</span>
-                                    <a href="{{ route('titles.index') }}" wire:click.prevent="resetAll" class="hidden items-center gap-1 font-semibold text-emerald-700 hover:text-emerald-800 sm:inline-flex">
-                                        <x-ui.icon name="fa-solid fa-rotate-left" />
-                                        <span>{{ __('catalog.catalog.reset_all') }}</span>
-                                    </a>
-                                </div>
-                            </div>
-                        @else
-                            <div class="mt-3 text-sm text-slate-600">
-                                <x-ui.icon name="fa-solid fa-magnifying-glass text-slate-400" />
-                                {{ __('catalog.catalog.found', ['results' => $filterView->resultCountLabel($titles->total())]) }}
-                            </div>
-                        @endif
-                    </div>
+    @island(name: 'catalog-live', with: $this->catalogPage)
+        <header data-catalog-page-header class="border-b border-slate-200 pb-6">
+            <div class="flex flex-wrap items-baseline justify-between gap-2">
+                <h1 class="text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
+                    {{ $seo['h1'] ?? __('catalog.navigation.all_titles') }}
+                </h1>
+                <p class="text-sm font-semibold text-slate-600">
+                    {{ __('catalog.catalog.found_label') }} {{ $filterView->resultCountLabel($titles->total()) }}
+                </p>
+            </div>
 
-                    <form method="GET" action="{{ route('titles.index') }}" wire:submit="applySearch" role="search" aria-label="{{ $filterView->hasActiveFilters() ? __('catalog.catalog.search_selected') : __('catalog.catalog.search_catalog') }}" class="flex w-full max-w-md min-w-0 gap-2">
-                        @foreach ($filterView->searchFormState() as $stateKey => $stateValue)
-                            @if (is_array($stateValue))
-                                @foreach ($stateValue as $stateItem)
-                                    <input type="hidden" name="{{ $stateKey }}[]" value="{{ $stateItem }}">
-                                @endforeach
-                            @else
-                                <input type="hidden" name="{{ $stateKey }}" value="{{ $stateValue }}">
-                            @endif
+            <form
+                method="GET"
+                action="{{ route('titles.index') }}"
+                wire:submit="applySearch"
+                role="search"
+                aria-label="{{ $filterView->hasActiveFilters() ? __('catalog.catalog.search_selected') : __('catalog.catalog.search_catalog') }}"
+                class="mt-5 flex min-w-0 gap-2"
+            >
+                @foreach ($filterView->searchFormState() as $stateKey => $stateValue)
+                    @if (is_array($stateValue))
+                        @foreach ($stateValue as $stateItem)
+                            <input type="hidden" name="{{ $stateKey }}[]" value="{{ $stateItem }}">
                         @endforeach
-                        <x-form.search-field
-                            id="catalog-search"
-                            name="q"
-                            :value="$search"
-                            :label="__('catalog.catalog.search_label')"
-                            :placeholder="__('catalog.catalog.search_placeholder')"
-                            container-class="min-w-0 flex-1"
-                            wire:model="filters.search"
-                        />
-                        <button type="submit" wire:loading.attr="disabled" wire:target="filters.search,applySearch" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 disabled:cursor-wait disabled:opacity-60">
-                            <x-ui.icon name="fa-solid fa-arrow-right" />
-                            <span>{{ __('catalog.catalog.search_submit') }}</span>
-                        </button>
-                    </form>
-                </div>
+                    @else
+                        <input type="hidden" name="{{ $stateKey }}" value="{{ $stateValue }}">
+                    @endif
+                @endforeach
+                <x-form.search-field
+                    id="catalog-search"
+                    name="q"
+                    :value="$search"
+                    :label="__('catalog.catalog.search_label')"
+                    :placeholder="__('catalog.catalog.search_placeholder')"
+                    container-class="min-w-0 flex-1"
+                    wire:model="filters.search"
+                />
+                <button type="submit" aria-label="{{ __('catalog.catalog.search_submit') }}" wire:loading.attr="disabled" wire:target="filters.search,applySearch" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 disabled:cursor-wait disabled:opacity-60">
+                    <x-ui.icon name="fa-solid fa-magnifying-glass" />
+                    <span class="hidden sm:inline">{{ __('catalog.catalog.search_submit') }}</span>
+                </button>
+            </form>
+        </header>
+    @endisland
 
-                @if ($tagPage !== null)
-                    <section aria-labelledby="public-tag-summary-{{ $tagPage->publicId }}" class="mt-5 rounded-lg border border-emerald-100 bg-emerald-50/60 p-4">
-                        <div class="flex flex-wrap items-start justify-between gap-3">
-                            <div class="min-w-0">
-                                <div class="flex flex-wrap items-center gap-2">
-                                    <h2 id="public-tag-summary-{{ $tagPage->publicId }}" class="break-words text-lg font-black text-slate-800">{{ $tagPage->name }}</h2>
-                                    <x-ui.status-pill variant="success">{{ __('tags.types.'.$tagPage->type) }}</x-ui.status-pill>
-                                </div>
-                                <p class="mt-1 text-sm text-slate-600">{{ trans_choice('tags.page.count', $tagPage->publicTitleCount, ['count' => $tagPage->publicTitleCount]) }}</p>
-                            </div>
-                            <a href="{{ route('tags.index') }}" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
-                                <x-ui.icon name="fa-solid fa-tags" />
-                                <span>{{ __('tags.title') }}</span>
-                            </a>
-                        </div>
-
-                        @if ($tagPage->shortDescription !== null)
-                            <p class="mt-3 max-w-4xl text-sm leading-6 text-slate-700">{{ $tagPage->shortDescription }}</p>
-                        @endif
-
-                        @if ($tagPage->description !== null && $tagPage->description !== $tagPage->shortDescription)
-                            <details class="group mt-3 max-w-4xl">
-                                <summary class="inline-flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-emerald-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
-                                    <x-ui.icon name="fa-solid fa-circle-info" />
-                                    <span>{{ __('tags.page.show_description') }}</span>
-                                    <x-ui.icon name="fa-solid fa-chevron-down transition group-open:rotate-180" />
-                                </summary>
-                                <p class="mt-2 whitespace-pre-line text-sm leading-6 text-slate-700">{{ $tagPage->description }}</p>
-                            </details>
-                        @endif
-
-                        @if ($tagPage->aliases !== [])
-                            <div class="mt-4">
-                                <h3 class="text-xs font-semibold text-slate-600">{{ __('tags.page.aliases') }}</h3>
-                                <div class="mt-2 flex flex-wrap gap-2">
-                                    @foreach ($tagPage->aliases as $alias)
-                                        <x-ui.status-pill variant="muted">{{ $alias }}</x-ui.status-pill>
-                                    @endforeach
-                                </div>
-                            </div>
-                        @endif
-
-                        @if ($tagPage->related !== [])
-                            <nav aria-labelledby="related-tags-{{ $tagPage->publicId }}" class="mt-4">
-                                <h3 id="related-tags-{{ $tagPage->publicId }}" class="text-xs font-semibold text-slate-600">{{ __('tags.page.related') }}</h3>
-                                <div class="mt-2 flex flex-wrap gap-2">
-                                    @foreach ($tagPage->related as $relatedTag)
-                                        <a href="{{ route('titles.taxonomy', ['type' => 'tag', 'taxonomy' => $relatedTag['slug']]) }}" class="inline-flex min-h-11 max-w-full items-center gap-2 rounded-full bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-emerald-100 hover:text-emerald-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
-                                            <x-ui.icon name="fa-solid fa-tag text-emerald-700" />
-                                            <span class="min-w-0 break-words">{{ $relatedTag['name'] }}</span>
-                                            <span class="tabular-nums text-slate-600">{{ $relatedTag['count'] }}</span>
-                                        </a>
-                                    @endforeach
-                                </div>
-                            </nav>
-                        @endif
-                    </section>
-                @endif
-
-                <div class="mt-4 hidden flex-wrap gap-2 lg:flex">
-                    @foreach ($filterView->sortLabels as $sortKey => $sortLabel)
-                        <a data-catalog-sort-option href="{{ route('titles.index', $filterView->sortQuery($sortKey)) }}" rel="nofollow" wire:click.prevent="sortBy('{{ $sortKey }}')" @if ($filterView->isActiveSort($sortKey)) aria-current="true" @endif @class([
-                            'inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold',
-                            'bg-emerald-50 text-emerald-700' => $filterView->isActiveSort($sortKey),
-                            'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-800' => ! $filterView->isActiveSort($sortKey),
-                        ])>
-                            <x-ui.icon name="{{ $filterView->sortIcon($sortKey) }}" />
-                            <span>{{ $sortLabel }}</span>
-                        </a>
-                    @endforeach
-                </div>
-
-                <div class="mt-3 hidden flex-wrap items-center gap-2 text-xs font-bold lg:flex">
-                    <span class="text-slate-600">{{ __('catalog.catalog.page_size_label') }}:</span>
-                    @foreach ([24, 48, 96] as $pageSize)
-                        <a data-catalog-page-size-option href="{{ route('titles.index', $filterView->perPageQuery($pageSize)) }}" rel="nofollow" wire:click.prevent="setPerPage({{ $pageSize }})" @class([
-                            'inline-flex min-h-11 min-w-11 items-center justify-center rounded-full px-3 py-2 tabular-nums',
-                            'bg-emerald-50 text-emerald-700' => $perPage === $pageSize,
-                            'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-800' => $perPage !== $pageSize,
-                        ])>{{ $pageSize }}</a>
-                    @endforeach
-                </div>
-
-                <x-catalog.alphabet-filter :filter-view="$filterView" class="mt-4 hidden lg:block" />
-
-                <details data-catalog-mobile-output-controls class="group mt-4 rounded-lg bg-slate-50 p-2 lg:hidden">
-                    <summary class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-control px-2 text-sm font-bold text-slate-700">
-                        <span class="inline-flex min-w-0 items-center gap-2">
-                            <x-ui.icon name="{{ $filterView->sortIcon($sort) }} text-amber-700" />
-                            <span class="min-w-0 break-words">{{ __('catalog.catalog.sort_summary', ['sort' => $filterView->sortLabel($sort)]) }}</span>
-                        </span>
-                        <x-ui.icon name="fa-solid fa-chevron-down text-slate-400 transition group-open:rotate-180" />
-                    </summary>
-                    <div class="mt-2 flex flex-wrap gap-2">
-                        @foreach ($filterView->sortLabels as $sortKey => $sortLabel)
-                            <a href="{{ route('titles.index', $filterView->sortQuery($sortKey)) }}" rel="nofollow" wire:click.prevent="sortBy('{{ $sortKey }}')" @if ($filterView->isActiveSort($sortKey)) aria-current="true" @endif @class([
-                                'inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold',
-                                'bg-emerald-50 text-emerald-700' => $filterView->isActiveSort($sortKey),
-                                'bg-white text-slate-600 hover:bg-emerald-50 hover:text-emerald-800' => ! $filterView->isActiveSort($sortKey),
-                            ])>
-                                <x-ui.icon name="{{ $filterView->sortIcon($sortKey) }}" />
-                                <span>{{ $sortLabel }}</span>
-                            </a>
-                        @endforeach
-                    </div>
-                    <div data-catalog-mobile-page-size-controls class="mt-3 border-t border-slate-200 pt-3">
-                        <div class="text-xs font-semibold text-slate-600">{{ __('catalog.catalog.page_size_label') }}</div>
-                        <div class="mt-2 flex flex-wrap gap-2">
-                            @foreach ([24, 48, 96] as $pageSize)
-                                <a href="{{ route('titles.index', $filterView->perPageQuery($pageSize)) }}" rel="nofollow" wire:click.prevent="setPerPage({{ $pageSize }})" @class([
-                                    'inline-flex min-h-11 min-w-11 items-center justify-center rounded-full px-3 py-2 text-xs font-bold tabular-nums',
-                                    'bg-emerald-50 text-emerald-700' => $perPage === $pageSize,
-                                    'bg-white text-slate-600 hover:bg-emerald-50 hover:text-emerald-800' => $perPage !== $pageSize,
-                                ])>{{ $pageSize }}</a>
-                            @endforeach
-                        </div>
-                    </div>
-                    <x-catalog.alphabet-filter :filter-view="$filterView" mobile class="mt-3" />
-                </details>
-                @endisland
-
-            </x-ui.panel>
-
+    <div data-catalog-desktop-layout class="min-w-0 lg:grid lg:grid-cols-[18rem_minmax(0,1fr)] lg:items-start lg:gap-6">
+        <aside data-catalog-filter-sidebar class="min-w-0 lg:sticky lg:top-24 lg:self-start">
             @island(name: 'catalog-live', lazy: true)
                 @placeholder
                     <div
                         id="catalog-filters"
                         data-catalog-advanced-filters
                         data-catalog-unified-filters
+                        data-catalog-mobile-filter-page
                         aria-busy="true"
-                        class="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3"
+                        class="rounded-xl border border-slate-200 bg-white p-3"
                     >
-                        <div data-catalog-facets-loading role="status" aria-live="polite" class="flex min-h-24 items-center justify-center gap-2 rounded-control bg-white px-4 py-5 text-sm font-bold text-slate-600">
+                        <div data-catalog-facets-loading role="status" aria-live="polite" class="flex min-h-24 items-center justify-center gap-2 px-4 py-5 text-sm font-semibold text-slate-600">
                             <x-ui.icon name="fa-solid fa-spinner fa-spin text-emerald-700" />
                             <span>{{ __('catalog.catalog.filters.loading') }}</span>
                         </div>
@@ -265,125 +89,156 @@
                     :route-taxonomy="$routeTaxonomy"
                 />
             @endisland
+        </aside>
 
+        <div class="mt-5 min-w-0 space-y-5 lg:mt-0">
             @island(name: 'catalog-live', with: $this->catalogPage)
-            @if ($collectionSuggestions->isNotEmpty())
-                <section aria-labelledby="catalog-collection-suggestions-title">
-                    <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
-                        <h2 id="catalog-collection-suggestions-title" class="flex items-center gap-2 text-lg font-black text-slate-800">
-                            <x-ui.icon name="fa-solid fa-layer-group text-emerald-700" />
-                            <span>{{ __('collections.directory.search_results') }}</span>
-                        </h2>
-                        <a href="{{ route('discover.index', ['type' => 'popular', 'collections_q' => $search]).'#collections' }}" class="text-sm font-bold text-emerald-700 hover:text-emerald-800">{{ __('collections.navigation.public_collections') }}</a>
-                    </div>
-                    <div class="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                        @foreach ($collectionSuggestions as $collectionSuggestion)
-                            <x-collections.collection-card wire:key="search-collection-{{ $collectionSuggestion->public_id }}" :collection="$collectionSuggestion" />
-                        @endforeach
-                    </div>
-                </section>
-            @endif
-
-            <div class="relative">
-                <div wire:loading.delay wire:target="filters.search,applySearch,applyFilters,sortBy,setPerPage,setLetter,resetGroup,resetAdvanced,resetAdvancedFilters,clearSearch,resetAll" class="hidden absolute inset-x-0 top-0 z-20 rounded-panel bg-white text-sm font-bold text-emerald-700" role="status" aria-live="polite">
-                    <div class="flex min-h-24 items-center justify-center">
-                        <x-ui.icon name="fa-solid fa-spinner fa-spin" />
-                        <span class="ml-2">{{ __('catalog.catalog.updating') }}</span>
-                    </div>
-                </div>
-                @island(name: 'catalog-pagination', always: true, with: $this->catalogPage)
-                <x-ui.pagination-region name="catalog-results" data-catalog-results>
-                <div data-catalog-results-list wire:loading.class="opacity-50" wire:target="filters.search,applySearch,applyFilters,sortBy,setPerPage,setLetter,resetGroup,resetAdvanced,resetAdvancedFilters,clearSearch,resetAll" class="divide-y divide-slate-200 overflow-hidden rounded-panel border border-slate-200 bg-white">
-                @forelse ($titles as $catalogTitle)
-                    <x-catalog.title-card wire:key="catalog-title-{{ $catalogTitle->id }}" :title="$catalogTitle" layout="list" readable />
-                @empty
-                    <x-ui.panel class="col-span-full border-dashed">
-                        <div class="flex flex-col gap-4">
-                            <div>
-                                <div class="inline-flex items-center gap-2 text-base font-bold text-slate-700">
-                                    <x-ui.icon name="fa-solid fa-magnifying-glass text-slate-400" />
-                                    @if ($insufficientSearch)
-                                        <span>{{ __('catalog.catalog.empty.insufficient', ['query' => $search]) }}</span>
-                                    @elseif ($search !== '')
-                                        <span>{{ __('catalog.catalog.empty.query', ['query' => $search]) }}</span>
-                                    @else
-                                        <span>{{ __('catalog.catalog.empty.filters') }}</span>
-                                    @endif
+                @if ($tagPage !== null)
+                    <section aria-labelledby="public-tag-summary-{{ $tagPage->publicId }}" class="border-b border-slate-200 pb-5">
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <h2 id="public-tag-summary-{{ $tagPage->publicId }}" class="break-words text-xl font-semibold text-slate-900">{{ $tagPage->name }}</h2>
+                                    <x-ui.status-pill variant="success">{{ __('tags.types.'.$tagPage->type) }}</x-ui.status-pill>
                                 </div>
-                                @if ($insufficientSearch)
-                                    <p class="mt-1 text-sm text-slate-600">{{ __('catalog.catalog.empty.insufficient_hint') }}</p>
-                                @elseif ($search !== '')
-                                    <p class="mt-1 text-sm text-slate-600">{{ __('catalog.catalog.empty.query_hint') }}</p>
-                                @else
-                                    <p class="mt-1 text-sm text-slate-600">{{ __('catalog.catalog.empty.filters_hint') }}</p>
-                                @endif
+                                <p class="mt-1 text-sm text-slate-600">{{ trans_choice('tags.page.count', $tagPage->publicTitleCount, ['count' => $tagPage->publicTitleCount]) }}</p>
                             </div>
-                            @if ($searchSuggestions->isNotEmpty())
-                                <div aria-labelledby="catalog-search-suggestions-title" class="rounded-control bg-emerald-50 p-3">
-                                    <div id="catalog-search-suggestions-title" class="text-sm font-bold text-emerald-800">{{ __('catalog.catalog.possible_match') }}</div>
-                                    <div class="mt-2 flex flex-wrap gap-2">
-                                        @foreach ($searchSuggestions as $suggestion)
-                                            <a
-                                                href="{{ route('titles.index', array_merge($filterView->withoutSearchQuery, ['q' => $suggestion->suggestion_name])) }}"
-                                                rel="nofollow"
-                                                class="inline-flex min-h-11 max-w-full items-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100"
-                                            >
-                                                <x-ui.icon name="fa-solid fa-wand-magic-sparkles" />
-                                                <span class="min-w-0 break-words">{{ $suggestion->suggestion_name }}</span>
-                                            </a>
-                                        @endforeach
-                                    </div>
-                                </div>
-                            @endif
-                            @if ($directorySuggestions->isNotEmpty())
-                                <nav aria-labelledby="catalog-directory-suggestions-title" class="rounded-control bg-sky-50 p-3">
-                                    <div id="catalog-directory-suggestions-title" class="text-sm font-bold text-sky-900">{{ __('catalog.directories.search_suggestion') }}</div>
-                                    <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-                                        @foreach ($directorySuggestions as $directorySuggestion)
-                                            <a
-                                                href="{{ route($directorySuggestion->indexRouteName) }}"
-                                                class="inline-flex min-h-11 items-center gap-2 py-2 text-sm font-bold text-sky-800 hover:text-emerald-800 hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
-                                            >
-                                                <x-ui.icon :name="$directorySuggestion->icon" />
-                                                <span>{{ $directorySuggestion->title }}</span>
-                                            </a>
-                                        @endforeach
-                                    </div>
-                                </nav>
-                            @endif
-                            <div class="flex flex-wrap gap-2">
-                                @if ($search !== '')
-                                    <a href="{{ route('titles.index', $filterView->withoutSearchQuery) }}" rel="nofollow" wire:click.prevent="clearSearch" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-slate-50 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-800">
-                                        <x-ui.icon name="fa-solid fa-magnifying-glass-minus" />
-                                        <span>{{ __('catalog.catalog.clear_search') }}</span>
-                                    </a>
-                                @endif
-                                @if ($filterView->hasActiveFilters() || $titleContext !== null || $filterView->selectedYears() !== [] || $invalidYear)
-                                    <a href="{{ route('titles.index', $filterView->withoutFiltersQuery) }}" rel="nofollow" wire:click.prevent="resetAll" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-slate-50 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-800">
-                                        <x-ui.icon name="fa-solid fa-filter-circle-xmark" />
-                                        <span>{{ __('catalog.catalog.remove_filters') }}</span>
-                                    </a>
-                                @endif
-                                <a href="{{ route('titles.index') }}" wire:click.prevent="resetAll" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100">
-                                    <x-ui.icon name="fa-solid fa-list-ul" />
-                                    <span>{{ __('catalog.catalog.show_all') }}</span>
-                                </a>
-                                <a href="{{ route('discover.index', ['type' => 'popular']) }}" wire:navigate class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-sky-50 px-4 py-2 text-sm font-bold text-sky-800 hover:bg-sky-100">
-                                    <x-ui.icon name="fa-solid fa-compass" />
-                                    <span>{{ __('recommendations.page.browse_popular') }}</span>
-                                </a>
-                            </div>
+                            <a href="{{ route('tags.index') }}" class="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
+                                <x-ui.icon name="fa-solid fa-tags" />
+                                <span>{{ __('tags.title') }}</span>
+                            </a>
                         </div>
-                    </x-ui.panel>
-                @endforelse
+                        @if ($tagPage->shortDescription !== null)
+                            <p class="mt-3 max-w-4xl text-sm leading-6 text-slate-700">{{ $tagPage->shortDescription }}</p>
+                        @endif
+                        @if ($tagPage->description !== null && $tagPage->description !== $tagPage->shortDescription)
+                            <details class="group mt-3 max-w-4xl">
+                                <summary class="inline-flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
+                                    <x-ui.icon name="fa-solid fa-circle-info" />
+                                    <span>{{ __('tags.page.show_description') }}</span>
+                                    <x-ui.icon name="fa-solid fa-chevron-down transition group-open:rotate-180" />
+                                </summary>
+                                <p class="mt-2 whitespace-pre-line text-sm leading-6 text-slate-700">{{ $tagPage->description }}</p>
+                            </details>
+                        @endif
+                    </section>
+                @endif
+
+                <div data-catalog-current-result-label="{{ $filterView->resultCountLabel($titles->total()) }}">
+                    <x-catalog.title-output-controls :filter-view="$filterView" :per-page="$perPage" />
                 </div>
 
-                <div>
-                    {{ $titles->links(data: ['region' => 'catalog-results']) }}
+                <x-catalog.active-title-filters
+                    :filter-view="$filterView"
+                    :search="$search"
+                    :title-context="$titleContext"
+                    :invalid-year="$invalidYear"
+                    :requested-year="$requestedYear"
+                    :selected-taxonomies="$selectedTaxonomies"
+                    :excluded-taxonomies="$excludedTaxonomies"
+                />
+
+                @if ($collectionSuggestions->isNotEmpty())
+                    <section aria-labelledby="catalog-collection-suggestions-title">
+                        <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+                            <h2 id="catalog-collection-suggestions-title" class="flex items-center gap-2 text-lg font-semibold text-slate-900">
+                                <x-ui.icon name="fa-solid fa-layer-group text-emerald-700" />
+                                <span>{{ __('collections.directory.search_results') }}</span>
+                            </h2>
+                            <a href="{{ route('discover.index', ['type' => 'popular', 'collections_q' => $search]).'#collections' }}" class="text-sm font-semibold text-emerald-700 hover:text-emerald-800">{{ __('collections.navigation.public_collections') }}</a>
+                        </div>
+                        <div class="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                            @foreach ($collectionSuggestions as $collectionSuggestion)
+                                <x-collections.collection-card wire:key="search-collection-{{ $collectionSuggestion->public_id }}" :collection="$collectionSuggestion" />
+                            @endforeach
+                        </div>
+                    </section>
+                @endif
+
+                <div class="relative">
+                    <div wire:loading.delay wire:target="filters.search,applySearch,applyFilters,sortBy,setView,setPerPage,setLetter,resetGroup,resetAdvanced,resetAdvancedFilters,clearSearch,resetAll" class="absolute inset-x-0 top-0 z-20 hidden rounded-xl bg-white/95 text-sm font-semibold text-emerald-700" role="status" aria-live="polite">
+                        <div class="flex min-h-24 items-center justify-center">
+                            <x-ui.icon name="fa-solid fa-spinner fa-spin" />
+                            <span class="ml-2">{{ __('catalog.catalog.updating') }}</span>
+                        </div>
+                    </div>
+
+                    @island(name: 'catalog-pagination', always: true, with: $this->catalogPage)
+                        <x-ui.pagination-region name="catalog-results" data-catalog-results>
+                            <div
+                                data-catalog-results-list
+                                data-catalog-results-view="{{ $view }}"
+                                wire:loading.class="opacity-50"
+                                wire:target="filters.search,applySearch,applyFilters,sortBy,setView,setPerPage,setLetter,resetGroup,resetAdvanced,resetAdvancedFilters,clearSearch,resetAll"
+                                @class([
+                                    'min-w-0',
+                                    'grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5' => $view === 'grid',
+                                    'divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white' => $view === 'list',
+                                ])
+                            >
+                                @forelse ($titles as $catalogTitle)
+                                    <x-catalog.title-card
+                                        wire:key="catalog-title-{{ $catalogTitle->id }}"
+                                        :title="$catalogTitle"
+                                        :layout="$view"
+                                        :show-description="$view === 'list'"
+                                        readable
+                                    />
+                                @empty
+                                    <x-ui.panel class="col-span-full border-dashed">
+                                        <div class="flex flex-col gap-4">
+                                            <div>
+                                                <div class="inline-flex items-center gap-2 text-base font-semibold text-slate-700">
+                                                    <x-ui.icon name="fa-solid fa-magnifying-glass text-slate-600" />
+                                                    @if ($insufficientSearch)
+                                                        <span>{{ __('catalog.catalog.empty.insufficient', ['query' => $search]) }}</span>
+                                                    @elseif ($search !== '')
+                                                        <span>{{ __('catalog.catalog.empty.query', ['query' => $search]) }}</span>
+                                                    @else
+                                                        <span>{{ __('catalog.catalog.empty.filters') }}</span>
+                                                    @endif
+                                                </div>
+                                                <p class="mt-1 text-sm text-slate-600">
+                                                    {{ $insufficientSearch ? __('catalog.catalog.empty.insufficient_hint') : ($search !== '' ? __('catalog.catalog.empty.query_hint') : __('catalog.catalog.empty.filters_hint')) }}
+                                                </p>
+                                            </div>
+                                            @if ($searchSuggestions->isNotEmpty())
+                                                <div aria-labelledby="catalog-search-suggestions-title" class="rounded-lg bg-emerald-50 p-3">
+                                                    <div id="catalog-search-suggestions-title" class="text-sm font-semibold text-emerald-800">{{ __('catalog.catalog.possible_match') }}</div>
+                                                    <div class="mt-2 flex flex-wrap gap-2">
+                                                        @foreach ($searchSuggestions as $suggestion)
+                                                            <a href="{{ route('titles.index', array_merge($filterView->withoutSearchQuery, ['q' => $suggestion->suggestion_name])) }}" rel="nofollow" class="inline-flex min-h-11 max-w-full items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
+                                                                <x-ui.icon name="fa-solid fa-wand-magic-sparkles" />
+                                                                <span class="min-w-0 break-words">{{ $suggestion->suggestion_name }}</span>
+                                                            </a>
+                                                        @endforeach
+                                                    </div>
+                                                </div>
+                                            @endif
+                                            <div class="flex flex-wrap gap-2">
+                                                @if ($search !== '')
+                                                    <a href="{{ route('titles.index', $filterView->withoutSearchQuery) }}" rel="nofollow" wire:click.prevent="clearSearch" class="inline-flex min-h-11 items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">
+                                                        <x-ui.icon name="fa-solid fa-magnifying-glass-minus" />
+                                                        <span>{{ __('catalog.catalog.clear_search') }}</span>
+                                                    </a>
+                                                @endif
+                                                <a href="{{ route('titles.index') }}" wire:click.prevent="resetAll" class="inline-flex min-h-11 items-center gap-2 rounded-lg bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100">
+                                                    <x-ui.icon name="fa-solid fa-list-ul" />
+                                                    <span>{{ __('catalog.catalog.show_all') }}</span>
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </x-ui.panel>
+                                @endforelse
+                            </div>
+
+                            <div class="mt-5">
+                                {{ $titles->links(data: ['region' => 'catalog-results']) }}
+                            </div>
+                        </x-ui.pagination-region>
+                    @endisland
                 </div>
-                </x-ui.pagination-region>
-                @endisland
-            </div>
             @endisland
         </div>
+    </div>
 </section>

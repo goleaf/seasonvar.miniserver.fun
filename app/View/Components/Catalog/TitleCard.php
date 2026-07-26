@@ -21,7 +21,7 @@ class TitleCard extends Component
 
     private const REASON_LIMIT = 120;
 
-    private const LAYOUTS = ['list', 'compact', 'recommendation', 'home', 'spotlight', 'trend'];
+    private const LAYOUTS = ['grid', 'list', 'compact', 'recommendation', 'home', 'spotlight', 'trend'];
 
     public int $seasonsCount;
 
@@ -123,7 +123,7 @@ class TitleCard extends Component
             || $this->userProgressPercent !== null
             || $this->userPrimaryAction !== null
             || $this->translationPreferenceState !== null;
-        $genreLimit = in_array($this->layout, ['home', 'spotlight'], true) ? 2 : 3;
+        $genreLimit = in_array($this->layout, ['grid', 'home', 'spotlight'], true) ? 2 : 3;
         $this->cardGenres = ($title->relationLoaded('genres') ? $title->genres : collect())->take($genreLimit);
         $this->cardRelations = $this->cardGenres;
     }
@@ -131,6 +131,7 @@ class TitleCard extends Component
     public function render(): View
     {
         return view(match ($this->layout) {
+            'grid' => 'components.catalog.title-card-grid',
             'recommendation' => 'components.catalog.title-card-recommendation',
             'home', 'spotlight' => 'components.catalog.title-card-home',
             'trend' => 'components.catalog.title-card-trend',

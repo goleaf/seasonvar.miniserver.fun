@@ -178,16 +178,16 @@ test('catalog keeps URL state, unified filters and responsive geometry', async (
     await expect(page).toHaveURL(/q=Browser(?:%20|\+)Smoke/);
     await expect(page.locator('[data-catalog-card]')).toHaveCount(1);
     await expect(page.locator('[data-catalog-results-list]')).toBeVisible();
-    await expect(page.locator('[data-ui-poster-layout="list"]')).toHaveCount(1);
-    await expect(page.locator('[data-catalog-view-option]')).toHaveCount(0);
+    await expect(page.locator('[data-ui-poster-layout="grid"]')).toHaveCount(1);
+    await expect(page.locator('[data-catalog-view-option]')).toHaveCount(2);
 
     const filters = page.locator('#catalog-filters');
 
     if (testInfo.project.name === 'Desktop Chromium') {
-        await expect(filters).toHaveAttribute('open', '');
+        await expect(filters.locator('form')).toBeVisible();
     } else {
         await expect(filters).not.toHaveAttribute('open', '');
-        await filters.locator('summary').click();
+        await page.locator('[data-catalog-mobile-filter-trigger]').click();
         await expect(filters).toHaveAttribute('open', '');
     }
     await expect(page.locator('[data-catalog-filter-groups]')).toBeVisible();
@@ -566,14 +566,20 @@ test('country pagination changes results, scrolls to them and keeps alphabet scr
     await page.getByRole('link', { name: 'Назад' }).click();
     await expect(page).not.toHaveURL(/page=2/);
 
-    const mobileControls = page.locator('[data-catalog-mobile-output-controls]');
-    if ((page.viewportSize()?.width || 0) < 1024) {
-        await mobileControls.locator('summary').click();
+    const mobileViewport = (page.viewportSize()?.width || 0) < 1024;
+    const alphabetMenu = mobileViewport
+        ? page.locator('[data-catalog-mobile-alphabet]')
+        : page.locator('[data-catalog-alphabet-menu]');
+
+    if (mobileViewport) {
+        await page.locator('[data-catalog-mobile-filter-trigger]').click();
     }
 
-    const alphabetRoot = (page.viewportSize()?.width || 0) < 1024
-        ? mobileControls
-        : page.locator('[data-catalog-desktop-alphabet]');
+    await alphabetMenu.locator('summary').click();
+
+    const alphabetRoot = mobileViewport
+        ? alphabetMenu
+        : alphabetMenu.locator('[data-catalog-desktop-alphabet]');
     await expect(alphabetRoot.locator('[data-catalog-alphabet-group="cyrillic"]')).toBeVisible();
     await expect(alphabetRoot.locator('[data-catalog-alphabet-group="latin"]')).toBeVisible();
     await expect(alphabetRoot.locator('[data-alphabet-letter="A"]')).toBeVisible();
@@ -655,13 +661,13 @@ test('title page renders the player shell without local asset failures', async (
     expect(browserErrors.pageErrors).toEqual([]);
 });
 
-test('list-only surfaces keep uncropped posters across responsive viewports', async ({ page, baseURL }, testInfo) => {
+test('catalog list view and existing poster surfaces stay responsive', async ({ page, baseURL }, testInfo) => {
     test.setTimeout(60_000);
     const browserErrors = await installNetworkGuard(page, baseURL);
 
-    await auditRenderedPage(page, testInfo, 'home', '/', { listPoster: true });
-    await auditRenderedPage(page, testInfo, 'titles', '/titles?q=Browser%20Smoke', { listPoster: true });
-    await expect(page.locator('[data-catalog-view-option]')).toHaveCount(0);
+    await auditRenderedPage(page, testInfo, 'home', '/');
+    await auditRenderedPage(page, testInfo, 'titles', '/titles?q=Browser%20Smoke&view=list', { listPoster: true });
+    await expect(page.locator('[data-catalog-view-option]')).toHaveCount(2);
     await auditRenderedPage(page, testInfo, 'genres', '/genres');
     await expect(page.locator('[data-directory-results-list]')).toBeVisible();
     await auditRenderedPage(page, testInfo, 'title', '/titles/browser-smoke');

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests\Api\V1;
 
 use App\Enums\CatalogSort;
+use App\Enums\CatalogView;
 use App\Http\Requests\CatalogTitlesRequest;
 
 final class CatalogTitleIndexRequest extends CatalogTitlesRequest
@@ -14,7 +15,7 @@ final class CatalogTitleIndexRequest extends CatalogTitlesRequest
     {
         $rules = parent::rules();
 
-        unset($rules['title'], $rules['type'], $rules['taxonomy']);
+        unset($rules['title'], $rules['type'], $rules['taxonomy'], $rules['view']);
 
         $rules['page'] = ['sometimes', 'integer', 'min:1'];
         $rules['per_page'] = ['sometimes', 'integer', 'min:1', 'max:50'];
@@ -46,5 +47,19 @@ final class CatalogTitleIndexRequest extends CatalogTitlesRequest
     public function perPage(): int
     {
         return $this->integer('per_page', (int) config('mobile-api.default_per_page', 20));
+    }
+
+    public function view(): CatalogView
+    {
+        return CatalogView::Grid;
+    }
+
+    /** @return array<string, mixed> */
+    public function catalogQueryState(): array
+    {
+        $state = parent::catalogQueryState();
+        unset($state['view']);
+
+        return $state;
     }
 }

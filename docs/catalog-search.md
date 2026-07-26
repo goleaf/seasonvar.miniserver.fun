@@ -290,3 +290,32 @@ Grid/card poster aspect ratio, dimensions/lazy loading, title wrapping, year/sta
 ## Help-center search integration Task 21
 
 Header portal registry теперь содержит public раздел помощи, но catalog/title suggestions и help suggestions не смешивают ranking или DTO. Внутри `/help` отдельный `HelpSearchService` повторно использует только `CatalogSearchNormalizer`: active/fallback editorial translation, aliases и bounded deterministic ranking. Он не ищет catalog content, не хранит query и не подключает внешний/AI index. Public autocomplete endpoint исключает draft/internal/authenticated/premium articles и возвращает `private, no-store`; полный контракт — [`help-center.md`](help-center.md).
+
+## UX выдачи `/titles` Task 98
+
+`/titles` сохраняет единственный `CatalogSeries`/`CatalogSeriesFilters` query
+boundary, прежние route и query-параметры. На desktop поиск названия находится
+над двухколоночным layout: sticky sidebar шириной `18rem` и выдача
+прокручиваются одним document-flow. На compact viewport кнопка
+`Фильтры N` открывает тот же native `<details>` как полноширинную страницу без
+вложенного scroll-контейнера; после lazy mount намерение открыть фильтры не
+теряется.
+
+Активные условия всегда видны над выдачей. Диапазон года и пара
+источник/минимальный рейтинг объединяются в один понятный chip, но счётчик
+`N` отражает точное количество server-side условий. Сброс одного chip,
+группы или всех условий сохраняет независимые поиск, сортировку, page size и
+route identity согласно прежнему контракту.
+
+Сортировка показывает активное значение без раскрытия. В первой группе
+остаются `popularity_desc`, `updated`, `year_desc`, `imdb_desc`; остальные
+поддерживаемые `CatalogSort` доступны под подписью «Другие варианты».
+Алфавит свёрнут, разделён на кириллицу и латиницу и остаётся обычным
+nofollow URL/Livewire state.
+
+Web-only параметр `view=grid|list` валидируется enum `CatalogView`, хранится в
+Livewire history и сбрасывает paginator. `grid` является default и не
+записывается в чистый URL; `list` noindex/canonicalize как presentation state.
+API `/api/v1/titles` не принимает и не сериализует этот параметр. Grid выбирает
+только нужные карточке поля и не загружает `description`; list сохраняет
+прежнее описание и uncropped poster contract.

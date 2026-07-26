@@ -1306,3 +1306,17 @@ Authenticated responses по-прежнему не попадают в shared re
 Route, API Resource, Livewire/Blade, locale, SEO, cache key/TTL/invalidation,
 schema/data, dependency, queue, config и environment не изменены. Rollback —
 обычный code/docs revert без restore, reindex, backfill или cache flush.
+
+## Производительность `/titles` Task 98
+
+Redesign не добавляет result count query, per-card query, новый facet request
+или client fetch. Lazy facet island, grouped taxonomy counts, pagination,
+eager loading и user overlay остаются прежними. `grid` передаёт
+`includeDescription=false` в существующий title loader; `list` включает
+описание явно. Обе карточки используют уже загруженные genres/counts, а Blade
+не выполняет запросов.
+
+Новый `view` не участвует в SQL predicates/order и не требует индекса.
+Существующие query-budget и FTS `EXPLAIN QUERY PLAN` tests остаются
+канонической проверкой индексов. Схема, cache keys/TTL/invalidation, queue,
+dependencies и production configuration не изменены.

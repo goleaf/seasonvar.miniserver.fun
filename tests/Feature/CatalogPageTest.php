@@ -121,7 +121,7 @@ class CatalogPageTest extends TestCase
 
         $this->assertStringContainsString('data-catalog-alphabet-group="cyrillic"', $catalog);
         $this->assertStringContainsString('data-catalog-alphabet-group="latin"', $catalog);
-        $this->assertSame(2, substr_count($catalog, 'data-alphabet-letter="Z"'));
+        $this->assertSame(1, substr_count($catalog, 'data-alphabet-letter="Z"'));
         $this->assertMatchesRegularExpression('/data-directory-alphabet-group="cyrillic".*Б.*Ё/s', $actorsPage);
         $this->assertMatchesRegularExpression('/data-directory-alphabet-group="latin".*A.*Z/s', $actorsPage);
         $this->assertStringContainsString('data-directory-alphabet-symbols', $actorsPage);
@@ -1017,7 +1017,7 @@ class CatalogPageTest extends TestCase
 
         $this->assertStringContainsString('Сериалы с актёром Стивен Рут онлайн', $plainContent);
         $this->assertStringContainsString('Показаны сериалы с актёром Стивен Рут.', $plainContent);
-        $this->assertStringContainsString('с актёром Стивен Рут · убрать', $plainContent);
+        $this->assertStringContainsString('Стивен Рут · ×', $plainContent);
         $this->assertStringContainsString('смотреть сериалы с актёром стивен рут', $lowerPlainContent);
         $this->assertStringNotContainsString('Сериалы: Стивен Рут', $plainContent);
         $this->assertStringNotContainsString('Актер: Стивен Рут', $plainContent);
@@ -1577,15 +1577,14 @@ class CatalogPageTest extends TestCase
             ->assertOk()
             ->assertSee('data-ui-poster-card', false)
             ->assertSee('data-ui-poster-frame', false)
-            ->assertSee('data-ui-poster-layout="list"', false)
+            ->assertSee('data-ui-poster-layout="grid"', false)
             ->assertSee('aspect-[2/3]', false)
-            ->assertSee('object-contain', false)
-            ->assertDontSee('object-cover', false)
-            ->assertDontSee('scale-[1.02]', false)
+            ->assertSee('object-cover', false)
+            ->assertSee('scale-[1.02]', false)
             ->assertDontSee('ring-1 ring-slate-200', false);
     }
 
-    public function test_titles_always_render_the_list_layout_and_description(): void
+    public function test_titles_render_grid_without_description_and_keep_a_real_list_view(): void
     {
         CatalogTitle::factory()->create([
             'title' => 'Сериал с описанием в списке',
@@ -1595,8 +1594,13 @@ class CatalogPageTest extends TestCase
 
         $this->get(route('titles.index', ['view' => 'grid']))
             ->assertOk()
+            ->assertSee('data-ui-poster-layout="grid"', false)
+            ->assertSee('data-catalog-view-option="grid"', false)
+            ->assertDontSeeText('Полное описание для горизонтальной карточки.');
+
+        $this->get(route('titles.index', ['view' => 'list']))
+            ->assertOk()
             ->assertSee('data-ui-poster-layout="list"', false)
-            ->assertDontSee('data-catalog-view-option', false)
             ->assertSeeText('Полное описание для горизонтальной карточки.');
     }
 
@@ -1689,7 +1693,7 @@ class CatalogPageTest extends TestCase
         $content = $this->get(route('titles.index'))->assertOk()->getContent();
 
         $this->assertMatchesRegularExpression('/<a[^>]*data-catalog-sort-option[^>]*rel="nofollow"[^>]*>/', $content);
-        $this->assertStringNotContainsString('data-catalog-view-option', $content);
+        $this->assertMatchesRegularExpression('/<a[^>]*data-catalog-view-option[^>]*rel="nofollow"[^>]*>/', $content);
         $this->assertMatchesRegularExpression('/<a[^>]*data-catalog-alphabet-option[^>]*rel="nofollow"[^>]*>/', $content);
         $this->assertStringContainsString('href="'.route('titles.show', $catalogTitle).'"', $content);
         $this->assertDoesNotMatchRegularExpression('/<a[^>]*href="'.preg_quote(route('titles.show', $catalogTitle), '/').'"[^>]*rel="nofollow"/', $content);

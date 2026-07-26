@@ -7,6 +7,7 @@ namespace App\Livewire;
 use App\Enums\CatalogFilterType;
 use App\Enums\CatalogPublicationType;
 use App\Enums\CatalogSort;
+use App\Enums\CatalogView;
 use App\Http\Requests\CatalogTitlesRequest;
 use App\Livewire\Forms\CatalogSeriesFilters;
 use App\Rules\CatalogFilterSlug;
@@ -145,6 +146,21 @@ class CatalogSeries extends Component
         }
 
         $this->filters->perPage = $perPage;
+        $this->resetPage();
+    }
+
+    public function setView(mixed $view): void
+    {
+        $option = is_string($view) ? CatalogView::tryFrom($view) : null;
+
+        if ($option === null) {
+            $this->addError('view', __('catalog.search.validation.view_supported'));
+
+            return;
+        }
+
+        $this->filters->view = $option->value;
+        $this->resetErrorBag('view');
         $this->resetPage();
     }
 
@@ -346,6 +362,7 @@ class CatalogSeries extends Component
             $this->routeTaxonomy,
             $this->getErrorBag()->isNotEmpty(),
             includeFacets: false,
+            includeDescription: $this->filters->view === CatalogView::List->value,
         );
     }
 

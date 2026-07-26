@@ -633,3 +633,18 @@ Desktop dropdown и mobile fullscreen presentation используют один
 Country добавляется только в header title projection через bounded eager-load;
 route middleware и policies профиля, уведомлений, библиотеки и заявок не
 заменяются сокрытием элементов интерфейса.
+
+## Архитектурная граница `/titles` Task 98
+
+Новый layout не создаёт controller, repository, второй filter form или
+client-side store. Full-page `CatalogSeries`, `CatalogSeriesFilters`,
+`CatalogTitlesRequest`, `CatalogTitlesPageBuilder` и
+`CatalogTitlesViewModel` сохраняют прежние обязанности; Blade получает
+готовые options/query links и не выполняет database queries.
+
+`CatalogView` является web presentation enum. `CatalogTitleIndexRequest`
+явно исключает его из API validation/state, поэтому `/api/v1/titles` и его
+Resource shape не меняются. Search, taxonomy/year route binding,
+authorization, visibility, SEO, cache, importer, player и notification
+границы остаются прежними. Rollback — обычный code/docs revert без migration,
+backfill, reindex или cache flush.

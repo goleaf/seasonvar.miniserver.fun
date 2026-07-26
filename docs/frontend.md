@@ -498,3 +498,19 @@ back/forward не публикует private state. Guest и unverified accounts
 страницу. Playwright проверяет desktop, narrow mobile и tablet, keyboard
 labels, loading/save path, отсутствие console/page/network errors и
 горизонтального переполнения.
+
+## Lifecycle каталога `/titles` Task 98
+
+Full-page `CatalogSeries` остаётся владельцем поиска, фильтров, сортировки,
+`grid|list`, page size и paginator history. Lazy island фасетов не создаёт
+второго filter state: mobile runtime сохраняет намерение открыть фильтры,
+если пользователь нажал кнопку до завершения lazy mount, а desktop получает
+открытый native `<details>` для доступности sidebar без JavaScript.
+
+`setView()` принимает только scalar enum value, сообщает локализованную
+ошибку для invalid state и сбрасывает paginator. Default `grid` исключает
+описание из select/hydration; `list` явно включает его. Все ссылки сохраняют
+независимые query-параметры и работают как обычные GET fallback без
+JavaScript. Filter apply/cancel, sort, alphabet, view и page size используют
+существующие Livewire loading targets, не допускают двойного submit и не
+добавляют frontend dependency.

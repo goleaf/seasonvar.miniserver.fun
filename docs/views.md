@@ -246,3 +246,23 @@ sticky desktop-строку с wordmark Seasonvar, четырьмя primary link
 видимый `focus-visible`; poster, original title, year, country, season и
 episode metadata создаются безопасно через DOM `textContent`, без inline
 business JavaScript и запросов из Blade.
+
+## Представление каталога `/titles` Task 98
+
+`resources/views/catalog/titles.blade.php` отвечает только за page composition:
+header/search, desktop sidebar, output toolbar, active-filter region,
+collection suggestions, results и pagination. Запросов к базе и построения
+query state в Blade нет.
+
+Повторно используемые границы:
+
+- `x-catalog.unified-title-filters` — один desktop/mobile native-details
+  owner для advanced/facet filters;
+- `x-catalog.title-output-controls` — primary/secondary sort, collapsed
+  alphabet, `grid|list` и page size;
+- `x-catalog.active-title-filters` — query-preserving chips и reset;
+- `x-catalog.title-card` + `title-card-grid.blade.php` — явный grid layout;
+  существующий list layout остаётся совместимым;
+- `CatalogTitlesViewModel` готовит labels/options/query links и раскрытие
+  primary/selected filter groups; Blade не вызывает enum cases и не
+  дублирует URL normalization.

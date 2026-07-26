@@ -66,7 +66,7 @@ class CatalogAdvancedFilterTest extends TestCase
             'genre' => ['drama', 'thriller'],
         ]))
             ->assertOk()
-            ->assertSeeText('Найдено сейчас: 3')
+            ->assertSeeText('Найдено 3 сериала')
             ->assertSeeText($actorADrama->title)
             ->assertSeeText($actorBThriller->title)
             ->assertSeeText($allSelectedValues->title)
@@ -149,7 +149,7 @@ class CatalogAdvancedFilterTest extends TestCase
 
         $this->get(route('titles.index', ['genre' => ['drama', 'detective']]))
             ->assertOk()
-            ->assertSeeText('Найдено сейчас: 2')
+            ->assertSeeText('Найдено 2 сериала')
             ->assertSeeText($matching->title)
             ->assertSeeText($partial->title);
     }
@@ -416,7 +416,7 @@ class CatalogAdvancedFilterTest extends TestCase
             'subtitles' => ['available', 'missing'],
         ]))
             ->assertOk()
-            ->assertSeeText('Найдено сейчас: 2')
+            ->assertSeeText('Найдено 2 сериала')
             ->assertSeeText($serial->title)
             ->assertSeeText($anime->title)
             ->assertDontSeeText($documentary->title);

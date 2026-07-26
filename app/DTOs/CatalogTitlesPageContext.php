@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\DTOs;
 
 use App\Enums\CatalogSort;
+use App\Enums\CatalogView;
 use App\Http\Requests\CatalogTitlesRequest;
 use App\Models\CatalogTitle;
 use App\Services\Catalog\CatalogTitlesCriteria;
@@ -38,6 +39,8 @@ final readonly class CatalogTitlesPageContext
         public array $years,
         public CatalogSort $sortOption,
         public string $sort,
+        public CatalogView $viewOption,
+        public string $view,
         public int $perPage,
         public array $filterTypes,
         public ?string $routeTaxonomyFilterType,

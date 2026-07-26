@@ -144,7 +144,7 @@ class CatalogTitlesRequestTest extends TestCase
         $this->assertSame(['available', 'missing'], $request->subtitleAvailability());
         $this->assertSame('month', $request->updatedPeriod());
         $this->assertSame('Ж', $request->letter());
-        $this->assertArrayNotHasKey('view', $request->catalogQueryState());
+        $this->assertSame('list', $request->catalogQueryState()['view']);
         $this->assertSame(48, $request->perPage());
         $this->assertSame(CatalogSort::ImdbRating, $request->sort());
     }

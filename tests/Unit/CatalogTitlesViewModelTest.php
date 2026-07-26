@@ -61,6 +61,108 @@ class CatalogTitlesViewModelTest extends TestCase
         ], $viewModel->sortLabels);
     }
 
+    public function test_catalog_output_controls_group_sorting_and_preserve_view_state(): void
+    {
+        $viewModel = new CatalogTitlesViewModel(
+            search: '',
+            sort: 'popularity_desc',
+            year: null,
+            requestedYear: '',
+            invalidYear: false,
+            activeTaxonomies: collect(),
+            selectedTaxonomies: collect(),
+            activeFilterSlugs: [],
+            invalidFilterSlugs: [],
+            titleContext: null,
+            view: 'list',
+            catalogQueryState: [
+                'view' => 'list',
+                'genre' => ['drama'],
+                'per_page' => 48,
+            ],
+        );
+
+        $this->assertSame(
+            ['popularity_desc', 'updated', 'year_desc', 'imdb_desc'],
+            array_keys($viewModel->primarySortOptions()),
+        );
+        $this->assertSame(
+            ['relevance', 'title_asc', 'title_desc', 'seasons_desc', 'episodes_desc', 'with_video', 'year_asc', 'kinopoisk_desc'],
+            array_keys($viewModel->secondarySortOptions()),
+        );
+        $this->assertSame('По популярности', $viewModel->currentSortLabel());
+        $this->assertTrue($viewModel->isActiveView('list'));
+        $this->assertSame([
+            'genre' => ['drama'],
+            'per_page' => 48,
+            'sort' => 'popularity_desc',
+        ], $viewModel->viewQuery('grid'));
+        $this->assertSame([
+            ['value' => 'grid', 'label' => 'Сетка', 'icon' => 'fa-solid fa-table-cells-large'],
+            ['value' => 'list', 'label' => 'Список', 'icon' => 'fa-solid fa-list'],
+        ], $viewModel->viewOptions());
+    }
+
+    public function test_primary_and_selected_filter_groups_are_expanded(): void
+    {
+        $actor = new Genre([
+            'name' => 'Стивен Рут',
+            'slug' => 'stephen-root',
+        ]);
+        $viewModel = new CatalogTitlesViewModel(
+            search: '',
+            sort: 'updated',
+            year: null,
+            requestedYear: '',
+            invalidYear: false,
+            activeTaxonomies: collect(),
+            selectedTaxonomies: collect(['actor' => collect([$actor])]),
+            activeFilterSlugs: [],
+            invalidFilterSlugs: [],
+            titleContext: null,
+        );
+
+        $this->assertTrue($viewModel->isPrimaryFilterType('genre'));
+        $this->assertTrue($viewModel->isPrimaryFilterType('country'));
+        $this->assertTrue($viewModel->isFilterGroupExpanded('actor'));
+        $this->assertFalse($viewModel->isFilterGroupExpanded('studio'));
+    }
+
+    public function test_summary_filter_chips_combine_year_and_rating_pairs(): void
+    {
+        $viewModel = new CatalogTitlesViewModel(
+            search: '',
+            sort: 'updated',
+            year: null,
+            requestedYear: '',
+            invalidYear: false,
+            activeTaxonomies: collect(),
+            selectedTaxonomies: collect(),
+            activeFilterSlugs: [],
+            invalidFilterSlugs: [],
+            titleContext: null,
+            catalogQueryState: [
+                'year_from' => '2020',
+                'year_to' => '2026',
+                'rating_source' => 'imdb',
+                'rating_min' => '8',
+            ],
+        );
+
+        $this->assertSame([
+            [
+                'keys' => ['year_from', 'year_to'],
+                'label' => '2020–2026',
+                'icon' => 'fa-solid fa-calendar-days',
+            ],
+            [
+                'keys' => ['rating_source', 'rating_min'],
+                'label' => 'IMDb от 8',
+                'icon' => 'fa-solid fa-star',
+            ],
+        ], $viewModel->summaryFilterChips());
+    }
+
     public function test_search_and_filter_reset_queries_preserve_only_relevant_state(): void
     {
         $genre = new Genre([
