@@ -11001,6 +11001,141 @@ table, dependency, queue, route или cache domain не добавляется.
 15. `[completed_unresolved_authentication]` Configured non-force
     `git push origin main` exited 128 before transfer because GitHub HTTPS
     credentials are unavailable; force, remote and history were not changed.
+## Task 90 — correlated season availability для обновлений главной
+
+Статус: `verified_commit_pending`.
+
+Дата начала: 26.07.2026.
+
+Approved design:
+[`2026-07-26-homepage-episode-season-exists-design.md`](../superpowers/specs/2026-07-26-homepage-episode-season-exists-design.md).
+
+Detailed implementation plan:
+[`2026-07-26-homepage-episode-season-exists.md`](../superpowers/plans/2026-07-26-homepage-episode-season-exists.md).
+
+### Цель и measured root cause
+
+После прогрева compact year-bucket resource private
+`CatalogHomeSnapshotCache::build()` выполняет 15 SQL statements за
+`253,460 ms` wall / `96,660 ms` SQL. Проверка доступности 2 048 уже
+ограниченных episode ID занимает `51,760 ms`.
+
+Outer `episodes NOT INDEXED` правильно использует integer primary key, но
+`season_id IN (SELECT id FROM seasons ...)` создаёт `LIST SUBQUERY` и
+материализует широкий набор доступных сезонов через
+`seasons_available_until_idx`. На текущей SQLite находятся 48 635 сезонов и
+729 494 серии.
+
+Same-snapshot сравнение девяти old/new запусков сохранило 2 048 ID и exact
+SHA-256
+`55f93b4440045888d7fce7d7214f9261d0a208c3e05708b248a6a33a0b91d5df`.
+Медиана wall-time изменилась с `192,910 ms` для `IN` до `72,887 ms` для
+correlated `EXISTS`; новый plan использует integer primary key конкретного
+сезона.
+
+Выбран portable correlated `Season::availableTo(null)` probe по
+`seasons.id = episodes.season_id`. Event window, payload, cache, route,
+schema и index остаются прежними.
+
+### Expected changed files
+
+- `app/Services/Catalog/CatalogHomeContentAdditionQuery.php`;
+- `tests/Feature/CatalogHomePerformanceTest.php`;
+- linked Task 90 design и detailed plan;
+- exact Task 90 sections в `docs/performance.md` и этом current plan;
+- exact Task 90 entries в `README.md` и `CHANGELOG.md`.
+
+### Protected files и public contracts
+
+- `/`, `/ru`, `/en`, full-page `CatalogHomePage`, SEO и page-cache headers;
+- `/api/v1/home`, `CatalogHomeResource`, full `data()` и bounded `webData()`;
+- `CatalogHomeSnapshotCache` key/version/dimensions/TTL/stale/lock/payload;
+- 48 full title updates, 12 web updates, release order, groups и `has_more`;
+- `CatalogEntitlementService`, `Episode::availableTo(null)` и
+  `Season::availableTo(null)` publication/audience/window/soft-delete rules;
+- title/media visibility, authenticated/private/Premium/region/legal/player
+  compatibility;
+- importer/admin/search/recommendation/calendar/notification/account state;
+- routes, translations, UI/assets, schema/index/data, queue and dependencies;
+- весь foreign Task 87–89 staged/unstaged/untracked scope.
+
+### Cross-feature, query и production risks
+
+| Domain | Статус | Решение / gate |
+| --- | --- | --- |
+| Episode result/order | `critical_affected` | Exact mixed-visibility fixture and ordered IDs |
+| Season visibility | `critical_affected` | Same authoritative scope in correlated probe |
+| SQLite plan | `critical_affected` | Episode/season integer PK; no `LIST SUBQUERY` |
+| Other DB drivers | `protected_critical` | Portable builder `whereExists/whereColumn`; SQLite hint remains local |
+| Homepage snapshot/web/API | `protected_critical` | Same scalar IDs/payload and related regression |
+| Cache/page cache/warming | `protected_critical` | No key/version/TTL/invalidation change |
+| Auth/security/privacy/legal | `protected_critical` | Public scope retained; no request input or private cache |
+| Import/write performance | `protected_high` | No index, migration, DML or write amplification |
+| Routes/translations/UI/assets | `not_applicable` | No public contract/presentation source change |
+| Dependencies/environment | `not_applicable` | No package, config, secret or `.env` change |
+| Production rollback | `affected_low` | Code-only revert/reload; no restore/flush/reindex |
+| Shared Git state | `critical_risk_recorded` | Exact alternate-index Task 90 paths/hunks only |
+
+### Task-specific requirement-compliance matrix
+
+| Requirement/domain | Статус | Evidence / следующий gate |
+| --- | --- | --- |
+| Skills/root/index/canonical fresh read | `completed` | 26.07.2026 before Task 90 PHP edit |
+| Related Markdown/runbooks/README/CHANGELOG | `completed` | Architecture/development/performance/cache/security/UI/frontend/deploy/rollback/backup traced |
+| Runtime/packages/database/frontend | `completed` | PHP 8.5.8, Laravel 13.22.0, Boost 2.4.13, Livewire 4.3.3, PHPUnit 12.5.32, SQLite 3.46.1, Tailwind 4.3.2, Vite 8.1.4 |
+| Official version-dependent docs | `completed` | Laravel 13 query listener, `whereExists`, correlated `whereColumn` through Boost |
+| Existing implementation/dependants first | `completed` | Routes/Livewire/API/snapshot/builder/content query/scopes/schema/indexes/tests traced |
+| Read-only root-cause profile | `completed` | Warm-year 15-query build, exact availability SQL, EXPLAIN and scale |
+| Alternatives/user authorization | `completed` | Four alternatives; correlated exact-PK query selected under explicit autonomy |
+| Design/spec self-review | `completed` | Linked design; no placeholders, migration or contract drift |
+| Design-only commit | `completed` | Exact commit `450e6df`; normal hook refused only foreign unstaged `CHANGELOG.md`, alternate-index docs commit used `--no-verify` |
+| Detailed plan/files/contracts/risks | `completed` | Linked executable plan and manifests above |
+| TDD RED/GREEN | `completed` | RED: 1/2 with one intended SQL-shape failure; GREEN targeted 1/7, classes 17/93, exact Pint passed |
+| Validation/request filters | `not_applicable` | No request/client input; fixed private limit |
+| Authorization/security/error | `completed` | Public/authenticated RED fixture plus 28 entitlement/security tests / 285 assertions; static bindings only |
+| Migration/index/data | `not_applicable` | No DDL/DML/index/backfill |
+| Cache/resource/invalidation | `already_compliant` | Identical snapshot semantics; existing layers retained |
+| Production parity/profile | `completed` | Exact 2 048-ID SHA-256; PK plan; median 107.170→56.101 ms, p90 178.334→102.616 ms; build 164.445 ms / 15 queries |
+| Related web/API/cache regression | `completed` | Unique homepage/content/entitlement/API/cache/warming matrix: 246 tests / 2 517 assertions GREEN |
+| Static/style/build/browser | `completed` | Syntax/Pint/PHPStan/Rector/Vite GREEN; bundled Chromium desktop/mobile 2/2; live web/API 200; CLI system Chrome unavailable, so the installed bundled runner was used |
+| Full suite/shared repository | `unresolved` | Default 256M ceiling reproduced; temporary 1G: 2 023 total, 2 010 passed, 202 135 assertions, 11 skipped, 1 account failure + 1 missing importer-class error; no Task 90 failure; temp removed |
+| Docs/README/CHANGELOG | `completed` | Canonical performance evidence, visitor history and Russian technical history; docs refresh and 23/63 policy tests GREEN |
+| Final requirements/legacy/debug/secret audit | `completed` | Applicable owners/design/plan reread; remaining season-ID subqueries reviewed as distinct domains; exact diff/check and added-line secret/debug scans passed |
+| Commit/push main | `pending` | Exact Task 90 implementation commit; configured non-force push |
+
+### Безлимитный execution order
+
+1. `[completed]` Fresh skills, requirements, owners, versions and Git audit.
+2. `[completed]` Existing homepage request/cache/query/visibility/test trace.
+3. `[completed]` Production-scale private build profile and SQL ranking.
+4. `[completed]` Exact old/new query parity, repeated timings and EXPLAIN.
+5. `[completed]` Four alternatives and autonomously approved design.
+6. `[completed]` Design self-review and exact design commit `450e6df`;
+   foreign CHANGELOG prevented a normal hook run without contaminating scope.
+7. `[completed]` Detailed TDD plan, expected/protected manifests, risks and
+   compliance matrix.
+8. `[completed]` Prepared plan reread and exact RED: 1 test / 2 assertions,
+   one intended failure on the missing correlated season `EXISTS`.
+9. `[completed]` Minimal correlated season `EXISTS` implementation.
+10. `[completed]` Focused GREEN, visibility/security/error review and exact
+    Pint; 28 additional entitlement/security tests / 285 assertions passed.
+11. `[completed]` Exact parity/query count/repeated profile/EXPLAIN.
+12. `[completed]` Related homepage/API/cache/warming regression matrix:
+    246 tests / 2 517 assertions GREEN; named routes unchanged.
+13. `[completed]` Syntax/Pint/PHPStan/Rector/Vite, bundled Chromium
+    desktop/mobile 2/2 and live compressed web/API 200 matrix.
+14. `[completed]` Broad suite: temporary 1G run completed 2 023 tests with
+    two isolated unrelated account/importer defects and no Task 90 failure;
+    temporary file removed.
+15. `[completed]` Canonical performance docs, README and Russian CHANGELOG;
+    docs refresh and 23 tests / 63 assertions passed.
+16. `[completed]` Final requirements/legacy/debug/secret/exact diff audit.
+17. `[pending]` Exact Task 90 implementation/docs commit on existing `main`.
+18. `[pending]` Configured non-force push; external failure remains
+    `unresolved`.
+
+---
+
 ## Task 84 — центр качества каталога
 
 Статус: `implementation_and_verification_complete_delivery_pending`.

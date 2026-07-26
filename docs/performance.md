@@ -884,6 +884,53 @@ Homepage или `CatalogFacets` нет. Route, API, UI, translation,
 schema/index/DML, dependency, queue и environment contracts не менялись.
 Rollback — обычный revert кода без restore, migration или cache flush.
 
+## Correlated availability сезона в обновлениях главной
+
+Следующий профиль 26.07.2026 выполнялся после прогрева compact year-bucket
+resource. Private `CatalogHomeSnapshotCache::build()` выполнил 15 statements
+за `253,460 ms` wall / `96,660 ms` SQL. Самый дорогой повторяемый statement
+проверял доступность 2 048 уже ограниченных episode ID за `51,760 ms`.
+Outer `episodes NOT INDEXED` использовал integer primary key, но
+`season_id IN (SELECT id FROM seasons ...)` создавал `LIST SUBQUERY` и
+материализовал широкий public-набор из таблицы с 48 635 сезонами через
+`seasons_available_until_idx`.
+
+`CatalogHomeContentAdditionQuery::availableEpisodeIds()` теперь
+коррелирует прежний authoritative `Season::availableTo(null)` по
+`seasons.id = episodes.season_id` через Laravel `whereExists()`. Внешний
+bounded exact-ID query, `Episode::availableTo(null)`, adaptive event window,
+visibility тайтла, порядок, лимиты и snapshot payload не изменились.
+`EXPLAIN QUERY PLAN` сохранил
+`SEARCH episodes USING INTEGER PRIMARY KEY` и заменил широкий list subquery
+на `CORRELATED SCALAR SUBQUERY` с
+`SEARCH seasons USING INTEGER PRIMARY KEY`.
+
+Девять чередующихся same-snapshot пар сохранили все 2 048 ID и одинаковый
+SHA-256
+`55f93b4440045888d7fce7d7214f9261d0a208c3e05708b248a6a33a0b91d5df`.
+Медиана wall-time изменилась с `107,170` до `56,101 ms`, p90 — с `178,334`
+до `102,616 ms`. Итоговый private build выполнил прежние 15 statements за
+`164,445 ms` wall / `28,310 ms` SQL; целевой availability statement занял
+`3,480 ms`, а year aggregate на cache hit не выполнялся. Это read-only
+диагностика текущей production SQLite при concurrent workload, а не p95 или
+SLA.
+
+TDD дал одно ожидаемое падение после двух утверждений и затем GREEN:
+направленные homepage/content tests прошли 17/93, дополнительная
+entitlement/security матрица — 28/285, связанная
+homepage/API/page-cache/warming матрица — 246/2 517. Синтаксис, exact Pint,
+PHPStan, Rector, Vite и bundled Chromium desktop/mobile завершились успешно;
+live `/`, `/ru`, `/en` сохранили gzip `MISS → HIT` с `200`, а
+`/api/v1/home` — прежний public cache contract. Полный 1 ГБ test-only run
+выполнил 2 023 теста: 2 010 passed, 11 skipped, один account failure и одна
+ошибка отсутствующего importer class воспроизводятся вне Task 90; отказов
+Homepage нет.
+
+Новая migration, таблица, индекс, cache resource/version, route, Resource,
+translation, asset, dependency, queue или environment value не добавлены.
+Rollback — обычный code/docs revert и штатный reload без restore, reindex,
+backfill или cache flush.
+
 ## Bounded name-order справочников каталога
 
 Follow-up 26.07.2026 локализовал глобальный grouped aggregate внутри

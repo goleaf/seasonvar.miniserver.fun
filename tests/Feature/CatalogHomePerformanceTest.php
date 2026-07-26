@@ -227,6 +227,76 @@ final class CatalogHomePerformanceTest extends TestCase
         );
     }
 
+    public function test_home_update_availability_correlates_each_episode_to_its_season(): void
+    {
+        $this->travelTo(now()->setDate(2026, 7, 26)->setTime(12, 0));
+        $availableTitle = CatalogTitle::factory()->create();
+        $availableSeason = Season::factory()->create([
+            'catalog_title_id' => $availableTitle->id,
+        ]);
+        Episode::factory()->create([
+            'season_id' => $availableSeason->id,
+            'created_at' => now()->subMinute(),
+            'updated_at' => now()->subMinute(),
+        ]);
+        $restrictedTitle = CatalogTitle::factory()->create();
+        $restrictedSeason = Season::factory()->create([
+            'catalog_title_id' => $restrictedTitle->id,
+            'audience' => 'authenticated',
+        ]);
+        Episode::factory()->create([
+            'season_id' => $restrictedSeason->id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $queries = [];
+        DB::listen(function (QueryExecuted $query) use (&$queries): void {
+            $normalized = str($query->sql)
+                ->replace(['`', '"'], '')
+                ->lower()
+                ->squish()
+                ->toString();
+
+            if (str_starts_with($normalized, 'select id from episodes not indexed')
+                && str_contains($normalized, 'episodes.id in')) {
+                $queries[] = $query;
+            }
+        });
+
+        $updates = app(CatalogHomeContentAdditionQuery::class)->latestTitleUpdates();
+        $availabilityQuery = collect($queries)->sole();
+        $normalizedSql = str($availabilityQuery->sql)
+            ->replace(['`', '"'], '')
+            ->lower()
+            ->squish()
+            ->toString();
+
+        $this->assertSame([$availableTitle->id], collect($updates)->pluck('id')->all());
+        $this->assertStringContainsString('exists (select 1 from seasons', $normalizedSql);
+        $this->assertStringContainsString(
+            'seasons.id = episodes.season_id',
+            $normalizedSql,
+        );
+        $this->assertStringNotContainsString(
+            'season_id in (select id from seasons',
+            $normalizedSql,
+        );
+
+        $plan = collect(DB::select('EXPLAIN QUERY PLAN '.$availabilityQuery->toRawSql()))
+            ->pluck('detail')
+            ->implode("\n");
+
+        $this->assertStringContainsString(
+            'SEARCH episodes USING INTEGER PRIMARY KEY',
+            $plan,
+        );
+        $this->assertStringContainsString(
+            'SEARCH seasons USING INTEGER PRIMARY KEY',
+            $plan,
+        );
+        $this->assertStringNotContainsString('LIST SUBQUERY', $plan);
+    }
+
     public function test_home_snapshot_uses_a_correlated_video_exists_probe(): void
     {
         $catalogTitle = CatalogTitle::factory()->create(['indexed_at' => now()]);

@@ -266,11 +266,16 @@ final class CatalogHomeContentAdditionQuery
         }
 
         $query = $this->withoutSecondaryIndexes(Episode::query(), 'episodes');
+        $availableSeason = Season::query()
+            ->availableTo(null)
+            ->whereColumn('seasons.id', 'episodes.season_id')
+            ->selectRaw('1')
+            ->toBase();
 
         return $query
             ->availableTo(null)
             ->whereKey($ids->all())
-            ->whereIn('season_id', Season::query()->availableTo(null)->select('id'))
+            ->whereExists($availableSeason)
             ->pluck('id')
             ->map(fn (mixed $id): int => (int) $id)
             ->flip()
