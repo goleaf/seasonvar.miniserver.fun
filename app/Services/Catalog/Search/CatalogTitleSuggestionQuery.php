@@ -9,6 +9,7 @@ use App\Models\CatalogTitle;
 use App\Models\Episode;
 use App\Models\Season;
 use App\Models\User;
+use App\Services\Catalog\CatalogTaxonomyRegistry;
 use App\Services\Catalog\CatalogTitleQuery;
 use Illuminate\Support\Collection;
 
@@ -16,6 +17,7 @@ final readonly class CatalogTitleSuggestionQuery
 {
     public function __construct(
         private CatalogTitleQuery $titles,
+        private CatalogTaxonomyRegistry $taxonomies,
         private CatalogSearchNormalizer $normalizer,
     ) {}
 
@@ -38,7 +40,10 @@ final readonly class CatalogTitleSuggestionQuery
                 'catalog_titles.poster_url',
                 'catalog_titles.indexed_at',
             ])
-            ->with('aliases:id,catalog_title_id,name')
+            ->with([
+                'aliases:id,catalog_title_id,name',
+                ...$this->taxonomies->cardSummaryLoads(),
+            ])
             ->limit(max(40, $limit * 8));
 
         $titles = $this->titles

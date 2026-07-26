@@ -24,51 +24,56 @@
             @endif
         </div>
 
-        <div class="flex items-center gap-2 whitespace-nowrap text-xs font-semibold text-slate-500 sm:shrink-0">
-            <span>{{ $title->type === 'serial' ? __('catalog.title.series_type') : __('recommendations.card.catalog_title') }}</span>
+        <div class="flex flex-wrap items-center gap-1.5 text-xs font-semibold sm:shrink-0 sm:justify-end">
             @if ($title->year)
-                <span aria-hidden="true">·</span>
-                <span>{{ $title->year }}</span>
+                <span class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1 text-slate-600">
+                    <x-ui.icon name="fa-solid fa-calendar-days text-[0.85em] text-slate-400" />
+                    <span>{{ $title->year }}</span>
+                </span>
             @endif
-        </div>
-    </div>
-
-    @if ($reasonLabels !== [])
-        <div class="mt-2" aria-label="{{ __('recommendations.page.why') }}">
-            <p class="text-xs font-black uppercase tracking-wide text-slate-500">
-                {{ __('recommendations.page.why') }}
-            </p>
-            <div class="mt-1.5 flex flex-wrap gap-1.5">
-                @foreach (array_slice($reasonLabels, 0, 4) as $reasonLabel)
-                    <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-700">
-                        <x-ui.icon name="fa-solid fa-check text-[0.8em]" />
-                        <span>{{ $reasonLabel }}</span>
-                    </span>
-                @endforeach
-            </div>
-        </div>
-    @endif
-
-    @if ($showDescription && $title->description)
-        <p class="mt-2 break-words text-sm leading-5 text-slate-600">{{ $title->description }}</p>
-    @endif
-
-    <div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs font-semibold text-slate-500">
-        <span class="inline-flex items-center gap-1">
-            <x-ui.icon name="fa-solid fa-layer-group text-[0.85em] text-slate-400" />
-            <span>{{ $seasonsLabel }}</span>
-        </span>
-        <span class="inline-flex items-center gap-1">
-            <x-ui.icon name="fa-solid fa-circle-play text-[0.85em] text-slate-400" />
-            <span>{{ $episodesLabel }}</span>
-        </span>
-        @if ($mediaCount > 0)
-            <span class="inline-flex items-center gap-1">
-                <x-ui.icon name="fa-solid fa-file-video text-[0.85em] text-slate-400" />
-                <span>{{ $mediaLabel }}</span>
+            @if ($ratingLabel)
+                <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-amber-800">
+                    <x-ui.icon name="fa-solid fa-star text-[0.85em]" />
+                    <span>{{ $ratingLabel }}</span>
+                </span>
+            @endif
+            <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-1 text-sky-700">
+                <x-ui.icon name="fa-solid fa-circle-play text-[0.85em]" />
+                <span>{{ $episodesLabel }}</span>
             </span>
-        @endif
+        </div>
     </div>
+
+    @if ($cardGenres->isNotEmpty())
+        <div class="relative z-10 mt-2 flex flex-wrap gap-1.5">
+            @foreach ($cardGenres as $genre)
+                <x-ui.taxonomy-chip :taxonomy="$genre" />
+            @endforeach
+        </div>
+    @endif
+
+    @if ($primaryReason)
+        <div class="mt-2 flex min-w-0 items-start gap-2 rounded-control bg-emerald-50 px-3 py-2 text-sm text-emerald-800" aria-label="{{ __('recommendations.page.why') }}">
+            <x-ui.icon name="fa-solid fa-check mt-1 shrink-0 text-[0.8em]" />
+            <p class="min-w-0 break-words">
+                <span class="font-bold">{{ __('recommendations.page.why') }}:</span>
+                <span>{{ $primaryReason }}</span>
+            </p>
+        </div>
+    @endif
+
+    @if ($showDescription && $descriptionExcerpt)
+        <p data-title-card-description class="mt-2 line-clamp-3 break-words text-sm leading-6 text-slate-600">{{ $descriptionExcerpt }}</p>
+    @endif
+
+    <a
+        data-title-card-details
+        href="{{ route('titles.show', $title) }}"
+        class="relative z-10 mt-2 inline-flex min-h-11 items-center gap-2 rounded-control px-3 py-2 text-sm font-bold text-emerald-700 transition hover:bg-emerald-50"
+    >
+        <span>{{ __('catalog.title.more_details') }}</span>
+        <x-ui.icon name="fa-solid fa-arrow-right text-xs" />
+    </a>
 
     @include('components.catalog.title-card-personal-state')
 </x-ui.poster-card>

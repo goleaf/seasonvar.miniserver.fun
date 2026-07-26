@@ -148,16 +148,21 @@ class BladeTemplateTest extends TestCase
         $this->assertDirectoryDoesNotExist(resource_path('views/livewire/volt'));
     }
 
-    public function test_blade_templates_do_not_truncate_visible_interface_text(): void
+    public function test_blade_templates_only_truncate_the_explicit_compact_card_excerpts(): void
     {
+        $compactCardExcerpts = [
+            resource_path('views/components/catalog/title-card-list.blade.php'),
+            resource_path('views/components/catalog/title-card-recommendation.blade.php'),
+        ];
         $offendingFiles = collect(File::allFiles(resource_path('views')))
             ->filter(fn (SplFileInfo $file): bool => str_ends_with($file->getFilename(), '.blade.php'))
+            ->reject(fn (SplFileInfo $file): bool => in_array($file->getPathname(), $compactCardExcerpts, true))
             ->filter(fn (SplFileInfo $file): bool => preg_match('/\b(line-clamp-\d+|truncate|text-ellipsis|overflow-ellipsis)\b/', (string) file_get_contents($file->getPathname())) === 1)
             ->map(fn (SplFileInfo $file): string => str_replace(base_path().'/', '', $file->getPathname()))
             ->values()
             ->all();
 
-        $this->assertSame([], $offendingFiles, 'Blade templates must show interface text without truncation utilities.');
+        $this->assertSame([], $offendingFiles, 'Only bounded compact card excerpts may use truncation utilities.');
     }
 
     public function test_status_pill_component_renders_slot_icon_and_variant_classes(): void

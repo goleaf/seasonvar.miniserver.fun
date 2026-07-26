@@ -454,6 +454,18 @@ title по-прежнему exact-excluded из нового результат�
 всех трёх обратимых действий до записи, не раскрывая source title, private
 activity или internal weight.
 
+Presentation сохраняет полный ordered evidence list внутри server-side DTO,
+но общая карточка выводит только первую наиболее значимую broad-причину; это
+не меняет ranking, feedback или audit payload.
+
+`x-catalog.title-card` является единственной query-free presentation boundary
+для `/titles`, главной и recommendation rows. Class component получает только
+attributes, batch counts и eager-loaded genres/ratings, формирует escaped
+plain-text excerpt до 240 Unicode-символов и выбирает КиноПоиск с fallback на
+IMDb. Blade не получает скрытое полное описание, не выполняет lazy loading и
+сохраняет canonical `titles.show` через stretched title link и отдельную
+доступную ссылку «Подробнее».
+
 `CatalogDiscoveryPage` выполняет один `discover()` на interaction. При явном
 обновлении новый seed и page 1 устанавливаются до запроса, а защищённый
 request-local `CatalogRecommendationResult` передаётся следующему render того

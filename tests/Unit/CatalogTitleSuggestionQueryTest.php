@@ -7,7 +7,9 @@ namespace Tests\Unit;
 use App\Enums\ContentAudience;
 use App\Enums\PublicationStatus;
 use App\Models\CatalogTitle;
+use App\Models\CatalogTitleRating;
 use App\Models\Episode;
+use App\Models\Genre;
 use App\Models\Season;
 use App\Services\Catalog\Search\CatalogSearchQueryParser;
 use App\Services\Catalog\Search\CatalogTitleSuggestionQuery;
@@ -85,6 +87,16 @@ final class CatalogTitleSuggestionQueryTest extends TestCase
             'number' => 99,
             'publication_status' => PublicationStatus::Hidden,
         ]);
+        $genre = Genre::query()->create([
+            'name' => 'Полярная драма',
+            'slug' => 'poliarnaia-drama',
+        ]);
+        $title->genres()->attach($genre);
+        CatalogTitleRating::query()->create([
+            'catalog_title_id' => $title->id,
+            'provider' => 'kinopoisk',
+            'rating' => 8.4,
+        ]);
 
         DB::enableQueryLog();
 
@@ -96,10 +108,21 @@ final class CatalogTitleSuggestionQueryTest extends TestCase
         $this->assertSame(2024, $result->year);
         $this->assertSame(1, (int) $result->getAttribute('seasons_count'));
         $this->assertSame(2, (int) $result->getAttribute('episodes_count'));
-        $this->assertLessThanOrEqual(7, count(DB::getQueryLog()));
+        $this->assertTrue($result->relationLoaded('genres'));
+        $this->assertTrue($result->relationLoaded('ratings'));
+        $this->assertSame('Полярная драма', $result->genres->sole()->name);
+        $this->assertEqualsWithDelta(8.4, (float) $result->ratings->sole()->rating, 0.001);
 
-        $episodeAggregateSql = collect(DB::getQueryLog())
-            ->pluck('query')
+        $queries = collect(DB::getQueryLog())->pluck('query');
+        $this->assertCount(9, $queries);
+        $this->assertCount(1, $queries->filter(
+            fn (string $sql): bool => str_contains($sql, 'from "catalog_title_ratings"'),
+        ));
+        $this->assertCount(1, $queries->filter(
+            fn (string $sql): bool => str_contains($sql, 'inner join "catalog_title_genre"'),
+        ));
+
+        $episodeAggregateSql = $queries
             ->first(fn (string $sql): bool => str_contains($sql, 'from "episodes"')) ?? '';
 
         $this->assertStringContainsString('"season_id" in', $episodeAggregateSql);

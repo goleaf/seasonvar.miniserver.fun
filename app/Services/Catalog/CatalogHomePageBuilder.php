@@ -100,10 +100,6 @@ class CatalogHomePageBuilder
         $latestTitles = $titleGroups['latest'];
         $featuredTitles = $titleGroups['featured'];
         $videoTitles = $titleGroups['video'];
-        $latestTitles->load([
-            'latestSeason' => fn ($query) => $query
-                ->select(['seasons.id', 'seasons.catalog_title_id', 'seasons.number']),
-        ]);
         $latestTitleUpdates = collect($snapshot['latest_title_updates']);
         $latestUpdateTimes = $latestTitleUpdates
             ->mapWithKeys(fn (array $update): array => [

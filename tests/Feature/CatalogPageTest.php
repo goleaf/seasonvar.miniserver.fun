@@ -1600,18 +1600,28 @@ class CatalogPageTest extends TestCase
             ->assertSeeText('Полное описание для горизонтальной карточки.');
     }
 
-    public function test_titles_list_rows_show_the_latest_regular_season(): void
+    public function test_titles_list_rows_show_episode_count_instead_of_a_season_summary(): void
     {
         $title = CatalogTitle::factory()->create([
             'title' => 'Сериал с последним сезоном',
             'slug' => 'serial-s-poslednim-sezonom',
         ]);
         Season::factory()->for($title)->create(['number' => 1]);
-        Season::factory()->for($title)->create(['number' => 4]);
+        $latestSeason = Season::factory()->for($title)->create(['number' => 4]);
+        Episode::factory()
+            ->count(3)
+            ->for($latestSeason)
+            ->sequence(
+                ['number' => 1],
+                ['number' => 2],
+                ['number' => 3],
+            )
+            ->create();
 
         $this->get(route('titles.index'))
             ->assertOk()
-            ->assertSeeText('Сезон 4');
+            ->assertSeeText('3 серии')
+            ->assertDontSeeText('Сезон 4');
     }
 
     public function test_title_page_server_renders_safe_localized_metadata_without_inferring_content_language(): void

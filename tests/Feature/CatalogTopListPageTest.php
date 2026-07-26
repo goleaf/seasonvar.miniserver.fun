@@ -110,11 +110,11 @@ final class CatalogTopListPageTest extends TestCase
 
         $this->assertLessThan(strpos($html, $imdbFallback->title), strpos($html, $trusted->title));
         $this->assertLessThan(strpos($html, $sparse->title), strpos($html, $trusted->title));
-        $this->assertStringContainsString('Кинопоиск 8,6', $html);
+        $this->assertStringContainsString('КиноПоиск 8,6', $html);
         $this->assertStringContainsString('IMDb 8,4', $html);
-        $this->assertStringContainsString('Кинопоиск 7,2', $html);
+        $this->assertStringContainsString('КиноПоиск 7,2', $html);
         $this->assertStringNotContainsString('IMDb 9,8', $html);
-        $this->assertStringContainsString('50 000', $html);
+        $this->assertStringContainsString('50 000', $html);
         $this->assertSame(1, substr_count($html, 'data-top-list-rank="1"'));
         $this->assertSame(4, substr_count($html, 'data-top-list-row'));
         $this->assertNotSame($trusted->id, $sparse->id);

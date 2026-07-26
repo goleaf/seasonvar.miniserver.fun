@@ -9964,3 +9964,65 @@ SQL statements без изменения HTML, API, cache или visibility cont
     `c082fb5` on `main`.
 14. `[completed_unresolved_authentication]` Configured non-force push exited
     128 before transfer: GitHub HTTPS username/credentials are unavailable.
+
+## Task 73 — компактные карточки каталога
+
+Статус: `ready_for_commit`.
+
+Дата: 26.07.2026.
+
+Design:
+[`2026-07-26-compact-catalog-title-cards-design.md`](../superpowers/specs/2026-07-26-compact-catalog-title-cards-design.md).
+
+Detailed plan:
+[`2026-07-26-compact-catalog-title-cards.md`](../superpowers/plans/2026-07-26-compact-catalog-title-cards.md).
+
+### Scope и protected contracts
+
+Общий `x-catalog.title-card` на `/titles`, главной, в глобальном поиске,
+Top 100 и рекомендациях получает server-side plain-text excerpt до 240
+Unicode-символов, максимум три жанра, год, КиноПоиск с fallback IMDb,
+количество серий, обычную ссылку «Подробнее» и одну broad-причину
+рекомендации.
+
+Сохранены route names, query string, filters/sorts/pagination, Livewire
+state, API Resources/JSON, SEO/full description, recommendation
+ranking/feedback/exclusions, personal card state, visibility/audience/
+Premium/region/legal scopes, cache keys, schema, importer и dependencies.
+Миграции, DML, новые permissions, routes, JavaScript и packages не нужны.
+Rollback — обычный revert task commit без database/cache cleanup.
+
+### Task-specific compliance matrix
+
+| Requirement/domain | Статус | Evidence |
+| --- | --- | --- |
+| Fresh root/index/canonical read | `completed` | Requirements read before implementation and reread before staging |
+| Installed runtime/packages/database | `completed` | PHP 8.5.8, Laravel 13.22.0, Livewire 4.3.3, Boost 2.4.13, Tailwind 4.3.2, SQLite |
+| Existing implementation first | `completed` | Shared component, all consumers, loaders, DTO/presenter and tests traced |
+| Canonical UI conflict | `completed` | UI/frontend/architecture/performance owners updated before finalization |
+| TDD RED/GREEN | `completed` | 3 expected RED failures; final related matrix 211/211, 75 309 assertions |
+| Query performance | `completed` | Genres plus two provider ratings; one bounded rating query; existing `(catalog_title_id,provider)` index selected |
+| XSS/privacy/security | `completed` | PlainText cleanup, escaped Blade, no private reason evidence/weights, no new write boundary |
+| Mobile/a11y/no-JS | `completed` | Visible 44px details link; focused Playwright 3/3 desktop/mobile/tablet |
+| Localization | `completed` | RU/EN keys and recursive parity gate |
+| Static/build verification | `completed` | Pint, syntax, task PHPStan 0 errors, Rector dry-run and Vite build |
+| Full suite | `completed_with_foreign_failures` | 1 914 tests: 1 900 passed, 11 skipped; related stale budget fixed/rechecked; foreign account-session failure and missing import-batcher error remain |
+| Managed docs check | `unresolved_shared_worktree` | `project:docs-refresh --check` reports foreign `docs/MAINTENANCE_LOG.md` drift |
+| Migration/routes/cache/env/dependencies | `not_applicable` | None changed |
+| Exact task-only commit | `pending` | Alternate index review follows this snapshot |
+| Configured non-force push | `pending` | Performed after commit; external rejection remains unresolved |
+
+### Execution checklist
+
+1. `[completed][critical]` Requirements, skills, stack, Git and shared-tree audit.
+2. `[completed][critical]` Consumer/query/component/test trace and approved design.
+3. `[completed][critical]` Canonical owner updates and detailed living plan.
+4. `[completed][critical]` RED for bounded excerpt, metadata, action, rating and one reason.
+5. `[completed][critical]` Query-free component and compact Blade layouts.
+6. `[completed][high]` Bounded genre/rating loaders and removal of card-only `latestSeason`.
+7. `[completed][high]` Search/Top 100 compatibility and query-budget regression fixes.
+8. `[completed][high]` Focused, broad, full diagnostic, static, build and browser verification.
+9. `[completed][medium]` README, Russian CHANGELOG, docs map and compliance evidence.
+10. `[completed][critical]` Final requirements, legacy/debug/secret/unrelated audit.
+11. `[pending][critical]` Exact alternate-index commit in existing `main`.
+12. `[pending][critical]` Configured non-force push to `origin/main`.

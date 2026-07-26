@@ -307,7 +307,7 @@ class CatalogAdvancedFilterTest extends TestCase
 
         $queriesWithoutOptions = $this->catalogQueryCount();
 
-        $this->assertSame(14, $queriesWithoutOptions);
+        $this->assertSame(10, $queriesWithoutOptions);
 
         foreach (range(2, 20) as $number) {
             $actor = Actor::query()->create([

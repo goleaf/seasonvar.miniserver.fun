@@ -58,8 +58,8 @@
 - Главная страница загружает только опубликованные тайтлы, их опубликованные видео, годы и таксономии. Подборка «Сейчас можно смотреть» ограничивается индексируемым подзапросом published media, а связанные тайтлы в блоке новых серий дополнительно проходят `published()`.
 - Порядок «Последних обновлений» строится одним `UNION ALL` доступных `episodes.created_at` и опубликованных `licensed_media.created_at` с последующей группировкой по тайтлу; изменение одной метаинформации тайтла в запрос не попадает. Детали «Новых серий» загружаются двумя bounded-запросами для выбранных тайтлов и группируются в PHP. Проекция серии, подгруженной через новое видео, включает `created_at`, потому что карточка использует дату серии при объединении и сортировке обновлений. Доступ к дочерним добавлениям поддерживают индексы `(season_id, created_at, id)` и `(catalog_title_id, created_at, id)`.
 - Выбор ID главных подборок, latest media IDs, year buckets, subtitle row и верхние genre/country rows хранится как компактный public tiered snapshot. На hit база загружает только фактически показываемые модели/relations по bounded ID; cached Eloquent graphs не используются.
-- Главная страница загружает последние карточки с `CatalogTaxonomyRegistry::cardSummaryLoads()`, а counts доступных сезонов, серий и media гидратирует одним `CatalogTitleCardCountLoader` для bounded набора model instances. Для taxonomy-моделей выбираются только `id/name/slug`, а для строки списка вместо всей коллекции сезонов загружается только `latestSeason(id, catalog_title_id, number)`.
-- Страница списка каталога использует те же constrained relation loads, один компактный `latestSeason` на тайтл в list-режиме и счетчики сезонов/серий один раз на страницу пагинации.
+- Главная страница загружает последние карточки с `CatalogTaxonomyRegistry::cardSummaryLoads()`, а counts доступных сезонов, серий и media гидратирует одним `CatalogTitleCardCountLoader` для bounded набора model instances. После перехода карточки на компактный contract eager-load ограничен жанрами (`id/name/slug`) и двумя provider rating (`catalog_title_id/provider/rating`); страны, возрастные рейтинги, переводы, теги и `latestSeason` для карточки больше не читаются.
+- Страница списка каталога использует те же constrained relation loads без `latestSeason`; счетчики сезонов, серий и доступного media собираются один раз на страницу пагинации и сохраняют прежние contracts сортировки.
 - Top 100 считает доступные эпизоды фильмов и сериалов одним grouped subquery по `seasons.catalog_title_id`, а не коррелированным `COUNT(*)` для каждой карточки. Валидированные годовые границы используют индексированное поле `catalog_titles.year`, страна и жанр — существующие pivot `catalog_title_country` и `catalog_title_genre`; все условия применяются до score/sort/`LIMIT 100`, поэтому отфильтрованная низкая базовая позиция не теряется. Списки вариантов страны и жанра независимо ограничены 100 строками. На локальной production-scale SQLite read-only замер `hasItems()` составил 1,98 с для фильмов и 1,85 с для сериалов; полная загрузка 100 карточек — 4,35 и 4,82 с соответственно, а повторный HTTP-ответ общего page cache — 59,7 мс. SQL-форма и порядок фильтрации закреплены feature-регрессиями.
 - `CatalogSeries::render()` вызывает `CatalogTitlesPageBuilder` один раз; `mount()` только валидирует URL и не читает каталог. Контрольный прямой вызов page builder с непустым каталогом выполняет 11 SQL-запросов вместо 20; HTTP session middleware может добавлять свои запросы.
 - Initial Livewire snapshot каталога содержит только `filters`, две короткие строки `optionSearch`, три locked route-поля и `paginators` (1288 байт JSON на контрольной базе); paginator, модели и facet-коллекции остаются только в render data.
@@ -68,7 +68,7 @@
 - Готовый FTS driver разделяет две SQL-границы: основная выдача материализует exact/BM25-ranked candidates, а total и фасеты используют filter-only FTS rowid subquery. Application не загружает полный набор совпавших ID в PHP, а SQLite не выполняет `MATCH` в внешнем цикле по `catalog_titles`.
 - Подзапросы алиасов и каждой связи группируют все legacy-варианты одного терма, чтобы не размножать одинаковые подзапросы на каждый вариант регистра, `е/ё` или транслитерации.
 - Выдача, API, фасеты, публичные счетчики, sitemap/feed и рекомендации начинают title-запросы с `CatalogTitleQuery::visibleTo()`. Распознанный год добавляется до текстовых условий. Все сортировки сопоставлены в `CatalogSort` и завершаются `catalog_titles.id DESC` как детерминированным tie-breaker.
-- Карточки списка выбирают только отображаемые поля, загружают constrained relations из `CatalogTaxonomyRegistry::cardSummaryLoads()` и считают видимые сезоны, серии и media через общие count-ограничения `CatalogTitleQuery`.
+- Карточки списка выбирают только отображаемые поля, загружают constrained жанры и provider ratings из `CatalogTaxonomyRegistry::cardSummaryLoads()` и считают видимые сезоны, серии и media через общие count-ограничения `CatalogTitleQuery`; Blade выводит episode count, а прочие aggregates остаются совместимыми с сортировками и существующими consumers.
 - Статическая часть страницы тайтла загружает справочники, aliases/ratings и summaries сезонов с агрегированными playable episode/media counts. Все серии всех сезонов больше не eager-load-ятся.
 - Вложенный `CatalogTitlePlayer` загружает только серии активного сезона и их playable media; выбор first/next episode остаётся SQL query с детерминированным tuple-order, а не полной PHP-коллекцией выпусков.
 - Кнопки предыдущей/следующей серии переиспользуют уже авторизованную и упорядоченную коллекцию серий активного сезона. Внутри сезона навигация не выполняет SQL; только реальный переход через границу сезона делает один прежний watchable keyset query для соответствующей стороны. На локальной production-scale SQLite странице `/titles/veshhdok` одинаковый профиль из 5 запусков сократил медиану с 60 до 58 запросов, общий SQL с 535,77 до 177,72 мс, playback SQL с 493,68 до 132,05 мс (−73,3%) и server render с 1381,70 до 1019,26 мс (−26,2%). Отдельные выборки по 20 HTTP-запросов дали p50 1139,0 → 735,5 мс и p95 1638,8 → 1037,9 мс при 20/20 HTTP 200 и неизменных 884195 байтах ответа. Коллекции остаются render-local; authorization result и signed media URL не кэшируются.
@@ -664,7 +664,7 @@ generation не добавлены; rollback — обычный revert PHP-ко�
 ## Консолидация hydration карточек главной
 
 Следующий follow-up 26.07.2026 проверил оставшиеся повторные запросы
-`latestTitles`, `featuredTitles` и `videoTitles`. Зафиксированный `main`
+`latestTitles`, `featuredTitles` и `videoTitles`. Исходный baseline этой задачи
 использует пять canonical card relations (`genres`, `countries`,
 `ageRatings`, `translations`, `tags`) и отдельный `latestSeason` для latest.
 На актуальном snapshot `webData()` выполнял по две section-группы root и
@@ -708,6 +708,15 @@ console/page/request/local-HTTP ошибки; API сохранил `48/12/8/12`.
 route, translation, cache key/version/TTL/invalidation, dependency, queue,
 environment или production DML не добавлены. Rollback — обычный revert
 PHP-кода без schema/data/cache cleanup.
+
+Follow-up компактных карточек Task 73 заменил этот historical relation
+baseline на `genres + ratings` и удалил latest-only `latestSeason`.
+Консолидированный homepage path поэтому выполняет для своих секций один root,
+один genre и один rating query; без консолидации те же relations повторялись
+бы дважды в `webData()` и трижды в `data()`. Focused homepage/card regression
+после удаления `latestSeason` прошла 14 тестов и 106 утверждений. Это
+структурное evidence текущего contract; прежние wall-time measurements Task
+74 остаются историческими и не объявляются новым benchmark.
 
 ## Производительность onboarding вкусов Task 71
 

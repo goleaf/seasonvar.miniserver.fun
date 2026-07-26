@@ -381,7 +381,7 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertStringContainsString('tabindex="0"', $administrationTable);
     }
 
-    public function test_title_surfaces_use_one_title_link_and_keep_relation_links_accessible(): void
+    public function test_title_surfaces_keep_stretched_and_explicit_title_links_with_accessible_genres(): void
     {
         $title = CatalogTitle::factory()->create();
         $genre = Genre::query()->create([
@@ -398,13 +398,14 @@ class CatalogVisualSystemTest extends TestCase
         $genreUrl = route('titles.taxonomy', ['type' => 'genre', 'taxonomy' => $genre->slug]);
 
         $this->assertSame([
-            'card' => 1,
-            'row' => 1,
+            'card' => 2,
+            'row' => 2,
         ], [
             'card' => substr_count($cardHtml, 'href="'.$showUrl.'"'),
             'row' => substr_count($rowHtml, 'href="'.$showUrl.'"'),
         ]);
         $this->assertStringContainsString('data-catalog-card', $cardHtml);
+        $this->assertStringContainsString('data-title-card-details', $cardHtml);
         $this->assertStringContainsString('catalog-card', $cardHtml);
         $this->assertStringContainsString('href="'.$genreUrl.'"', $cardHtml);
         $this->assertStringContainsString('href="'.$genreUrl.'"', $rowHtml);

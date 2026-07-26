@@ -92,6 +92,9 @@ final class CatalogTopListQuery
                     votes: $votes,
                     weightedScore: $weightedScore,
                     reasonLabels: [
+                        trans_choice('top_lists.votes', $votes, [
+                            'count' => (string) Number::format($votes, locale: app()->currentLocale()),
+                        ]),
                         __('top_lists.rating', [
                             'provider' => __("top_lists.providers.{$provider}"),
                             'rating' => (string) Number::format(
@@ -99,9 +102,6 @@ final class CatalogTopListQuery
                                 precision: 1,
                                 locale: app()->currentLocale(),
                             ),
-                        ]),
-                        trans_choice('top_lists.votes', $votes, [
-                            'count' => (string) Number::format($votes, locale: app()->currentLocale()),
                         ]),
                     ],
                 );

@@ -627,6 +627,12 @@ return [
         'refresh_failed' => 'Не удалось обновить',
         'description' => 'Описание',
         'description_missing' => 'Описание пока отсутствует.',
+        'more_details' => 'Подробнее',
+        'card_rating' => ':provider :rating',
+        'rating_providers' => [
+            'kinopoisk' => 'КиноПоиск',
+            'imdb' => 'IMDb',
+        ],
         'cast' => 'В ролях',
         'other_names' => 'Другие названия',
         'ratings' => 'Рейтинги',

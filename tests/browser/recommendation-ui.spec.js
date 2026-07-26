@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('catalog card surfaces never render the redundant open-title action', async ({ page, baseURL }, testInfo) => {
+test('compact catalog cards expose details and one recommendation reason', async ({ page, baseURL }, testInfo) => {
     const browserErrors = [];
     const localOrigin = new URL(baseURL).origin;
 
@@ -21,22 +21,38 @@ test('catalog card surfaces never render the redundant open-title action', async
 
         expect(response?.status()).toBe(200);
         await expect(page.getByText('Открыть тайтл', { exact: true })).toHaveCount(0);
+        await expect(page.locator('[data-title-card-details]').first()).toBeVisible();
         expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1);
     }
+
+    await page.goto('/titles?q=Browser%20Smoke');
+    const description = page.locator('[data-title-card-description]').first();
+
+    await expect(description).toBeVisible();
+    await expect(description).toHaveClass(/line-clamp-3/);
+    expect(await description.evaluate((element) => {
+        const lineHeight = Number.parseFloat(getComputedStyle(element).lineHeight);
+
+        return element.scrollHeight <= Math.ceil(lineHeight * 3) + 1;
+    })).toBe(true);
 
     await page.goto('/titles/browser-smoke');
     const recommendationRows = page.locator('[data-recommendation-list] [data-recommendation-row]');
 
     await expect(recommendationRows).toHaveCount(1);
     await expect(recommendationRows.getByRole('link', { name: 'Рекомендованный браузерный сериал' })).toBeVisible();
-    await expect(recommendationRows.getByText('Почему это показано', { exact: true })).toBeVisible();
+    await expect(recommendationRows.getByRole('link', { name: 'Подробнее' })).toBeVisible();
+    await expect(recommendationRows.getByText('Почему это показано:', { exact: true })).toBeVisible();
     await expect(recommendationRows.getByText('Похожие жанры и темы', { exact: true })).toBeVisible();
     const recommendationHrefs = await recommendationRows.locator('a[href*="/titles/"]').evaluateAll(
         (links) => links.map((link) => link.getAttribute('href')),
     );
+    const recommendedTitleUrl = `${baseURL}/titles/browser-recommended`;
+    const recommendationTitleHrefs = recommendationHrefs.filter((href) => href === recommendedTitleUrl);
 
     expect(recommendationHrefs).not.toContain(`${baseURL}/titles/browser-smoke`);
-    expect(new Set(recommendationHrefs).size).toBe(recommendationHrefs.length);
+    expect(recommendationTitleHrefs).toHaveLength(2);
+    expect(new Set(recommendationTitleHrefs).size).toBe(1);
 
     await page.goto('/login');
     await page.getByLabel('Электронная почта').fill('browser@example.com');
@@ -61,8 +77,8 @@ test('catalog card surfaces never render the redundant open-title action', async
     await expect(personalizedRows.getByRole('link', { name: 'Рекомендованный браузерный сериал' })).toBeVisible();
     const personalizedReasonGroup = personalizedRows.first().locator('[aria-label="Почему это показано"]');
 
-    await expect(personalizedReasonGroup.getByText('Почему это показано', { exact: true })).toBeVisible();
-    await expect(personalizedReasonGroup.locator('div > span').first()).toBeVisible();
+    await expect(personalizedReasonGroup.getByText('Почему это показано:', { exact: true })).toBeVisible();
+    await expect(personalizedReasonGroup.locator('p > span')).toHaveCount(2);
     const feedback = personalizedRows.first().locator('[data-recommendation-feedback]');
 
     await feedback.getByText('Настроить рекомендацию', { exact: true }).click();

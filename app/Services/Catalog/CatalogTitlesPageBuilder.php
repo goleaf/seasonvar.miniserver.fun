@@ -98,9 +98,7 @@ class CatalogTitlesPageBuilder
 
         $rankSearch = $searchQuery->isReady();
         $catalogTotal = $this->query->filteredTitles($criteria, $request->user())->count();
-        $cardRelations = array_merge([
-            'latestSeason' => fn ($query) => $query->select(['seasons.id', 'seasons.catalog_title_id', 'seasons.number']),
-        ], $cardLoads);
+        $cardRelations = $cardLoads;
 
         if ($rankSearch) {
             $catalogTitleIds = $this->query->filteredTitles(

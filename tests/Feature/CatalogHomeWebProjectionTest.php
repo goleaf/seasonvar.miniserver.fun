@@ -61,8 +61,8 @@ final class CatalogHomeWebProjectionTest extends TestCase
         $this->assertNotSame($latestTitle, $videoTitle);
         $this->assertTrue($latestTitle->hasAttribute('content_added_at'));
         $this->assertFalse($videoTitle->hasAttribute('content_added_at'));
-        $this->assertTrue($latestTitle->relationLoaded('latestSeason'));
         $this->assertFalse($videoTitle->relationLoaded('latestSeason'));
+        $this->assertFalse($latestTitle->relationLoaded('latestSeason'));
 
         $webResponse = $this->get(route('home'))->assertOk();
         $webHtml = $webResponse->getContent();
@@ -187,14 +187,9 @@ final class CatalogHomeWebProjectionTest extends TestCase
                 $sql,
                 'select catalog_title_ratings.catalog_title_id, catalog_title_ratings.provider, catalog_title_ratings.rating from catalog_title_ratings where',
             ),
-            'latestSeason' => fn (string $sql): bool => str_starts_with(
-                $sql,
-                'select seasons.id, seasons.catalog_title_id, seasons.number from seasons ',
-            ),
         ];
 
         return collect(array_keys(app(CatalogTaxonomyRegistry::class)->cardSummaryLoads()))
-            ->push('latestSeason')
             ->mapWithKeys(fn (string $relation): array => [$relation => $matchers[$relation]])
             ->all();
     }

@@ -627,6 +627,12 @@ return [
         'refresh_failed' => 'Could not update',
         'description' => 'Description',
         'description_missing' => 'No description is available yet.',
+        'more_details' => 'Details',
+        'card_rating' => ':provider :rating',
+        'rating_providers' => [
+            'kinopoisk' => 'Kinopoisk',
+            'imdb' => 'IMDb',
+        ],
         'cast' => 'Cast',
         'other_names' => 'Alternative titles',
         'ratings' => 'Ratings',

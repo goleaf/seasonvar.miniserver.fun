@@ -38,7 +38,7 @@ class CatalogBladeComponentTest extends TestCase
         $this->assertStringContainsString('flex-wrap', $html);
     }
 
-    public function test_title_card_and_list_row_render_relation_chips_as_links(): void
+    public function test_title_card_and_list_row_render_only_genre_chips_as_links(): void
     {
         $catalogTitle = CatalogTitle::factory()->create([
             'title' => 'Навигационный сериал',
@@ -66,11 +66,11 @@ class CatalogBladeComponentTest extends TestCase
             $this->assertStringContainsString('data-ui-poster-frame', $html);
             $this->assertStringContainsString('href="'.route('titles.show', $catalogTitle).'"', $html);
             $this->assertStringContainsString('href="'.route('titles.taxonomy', ['type' => 'genre', 'taxonomy' => $genre->slug]).'"', $html);
-            $this->assertStringContainsString('href="'.route('titles.taxonomy', ['type' => 'country', 'taxonomy' => $country->slug]).'"', $html);
+            $this->assertStringNotContainsString('href="'.route('titles.taxonomy', ['type' => 'country', 'taxonomy' => $country->slug]).'"', $html);
         }
     }
 
-    public function test_title_card_only_renders_visible_personal_state_and_never_an_open_title_action(): void
+    public function test_title_card_renders_details_action_and_only_visible_personal_state(): void
     {
         $title = CatalogTitle::factory()->make([
             'title' => 'Персональное состояние карточки',
@@ -87,10 +87,11 @@ class CatalogBladeComponentTest extends TestCase
         );
 
         $this->assertStringNotContainsString('data-user-card-state', $emptyHtml);
-        $this->assertStringNotContainsString('Открыть тайтл', $emptyHtml);
+        $this->assertStringContainsString('data-title-card-details', $emptyHtml);
+        $this->assertStringContainsString('Подробнее', $emptyHtml);
         $this->assertStringContainsString('data-user-card-state', $ratedHtml);
         $this->assertStringContainsString('data-user-rating="8"', $ratedHtml);
-        $this->assertStringNotContainsString('Открыть тайтл', $ratedHtml);
+        $this->assertStringContainsString('data-title-card-details', $ratedHtml);
     }
 
     public function test_title_card_does_not_lazy_load_missing_relations(): void

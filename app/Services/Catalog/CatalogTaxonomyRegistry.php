@@ -63,7 +63,7 @@ class CatalogTaxonomyRegistry
      */
     public function cardRelations(): array
     {
-        return ['genres', 'countries', 'ageRatings', 'translations', 'tags'];
+        return ['genres'];
     }
 
     /**
@@ -125,9 +125,19 @@ class CatalogTaxonomyRegistry
      */
     public function cardSummaryLoads(): array
     {
-        return collect($this->relationSummaryLoads())
-            ->only($this->cardRelations())
-            ->all();
+        return [
+            ...collect($this->relationSummaryLoads())
+                ->only($this->cardRelations())
+                ->all(),
+            'ratings' => fn ($query) => $query
+                ->select([
+                    'catalog_title_ratings.catalog_title_id',
+                    'catalog_title_ratings.provider',
+                    'catalog_title_ratings.rating',
+                ])
+                ->whereIn('catalog_title_ratings.provider', ['kinopoisk', 'imdb'])
+                ->whereBetween('catalog_title_ratings.rating', [0, 10]),
+        ];
     }
 
     public function relationName(string $filterType): string

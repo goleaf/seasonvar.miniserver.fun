@@ -5,15 +5,22 @@ declare(strict_types=1);
 namespace App\View\Components\Catalog;
 
 use App\Models\CatalogTitle;
+use App\Models\CatalogTitleRating;
 use App\Models\Season;
+use App\Support\PlainText;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Number;
+use Illuminate\Support\Str;
 use Illuminate\View\Component;
 
 class TitleCard extends Component
 {
+    private const DESCRIPTION_LIMIT = 240;
+
+    private const REASON_LIMIT = 120;
+
     private const LAYOUTS = ['list', 'compact', 'recommendation'];
 
     public int $seasonsCount;
@@ -29,6 +36,12 @@ class TitleCard extends Component
     public string $episodesLabel;
 
     public string $mediaLabel;
+
+    public ?string $descriptionExcerpt;
+
+    public ?string $ratingLabel;
+
+    public ?string $primaryReason;
 
     public ?Season $latestSeason;
 
@@ -49,6 +62,11 @@ class TitleCard extends Component
      * @var Collection<int, Model>
      */
     public Collection $cardRelations;
+
+    /**
+     * @var Collection<int, Model>
+     */
+    public Collection $cardGenres;
 
     /**
      * @param  list<string>  $reasonLabels
@@ -76,6 +94,11 @@ class TitleCard extends Component
         $this->seasonsLabel = $this->countLabel('catalog.counts.seasons', $this->seasonsCount);
         $this->episodesLabel = $this->countLabel('catalog.counts.episodes', $this->episodesCount);
         $this->mediaLabel = $this->countLabel('catalog.counts.videos', $this->mediaCount);
+        $this->descriptionExcerpt = $showDescription && $title->hasAttribute('description')
+            ? $this->boundedText($title->getAttribute('description'), self::DESCRIPTION_LIMIT)
+            : null;
+        $this->ratingLabel = $this->ratingLabel($title);
+        $this->primaryReason = $this->boundedText($reasonLabels[0] ?? null, self::REASON_LIMIT);
         $this->latestSeason = $title->relationLoaded('latestSeason') ? $title->latestSeason : null;
         $this->userInWatchlist = $userInWatchlist
             ?? ($title->hasAttribute('user_in_watchlist') && (bool) $title->getAttribute('user_in_watchlist'));
@@ -86,13 +109,8 @@ class TitleCard extends Component
             || $this->userRating !== null
             || $this->userProgressPercent !== null
             || $this->userPrimaryAction !== null;
-        $this->cardRelations = collect()
-            ->merge($title->relationLoaded('genres') ? $title->genres : collect())
-            ->merge($title->relationLoaded('countries') ? $title->countries : collect())
-            ->merge($title->relationLoaded('ageRatings') ? $title->ageRatings : collect())
-            ->merge($title->relationLoaded('translations') ? $title->translations : collect())
-            ->merge($title->relationLoaded('tags') ? $title->tags : collect())
-            ->take(4);
+        $this->cardGenres = ($title->relationLoaded('genres') ? $title->genres : collect())->take(3);
+        $this->cardRelations = $this->cardGenres;
     }
 
     public function render(): View
@@ -119,6 +137,47 @@ class TitleCard extends Component
         $value = $title->getAttribute($key);
 
         return $value === null ? null : (int) $value;
+    }
+
+    private function boundedText(mixed $value, int $limit): ?string
+    {
+        $text = PlainText::clean($value);
+
+        if ($text === '') {
+            return null;
+        }
+
+        if (Str::length($text) <= $limit) {
+            return $text;
+        }
+
+        return Str::limit($text, $limit - 1, '…', preserveWords: true);
+    }
+
+    private function ratingLabel(CatalogTitle $title): ?string
+    {
+        if (! $title->relationLoaded('ratings')) {
+            return null;
+        }
+
+        $rating = $title->ratings->first(
+            fn (CatalogTitleRating $rating): bool => $rating->provider === 'kinopoisk' && $rating->rating !== null,
+        ) ?? $title->ratings->first(
+            fn (CatalogTitleRating $rating): bool => $rating->provider === 'imdb' && $rating->rating !== null,
+        );
+
+        if (! $rating instanceof CatalogTitleRating) {
+            return null;
+        }
+
+        return __('catalog.title.card_rating', [
+            'provider' => __("catalog.title.rating_providers.{$rating->provider}"),
+            'rating' => Number::format(
+                (float) $rating->rating,
+                precision: 1,
+                locale: app()->currentLocale(),
+            ),
+        ]);
     }
 
     /** @return array{type: string, label: string, url: string}|null */

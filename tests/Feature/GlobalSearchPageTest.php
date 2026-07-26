@@ -58,7 +58,6 @@ final class GlobalSearchPageTest extends TestCase
             ->assertSeeText('Результаты поиска')
             ->assertSeeText('Северный детектив')
             ->assertSee('https://images.example.com/north-detective.jpg', false)
-            ->assertSeeText('1 сезон')
             ->assertSeeText('2 серии')
             ->assertSee(route('titles.taxonomy', ['type' => 'genre', 'taxonomy' => $genre->slug]), false)
             ->assertDontSeeText('Северный детектив скрытый');
