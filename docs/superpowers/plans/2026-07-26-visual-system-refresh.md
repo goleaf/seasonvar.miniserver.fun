@@ -1,6 +1,6 @@
 # План обновления визуальной системы Seasonvar
 
-Статус: `verified_ready_to_commit`.
+Статус: `implementation_committed_push_unresolved_authentication`.
 
 Дата начала: 26.07.2026.
 
@@ -293,17 +293,21 @@ scope, риск или решение.
 
 ### 27. Commit
 
-- Статус/приоритет: `[in_progress]` / `critical`.
+- Статус/приоритет: `[completed]` / `critical`.
 - Сделать: commit exact scope on `main` as
   `feat: refresh the light visual system`.
-- Проверка: hash, `git show --stat`, empty task staging.
+- Проверка: commit `3599547499f6470088466e034c429c560df121f1`
+  содержит 55 файлов Task 79; commit diff/secret/debug checks прошли.
 
 ### 28. Push
 
-- Статус/приоритет: `[pending]` / `critical`.
+- Статус/приоритет: `[unresolved_authentication]` / `critical`.
 - Сделать: configured non-force push of current `main`.
 - Риск: foreign dirty tree pre-push gate, auth/network/divergence.
-- Проверка: exact command/output; failure stays `unresolved`.
+- Проверка: `git push origin main` завершился кодом 128:
+  `fatal: could not read Username for 'https://github.com': No such device or address`.
+  Remote, credentials, branch и history не менялись; force push не
+  выполнялся.
 
 ## Task-specific compliance matrix
 
@@ -332,7 +336,7 @@ scope, риск или решение.
 | Production/rollback | `completed` | Production build GREEN; code/assets-only rollback |
 | README/CHANGELOG/docs | `completed` | UI/frontend/audit owners, visitor history and Russian changelog updated; docs profile GREEN |
 | Final audit | `completed` | Requirements, legacy/design, debug/secret and task-scoped diff checks complete; three foreign EOF whitespace errors excluded |
-| Commit/push main | `pending` | Exact index, honest failure |
+| Commit/push main | `completed_with_unresolved_push_authentication` | `3599547` в `main`; обычный HTTPS push отклонён до передачи credentials |
 
 ## Expected changed files
 

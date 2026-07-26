@@ -10341,7 +10341,7 @@ foreign shared-worktree scope.
 
 ## Task 79 — Единая светлая визуальная система
 
-Статус: `verified_ready_to_commit`.
+Статус: `implementation_committed_push_unresolved_authentication`.
 
 Дата начала: 26.07.2026.
 
@@ -10374,7 +10374,7 @@ protected.
 | Full repository suite | `completed_with_2_unrelated_failures` | 1 969 total; 1 956 passed, 11 skipped, 199 592 assertions; missing importer class and stale auth flash assertion remain independent |
 | Docs/README/CHANGELOG | `completed` | Canonical UI/frontend, audit, visitor history, Russian changelog; docs gate GREEN |
 | Final audit | `completed_with_foreign_tree_limits` | Requirements, legacy/design, debug/secret and task-only diff checks GREEN; three foreign EOF whitespace errors remain outside Task 79 |
-| Commit/push main | `in_progress` | Exact alternate index; shared/external failure honest |
+| Commit/push main | `completed_with_unresolved_push_authentication` | `3599547` в `main`; `git push origin main` завершился кодом 128 из-за отсутствующих GitHub HTTPS credentials |
 
 ### Checklist
 
@@ -10391,7 +10391,9 @@ protected.
 10. `[completed]` Docs, README, Russian CHANGELOG and evidence.
 11. `[completed_with_foreign_tree_limits]` Final requirement/legacy/debug/
     secret/task-only diff audit; three foreign EOF whitespace errors excluded.
-12. `[in_progress]` Exact Task 79 commit and configured non-force push.
+12. `[completed_with_unresolved_push_authentication]` Exact Task 79 commit
+    `3599547`; configured non-force push выполнен и отклонён GitHub HTTPS до
+    передачи данных: `could not read Username`.
 
 ---
 

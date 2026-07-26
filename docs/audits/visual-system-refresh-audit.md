@@ -90,3 +90,13 @@ violation на проверенных страницах.
 
 После будущих изменений нужно повторно запускать `$impeccable audit`, чтобы
 сравнивать оценку с этим evidence.
+
+## Delivery evidence
+
+- Реализация зафиксирована в `main` коммитом
+  `3599547499f6470088466e034c429c560df121f1`
+  (`feat: refresh the light visual system`).
+- Обычный `git push origin main` завершился кодом 128 до передачи данных:
+  GitHub HTTPS не смог получить имя пользователя из текущей среды.
+- Force push, смена remote, изменение credentials и переписывание истории
+  не выполнялись; отправка остаётся `unresolved_authentication`.
