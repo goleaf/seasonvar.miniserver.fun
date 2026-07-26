@@ -45,6 +45,19 @@ return [
         'quality_upgrade' => 'Обновление качества',
         'special_release' => 'Специальный выпуск',
     ],
+    'batches' => [
+        'details' => 'Список серий (:count)',
+        'labels' => [
+            'serial_premiere' => 'Серии :episodes',
+            'season_premiere' => 'Серии :episodes',
+            'episode_release' => 'Вышли серии :episodes',
+            'translation_release' => 'Добавлен перевод для серий :episodes',
+            'subtitle_release' => 'Добавлены субтитры для серий :episodes',
+            'portal_publication' => 'Добавлены серии :episodes',
+            'quality_upgrade' => 'Обновлено качество серий :episodes',
+            'special_release' => 'Добавлены специальные выпуски :episodes',
+        ],
+    ],
     'statuses' => [
         'scheduled' => 'Запланировано',
         'estimated' => 'Предварительно',

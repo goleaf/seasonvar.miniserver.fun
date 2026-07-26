@@ -323,7 +323,28 @@ Requester/support directories используют deterministic secondary `id`,
 
 ## Query contract календаря релизов
 
-Calendar query всегда ограничен day/week/month либо configurable upcoming/recent window, eager-loads title/season/episode/media и использует deterministic ID tie-break. Индексы `(is_public,status,starts_at,id)`, `(entry_type,status,starts_at,id)` и target-prefixed lookup соответствуют public range, filter и merge/observer identity; correction и subscription timelines имеют отдельные owner indexes. Month summary агрегирует один bounded set, а partial/unknown dates не инициируют full catalogue scan. Personal exclusions применяются owner subqueries и не загружаются по карточке. Migration проверена на чистой SQLite; полный contract — в [`release-calendar.md`](release-calendar.md).
+Calendar query всегда ограничен day/week/month либо configurable
+upcoming/recent window и использует deterministic aggregate-ID tie-break.
+HTML-выдача сначала пагинирует semantic episode groups, затем одним bounded
+query загружает members максимум `per_page` групп и только проекции
+`catalogTitle(id,slug,title,original_title,poster_url)` и
+`episode(id,season_id,number,title)`. Query budget одинаков для пачек из 2 и
+20 серий и не содержит query-per-card/episode. Индексы
+`(is_public,status,starts_at,id)`, `(is_public,status,date_value,id)`,
+`(entry_type,status,starts_at,id)` и target-prefixed lookup соответствуют
+public range, filter и merge/observer identity; correction и subscription
+timelines имеют отдельные owner indexes.
+
+Фактический SQLite `EXPLAIN QUERY PLAN` для recent group count/page/member
+выбирает `release_schedule_public_time_idx` и
+`release_schedule_public_date_idx`. `GROUP BY` и chronological order
+используют bounded temporary B-tree после индексного window scan; добавочный
+широкий composite index не устранил бы semantic grouping и неоправданно
+увеличил бы стоимость importer/observer writes, поэтому migration не
+добавлялась. Month summary по-прежнему агрегирует canonical events, а
+partial/unknown dates не инициируют full catalogue scan. Personal exclusions
+применяются owner subqueries и не загружаются по карточке. Полный contract —
+в [`release-calendar.md`](release-calendar.md).
 
 Private ICS query использует тот же `ReleaseScheduleVisibility` и personal constraint, выбирает только поля renderer и eager-load одного title, ограничивает окно `60` дней назад / `400` вперёд и максимум `1000` событий. Exact datetime/date/range проходят один bounded query; month/quarter/year/unknown не превращаются в fake timestamps. Scope filters составляются server-side, collection использует existing membership relation, а owner management list ограничен десятью feeds и сотней подборок; title autocomplete сначала использует canonical FTS, bounded escaped `LIKE` остаётся только fallback при отсутствующем индексе.
 

@@ -10140,3 +10140,78 @@ Detailed implementation plan:
 15. `[completed_unresolved_authentication]` Configured non-force push was
     attempted and rejected before transfer because GitHub HTTPS credentials
     are unavailable.
+
+## Task 81 — группировка пакетных событий календаря релизов
+
+Статус: `verified_delivery_pending`.
+
+Дата начала: 26.07.2026.
+
+Design:
+[`2026-07-26-release-calendar-episode-batches-design.md`](../superpowers/specs/2026-07-26-release-calendar-episode-batches-design.md).
+
+Detailed implementation plan:
+[`2026-07-26-release-calendar-episode-batches.md`](../superpowers/plans/2026-07-26-release-calendar-episode-batches.md).
+
+### Цель и root cause
+
+`ReleaseCalendarQuery` пагинирует по одной canonical
+`release_schedule_entries` строке, а Blade создаёт по одной карточке на строку.
+Поэтому один синхронный import нескольких соседних серий показывает десятки
+одинаковых блоков. Группировка после текущего paginator отклонена: пачка
+больше 24 строк разрывалась бы между страницами, а pagination total оставался
+бы числом событий вместо числа карточек.
+
+Выбран двухфазный bounded read: сначала paginate semantic group keys, затем
+одним запросом hydrate members максимум 24 групп текущей страницы. Canonical
+event identity, уведомления, private iCalendar, corrections, admin и import
+остаются раздельными.
+
+### Expected files и protected contracts
+
+Ожидаются calendar query/DTO/SEO/Livewire/Blade/translations, focused
+PHPUnit/browser tests, calendar/frontend/performance owners, README,
+CHANGELOG и task evidence. Не планируются migration, DML, route/API/cache/
+queue/dependency/env changes.
+
+Защищены все route names/URLs, `type|status|sort|title|calendarPage`,
+visibility/personal/subscription boundaries, UUID/logical key/enums,
+notification/feed/admin/import contracts, month event counts, SEO canonical/
+`hreflang`, cache invalidation, RU/EN locale state, SQLite portability и весь
+foreign shared-worktree scope.
+
+### Task-specific compliance matrix
+
+| Requirement/domain | Статус | Evidence / следующий gate |
+| --- | --- | --- |
+| Root/index/canonical fresh read | `completed` | Mandatory owners и task evidence повторно прочитаны перед Git-аудитом |
+| Actual stack | `completed` | PHP 8.5, Laravel 13.22.0, Livewire 4.3.3, Boost 2.4.13, Tailwind 4.3.2, PHPUnit 12.5.32, SQLite |
+| Existing implementation first | `completed` | Routes/query/DTO/SEO/page/Blade/tests/feed/notification/admin/import traced |
+| Alternatives/user authorization | `completed` | Client/post-page grouping rejected; repeated explicit directive authorizes two-phase query |
+| Design | `completed_with_commit_blocker` | Spec complete; hook-enabled isolated commit blocked because foreign `CHANGELOG.md` has unstaged content |
+| Plan/files/contracts/risks | `completed` | Linked unlimited plan and risk matrix |
+| TDD | `completed` | Initial 3 RED failures; focused 11/56 and related 137/1 228 GREEN |
+| Schema/index | `not_applicable` | SQLite EXPLAIN uses existing public time/date indexes; no DDL justified |
+| Validation/auth/security/error/cache | `already_compliant` | Existing boundaries unchanged; combined-filter and fallback regressions green |
+| Localization/a11y/mobile | `completed` | RU/EN parity 3/74 795; native details; Playwright 9/9 standard + 7/7 extended |
+| Notifications/feed/admin/import/API | `already_compliant` | Canonical rows untouched; related feed/default tests green |
+| Docs/README/CHANGELOG | `completed` | Canonical owners and dated visitor/product notes updated |
+| Verification/final audit | `completed_with_repository_limits` | Global PHPStan, task Rector/Pint/syntax, audits/build/browser and related tests green; monolithic PHPUnit hits 256 МБ, split suite exposes two unrelated repository failures; full Rector/docs checks expose foreign changes |
+| Commit/push main | `pending` | Exact task-only scope; external failure honest |
+
+### Безлимитный execution order
+
+1. `[completed]` Skills, runtime, Git/shared-tree and calendar architecture audit.
+2. `[completed]` Alternatives and safe semantic grouping design.
+3. `[completed]` Detailed TDD plan, files, compatibility and rollback.
+4. `[completed]` Finish mandatory owner reread and plan reread.
+5. `[completed]` RED happy path, edge matrix, group pagination and query budget.
+6. `[completed]` Two-phase group page/member hydration and typed DTO.
+7. `[completed]` Type-aware range summary and native accessible disclosure.
+8. `[completed]` RU/EN parity and single-event compatibility.
+9. `[completed]` Query/EXPLAIN/security/SEO/feed/notification/admin/import review.
+10. `[completed_with_repository_limits]` Focused/full/static/build/browser verification and fixes.
+11. `[completed]` Canonical docs, visitor README and Russian changelog.
+12. `[completed]` Final requirement reread and exact task diff audit.
+13. `[pending]` Hook-enabled isolated implementation commit in existing `main`.
+14. `[pending]` Configured non-force push; failure stays `unresolved`.

@@ -60,6 +60,66 @@ test('recent calendar defaults to newest first and keeps explicit earliest sorti
     expect(pageErrors).toEqual([]);
 });
 
+test('simultaneous episodes render as one keyboard-expandable calendar batch', async ({
+    page,
+    baseURL,
+}, testInfo) => {
+    const errors = [];
+    const localOrigin = new URL(baseURL).origin;
+
+    page.on('console', (message) => {
+        if (message.type() === 'error' && !message.text().startsWith('Failed to load resource:')) {
+            errors.push(`console: ${message.text()}`);
+        }
+    });
+    page.on('pageerror', (error) => errors.push(`page: ${error.message}`));
+    page.on('response', (response) => {
+        if (new URL(response.url()).origin === localOrigin && response.status() >= 400) {
+            errors.push(`${response.status()} ${response.url()}`);
+        }
+    });
+
+    const response = await page.goto('/calendar');
+    expect(response?.status()).toBe(200);
+    await expect(page.getByRole('heading', { level: 1, name: 'Календарь релизов' })).toBeVisible();
+
+    const batch = page.locator('[data-release-batch-card]').filter({
+        hasText: 'Осторожно с ангелом',
+    });
+    const disclosure = batch.locator('details');
+    const summary = disclosure.locator('summary');
+
+    await expect(batch).toHaveCount(1);
+    await expect(batch).toContainText('Добавлены серии 185–194');
+    await expect(summary).toContainText('Список серий (10)');
+    await expect(disclosure).not.toHaveAttribute('open', '');
+    await summary.focus();
+    await expect(summary).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(disclosure).toHaveAttribute('open', '');
+    await expect(summary).toBeFocused();
+    await expect(batch.locator('[data-release-batch-item]')).toHaveCount(10);
+    await expect(batch.getByText('Название серии 185')).toBeVisible();
+    await expect(batch.getByText('Название серии 194')).toBeVisible();
+
+    const summaryHeight = await summary.evaluate((element) => element.getBoundingClientRect().height);
+    const skipLinkBox = await page.locator('[data-skip-link]').boundingBox();
+
+    expect(summaryHeight).toBeGreaterThanOrEqual(44);
+    expect(skipLinkBox.y + skipLinkBox.height).toBeLessThanOrEqual(0);
+    expect(await page.evaluate(
+        () => document.documentElement.scrollWidth - window.innerWidth,
+    )).toBeLessThanOrEqual(1);
+    expect(errors).toEqual([]);
+
+    const viewport = page.viewportSize();
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({
+        path: `output/playwright/calendar-batch-${testInfo.project.name.toLowerCase().replaceAll(' ', '-')}-${viewport.width}x${viewport.height}.png`,
+        fullPage: true,
+    });
+});
+
 test('private calendar subscription manager is responsive and exposes working provider actions', async ({
     page,
     context,

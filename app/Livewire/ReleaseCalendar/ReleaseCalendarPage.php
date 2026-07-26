@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\ReleaseCalendar;
 
 use App\Actions\ReleaseCalendar\SetReleaseCalendarSubscription;
+use App\DTOs\ReleaseCalendar\ReleaseScheduleGroupData;
 use App\Enums\ReleaseCalendarSort;
 use App\Enums\ReleaseCalendarView;
 use App\Enums\ReleaseScheduleEntryType;
@@ -18,9 +19,8 @@ use App\Services\ReleaseCalendar\ReleaseCalendarSchema;
 use App\Services\ReleaseCalendar\ReleaseCalendarSeoPresenter;
 use App\Services\ReleaseCalendar\ReleaseCalendarTimezone;
 use Carbon\CarbonImmutable;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
-use Illuminate\Pagination\LengthAwarePaginator as Paginator;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
@@ -62,7 +62,7 @@ final class ReleaseCalendarPage extends Component
 
     public function mount(string $view = 'upcoming', ?string $period = null, ?string $locale = null): void
     {
-        $this->view = ReleaseCalendarView::tryFrom($view)?->value ?? ReleaseCalendarView::Upcoming->value;
+        $this->view = (ReleaseCalendarView::tryFrom($view) ?? ReleaseCalendarView::Upcoming)->value;
         $this->period = $period;
         $this->locale = is_string($locale) && in_array($locale, (array) config('release-calendar.supported_locales', []), true)
             ? $locale
@@ -177,7 +177,9 @@ final class ReleaseCalendarPage extends Component
 
         return view('livewire.release-calendar.release-calendar-page', [
             'entries' => $entries,
-            'entryGroups' => $entries->getCollection()->groupBy(fn ($entry): string => $entry->groupLabel),
+            'entryGroups' => $entries->getCollection()->groupBy(
+                fn (ReleaseScheduleGroupData $group): string => $group->primary->groupLabel,
+            ),
             'schemaReady' => $schema->ready(),
             'calendarView' => $calendarView,
             'interfaceLocale' => $locale,
@@ -212,8 +214,10 @@ final class ReleaseCalendarPage extends Component
 
     private function normalize(): void
     {
-        $this->type = ReleaseScheduleEntryType::tryFrom($this->type)?->value ?? '';
-        $this->status = ReleaseScheduleStatus::tryFrom($this->status)?->value ?? '';
+        $type = ReleaseScheduleEntryType::tryFrom($this->type);
+        $status = ReleaseScheduleStatus::tryFrom($this->status);
+        $this->type = $type instanceof ReleaseScheduleEntryType ? $type->value : '';
+        $this->status = $status instanceof ReleaseScheduleStatus ? $status->value : '';
         $sort = ReleaseCalendarSort::tryFrom($this->sort);
         $this->sort = $sort instanceof ReleaseCalendarSort && $sort !== $this->defaultSort()
             ? $sort->value
@@ -361,10 +365,10 @@ final class ReleaseCalendarPage extends Component
         return ['weekdays' => $weekdays, 'weeks' => $weeks];
     }
 
-    /** @return LengthAwarePaginator<int, mixed> */
+    /** @return LengthAwarePaginator<int, ReleaseScheduleGroupData> */
     private function emptyPaginator(): LengthAwarePaginator
     {
-        return new Paginator([], 0, max(1, (int) config('release-calendar.per_page', 24)), max(1, Paginator::resolveCurrentPage('calendarPage')), [
+        return new LengthAwarePaginator([], 0, max(1, (int) config('release-calendar.per_page', 24)), max(1, LengthAwarePaginator::resolveCurrentPage('calendarPage')), [
             'path' => request()->url(), 'query' => request()->query(), 'pageName' => 'calendarPage',
         ]);
     }

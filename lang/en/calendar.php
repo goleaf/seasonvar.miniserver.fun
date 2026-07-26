@@ -45,6 +45,19 @@ return [
         'quality_upgrade' => 'Quality upgrade',
         'special_release' => 'Special release',
     ],
+    'batches' => [
+        'details' => 'Episode list (:count)',
+        'labels' => [
+            'serial_premiere' => 'Episodes :episodes',
+            'season_premiere' => 'Episodes :episodes',
+            'episode_release' => 'Episodes :episodes released',
+            'translation_release' => 'Translation added for episodes :episodes',
+            'subtitle_release' => 'Subtitles added for episodes :episodes',
+            'portal_publication' => 'Episodes :episodes added',
+            'quality_upgrade' => 'Quality updated for episodes :episodes',
+            'special_release' => 'Special episodes :episodes added',
+        ],
+    ],
     'statuses' => [
         'scheduled' => 'Scheduled',
         'estimated' => 'Estimated',

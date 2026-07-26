@@ -77,35 +77,56 @@
             @foreach ($entryGroups as $groupLabel => $groupEntries)
                 <section aria-labelledby="release-group-{{ $loop->index }}">
                     <h2 id="release-group-{{ $loop->index }}" class="mb-3 text-lg font-black text-slate-900">{{ $groupLabel }}</h2>
-                    <ul class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                @foreach ($groupEntries as $entry)
-                    <li wire:key="release-entry-{{ $entry->publicId }}" @class(['overflow-hidden rounded-panel border bg-white shadow-panel', 'border-rose-200' => $entry->isCancelled, 'border-amber-200' => $entry->isDelayed, 'border-slate-200' => ! $entry->isCancelled && ! $entry->isDelayed])>
+                    <ul class="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
+                @foreach ($groupEntries as $releaseGroup)
+                    <li wire:key="release-group-{{ $releaseGroup->key }}" data-release-card @if ($releaseGroup->isBatch) data-release-batch-card @endif @class(['overflow-hidden rounded-panel border bg-white shadow-panel', 'border-rose-200' => $releaseGroup->primary->isCancelled, 'border-amber-200' => $releaseGroup->primary->isDelayed, 'border-slate-200' => ! $releaseGroup->primary->isCancelled && ! $releaseGroup->primary->isDelayed])>
                         <article class="flex h-full min-w-0 gap-4 p-4">
-                            @if ($entry->posterUrl)<img src="{{ $entry->posterUrl }}" alt="{{ __('calendar.poster_alt', ['title' => $entry->title]) }}" loading="lazy" class="h-32 w-24 shrink-0 rounded-control object-cover" />@endif
+                            @if ($releaseGroup->primary->posterUrl)<img src="{{ $releaseGroup->primary->posterUrl }}" alt="{{ __('calendar.poster_alt', ['title' => $releaseGroup->primary->title]) }}" loading="lazy" class="h-32 w-24 shrink-0 rounded-control object-cover" />@endif
                             <div class="flex min-w-0 flex-1 flex-col">
                                 <div class="flex flex-wrap gap-2">
-                                    <x-ui.status-pill>{{ $entry->typeLabel }}</x-ui.status-pill>
-                                    @if ($entry->isCancelled)
-                                        <x-ui.status-pill variant="danger">{{ $entry->statusLabel }}</x-ui.status-pill>
-                                    @elseif ($entry->isDelayed)
-                                        <x-ui.status-pill variant="warning">{{ $entry->statusLabel }}</x-ui.status-pill>
+                                    <x-ui.status-pill>{{ $releaseGroup->primary->typeLabel }}</x-ui.status-pill>
+                                    @if ($releaseGroup->primary->isCancelled)
+                                        <x-ui.status-pill variant="danger">{{ $releaseGroup->primary->statusLabel }}</x-ui.status-pill>
+                                    @elseif ($releaseGroup->primary->isDelayed)
+                                        <x-ui.status-pill variant="warning">{{ $releaseGroup->primary->statusLabel }}</x-ui.status-pill>
                                     @else
-                                        <x-ui.status-pill>{{ $entry->statusLabel }}</x-ui.status-pill>
+                                        <x-ui.status-pill>{{ $releaseGroup->primary->statusLabel }}</x-ui.status-pill>
                                     @endif
                                 </div>
-                                <h2 class="mt-3 break-words text-base font-black text-slate-900"><a href="{{ $entry->url }}" wire:navigate class="hover:text-emerald-700">{{ $entry->title }}</a></h2>
-                                @if ($entry->originalTitle)<p class="mt-1 break-words text-xs text-slate-500">{{ $entry->originalTitle }}</p>@endif
-                                <p class="mt-2 text-sm font-bold text-slate-700"><time @if ($entry->dateTimeIso) datetime="{{ $entry->dateTimeIso }}" @endif>{{ $entry->dateLabel }}</time></p>
-                                <p class="mt-1 text-xs text-slate-500">{{ $entry->precisionLabel }}</p>
-                                @if ($entry->contextLabel)<p class="mt-2 text-sm text-slate-600">{{ $entry->contextLabel }}</p>@endif
-                                @if ($entry->availabilityLabel)<p class="mt-1 break-words text-sm text-slate-600">{{ $entry->availabilityLabel }}</p>@endif
-                                @if ($entry->countdownIso)
-                                    <p class="mt-2 text-sm font-black text-emerald-700" data-release-countdown="{{ $entry->countdownIso }}" data-release-countdown-fallback="{{ __('calendar.countdown.awaiting') }}" data-release-countdown-days="{{ __('calendar.countdown.days_short') }}" data-release-countdown-hours="{{ __('calendar.countdown.hours_short') }}" data-release-countdown-minutes="{{ __('calendar.countdown.minutes_short') }}" aria-live="off"><span aria-hidden="true">{{ __('calendar.countdown.calculating') }}</span><span class="sr-only">{{ __('calendar.countdown.accessible', ['date' => $entry->dateLabel]) }}</span></p>
+                                <h3 class="mt-3 break-words text-base font-black text-slate-900">
+                                    <a href="{{ $releaseGroup->primary->url }}" wire:navigate class="hover:text-emerald-700">{{ $releaseGroup->primary->title }}</a>
+                                    @if ($releaseGroup->batchLabel)<span class="font-bold text-slate-700"> — {{ $releaseGroup->batchLabel }}</span>@endif
+                                </h3>
+                                @if ($releaseGroup->primary->originalTitle)<p class="mt-1 break-words text-xs text-slate-500">{{ $releaseGroup->primary->originalTitle }}</p>@endif
+                                <p class="mt-2 text-sm font-bold text-slate-700"><time @if ($releaseGroup->primary->dateTimeIso) datetime="{{ $releaseGroup->primary->dateTimeIso }}" @endif>{{ $releaseGroup->primary->dateLabel }}</time></p>
+                                <p class="mt-1 text-xs text-slate-500">{{ $releaseGroup->primary->precisionLabel }}</p>
+                                @if ($releaseGroup->isBatch)
+                                    @if ($releaseGroup->primary->seasonLabel)<p class="mt-2 text-sm text-slate-600">{{ $releaseGroup->primary->seasonLabel }}</p>@endif
+                                    <details class="group mt-3 rounded-control border border-slate-200 bg-slate-50">
+                                        <summary class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-sm font-bold text-slate-700 marker:hidden">
+                                            <span>{{ $releaseGroup->detailLabel }}</span>
+                                            <x-ui.icon name="fa-solid fa-chevron-down text-xs text-slate-400 transition group-open:rotate-180" />
+                                        </summary>
+                                        <ul class="border-t border-slate-200 px-3 py-2">
+                                            @foreach ($releaseGroup->entries as $batchEntry)
+                                                <li wire:key="release-batch-entry-{{ $batchEntry->publicId }}" data-release-batch-item class="flex min-w-0 flex-wrap gap-x-2 border-b border-slate-200 py-2 text-sm text-slate-600 last:border-b-0">
+                                                    <span class="font-bold text-slate-800">{{ $batchEntry->episodeLabel }}</span>
+                                                    @if ($batchEntry->episodeTitle)<span class="min-w-0 break-words">{{ $batchEntry->episodeTitle }}</span>@endif
+                                                </li>
+                                            @endforeach
+                                        </ul>
+                                    </details>
+                                @elseif ($releaseGroup->primary->contextLabel)
+                                    <p class="mt-2 text-sm text-slate-600">{{ $releaseGroup->primary->contextLabel }}</p>
+                                @endif
+                                @if ($releaseGroup->primary->availabilityLabel)<p class="mt-1 break-words text-sm text-slate-600">{{ $releaseGroup->primary->availabilityLabel }}</p>@endif
+                                @if ($releaseGroup->primary->countdownIso)
+                                    <p class="mt-2 text-sm font-black text-emerald-700" data-release-countdown="{{ $releaseGroup->primary->countdownIso }}" data-release-countdown-fallback="{{ __('calendar.countdown.awaiting') }}" data-release-countdown-days="{{ __('calendar.countdown.days_short') }}" data-release-countdown-hours="{{ __('calendar.countdown.hours_short') }}" data-release-countdown-minutes="{{ __('calendar.countdown.minutes_short') }}" aria-live="off"><span aria-hidden="true">{{ __('calendar.countdown.calculating') }}</span><span class="sr-only">{{ __('calendar.countdown.accessible', ['date' => $releaseGroup->primary->dateLabel]) }}</span></p>
                                 @endif
                                 <div class="mt-auto flex flex-wrap gap-2 pt-3">
-                                    <a href="{{ $entry->url }}" wire:navigate class="inline-flex min-h-11 items-center rounded-control bg-emerald-700 px-3 text-sm font-bold text-white">{{ __('calendar.open_title') }}</a>
-                                    @if ($entry->canSubscribe)
-                                        <button type="button" wire:click="toggleSubscription({{ $entry->catalogTitleId }}, {{ $entry->isSubscribed ? 'false' : 'true' }})" wire:loading.attr="disabled" wire:target="toggleSubscription({{ $entry->catalogTitleId }}, {{ $entry->isSubscribed ? 'false' : 'true' }})" class="inline-flex min-h-11 items-center rounded-control bg-slate-100 px-3 text-sm font-bold text-slate-700 hover:bg-slate-200">{{ $entry->isSubscribed ? __('calendar.follow.remove') : __('calendar.follow.add') }}</button>
+                                    <a href="{{ $releaseGroup->primary->url }}" wire:navigate class="inline-flex min-h-11 items-center rounded-control bg-emerald-700 px-3 text-sm font-bold text-white">{{ __('calendar.open_title') }}</a>
+                                    @if ($releaseGroup->primary->canSubscribe)
+                                        <button type="button" wire:click="toggleSubscription({{ $releaseGroup->primary->catalogTitleId }}, {{ $releaseGroup->primary->isSubscribed ? 'false' : 'true' }})" wire:loading.attr="disabled" wire:target="toggleSubscription({{ $releaseGroup->primary->catalogTitleId }}, {{ $releaseGroup->primary->isSubscribed ? 'false' : 'true' }})" class="inline-flex min-h-11 items-center rounded-control bg-slate-100 px-3 text-sm font-bold text-slate-700 hover:bg-slate-200">{{ $releaseGroup->primary->isSubscribed ? __('calendar.follow.remove') : __('calendar.follow.add') }}</button>
                                     @endif
                                 </div>
                             </div>

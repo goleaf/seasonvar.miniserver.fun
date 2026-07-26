@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Services\ReleaseCalendar;
 
-use App\DTOs\ReleaseCalendar\ReleaseScheduleCardData;
+use App\DTOs\ReleaseCalendar\ReleaseScheduleGroupData;
 use App\Enums\ReleaseCalendarView;
 
 final class ReleaseCalendarSeoPresenter
 {
-    /** @param iterable<int, ReleaseScheduleCardData> $items
+    /** @param iterable<int, ReleaseScheduleGroupData> $items
      * @return array<string, mixed>
      */
     public function page(ReleaseCalendarView $view, ?string $period, bool $filtered, ?string $locale, iterable $items = []): array
@@ -22,7 +22,9 @@ final class ReleaseCalendarSeoPresenter
         $seenUrls = [];
 
         if ($eligible) {
-            foreach ($items as $item) {
+            foreach ($items as $group) {
+                $item = $group->primary;
+
                 if (isset($seenUrls[$item->url])) {
                     continue;
                 }

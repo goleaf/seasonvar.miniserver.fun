@@ -301,6 +301,62 @@ collect(range(1, 26))->each(
     },
 );
 
+$batchTitle = CatalogTitle::factory()->create([
+    'slug' => 'browser-calendar-batch',
+    'title' => 'Осторожно с ангелом',
+    'original_title' => 'Cuidado con el ángel',
+    'description' => 'Детерминированная пачка серий для браузерной проверки календаря.',
+    'poster_url' => $posterUrl,
+    'type' => 'show',
+    'year' => 2008,
+]);
+$batchSeason = Season::factory()->for($batchTitle)->create(['number' => 1]);
+$batchPublishedAt = now()->subHours(2)->startOfMinute();
+
+foreach (range(185, 194) as $episodeNumber) {
+    $batchEpisode = Episode::factory()->for($batchSeason)->create([
+        'number' => $episodeNumber,
+        'title' => 'Название серии '.$episodeNumber,
+    ]);
+    $batchMedia = LicensedMedia::withoutEvents(fn (): LicensedMedia => LicensedMedia::factory()->create([
+        'catalog_title_id' => $batchTitle->id,
+        'season_id' => $batchSeason->id,
+        'episode_id' => $batchEpisode->id,
+        'title' => 'Осторожно с ангелом, серия '.$episodeNumber,
+        'storage_disk' => 'external_playlist',
+        'path' => 'https://media.example.com/player-fixtures/calendar-'.$episodeNumber.'.mp4',
+        'playback_url' => 'https://media.example.com/player-fixtures/calendar-'.$episodeNumber.'.mp4',
+        'format' => 'mp4',
+        'quality' => '720p',
+        'variant_type' => 'original',
+        'variant_key' => 'browser-original',
+        'duration_seconds' => 600,
+        'status' => 'published',
+        'check_status' => 'available',
+        'health_status' => 'active',
+        'published_at' => $batchPublishedAt,
+    ]));
+
+    ReleaseScheduleEntry::query()->create([
+        'logical_key' => 'browser-calendar-batch-'.$episodeNumber,
+        'entry_type' => ReleaseScheduleEntryType::PortalPublication,
+        'status' => ReleaseScheduleStatus::Released,
+        'precision' => ReleaseDatePrecision::ExactDateTime,
+        'source' => ReleaseScheduleSource::Portal,
+        'catalog_title_id' => $batchTitle->id,
+        'season_id' => $batchSeason->id,
+        'episode_id' => $batchEpisode->id,
+        'licensed_media_id' => $batchMedia->id,
+        'season_number' => $batchSeason->number,
+        'episode_number' => $episodeNumber,
+        'starts_at' => $batchPublishedAt,
+        'released_at' => $batchPublishedAt,
+        'original_timezone' => 'UTC',
+        'is_public' => true,
+        'notifications_enabled' => false,
+    ]);
+}
+
 $recommendedTitle = CatalogTitle::factory()->create([
     'slug' => 'browser-recommended',
     'title' => 'Рекомендованный браузерный сериал',

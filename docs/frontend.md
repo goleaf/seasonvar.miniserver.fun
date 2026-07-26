@@ -276,6 +276,14 @@ Dropdown реализует `combobox`/`listbox`, `aria-expanded`, `aria-actived
 
 Public/personal calendar рендерится full-page Livewire и остаётся содержательным без JavaScript. Default `/calendar` разрешает пустое sort-state как `latest`, поэтому недавние фактические даты идут от новых к старым без лишнего query-параметра; explicit `earliest|latest|title` и все остальные views сохраняют прежнее значение. Направление применяется server-side до `calendarPage`, а Blade только выводит подготовленные группы; смена select сбрасывает именованный paginator и не создаёт второго client sort-state. `resources/js/release-calendar.js` отвечает только за presentation countdown из trusted server ISO timestamp: minute-level interval, stop at zero, `livewire:navigating` cleanup и reinitialization после navigation. Он не определяет release status, timezone, visibility или notification eligibility. Month table скрывается в пользу server-rendered agenda на телефоне; loading/empty/error/live status и keyboard focus принадлежат Blade/Livewire. Полный contract: [`release-calendar.md`](release-calendar.md).
 
+Синхронные серии одной semantic batch выводятся одной карточкой с краткой
+фразой о точных диапазонах. Список серий раскрывается нативным
+`<details>/<summary>`, поэтому доступен клавиатуре и работает без
+дополнительного JavaScript, client state или сетевого запроса. В раскрытии
+используется семантический список; повторные медиаварианты серии не
+дублируют строку. Одиночные события, кнопки подписки, countdown, pagination,
+loading/error/empty и responsive grid сохраняют прежний lifecycle.
+
 Только `/calendar/mine` монтирует child `ReleaseCalendarFeedManager`. Он server-side готовит owner feeds, максимум 100 собственных подборок и bounded title autocomplete; Blade не выполняет queries. Scope меняет только относящиеся к нему поля, выбранный title ID является locked Livewire state, submit/regenerate/delete получают loading/confirmation/status и повторную owner validation. Формы и карточки используют текущие light Tailwind tokens, видимые labels, минимум 44 px и обычную page scroll без вложенных scroll-контейнеров.
 
 Optional `release-calendar.js` теперь также обслуживает copy/Google controls. Он принимает только same-origin `/calendar/feed/{64-char-token}.ics`, использует Clipboard API с bounded textarea fallback, меняет доступный текст результата и очищает timers при Livewire navigation. Apple остаётся обычной `webcal://` ссылкой, Google открывается в новой вкладке после локального копирования. Без JavaScript readonly ICS URL и обе provider links остаются рабочими; token не сохраняется в browser storage. FontAwesome brand glyphs загружаются из уже установленного локального npm package.
