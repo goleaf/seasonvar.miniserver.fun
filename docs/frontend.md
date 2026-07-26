@@ -86,7 +86,24 @@ large-display получают увеличенные цели. Это Chromium 
 - `CatalogTitle` не имеет translation relation, поэтому карточка показывает существующий `display_title`, optional original title и provider metadata без автоматического перевода. Featured collection summary загружает только active/fallback translation rows. Audio translation/studio name остаётся брендом/данными источника; quality/format и их accessible context разделены от interface language.
 - Counts используют locale-aware `Number::format` и Laravel plural rules. Dates используют `AccountDateTimeFormatter`, active locale и account/default timezone; hardcoded `d.m.Y` на главной отсутствует. Layout допускает длинные labels через wrap/min-width rules; текущие `ru`/`en` LTR, полная RTL-поддержка не заявляется.
 - Homepage sections не являются отдельными Livewire components. Если layout или дочерний component выполняет Livewire update, `ApplyAccountPreferences` повторно устанавливает validated session locale до hydration; locale не дублируется mutable public property в каждой секции.
-- «Новые серии» остаются обзором двенадцати последних обновлённых тайтлов, но одна карточка выводит не более восьми объединённых серий/видеовариантов за последний день пополнения. При наличии продолжения показывается локализованная обычная ссылка на полную страницу тайтла; полные сезоны и источники в БД, на detail page и в API не сокращаются. Гостевая подборка главной использует индексируемый тип `RecentlyAdded`, а авторизованный пользователь сохраняет прежний `Personalized` lifecycle и private remember-shown state.
+
+### Personalized homepage lifecycle Task 94
+
+`CatalogHomePageBuilder::webData()` готовит два server-owned варианта одной
+Livewire-страницы. Guest projection состоит только из shared public
+metrics/trending/updates/new/watchable/featured/facet данных. Authenticated
+projection после public cache bypass добавляет bounded owner-only continue
+watching, library updates и personalized recommendations; User, progress,
+library state и private recommendation context не сериализуются в shared
+homepage payload.
+
+Структурный порядок является server-rendered DOM order, а не CSS/JavaScript
+перестановкой. Главная не создаёт дочерние Livewire components для каждой
+секции, client-side carousel, infinite scroll или параллельный API fetch.
+Title/release components получают eager-loaded модели, DTO, formatted
+labels и named-route URLs; Blade не выполняет query, ranking, timezone,
+range или ownership calculation.
+- «Последние обновления» показывает не более шести тайтлов. Для каждого тайтла query гидратирует максимум восемь новых series/media rows, но оконные `COUNT/MIN/MAX` сохраняют точный общий диапазон массового пополнения; компонент выводит одну summary-строку, metadata и действия вместо списка эпизодов. На phone видимы первые четыре обновления с переходом к полному разделу. Полные сезоны и источники в БД, detail page и API не сокращаются. Гостевая подборка новых сериалов использует индексируемый тип `RecentlyAdded`, а авторизованный пользователь сохраняет `Personalized` lifecycle и private remember-shown state.
 
 Датированные доказательства и незакрытые gaps находятся в [`audits/frontend-report.md`](audits/frontend-report.md), [`audits/livewire-report.md`](audits/livewire-report.md) и [`audits/video-playback-report.md`](audits/video-playback-report.md). Текущий переходный gap: Blade не содержит PHP/query/service calls, но header/footer/layout всё ещё используют route-aware `request()` и один template читает `config()`; living plan переносит эти решения в prepared view state.
 

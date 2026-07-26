@@ -69,6 +69,10 @@ final class CatalogHomeContentAdditionQuery
      *     title: CatalogTitle,
      *     episodes: Collection<int, Episode>,
      *     media: Collection<int, LicensedMedia>,
+     *     episode_count: int,
+     *     media_count: int,
+     *     episode_min: int|null,
+     *     episode_max: int|null,
      *     has_more: bool
      * }>
      */
@@ -102,15 +106,22 @@ final class CatalogHomeContentAdditionQuery
             ->groupBy(fn (Episode $episode): int => (int) $episode->season->catalog_title_id);
         $mediaByTitle = $this->mediaFor($coordinates)
             ->groupBy(fn (LicensedMedia $media): int => (int) $media->catalog_title_id);
-        $truncatedTitleIds = $episodesByTitle
-            ->filter(fn (Collection $episodes): bool => $episodes->count() > self::RELEASE_ITEMS_PER_TITLE)
-            ->keys()
-            ->concat($mediaByTitle
-                ->filter(fn (Collection $media): bool => $media->count() > self::RELEASE_ITEMS_PER_TITLE)
-                ->keys())
-            ->map(fn (mixed $titleId): int => (int) $titleId)
-            ->unique()
-            ->all();
+        $episodeCounts = $episodesByTitle->map(
+            fn (Collection $episodes): int => (int) ($episodes->first()?->getAttribute('home_release_total') ?? $episodes->count()),
+        );
+        $mediaCounts = $mediaByTitle->map(
+            fn (Collection $media): int => (int) ($media->first()?->getAttribute('home_release_total') ?? $media->count()),
+        );
+        $episodeMinimums = $episodesByTitle->map(
+            fn (Collection $episodes): ?int => $episodes->first()?->getAttribute('home_release_min_number') === null
+                ? null
+                : (int) $episodes->first()->getAttribute('home_release_min_number'),
+        );
+        $episodeMaximums = $episodesByTitle->map(
+            fn (Collection $episodes): ?int => $episodes->first()?->getAttribute('home_release_max_number') === null
+                ? null
+                : (int) $episodes->first()->getAttribute('home_release_max_number'),
+        );
         $episodesByTitle = $episodesByTitle->map(
             fn (Collection $episodes): Collection => $episodes->take(self::RELEASE_ITEMS_PER_TITLE)->values(),
         );
@@ -123,15 +134,24 @@ final class CatalogHomeContentAdditionQuery
                 $titlesById,
                 $episodesByTitle,
                 $mediaByTitle,
-                $truncatedTitleIds,
+                $episodeCounts,
+                $mediaCounts,
+                $episodeMinimums,
+                $episodeMaximums,
             ): array {
                 $titleId = $coordinate['id'];
+                $episodeCount = (int) $episodeCounts->get($titleId, 0);
+                $mediaCount = (int) $mediaCounts->get($titleId, 0);
 
                 return [
                     'title' => $titlesById->get($titleId),
                     'episodes' => $episodesByTitle->get($titleId, collect())->values(),
                     'media' => $mediaByTitle->get($titleId, collect())->values(),
-                    'has_more' => in_array($titleId, $truncatedTitleIds, true),
+                    'episode_count' => $episodeCount,
+                    'media_count' => $mediaCount,
+                    'episode_min' => $episodeMinimums->get($titleId),
+                    'episode_max' => $episodeMaximums->get($titleId),
+                    'has_more' => max($episodeCount, $mediaCount) > self::RELEASE_ITEMS_PER_TITLE,
                 ];
             })
             ->filter(fn (array $group): bool => $group['title'] instanceof CatalogTitle
@@ -399,12 +419,13 @@ final class CatalogHomeContentAdditionQuery
             $episodeTable.'.created_at',
         );
 
-        $rankedIds = $this->rankedIds(
+        $rankedRows = $this->rankedRows(
             $ranked,
             $episodeTable.'.id',
             $seasonTable.'.catalog_title_id',
             $episodeTable.'.created_at',
             'catalog_home_episode_ids',
+            $episodeTable.'.number',
         );
 
         $episodes = $this->withoutSecondaryIndexes(
@@ -414,8 +435,19 @@ final class CatalogHomeContentAdditionQuery
 
         return $episodes
             ->select($episodeTable.'.*')
+            ->addSelect([
+                'catalog_home_episode_rows.home_release_total',
+                'catalog_home_episode_rows.home_release_min_number',
+                'catalog_home_episode_rows.home_release_max_number',
+            ])
+            ->joinSub(
+                $rankedRows,
+                'catalog_home_episode_rows',
+                'catalog_home_episode_rows.home_release_id',
+                '=',
+                $episodeTable.'.id',
+            )
             ->availableTo(null)
-            ->whereIn($episodeTable.'.id', $rankedIds)
             ->with([
                 'season' => fn ($query) => $query
                     ->availableTo(null)
@@ -446,7 +478,7 @@ final class CatalogHomeContentAdditionQuery
             $media->qualifyColumn('created_at'),
         );
 
-        $rankedIds = $this->rankedIds(
+        $rankedRows = $this->rankedRows(
             $ranked,
             $media->qualifyColumn('id'),
             $media->qualifyColumn('catalog_title_id'),
@@ -457,18 +489,25 @@ final class CatalogHomeContentAdditionQuery
         $media = LicensedMedia::query()
             ->published()
             ->forAvailableReleases(null)
-            ->whereIn($media->qualifyColumn('id'), $rankedIds)
+            ->joinSub(
+                $rankedRows,
+                'catalog_home_media_rows',
+                'catalog_home_media_rows.home_release_id',
+                '=',
+                $media->qualifyColumn('id'),
+            )
             ->select([
-                'id',
-                'catalog_title_id',
-                'season_id',
-                'episode_id',
-                'title',
-                'quality',
-                'translation_name',
-                'format',
-                'published_at',
-                'created_at',
+                $mediaTable.'.id',
+                $mediaTable.'.catalog_title_id',
+                $mediaTable.'.season_id',
+                $mediaTable.'.episode_id',
+                $mediaTable.'.title',
+                $mediaTable.'.quality',
+                $mediaTable.'.translation_name',
+                $mediaTable.'.format',
+                $mediaTable.'.published_at',
+                $mediaTable.'.created_at',
+                'catalog_home_media_rows.home_release_total',
             ])
             ->with([
                 'season' => fn ($query) => $query
@@ -506,24 +545,37 @@ final class CatalogHomeContentAdditionQuery
     /**
      * @param  Builder<Episode>|Builder<LicensedMedia>  $query
      */
-    private function rankedIds(
+    private function rankedRows(
         Builder $query,
         string $idColumn,
         string $titleColumn,
         string $createdAtColumn,
         string $alias,
+        ?string $numberColumn = null,
     ): QueryBuilder {
         $ranked = $query
             ->selectRaw("{$idColumn} AS home_release_id")
+            ->selectRaw("COUNT(*) OVER (PARTITION BY {$titleColumn}) AS home_release_total")
             ->selectRaw(
                 "ROW_NUMBER() OVER (PARTITION BY {$titleColumn} ORDER BY {$createdAtColumn} DESC, {$idColumn} DESC) AS home_release_rank",
-            )
-            ->reorder()
-            ->toBase();
+            );
+
+        if ($numberColumn !== null) {
+            $ranked
+                ->selectRaw("MIN({$numberColumn}) OVER (PARTITION BY {$titleColumn}) AS home_release_min_number")
+                ->selectRaw("MAX({$numberColumn}) OVER (PARTITION BY {$titleColumn}) AS home_release_max_number");
+        }
+
+        $columns = ['home_release_id', 'home_release_total'];
+
+        if ($numberColumn !== null) {
+            $columns[] = 'home_release_min_number';
+            $columns[] = 'home_release_max_number';
+        }
 
         return DB::query()
-            ->fromSub($ranked, $alias)
-            ->select('home_release_id')
+            ->fromSub($ranked->reorder()->toBase(), $alias)
+            ->select($columns)
             ->where('home_release_rank', '<=', self::RELEASE_ITEMS_PER_TITLE + 1);
     }
 

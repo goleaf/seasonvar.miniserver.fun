@@ -167,11 +167,13 @@ class CatalogBladeComponentTest extends TestCase
         $this->assertStringContainsString('data-ui-poster-card', $html);
         $this->assertStringContainsString('data-home-latest-media-group="'.$catalogTitle->id.'"', $html);
         $this->assertStringContainsString('Новая серия', $html);
-        $this->assertStringContainsString('Сезон 2', $html);
-        $this->assertStringContainsString('7 серия', $html);
-        $this->assertStringContainsString('Профессиональный перевод', $html);
-        $this->assertStringContainsString('M3U8', $html);
-        $this->assertStringContainsString('13 июл. 2026', $html);
+        $this->assertStringContainsString('Добавлена серия 7', $html);
+        $this->assertStringContainsString('1 сезон', $html);
+        $this->assertStringContainsString('1 новая серия', $html);
+        $this->assertStringContainsString('Смотреть последнюю', $html);
+        $this->assertStringContainsString('Показать серии', $html);
+        $this->assertStringNotContainsString('Профессиональный перевод', $html);
+        $this->assertStringNotContainsString('1080P', $html);
     }
 
     public function test_public_title_components_separate_matching_original_title_suffix(): void

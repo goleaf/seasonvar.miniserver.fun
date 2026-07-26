@@ -39,10 +39,10 @@
 - Компоненты получают готовые модели, коллекции или ViewModel-объекты и не выполняют запросы к базе.
 - В компонентных шаблонах используйте `$attributes->merge()` или `$attributes->class()` для расширяемых классов и атрибутов.
 - `x-ui.poster-frame` — единственный Blade boundary для `<img>` каталожного постера: готовые URL, alt и `fit` передаются вызывающим слоем. Контентная строка использует `contain`, `2:3` и `overscan=false`; явно выбранный `cover` с 2% overscan остаётся для главного постера и технических миниатюр. Background появляется только у заглушки.
-- `x-ui.poster-card` собирает poster frame и body в строгих layout `list`, `compact`, `recommendation`, `stats`; он не создаёт wrapping anchor. Контентные layouts не рисуют собственную рамку или тень, потому что строки группирует один родительский `divide-y` список; `stats` остаётся техническим исключением.
-- `x-catalog.title-card` даёт `CatalogTitle` один основной tab-stop во всех списках, поиске и рекомендациях; неизвестный или устаревший layout нормализуется в `list`. Ссылки справочников остаются отдельными доступными ссылками поверх stretched-link. Компонент не вызывает lazy loading и читает только агрегатные атрибуты или уже загруженные relations.
+- `x-ui.poster-card` собирает poster frame и body в строгих layout `list`, `compact`, `recommendation`, `stats`, `home`, `spotlight`, `trend`; он не создаёт wrapping anchor. Контентные layouts не рисуют собственную рамку или тень, кроме самостоятельного homepage spotlight; `stats` остаётся техническим исключением.
+- `x-catalog.title-card` даёт `CatalogTitle` один основной tab-stop в обычных списках, поиске и компактных карточках; homepage spotlight дополнительно получает отдельные доступные действия просмотра и detail page. Неизвестный или устаревший layout нормализуется в `list`. Компонент не вызывает lazy loading и читает только агрегатные атрибуты или уже загруженные relations.
 - `CatalogTitlePageBuilder` передаёт Blade одну коллекцию `recommendationItems`: precomputed `v3` и объединённый genre/year fallback используют одинаковые строки, последовательные ranks и дедупликацию по ID. Blade не объединяет коллекции и не выполняет запросы.
-- Специализированная строка новой серии готовит подписи в PHP/page builder и составляет shell через `x-ui.poster-card`; история просмотра и `/stats` также используют общий shell, не передавая туда авторизацию или проверку внешнего URL. Главная, `/titles`, directory hubs, рекомендации и личная библиотека группируют контент только вертикальными списками; структурные grid-раскладки форм, навигации, player/admin и статистики остаются отдельным layout-решением.
+- Специализированная строка обновлений готовит точный диапазон, count, metadata и действия в PHP component и составляет shell через `x-ui.poster-card`; история просмотра и `/stats` также используют общий shell, не передавая туда авторизацию или проверку внешнего URL. Главная Task 94 использует bounded responsive grids, а `/titles`, directory hubs, обычные рекомендации и личная библиотека сохраняют прежние вертикальные списки.
 - Публичное имя тайтла берётся из `CatalogTitle::display_title`: совпадающий суффикс `/original_title` не повторяется в основном заголовке, а `display_original_title` выводится отдельной вторичной строкой. Исходные поля базы и поисковый индекс не изменяются.
 - Обычный `$paginator->links()` использует русский светлый override `vendor.pagination.tailwind`. Каждый Livewire caller помещает выдачу и controls в уникальные `@island(... with: $this->...Page)` и `x-ui.pagination-region`, а в `vendor.livewire.tailwind` передаёт `links(data: ['region' => '...'])`; произвольные `scrollTo`, inline JavaScript и duplicate spinner markup не используются.
 - Пустая выдача каталога показывает точный запрос; запрос только из стоп-слов получает отдельное сообщение «слишком общий». Пустое состояние не подменяется ближайшими карточками.
@@ -117,8 +117,10 @@ Create view показывает search-before-submit, type descriptions, stable
 
 `CatalogRecommendationPresenter` — единственная boundary для type metadata, relation labels, stored similarity badges и broad explanation templates. `CatalogRecommendationListItem` содержит уже загруженный card title, rank/reason codes и permission to dismiss; Blade не видит score breakdown, user history или query services.
 
-Homepage показывает не более одной recommendation section; title detail —
-explicit related перед computed similar; discovery — filtered paginated list
+Homepage Task 94 показывает общий «В тренде» и, только для вошедшего
+пользователя, одну отдельную personal recommendation section; это две
+разные подписанные surfaces, а не дублированная выдача одного типа. Title
+detail — explicit related перед computed similar; discovery — filtered paginated list
 с reason-aware feedback и owner-only настройками вкуса; library — link на
 personal discovery и восстановление exact hidden titles; search no-result —
 labelled popular link. «Не интересует» сначала раскрывает один из 11
@@ -133,6 +135,24 @@ focused/balanced/varied diversity, newer/balanced/proven freshness,
 escaped output. No fake percentage/AI label/dead feedback/carousel/hover-only
 reason exists; «Почему это показано» остаётся broad truthful explanation без
 score/history/private feature details.
+
+## Представление главной страницы Task 94
+
+`resources/views/livewire/catalog-home-page.blade.php` получает только
+подготовленные `CatalogTitle`, `CatalogRecommendationListItem`,
+`CatalogContinueWatchingItem`, library-state rows, release-group view data,
+facets, collection cards и URLs. Он не выбирает recommendation type, не
+вычисляет диапазон серий, timezone, progress, ownership, visibility или
+счётчики и не обращается к model/service/facade/database.
+
+Guest/auth branches имеют фиксированный semantic section order из
+`UI_STANDARDS.md`. Compact statistics выводится одним bounded блоком; trending —
+responsive grid с одним desktop spotlight; обычные title grids используют
+общий `x-catalog.title-card`; массовые release events — один
+`x-catalog.latest-media-card` на тайтл. Empty states остаются видимыми и
+ведут к реальному каталогу/библиотеке. Нет `@php`, inline CSS/business
+JavaScript, raw HTML, nested scrolling, fake trend/recommendation labels или
+дублирования Eloquent graph в public Livewire state.
 
 ## Представление рейтингов Top 100
 

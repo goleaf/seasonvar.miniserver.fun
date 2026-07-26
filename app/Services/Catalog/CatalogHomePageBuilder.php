@@ -26,6 +26,10 @@ class CatalogHomePageBuilder
 {
     private const WEB_LATEST_TITLE_LIMIT = 12;
 
+    private const WEB_GRID_TITLE_LIMIT = 6;
+
+    private const WEB_TRENDING_TITLE_LIMIT = 5;
+
     public function __construct(
         private readonly CatalogSeoBuilder $seo,
         private readonly CatalogFacetQuery $facets,
@@ -39,6 +43,8 @@ class CatalogHomePageBuilder
         private readonly CatalogCollectionQuery $collections,
         private readonly CatalogRecommendationService $recommendations,
         private readonly CatalogRecommendationPresenter $recommendationPresenter,
+        private readonly CatalogViewingActivityQuery $viewingActivity,
+        private readonly UserLibraryQuery $library,
         private readonly AccountSettingsService $accountSettings,
         private readonly AccountDateTimeFormatter $dates,
         private readonly AuthenticationRedirectService $authenticationRoutes,
@@ -61,6 +67,7 @@ class CatalogHomePageBuilder
             $user,
             self::WEB_LATEST_TITLE_LIMIT,
             includeApiOnlySections: false,
+            includeWebOnlySections: true,
         );
     }
 
@@ -71,6 +78,7 @@ class CatalogHomePageBuilder
         ?User $user,
         ?int $latestTitleLimit = null,
         bool $includeApiOnlySections = true,
+        bool $includeWebOnlySections = false,
     ): array {
         $accountSettings = $this->accountSettings->resolve($user);
         $locale = app()->currentLocale();
@@ -95,7 +103,9 @@ class CatalogHomePageBuilder
         $titleGroups = $this->orderedTitleGroups([
             'latest' => $latestTitleIds,
             'featured' => $includeApiOnlySections ? $snapshot['featured_title_ids'] : [],
-            'video' => $snapshot['video_title_ids'],
+            'video' => $includeWebOnlySections
+                ? array_slice($snapshot['video_title_ids'], 0, self::WEB_GRID_TITLE_LIMIT)
+                : $snapshot['video_title_ids'],
         ], $this->titleSummaryQuery($user)->with($this->taxonomies->cardSummaryLoads()));
         $latestTitles = $titleGroups['latest'];
         $featuredTitles = $titleGroups['featured'];
@@ -138,6 +148,7 @@ class CatalogHomePageBuilder
         $latestReleaseGroups = $this->contentAdditions->latestReleaseGroups(
             $latestTitles,
             $latestTitleUpdates->all(),
+            $includeWebOnlySections ? 6 : 12,
         );
         $featuredRecommendationIds = $includeApiOnlySections
             ? $featuredTitles->pluck('id')
@@ -156,28 +167,54 @@ class CatalogHomePageBuilder
             type: $recommendationType,
             user: $user,
             locale: app()->currentLocale(),
-            excludedTitleIds: $excludedRecommendationIds,
-            perPage: 8,
+            excludedTitleIds: $includeWebOnlySections ? [] : $excludedRecommendationIds,
+            perPage: $includeWebOnlySections ? self::WEB_GRID_TITLE_LIMIT : 8,
             seed: $user !== null ? 'home' : null,
         ));
 
-        if ($user !== null) {
+        if ($user !== null && (! $includeWebOnlySections || $recommendationType === CatalogRecommendationType::Personalized)) {
             $this->recommendations->rememberShown($recommendationResult, $user);
         }
 
-        $homeRecommendationItems = $recommendationResult->items->map(
-            fn (CatalogRecommendationItem $item): CatalogRecommendationListItem => new CatalogRecommendationListItem(
-                title: $item->title,
-                rank: $item->rank,
-                reasonLabels: $this->recommendationPresenter->explanations($item->explanations),
-                score: $item->score,
-                type: $item->type,
-                source: $item->source,
-                relationType: $item->relationType,
-                canDismiss: false,
-            ),
-        );
+        $homeRecommendationItems = $this->presentRecommendationItems($recommendationResult->items);
         $homeRecommendationPresentation = $this->recommendationPresenter->type($recommendationResult->displayType);
+        $trendingItems = collect();
+        $trendingPresentation = $this->recommendationPresenter->type(CatalogRecommendationType::Trending);
+
+        if ($includeWebOnlySections) {
+            $trendingResult = $this->recommendations->discover(new CatalogRecommendationContext(
+                type: CatalogRecommendationType::Trending,
+                user: null,
+                locale: $locale,
+                perPage: self::WEB_TRENDING_TITLE_LIMIT,
+                seed: 'home-trending',
+            ));
+            $trendingItems = $this->presentRecommendationItems($trendingResult->items);
+            $usedTrendingTitleIds = $trendingItems
+                ->map(fn (CatalogRecommendationListItem $item): int => (int) $item->title->id)
+                ->all();
+            $fallbackTrendingItems = $videoTitles
+                ->concat($latestTitles)
+                ->unique(fn (CatalogTitle $title): int => (int) $title->id)
+                ->reject(fn (CatalogTitle $title): bool => in_array((int) $title->id, $usedTrendingTitleIds, true))
+                ->take(max(0, self::WEB_TRENDING_TITLE_LIMIT - $trendingItems->count()))
+                ->values()
+                ->map(fn (CatalogTitle $title, int $index): CatalogRecommendationListItem => new CatalogRecommendationListItem(
+                    title: $title,
+                    rank: $trendingItems->count() + $index + 1,
+                    reasonLabels: [__('home.trending.reason')],
+                    type: CatalogRecommendationType::Trending,
+                ));
+            $trendingItems = $trendingItems->concat($fallbackTrendingItems)->values();
+            $trendingPresentation = $this->recommendationPresenter->type($trendingResult->displayType);
+        }
+
+        $continueWatchingItems = $includeWebOnlySections && $user !== null
+            ? $this->viewingActivity->continueWatching($user, 6)
+            : collect();
+        $libraryUpdateStates = $includeWebOnlySections && $user !== null
+            ? $this->library->homeUpdates($user, 6)
+            : new EloquentCollection;
         $this->cardStates->load(
             $latestTitles->concat($featuredTitles)->concat($videoTitles),
             $user,
@@ -212,8 +249,15 @@ class CatalogHomePageBuilder
             'featuredCollections' => $this->collections->featured(),
             'homeRecommendationItems' => $homeRecommendationItems,
             'homeRecommendationPresentation' => $homeRecommendationPresentation,
+            'trendingSpotlight' => $trendingItems->first(),
+            'trendingCandidates' => $trendingItems->skip(1)->values(),
+            'trendingPresentation' => $trendingPresentation,
+            'continueWatchingItems' => $continueWatchingItems,
+            'libraryUpdateStates' => $libraryUpdateStates,
+            'isPersonalizedHome' => $includeWebOnlySections && $user !== null,
             'collectionsUrl' => $this->discoveryUrl(CatalogRecommendationType::Popular).'#collections',
             'discoveryUrl' => $this->discoveryUrl($recommendationResult->displayType),
+            'trendingUrl' => $this->discoveryUrl(CatalogRecommendationType::Trending),
             'hasMoreLatestTitles' => count($allLatestTitleIds) > $latestTitles->count(),
             'topRatedUrl' => $this->discoveryUrl(CatalogRecommendationType::TopRated),
             'recentlyAddedUrl' => $this->discoveryUrl(CatalogRecommendationType::RecentlyAdded),
@@ -223,6 +267,15 @@ class CatalogHomePageBuilder
             'continueWatchingUrl' => $user !== null
                 ? route('library.section', ['section' => 'continue-watching'])
                 : $this->authenticationRoutes->guestUrl('login', locale: $locale),
+            'libraryUpdatesUrl' => $user !== null
+                ? route('library.section', ['section' => 'with-updates'])
+                : $this->authenticationRoutes->guestUrl('login', locale: $locale),
+            'myCollectionsUrl' => $user !== null
+                ? route('collections.mine')
+                : $this->authenticationRoutes->guestUrl('login', locale: $locale),
+            'myCalendarUrl' => $user !== null
+                ? $this->localeRoute('calendar.mine')
+                : $this->localeRoute('calendar.index'),
             'noveltiesUrl' => route('titles.year', ['year' => now()->year]),
             'seo' => $this->seo->home($stats, $latestTitles),
         ];
@@ -242,6 +295,26 @@ class CatalogHomePageBuilder
         return $this->localeRoute('discover.index', [
             'type' => $type->value,
         ]);
+    }
+
+    /**
+     * @param  Collection<int, CatalogRecommendationItem>  $items
+     * @return Collection<int, CatalogRecommendationListItem>
+     */
+    private function presentRecommendationItems(Collection $items): Collection
+    {
+        return $items->map(
+            fn (CatalogRecommendationItem $item): CatalogRecommendationListItem => new CatalogRecommendationListItem(
+                title: $item->title,
+                rank: $item->rank,
+                reasonLabels: $this->recommendationPresenter->explanations($item->explanations),
+                score: $item->score,
+                type: $item->type,
+                source: $item->source,
+                relationType: $item->relationType,
+                canDismiss: false,
+            ),
+        );
     }
 
     /** @param array<string, scalar> $parameters */

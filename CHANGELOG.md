@@ -2,6 +2,30 @@
 
 ## 2026-07-26
 
+- Главная Task 94 разделена на две bounded web-проекции внутри
+  `CatalogHomePageBuilder::webData()` без изменения `/api/v1/home`: гостю
+  отдаются компактная статистика, `Trending`, сгруппированные обновления,
+  `RecentlyAdded`, доступные видео, редакционные подборки и facets; после
+  authenticated cache bypass пользователь получает owner-scoped
+  `CatalogViewingActivityQuery`, `UserLibraryQuery::homeUpdates()`,
+  `Personalized`, общий тренд, обновления и ссылки на свои
+  подборки/календарь. `CatalogHomeContentAdditionQuery` переносит точные
+  оконные `COUNT/MIN/MAX` через bounded hydration максимум восьми rows,
+  поэтому массовое пополнение выводится одной карточкой с диапазоном и
+  точным count. Добавлены query-free layouts `home`, `spotlight`, `trend`,
+  постеры `2:3`, мобильные ограничения первых четырёх элементов, RU/EN
+  тексты и локализованное время через `AccountDateTimeFormatter::time()`.
+  Схема, индексы, маршруты, cache keys, зависимости и environment не
+  менялись. Initial RED подтвердил отсутствие нового порядка и aggregate
+  presentation; финальный focused-контур завершился `39` тестами / `304`
+  assertions, UI/Blade contracts — `56` / `423`. Полный набор из `2 065`
+  тестов был выполнен малыми независимыми пакетами из-за внешнего лимита
+  долгого процесса: восемь падений относятся к параллельным staged-файлам
+  playback, sitemap, importer, sessions и notification service и не
+  скрыты. `Pint`, `PHPStan` и `npm run build` завершены; Chromium
+  `1440×1000` и `390×844` подтвердил точный порядок, реальный четырёхстрочный
+  clamp, сетку статистики `2 + 2 + 1`, отсутствие horizontal overflow и
+  ноль console errors.
 - `CatalogHomeSnapshotCache` больше не повторяет коррелированный
   `withCount()` публичных тайтлов для `code=subtitle-available` при каждом
   перестроении только главной. Прежний запрос тега для канонической и

@@ -34,7 +34,7 @@ final class CatalogHomeWebProjectionTest extends TestCase
         $this->assertCount(12, $web['latestTitles']);
         $this->assertCount(12, $full['featuredTitles']);
         $this->assertCount(8, $full['videoTitles']);
-        $this->assertCount(8, $web['videoTitles']);
+        $this->assertCount(6, $web['videoTitles']);
         $this->assertCount(12, $full['latestMedia']);
         $this->assertEmpty($web['featuredTitles']);
         $this->assertEmpty($web['latestMedia']);
@@ -47,7 +47,8 @@ final class CatalogHomeWebProjectionTest extends TestCase
             route('discover.index', ['type' => CatalogRecommendationType::RecentlyUpdated->value]),
             $web['recentlyUpdatedUrl'],
         );
-        $this->assertEmpty($web['homeRecommendationItems']);
+        $this->assertLessThanOrEqual(6, $web['homeRecommendationItems']->count());
+        $this->assertLessThanOrEqual(4, $web['trendingCandidates']->count());
 
         $sharedTitleId = collect($full['latestTitles'])
             ->pluck('id')
@@ -68,9 +69,9 @@ final class CatalogHomeWebProjectionTest extends TestCase
         $webResponse = $this->get(route('home'))->assertOk();
         $webHtml = $webResponse->getContent();
 
-        $this->assertSame(12, substr_count($webHtml, 'data-home-latest-update-card'));
+        $this->assertLessThanOrEqual(6, substr_count($webHtml, 'data-home-latest-media-group'));
         $webResponse
-            ->assertSee('data-home-latest-updates-all', false)
+            ->assertSee('data-home-section="latest-updates"', false)
             ->assertSee($web['recentlyUpdatedUrl'], false)
             ->assertSeeText(__('home.actions.view_all'));
 
@@ -114,7 +115,7 @@ final class CatalogHomeWebProjectionTest extends TestCase
             $relationHydrations = collect($queries)->filter($matches);
 
             $this->assertCount(
-                1,
+                2,
                 $relationHydrations,
                 "{$relation}:\n".implode("\n", $relationHydrations->all()),
             );
@@ -156,7 +157,9 @@ final class CatalogHomeWebProjectionTest extends TestCase
         $web = app(CatalogHomePageBuilder::class)->webData();
         $validCard = $web['latestTitles']->firstWhere('id', $validTitle->id);
         $outOfRangeCard = $web['latestTitles']->firstWhere('id', $outOfRangeTitle->id);
-        $ratingQuery = collect($ratingQueries)->sole();
+        $this->assertCount(2, $ratingQueries);
+        $ratingQuery = collect($ratingQueries)->first();
+        $this->assertInstanceOf(QueryExecuted::class, $ratingQuery);
         $normalizedSql = str($ratingQuery->sql)
             ->replace(['`', '"'], '')
             ->lower()
@@ -175,6 +178,12 @@ final class CatalogHomeWebProjectionTest extends TestCase
             'from catalog_title_ratings indexed by catalog_title_ratings_catalog_title_id_provider_unique where',
             $normalizedSql,
         );
+        foreach ($ratingQueries as $query) {
+            $this->assertStringContainsString(
+                'catalog_title_ratings_catalog_title_id_provider_unique',
+                str($query->sql)->replace(['`', '"'], '')->toString(),
+            );
+        }
 
         $plan = collect(DB::select('EXPLAIN QUERY PLAN '.$ratingQuery->toRawSql()))
             ->pluck('detail')

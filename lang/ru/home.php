@@ -3,11 +3,11 @@
 return [
     'title' => 'Сериалы онлайн',
     'statistics' => [
-        'titles' => 'Сериалов',
-        'episodes' => 'Серий',
-        'videos' => 'Видео',
-        'genres' => 'Жанров',
-        'countries' => 'Стран',
+        'titles' => 'сериалов',
+        'episodes' => 'серий',
+        'videos' => 'видео',
+        'genres' => 'жанр',
+        'countries' => 'стран',
     ],
     'sections' => [
         'latest_updates' => 'Последние обновления',
@@ -17,6 +17,13 @@ return [
         'countries' => 'Страны',
         'genres' => 'Жанры',
         'years' => 'Годы',
+        'trending' => 'В тренде',
+        'new_titles' => 'Новые сериалы',
+        'catalog_facets' => 'Поиск по жанрам, странам и годам',
+        'continue_watching' => 'Продолжить просмотр',
+        'library_updates' => 'Новые серии из моей библиотеки',
+        'recommended_for_you' => 'Рекомендовано для меня',
+        'account_tools' => 'Мои подборки и календарь',
     ],
     'navigation' => [
         'all_titles' => 'Все сериалы',
@@ -28,6 +35,8 @@ return [
         'upcoming' => 'Скоро',
         'random' => 'Случайный сериал',
         'recommendations' => 'Рекомендации',
+        'my_collections' => 'Мои подборки',
+        'my_calendar' => 'Мой календарь',
     ],
     'updates' => [
         'season' => 'Сезон :season',
@@ -40,6 +49,15 @@ return [
         'translation' => 'Перевод: :translation',
         'published_at' => 'Опубликовано: :date',
         'more_on_title' => 'На странице сериала доступны остальные серии и видео.',
+        'episodes_range' => 'Добавлены серии :first–:last',
+        'episode_single' => 'Добавлена серия :number',
+        'episodes_added' => 'Добавлена :count серия|Добавлены :count серии|Добавлено :count серий',
+        'videos_added' => 'Добавлено :count видео|Добавлено :count видео|Добавлено :count видео',
+        'new_episodes_count' => ':count новая серия|:count новые серии|:count новых серий',
+        'new_videos_count' => ':count новое видео|:count новых видео|:count новых видео',
+        'metadata' => ':season · :count · :date в :time',
+        'watch_latest' => 'Смотреть последнюю',
+        'show_episodes' => 'Показать серии',
     ],
     'update_types' => [
         'new_episode' => 'Новая серия',
@@ -60,6 +78,11 @@ return [
         'countries' => 'Страны не указаны.',
         'genres' => 'Жанры не указаны.',
         'years' => 'Годы не указаны.',
+        'trending' => 'Тренд сформируется после появления достаточного количества просмотров.',
+        'collections' => 'Тематические подборки пока не опубликованы.',
+        'continue_watching' => 'Начните просмотр, и здесь появится быстрый возврат к серии.',
+        'library_updates' => 'В вашей библиотеке пока нет новых серий.',
+        'recommendations' => 'Персональные рекомендации появятся после взаимодействия с каталогом.',
     ],
     'states' => [
         'loading' => 'Обновляем главную страницу…',
@@ -71,6 +94,7 @@ return [
         'view_all' => 'Показать все',
         'previous' => 'Предыдущая страница',
         'next' => 'Следующая страница',
+        'watch' => 'Смотреть',
     ],
     'accessibility' => [
         'latest_updates' => 'Последние обновления каталога',
@@ -78,6 +102,11 @@ return [
         'watch_now' => 'Сериалы с доступным видео',
         'discovery_navigation' => 'Способы поиска сериалов',
         'poster' => 'Постер :title',
+        'statistics' => 'Статистика каталога',
+    ],
+    'trending' => [
+        'description' => 'Сериалы, к которым сейчас растёт интерес зрителей.',
+        'reason' => 'Растёт интерес зрителей',
     ],
     'seo' => [
         'title' => 'Сериалы онлайн — :site',

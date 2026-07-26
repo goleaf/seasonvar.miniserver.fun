@@ -1095,7 +1095,7 @@ class CatalogPageTest extends TestCase
 
         $content = $this->get(route('home'))->assertOk()->getContent();
         $sectionStart = strpos($content, 'Сейчас можно смотреть');
-        $sectionEnd = strpos($content, '<aside class="space-y-4 xl:order-1">', $sectionStart ?: 0);
+        $sectionEnd = strpos($content, 'data-home-section="featured-collections"', $sectionStart ?: 0);
 
         $this->assertIsInt($sectionStart);
         $this->assertIsInt($sectionEnd);

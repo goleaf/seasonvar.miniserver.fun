@@ -151,8 +151,12 @@ class BladeTemplateTest extends TestCase
     public function test_blade_templates_only_truncate_the_explicit_compact_card_excerpts(): void
     {
         $compactCardExcerpts = [
+            resource_path('views/components/catalog/latest-media-card.blade.php'),
+            resource_path('views/components/catalog/title-card-home.blade.php'),
             resource_path('views/components/catalog/title-card-list.blade.php'),
             resource_path('views/components/catalog/title-card-recommendation.blade.php'),
+            resource_path('views/components/catalog/title-card-trend.blade.php'),
+            resource_path('views/livewire/catalog-home-page.blade.php'),
         ];
         $offendingFiles = collect(File::allFiles(resource_path('views')))
             ->filter(fn (SplFileInfo $file): bool => str_ends_with($file->getFilename(), '.blade.php'))

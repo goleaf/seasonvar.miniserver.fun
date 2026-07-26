@@ -646,7 +646,10 @@ final class CatalogHomePerformanceTest extends TestCase
         $first = $this->get(route('home'))
             ->assertOk()
             ->assertHeader('X-Seasonvar-Page-Cache', 'MISS')
-            ->assertSeeText('На странице сериала доступны остальные серии и видео.');
+            ->assertSeeText('Добавлены серии 1–40')
+            ->assertSeeText('40 новых серий')
+            ->assertSeeText('Смотреть последнюю')
+            ->assertSeeText('Показать серии');
 
         $this->assertLessThanOrEqual(180_000, strlen((string) $first->getContent()));
 

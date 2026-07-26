@@ -17,7 +17,9 @@ use App\Services\Api\V1\Sync\ApiSyncReadiness;
 use App\Services\UserPortal\UserPortalIdPaginator;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Pagination\LengthAwarePaginator as ConcreteLengthAwarePaginator;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 
 final readonly class UserLibraryQuery
@@ -171,6 +173,34 @@ final readonly class UserLibraryQuery
         $this->personalUpdates->hydrateIndicators($user, $paginator->getCollection());
 
         return $paginator;
+    }
+
+    /** @return EloquentCollection<int, CatalogTitleUserState> */
+    public function homeUpdates(User $user, int $limit = 6): EloquentCollection
+    {
+        $query = $this->base($user)
+            ->where(function (Builder $state): void {
+                $state->where('in_watchlist', true)->orWhereNotNull('watch_status');
+            })
+            ->where(function (Builder $state): void {
+                $state->whereNull('recommendation_feedback')
+                    ->orWhereNotIn(
+                        'recommendation_feedback',
+                        CatalogRecommendationFeedback::negativeValues(),
+                    );
+            });
+        $this->personalUpdates->constrain($query, $user, true);
+
+        $states = $query
+            ->orderByDesc('updated_at')
+            ->orderByDesc('id')
+            ->limit(max(1, min(12, $limit)))
+            ->get();
+
+        $this->hydrateCardCountCollection($states, $user);
+        $this->personalUpdates->hydrateIndicators($user, $states);
+
+        return $states;
     }
 
     /** @return LengthAwarePaginator<int, EpisodePlaybackMarker> */
@@ -339,14 +369,20 @@ final readonly class UserLibraryQuery
      */
     private function hydrateCardCounts(ConcreteLengthAwarePaginator $paginator, User $user): ConcreteLengthAwarePaginator
     {
-        $titles = $paginator->getCollection()
+        $this->hydrateCardCountCollection($paginator->getCollection(), $user);
+
+        return $paginator;
+    }
+
+    /** @param  Collection<int, mixed>  $items */
+    private function hydrateCardCountCollection(Collection $items, User $user): void
+    {
+        $titles = $items
             ->pluck('catalogTitle')
             ->filter(fn (mixed $title): bool => $title instanceof CatalogTitle)
             ->values();
 
         $this->cardCounts->load($titles, $user);
-
-        return $paginator;
     }
 
     /**

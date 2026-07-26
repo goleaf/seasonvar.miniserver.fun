@@ -158,24 +158,13 @@ class CatalogHomeContentAdditionTest extends TestCase
             substr_count($html, 'data-home-latest-media-group="'.$catalogTitle->id.'"'),
         );
         $response
-            ->assertSeeText('Сезон 3')
-            ->assertSeeText('1 серия')
-            ->assertSeeText('2 серия')
-            ->assertSeeText('3 серия')
-            ->assertSeeText('Первая новая серия')
-            ->assertSeeText('Вторая новая серия')
-            ->assertSeeText('Серия пока без видео')
-            ->assertSeeText('1080P')
-            ->assertSeeText('720P')
-            ->assertSeeText('480P')
-            ->assertSeeText('Профессиональный перевод')
-            ->assertSeeText('Оригинальная дорожка')
-            ->assertSeeText('Субтитры')
-            ->assertSeeText('M3U8')
-            ->assertSeeText('MP4')
-            ->assertSeeText('WEBM')
-            ->assertSeeText('15 июл. 2026')
-            ->assertSeeText('Видео для серии пока не добавлено.');
+            ->assertSeeText('Добавлены серии 1–3')
+            ->assertSeeText('3 новые серии')
+            ->assertSeeText('Смотреть последнюю')
+            ->assertSeeText('Показать серии')
+            ->assertDontSeeText('Первая новая серия')
+            ->assertDontSeeText('Профессиональный перевод')
+            ->assertDontSeeText('1080P');
     }
 
     public function test_home_renders_new_media_for_an_older_episode(): void
@@ -214,8 +203,11 @@ class CatalogHomeContentAdditionTest extends TestCase
         $this->get(route('home'))
             ->assertOk()
             ->assertSeeText('Сериал со свежим видео')
-            ->assertSeeText('Старая серия с новым видео')
-            ->assertSeeText('1080P');
+            ->assertSeeText('Добавлено 1 видео')
+            ->assertSeeText('Смотреть последнюю')
+            ->assertSeeText('Показать серии')
+            ->assertDontSeeText('Старая серия с новым видео')
+            ->assertDontSeeText('1080P');
     }
 
     public function test_home_bounds_mass_import_release_groups_and_links_to_the_full_title(): void
@@ -267,16 +259,23 @@ class CatalogHomeContentAdditionTest extends TestCase
             array_reverse(array_slice($episodeIds, -8)),
             $group['episodes']->pluck('id')->all(),
         );
+        $this->assertSame(10, $group['episode_count']);
+        $this->assertSame(10, $group['media_count']);
+        $this->assertSame(1, $group['episode_min']);
+        $this->assertSame(10, $group['episode_max']);
         $this->assertTrue($group['has_more']);
 
         app(CatalogHomeSnapshotCache::class)->refresh();
 
         $this->get(route('home'))
             ->assertOk()
-            ->assertSeeText('На странице сериала доступны остальные серии и видео.')
+            ->assertSeeText('Добавлены серии 1–10')
+            ->assertSeeText('10 новых серий')
+            ->assertSeeText('Смотреть последнюю')
+            ->assertSeeText('Показать серии')
             ->assertSee(route('titles.show', $catalogTitle), false)
-            ->assertSeeText('Массовая серия 3')
-            ->assertSeeText('Массовая серия 10');
+            ->assertDontSeeText('Массовая серия 3')
+            ->assertDontSeeText('Массовая серия 10');
     }
 
     public function test_home_release_group_does_not_mark_a_small_update_as_truncated(): void
@@ -294,6 +293,7 @@ class CatalogHomeContentAdditionTest extends TestCase
             ->latestReleaseGroups(collect([$catalogTitle]), $updates)
             ->sole();
 
+        $this->assertSame(1, $group['episode_count']);
         $this->assertFalse($group['has_more']);
     }
 

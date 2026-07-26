@@ -453,6 +453,22 @@ Schema/index/rollback и aggregate definitions принадлежат [`DATA_REL
 
 `CatalogRecommendationService` — единственный orchestration layer для homepage, title related/similar, discovery, library и legacy recommendation API. Он собирает server-only `CatalogRecommendationContext`, выбирает один bounded query provider, применяет canonical visibility/exclusions/availability rerank/diversity/repeat suppression и отдаёт typed result/item/explanation DTO. Controllers и Livewire только нормализуют request state и выбирают response; Blade не запрашивает модели и не рассчитывает ranking.
 
+Для Task 94 `CatalogHomePageBuilder::webData()` оркестрирует отдельные
+bounded public и authenticated homepage projections, но не вводит новый
+recommendation/query domain. Guest использует `Trending` и `RecentlyAdded`;
+authenticated пользователь — `Personalized` и отдельный общий `Trending`.
+Продолжение просмотра делегируется `CatalogViewingActivityQuery`, обновления
+библиотеки — compact read `UserLibraryQuery` поверх существующего
+`CatalogPersonalUpdateQuery`. API-only `data()` и `CatalogHomeResource`
+сохраняют прежний response contract.
+
+Personal queries запускаются только при наличии server-authenticated `User`
+после обхода shared public response cache. Они остаются owner-scoped,
+visibility-aware и bounded; результат не сохраняется в
+`CatalogHomeSnapshotCache`, `CatalogHomeMetricsCache`, public full-response
+cache или warmer targets. Blade получает уже подготовленный порядок,
+счётчики, labels и URLs.
+
 Recommendation feedback остаётся в canonical one-row-per-user/title state.
 `more_like_this` — явный bounded positive source для legacy и v2
 personalization; `not_interested|blacklisted` — единственные отрицательные

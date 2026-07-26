@@ -9,8 +9,8 @@
             :alt="$alt"
             :empty-label="$emptyLabel"
             :loading="$loading"
-            :fit="$layout === 'stats' ? 'cover' : 'contain'"
-            :overscan="$layout === 'stats'"
+            :fit="in_array($layout, ['stats', 'home', 'spotlight', 'trend'], true) ? 'cover' : 'contain'"
+            :overscan="in_array($layout, ['stats', 'home', 'spotlight', 'trend'], true)"
             class="h-full w-full"
         />
     </div>

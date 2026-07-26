@@ -7,36 +7,28 @@ namespace App\View\Components\Catalog;
 use App\Models\CatalogTitle;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
-use App\Models\Season;
 use App\Services\Auth\AccountDateTimeFormatter;
-use App\Services\Catalog\CatalogHomeContentAdditionQuery;
+use Carbon\CarbonInterface;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Number;
 use Illuminate\View\Component;
 
-class LatestMediaCard extends Component
+final class LatestMediaCard extends Component
 {
-    /**
-     * @var list<array{
-     *     key: string,
-     *     season_label: string|null,
-     *     episode_label: string|null,
-     *     update_type: string,
-     *     update_type_label: string,
-     *     title: string|null,
-     *     added_at: int,
-     *     media: list<array{key: int, url: string, title: string, quality: string|null, translation: string|null, format: string|null, published_date: string|null, accessibility_label: string}>
-     * }>
-     */
-    public array $items;
-
     public string $titleUrl;
+
+    public string $episodesUrl;
+
+    public ?string $latestUrl;
 
     public string $posterAlt;
 
     public string $displayTitle;
 
-    public bool $hasMore;
+    public string $summaryLabel;
+
+    public string $metadataLabel;
 
     /**
      * @param  Collection<int, Episode>  $episodes
@@ -48,153 +40,122 @@ class LatestMediaCard extends Component
         public Collection $media,
         private readonly AccountDateTimeFormatter $dates,
         public ?string $timezone = null,
-        bool $hasMore = false,
+        public int $episodeCount = 0,
+        public int $mediaCount = 0,
+        public ?int $episodeMin = null,
+        public ?int $episodeMax = null,
     ) {
         $this->titleUrl = route('titles.show', $title);
+        $this->episodesUrl = $this->titleUrl.'#seasons';
         $this->displayTitle = filled($title->display_title)
             ? (string) $title->display_title
             : __('catalog.title.untitled');
         $this->posterAlt = __('catalog.seo.poster_alt', ['title' => $this->displayTitle]);
-        $releaseItems = $this->releaseItems();
-        $this->hasMore = $hasMore
-            || count($releaseItems) > CatalogHomeContentAdditionQuery::RELEASE_ITEMS_PER_TITLE;
-        $this->items = array_slice(
-            $releaseItems,
-            0,
-            CatalogHomeContentAdditionQuery::RELEASE_ITEMS_PER_TITLE,
-        );
-    }
-
-    /**
-     * @return list<array{
-     *     key: string,
-     *     season_label: string|null,
-     *     episode_label: string|null,
-     *     update_type: string,
-     *     update_type_label: string,
-     *     title: string|null,
-     *     added_at: int,
-     *     media: list<array{key: int, url: string, title: string, quality: string|null, translation: string|null, format: string|null, published_date: string|null, accessibility_label: string}>
-     * }>
-     */
-    private function releaseItems(): array
-    {
-        $items = [];
-
-        foreach ($this->episodes as $episode) {
-            $season = $episode->relationLoaded('season') ? $episode->season : null;
-            $items['episode-'.$episode->id] = $this->episodeItem($episode, $season);
-        }
-
-        foreach ($this->media as $media) {
-            $episode = $media->relationLoaded('episode') ? $media->episode : null;
-            $season = $media->relationLoaded('season') ? $media->season : null;
-            $key = $episode !== null ? 'episode-'.$episode->id : 'media-'.$media->id;
-
-            if (! isset($items[$key])) {
-                $items[$key] = $episode !== null
-                    ? $this->episodeItem($episode, $season)
-                    : $this->standaloneMediaItem($media, $season);
-            }
-
-            $items[$key]['media'][] = $this->mediaItem($media);
-            $items[$key]['added_at'] = max(
-                $items[$key]['added_at'],
-                $media->created_at?->getTimestamp() ?? 0,
-            );
-        }
-
-        return collect($items)
-            ->sortByDesc('added_at')
-            ->values()
-            ->all();
-    }
-
-    /**
-     * @return array{
-     *     key: string,
-     *     season_label: string|null,
-     *     episode_label: string|null,
-     *     update_type: string,
-     *     update_type_label: string,
-     *     title: string|null,
-     *     added_at: int,
-     *     media: list<array{key: int, url: string, title: string, quality: string|null, translation: string|null, format: string|null, published_date: string|null, accessibility_label: string}>
-     * }
-     */
-    private function episodeItem(Episode $episode, ?Season $season): array
-    {
-        return [
-            'key' => 'episode-'.$episode->id,
-            'season_label' => $season?->number !== null
-                ? __('catalog.release.season', ['number' => $season->number])
-                : null,
-            'episode_label' => __('catalog.release.episode', ['number' => $episode->number]),
-            'update_type' => 'new_episode',
-            'update_type_label' => __('home.update_types.new_episode'),
-            'title' => filled($episode->title) ? (string) $episode->title : null,
-            'added_at' => $episode->created_at?->getTimestamp() ?? 0,
-            'media' => [],
-        ];
-    }
-
-    /**
-     * @return array{
-     *     key: string,
-     *     season_label: string|null,
-     *     episode_label: null,
-     *     update_type: string,
-     *     update_type_label: string,
-     *     title: string|null,
-     *     added_at: int,
-     *     media: list<array{key: int, url: string, title: string, quality: string|null, translation: string|null, format: string|null, published_date: string|null, accessibility_label: string}>
-     * }
-     */
-    private function standaloneMediaItem(LicensedMedia $media, ?Season $season): array
-    {
-        return [
-            'key' => 'media-'.$media->id,
-            'season_label' => $season?->number !== null
-                ? __('catalog.release.season', ['number' => $season->number])
-                : null,
-            'episode_label' => null,
-            'update_type' => 'video_added',
-            'update_type_label' => __('home.update_types.video_added'),
-            'title' => filled($media->title) ? (string) $media->title : null,
-            'added_at' => $media->created_at?->getTimestamp() ?? 0,
-            'media' => [],
-        ];
-    }
-
-    /** @return array{key: int, url: string, title: string, quality: string|null, translation: string|null, format: string|null, published_date: string|null, accessibility_label: string} */
-    private function mediaItem(LicensedMedia $media): array
-    {
-        $title = filled($media->title) ? (string) $media->title : __('home.updates.video');
-
-        return [
-            'key' => (int) $media->id,
-            'url' => route('titles.show', [
-                'catalogTitle' => $this->title,
-                'episode' => $media->episode_id,
-                'media' => $media->id,
-            ]).'#player',
-            'title' => $title,
-            'quality' => filled($media->quality) ? mb_strtoupper((string) $media->quality) : null,
-            'translation' => filled($media->translation_name) ? (string) $media->translation_name : null,
-            'format' => filled($media->format) ? mb_strtoupper((string) $media->format) : null,
-            'published_date' => $media->published_at === null
-                ? null
-                : $this->dates->date(
-                    $media->published_at,
-                    app()->currentLocale(),
-                    $this->timezone ?? (string) config('account-settings.default_timezone', 'UTC'),
-                ),
-            'accessibility_label' => __('home.updates.open_media', ['title' => $title]),
-        ];
+        $this->episodeCount = $episodeCount > 0 ? $episodeCount : $episodes->count();
+        $this->mediaCount = $mediaCount > 0 ? $mediaCount : $media->count();
+        $episodeNumbers = $episodes
+            ->pluck('number')
+            ->filter(fn (mixed $number): bool => is_numeric($number))
+            ->map(fn (mixed $number): int => (int) $number);
+        $this->episodeMin = $episodeMin ?? ($episodeNumbers->isEmpty() ? null : $episodeNumbers->min());
+        $this->episodeMax = $episodeMax ?? ($episodeNumbers->isEmpty() ? null : $episodeNumbers->max());
+        $this->latestUrl = $this->latestMediaUrl();
+        $this->summaryLabel = $this->summary();
+        $this->metadataLabel = $this->metadata();
     }
 
     public function render(): View
     {
         return view('components.catalog.latest-media-card');
+    }
+
+    private function summary(): string
+    {
+        if ($this->episodeCount === 1 && $this->episodeMin !== null) {
+            return __('home.updates.episode_single', [
+                'number' => Number::format($this->episodeMin, locale: app()->currentLocale()),
+            ]);
+        }
+
+        if ($this->episodeCount > 0
+            && $this->episodeMin !== null
+            && $this->episodeMax !== null
+            && ($this->episodeMax - $this->episodeMin + 1) === $this->episodeCount) {
+            return __('home.updates.episodes_range', [
+                'first' => Number::format($this->episodeMin, locale: app()->currentLocale()),
+                'last' => Number::format($this->episodeMax, locale: app()->currentLocale()),
+            ]);
+        }
+
+        $count = $this->episodeCount > 0 ? $this->episodeCount : $this->mediaCount;
+
+        return trans_choice(
+            $this->episodeCount > 0 ? 'home.updates.episodes_added' : 'home.updates.videos_added',
+            $count,
+            ['count' => Number::format($count, locale: app()->currentLocale())],
+        );
+    }
+
+    private function metadata(): string
+    {
+        $seasons = $this->episodes
+            ->concat($this->media)
+            ->map(fn (Episode|LicensedMedia $item): mixed => $item->relationLoaded('season') ? $item->season?->number : null)
+            ->filter(fn (mixed $number): bool => $number !== null)
+            ->unique()
+            ->values();
+        $seasonLabel = $seasons->count() === 1
+            ? trans_choice('catalog.counts.seasons', 1, [
+                'count' => Number::format(1, locale: app()->currentLocale()),
+            ])
+            : trans_choice('catalog.counts.seasons', $seasons->count(), [
+                'count' => Number::format($seasons->count(), locale: app()->currentLocale()),
+            ]);
+        $newCount = $this->episodeCount > 0 ? $this->episodeCount : $this->mediaCount;
+        $newLabel = trans_choice(
+            $this->episodeCount > 0 ? 'home.updates.new_episodes_count' : 'home.updates.new_videos_count',
+            $newCount,
+            ['count' => Number::format($newCount, locale: app()->currentLocale())],
+        );
+        $addedAt = $this->latestAddedAt();
+
+        if (! $addedAt instanceof CarbonInterface) {
+            return $seasonLabel.' · '.$newLabel;
+        }
+
+        $locale = app()->currentLocale();
+        $timezone = $this->timezone ?? (string) config('account-settings.default_timezone', 'UTC');
+
+        return __('home.updates.metadata', [
+            'season' => $seasonLabel,
+            'count' => $newLabel,
+            'date' => $this->dates->dateGroup($addedAt, $locale, $timezone),
+            'time' => $this->dates->time($addedAt, $locale, $timezone),
+        ]);
+    }
+
+    private function latestAddedAt(): ?CarbonInterface
+    {
+        return $this->episodes
+            ->concat($this->media)
+            ->map(fn (Episode|LicensedMedia $item): mixed => $item->created_at)
+            ->filter(fn (mixed $value): bool => $value instanceof CarbonInterface)
+            ->sortByDesc(fn (CarbonInterface $value): int => $value->getTimestamp())
+            ->first();
+    }
+
+    private function latestMediaUrl(): ?string
+    {
+        $media = $this->media->first();
+
+        if (! $media instanceof LicensedMedia) {
+            return null;
+        }
+
+        return route('titles.show', [
+            'catalogTitle' => $this->title,
+            'episode' => $media->episode_id,
+            'media' => $media->id,
+        ]).'#player';
     }
 }

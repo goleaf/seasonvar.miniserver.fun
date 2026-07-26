@@ -11610,6 +11610,164 @@ Detailed implementation plan:
 
 ---
 
+## Task 94 — новая персонализированная главная
+
+Статус: `verification_complete_delivery_pending`.
+
+Дата начала: 26.07.2026.
+
+Approved design:
+[`2026-07-26-personalized-homepage-design.md`](../superpowers/specs/2026-07-26-personalized-homepage-design.md).
+
+Detailed implementation plan:
+[`2026-07-26-personalized-homepage.md`](../superpowers/plans/2026-07-26-personalized-homepage.md).
+
+### Фактический baseline и выбранное решение
+
+- PHP `8.5.8`, Laravel `13.22.0`, Boost `2.4.13`, Livewire `4.3.3`,
+  PHPUnit `12.5.32`, Pint `1.29.3`, Tailwind `4.3.2`, Vite `8.1.4`,
+  SQLite.
+- `/`, `/ru` и `/en` уже принадлежат full-page
+  `App\Livewire\CatalogHomePage`; `/api/v1/home` использует тот же
+  `CatalogHomePageBuilder::data()`.
+- Current web projection ограничивает latest titles двенадцатью, но
+  показывает пять равноправных metric cards, длинные nested panel/list
+  sections и почти одинаковый guest/auth порядок.
+- Existing `CatalogRecommendationService`, `CatalogViewingActivityQuery`,
+  `CatalogPersonalUpdateQuery`, `UserLibraryQuery`,
+  `CatalogHomeContentAdditionQuery`, `CatalogCollectionQuery`, snapshot,
+  metrics, card count/state loaders и account formatter переиспользуются.
+- Выбран web-only projection внутри существующего builder. Новый dashboard
+  service/controller/repository, client fetch, route, migration, index,
+  cache key, package, queue и environment variable не создаются.
+- Ветка `main`, remote `origin`; branch ahead remote и shared tree содержит
+  foreign staged/unstaged/untracked Tasks 90–93. Task 94 не reset/stash/
+  unstage/delete и не blind-stage эти изменения.
+
+### Expected changed files
+
+- `app/Services/Catalog/CatalogHomePageBuilder.php`;
+- `app/Services/Catalog/UserLibraryQuery.php`;
+- presentation-only exact release total hunk в
+  `app/Services/Catalog/CatalogHomeContentAdditionQuery.php` с сохранением
+  foreign Task 90 correlated-season hunk;
+- `app/Services/Auth/AccountDateTimeFormatter.php`;
+- `app/View/Components/Catalog/TitleCard.php`;
+- `app/View/Components/Catalog/LatestMediaCard.php`;
+- `app/View/Components/Ui/PosterCard.php`;
+- `resources/views/livewire/catalog-home-page.blade.php`;
+- `resources/views/components/catalog/latest-media-card.blade.php`;
+- новые query-free `home-trending-grid`, `title-card-home` и
+  `title-card-trend` templates;
+- `lang/{ru,en}/home.php`;
+- focused home/content/component/formatter/cache/API/security/browser tests;
+- canonical UI/frontend/views/architecture/caching docs, linked Task 94
+  design/plan, current plan, README и CHANGELOG.
+
+Discovery, меняющее этот список, требует немедленного обновления scope.
+
+### Protected files и public contracts
+
+- `/`, `/ru`, `/en`, route names, locale aliases, canonical/hreflang,
+  JSON-LD, Open Graph и guest cache headers;
+- `/api/v1/home`, `CatalogHomeResource`, полный `data()` payload, pagination
+  metadata и raw URL/privacy exclusions;
+- `CatalogHomeSnapshotCache`, `CatalogHomeMetricsCache`, cache key/version/
+  locale/audience/TTL/stale/lock/invalidation/warming contracts;
+- title/season/episode/media publication, audience, entitlement, soft-delete,
+  Premium, region, legal and player visibility;
+- recommendation ranking/exclusions/repeat suppression/feedback and library
+  ownership;
+- continue-watching progress/completion/resume semantics;
+- collections/calendar/auth/settings/notifications/search/header/mobile/PWA;
+- importer/admin writes, routes, migrations/indexes/data, queues,
+  dependencies and environment;
+- all foreign shared-tree hunks and current `main` history.
+
+### Cross-feature, query, security и production matrix
+
+| Domain | Статус | Решение / gate |
+| --- | --- | --- |
+| Guest information architecture | `critical_affected` | Exact seven-section DOM order and mobile/desktop browser evidence |
+| Authenticated information architecture | `critical_affected` | Exact six-section owner-only order and empty states |
+| Homepage builder/API | `critical_affected` | Web-only keys; API shape/query regression |
+| Recommendations | `critical_affected` | Canonical `Trending`, `RecentlyAdded`, `Personalized`; max 5/6 |
+| Viewing activity | `high_affected` | Existing owner query, limit 6, no new state |
+| Personal library updates | `critical_affected` | Compact bounded owner query; no paginator/count |
+| Release grouping | `critical_affected` | One title card, exact count/range, max eight hydrated rows |
+| Shared cache/privacy | `critical_affected` | Personal reads only after authenticated cache bypass |
+| Eloquent/N+1 | `high_affected` | Existing eager loads and batch count/state owners |
+| UI/mobile/accessibility | `critical_affected` | 2:3 cards, `2+2+1` metrics, DOM order, focus, 44px, no overflow |
+| Localization/timezone | `high_affected` | RU/EN key parity and account formatter |
+| Validation/input | `not_applicable` | No new request/query/form/write input |
+| Authorization/write/CSRF | `already_compliant` | Read-only server-owned User; existing auth/cache middleware |
+| SQL injection/XSS/IDOR | `protected_critical` | Bindings/named routes/escaped output/owner predicates |
+| Database/schema/index | `not_applicable` | No migration, index, DML or backfill |
+| Performance | `critical_affected` | Guest/auth query counts, release/library EXPLAIN, payload/page height |
+| Production deployment | `high_affected` | Code/assets/docs-only deploy; Vite build and process reload |
+| Rollback | `completed_design` | Revert code/assets; no DB restore/cache flush/data repair |
+| Dependencies/environment | `not_applicable` | No package, service, `.env` or config addition |
+| Shared Git state | `critical_risk_recorded` | Exact Task 94 hunks via alternate index; no blind add |
+
+### Task-specific requirement-compliance matrix
+
+| Requirement/domain | Статус | Evidence / следующий gate |
+| --- | --- | --- |
+| Root/index/all applicable canonical fresh read | `completed` | 26.07.2026 before Task 94 app edit |
+| Relevant Markdown/README/CHANGELOG read | `completed` | UI/frontend/views/architecture/cache/recommendation/library/home plans traced |
+| Runtime/packages/database/frontend/Git | `completed` | Actual tool/runtime/branch/remote/dirty state recorded |
+| Applicable skills | `completed` | Brainstorming, planning, TDD, Laravel, Tailwind, UI/redesign, Playwright |
+| Official version-dependent docs | `completed` | Laravel 13 eager loads, conditional clauses, exists/subqueries via Boost |
+| Existing implementation first | `completed` | Routes/Livewire/builder/snapshot/recommendations/library/releases/components/tests traced |
+| Manual layout assessment and detector | `completed` | Nested equal panels identified; layout detector returned `[]` |
+| Alternatives and approved design | `completed` | Three approaches; builder web projection selected under explicit autonomy |
+| Canonical permanent rule first | `completed` | Task 94 UI/frontend/views/architecture/cache sections authored before app code |
+| Design/files/contracts/risks/rollback | `completed` | Linked spec and exhaustive executable plan |
+| Prepared-plan reread | `completed` | План перечитан до первого RED |
+| TDD guest/auth/release/component/time | `completed` | Initial 3 RED; final focused 39 tests / 304 assertions GREEN |
+| Validation/normalization | `not_applicable` | No client input; bounded private constants |
+| Authorization/security/privacy | `completed` | Owner/foreign markers, guest section exclusions and private post-cache builder boundary GREEN |
+| SQL/N+1/EXPLAIN/query budget | `completed` | Bounded window totals, existing covering indexes and homepage query regressions GREEN |
+| Migration/index/data safety | `not_applicable` | No DDL/DML/backfill |
+| API/cache/SEO/routes compatibility | `completed` | `data()` API-only projection preserved; home/web/API/cache regressions GREEN |
+| Desktop/mobile/accessibility/browser | `completed` | Chromium `1440×1000`/`390×844`, DOM boxes, manual screenshots, zero console errors |
+| Static/style/build/full tests | `unresolved` | Task 94 focused 39/304 and UI/Blade 56/423 GREEN; Pint/PHPStan/Vite GREEN. Full suite sharded: 2 065 tests / 203 595 assertions, 8 foreign-tree failures remain |
+| Docs/README/CHANGELOG | `completed` | Canonical owners, visitor history, Russian changelog and executable evidence updated |
+| Final requirement/legacy/debug/secret audit | `completed` | Canonical owners/spec/plan reread; exact Task 94 legacy/duplicate/TODO/debug/secret/diff scan completed; rebased staged tree 95 tests / 727 assertions, Pint/PHPStan/Vite GREEN |
+| Commit/push main | `pending` | Exact isolated Task 94 commit and ordinary push |
+
+### Execution order
+
+1. `[completed]` Fresh mandatory requirements, relevant docs, skills,
+   versions, structure, current behavior and shared Git audit.
+2. `[completed]` Manual layout assessment, detector, source/query/cache/
+   security trace and three approaches.
+3. `[completed]` Canonical Task 94 contract, approved design, exhaustive
+   plan, manifests, matrices and rollback.
+4. `[completed]` Prepared-plan reread and isolated RED guest/auth/release
+   tests.
+5. `[completed]` Compact personal library query.
+6. `[completed]` Web-only public/personal homepage projection.
+7. `[completed]` Exact release total/range/time presentation.
+8. `[completed]` Reusable home/spotlight/trend title-card layouts.
+9. `[completed]` Exact guest/auth Blade order, facets and empty states.
+10. `[completed]` RU/EN translations and account timezone formatting.
+11. `[completed]` Focused GREEN and related API/cache/SEO/security regressions.
+12. `[completed]` Query counts, N+1 audit, EXPLAIN and payload/performance check.
+13. `[completed]` Pint/syntax/PHPStan/sharded PHPUnit/Vite; eight
+    non-Task-94 foreign-tree failures recorded as unresolved.
+14. `[completed]` Playwright guest desktop/mobile, console/a11y and manual
+    screenshot inspection.
+15. `[completed]` Canonical evidence, README, Russian CHANGELOG and final
+    compliance reread.
+16. `[completed]` Legacy/duplicate/TODO/debug/secret/status/diff/stat/index/
+    remote audit.
+17. `[pending]` Exact Task 94 commit on existing `main`.
+18. `[pending]` Configured non-force push; external failure remains
+    `unresolved`.
+
+---
+
 ## Task 95 — повторное использование subtitle facet главной
 
 Статус: `implementation_committed_push_unresolved_authentication`.

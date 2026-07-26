@@ -31,6 +31,27 @@ final class AccountDateTimeFormatter
         return $this->formatDate($value, $locale, $timezone, IntlDateFormatter::MEDIUM);
     }
 
+    public function time(CarbonInterface $value, string $locale, string $timezone): string
+    {
+        $localized = CarbonImmutable::createFromTimestamp($value->getTimestamp(), $timezone);
+
+        if (class_exists(IntlDateFormatter::class)) {
+            $formatter = new IntlDateFormatter(
+                $locale,
+                IntlDateFormatter::NONE,
+                IntlDateFormatter::SHORT,
+                $timezone,
+            );
+            $formatted = $formatter->format($localized->getTimestamp());
+
+            if (is_string($formatted)) {
+                return $formatted;
+            }
+        }
+
+        return $localized->format('H:i');
+    }
+
     public function dateGroup(CarbonInterface $value, string $locale, string $timezone): string
     {
         $localized = CarbonImmutable::createFromTimestamp($value->getTimestamp(), $timezone);
