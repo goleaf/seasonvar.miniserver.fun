@@ -380,6 +380,21 @@ Account deletion обнуляет `reviews.user_id` и `reports.reporter_id`, у
 - Full provider-set sync идемпотентен: stable mapping/pivot uniqueness, current provenance timestamps и complete-snapshot stale reconciliation не создают повторов. Explicit editorial provenance/suppression survives import; rejected mapping clears only its current provider observations, а pivot удаляется только без remaining current source. Raw provider spelling не становится canonical public label автоматически.
 - Каждая новая глобальная связь `catalog_title_tag` обязана иметь current provider или editorial provenance в `catalog_title_tag_sources`. Demo/user seed не создаёт и не переиспользует публичные теги и не пишет aggregate pivot: тестовые пользовательские сценарии используют только owner-scoped `user_tags`. Исторический deterministic footprint `seasonvar-demo-v1` удаляется только точным bounded repair по прежнему tag/title selection и только при отсутствии любого current provenance; собственные `demo-tag-*` подтверждаются exact versioned `code` вместе с deterministic UUIDv5 `public_id` и архивируются без hard delete. Mutable имя/slug не являются ownership evidence. Это не разрешает широкий orphan cleanup и не ослабляет preservation старых редакционных или подтверждённых provider assignments.
 
+## Производные снимки качества каталога
+
+`catalog_title_quality_snapshots` имеет отношение один-к-одному к
+`CatalogTitle`, а `catalog_title_quality_issues` — один-ко-многим. Обе
+таблицы производны и удаляются cascade только вместе с фактическим удалением
+тайтла. Unique `(catalog_title_id,code)` сохраняет одну текущую проблему
+каждого stable типа, а индексы score/refresh/category/severity обслуживают
+bounded command и административные очереди.
+
+Source pages, provider field baselines, tag provenance, seasons/episodes,
+ratings и licensed media остаются authoritative. Снимок их не дублирует и не
+может менять public visibility/ranking. Полный контракт формулы,
+идемпотентного пересчёта, evidence и rollback находится в
+[`catalog-quality.md`](catalog-quality.md).
+
 ## Профили пользователей
 
 - `user_profiles.user_id` одновременно PK и cascade FK к `users`: ровно один профиль на стабильного пользователя. `normalized_username` unique и используется для lookup; display name/email никогда не являются route identity. Visibility/moderation — стабильные codes, media columns содержат только private disk/path metadata и monotonically increasing versions.

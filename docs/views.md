@@ -189,3 +189,38 @@ Native buttons/links/dialog имеют семантику, visible focus, мин
 `resources/views/livewire/library/user-library-page.blade.php` отображает только prepared tabs, paginator items, grouped counts, filter/sort options, update indicators и safe action flags. Вычисление status, update predicate, progress percentage, marker time и URL принадлежит typed PHP/query/service boundary. Шаблон не содержит `@php`, inline CSS, direct model/service query или application JavaScript.
 
 Табы, фильтры, cards, marker rows, empty/loading/error/live-region состояния адаптивны, keyboard-operable и используют `library.*` переводы для ru/en. Existing collection pages остаются единственным CRUD/ordering/visibility UI; library не создаёт competing modal или fake bulk actions.
+
+## Представление центра качества каталога
+
+`resources/views/livewire/administration/catalog-quality-center.blade.php`
+получает только подготовленные DTO сводки, очереди и карточек. Расчёт оценки,
+поиск, сортировка, фильтры, пагинация, evidence и authorization принадлежат
+Livewire/query/service boundary; Blade не обращается к моделям, базе,
+facade или config и не раскрывает provider URL, исходный payload или
+техническую ошибку.
+
+Семь очередей, score range, поиск, сортировка и размер страницы сохраняются в
+URL. Форма имеет отдельный reset, loading/disabled, validation, unavailable,
+empty и error states. На узком экране фильтры и карточки переходят в одну
+колонку без горизонтального переполнения; интерактивные элементы сохраняют
+видимый focus и минимальную высоту 44 px. Видимый текст берётся из
+`lang/{ru,en}/catalog-quality.php`, а административная страница всегда
+остаётся `noindex`.
+
+## Представление шапки и глобального поиска Task 88
+
+`resources/views/components/layout/site-header.blade.php` выводит одну
+sticky desktop-строку с wordmark Seasonvar, четырьмя primary links,
+компактным «Ещё», flexible search, уведомлениями и avatar/account menu.
+Активный раздел отмечается одновременно `aria-current`, semibold и нижней
+полосой. На ширине меньше `64rem` остаются logo/search/profile сверху и
+ровно пять действий снизу:
+`Главная/Каталог/Поиск/Календарь/Библиотека`.
+
+`header-search.blade.php` создаёт один neutral-frame combobox. CSS
+переключает тот же root в fullscreen dialog на mobile, учитывает
+`safe-area-inset-bottom` и скрывает bottom navigation при
+`app-keyboard-visible` или открытом поиске. Все ссылки autocomplete имеют
+видимый `focus-visible`; poster, original title, year, country, season и
+episode metadata создаются безопасно через DOM `textContent`, без inline
+business JavaScript и запросов из Blade.

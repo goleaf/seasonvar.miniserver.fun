@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\SeasonvarSourceAvailability;
 use App\Models\Actor;
 use App\Models\CatalogTitle;
+use App\Models\CatalogTitleQualitySnapshot;
 use App\Models\CatalogTitleRecommendationSignal;
 use App\Models\Country;
 use App\Models\Episode;
@@ -189,6 +190,9 @@ class SeasonvarParsePageCommandTest extends TestCase
             'source_url' => $url,
             'source_url_hash' => $currentPage->url_hash,
         ]);
+        CatalogTitleQualitySnapshot::factory()->for($catalogTitle)->create([
+            'needs_refresh' => false,
+        ]);
         $season = Season::factory()->create([
             'catalog_title_id' => $catalogTitle->id,
             'number' => 2,
@@ -221,6 +225,7 @@ class SeasonvarParsePageCommandTest extends TestCase
         $this->assertSame('parsed', $siblingPage->fresh()->import_status);
         $this->assertSame($previousRun->id, $siblingPage->fresh()->last_import_run_id);
         $this->assertSame($siblingImportedAt->toDateTimeString(), $siblingPage->fresh()->last_imported_at?->toDateTimeString());
+        $this->assertTrue($catalogTitle->qualitySnapshot()->sole()->needs_refresh);
     }
 
     public function test_serial_not_modified_response_reuses_snapshot_when_media_recovery_is_needed(): void

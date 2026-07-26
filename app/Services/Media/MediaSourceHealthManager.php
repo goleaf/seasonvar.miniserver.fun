@@ -7,13 +7,18 @@ namespace App\Services\Media;
 use App\DTOs\MediaHealthCheckResultData;
 use App\Enums\MediaHealthStatus;
 use App\Models\LicensedMedia;
+use App\Services\Catalog\Quality\CatalogTitleQualityDirtyTracker;
 use Illuminate\Support\Facades\DB;
 
 final class MediaSourceHealthManager
 {
+    public function __construct(
+        private readonly CatalogTitleQualityDirtyTracker $quality,
+    ) {}
+
     public function record(LicensedMedia $media, MediaHealthCheckResultData $result): LicensedMedia
     {
-        return DB::transaction(function () use ($media, $result): LicensedMedia {
+        $recorded = DB::transaction(function () use ($media, $result): LicensedMedia {
             $locked = LicensedMedia::query()->lockForUpdate()->findOrFail($media->getKey());
 
             if ($locked->health_status === MediaHealthStatus::Disabled) {
@@ -53,6 +58,12 @@ final class MediaSourceHealthManager
 
             return $locked;
         }, attempts: 3);
+
+        if ($recorded->catalog_title_id !== null) {
+            $this->quality->mark([(int) $recorded->catalog_title_id]);
+        }
+
+        return $recorded;
     }
 
     private function healthStatus(MediaHealthCheckResultData $result, int $failures): MediaHealthStatus

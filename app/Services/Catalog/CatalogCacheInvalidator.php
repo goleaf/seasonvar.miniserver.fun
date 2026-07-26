@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Catalog;
 
 use App\Jobs\WarmCatalogCaches;
+use App\Services\Catalog\Quality\CatalogTitleQualityDirtyTracker;
 use App\Services\Collections\CatalogCollectionCacheInvalidator;
 use App\Support\Cache\CacheDomain;
 use App\Support\Cache\CacheTelemetry;
@@ -37,6 +38,7 @@ final class CatalogCacheInvalidator
         private readonly CacheTelemetry $telemetry,
         private readonly CatalogCacheWarmRequestStore $warmRequests,
         private readonly CatalogCollectionCacheInvalidator $collections,
+        private readonly CatalogTitleQualityDirtyTracker $quality,
     ) {}
 
     /** @param iterable<int, int|string> $titleIds */
@@ -123,6 +125,8 @@ final class CatalogCacheInvalidator
     /** @param list<int> $titleIds */
     private function invalidateNow(array $titleIds): void
     {
+        $this->quality->mark($titleIds);
+
         foreach (self::PUBLIC_DOMAINS as $domain) {
             $this->versions->bump($domain);
             $this->telemetry->increment($domain, 'invalidation');
@@ -144,6 +148,7 @@ final class CatalogCacheInvalidator
         bool $warm,
         bool $invalidateCollections,
     ): void {
+        $this->quality->mark([$titleId]);
         $this->versions->bump(CacheDomain::TitleDetail, 'title:'.$titleId);
         $this->telemetry->increment(CacheDomain::TitleDetail, 'invalidation');
 
@@ -158,6 +163,7 @@ final class CatalogCacheInvalidator
 
     private function invalidateTitlePlaybackMetadataNow(int $titleId): void
     {
+        $this->quality->mark([$titleId]);
         $this->versions->bump(CacheDomain::TitleDetail, 'title:'.$titleId);
         $this->telemetry->increment(CacheDomain::TitleDetail, 'playback-metadata-invalidation');
     }

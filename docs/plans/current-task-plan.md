@@ -10903,3 +10903,112 @@ table, dependency, queue, route или cache domain не добавляется.
 15. `[completed_unresolved_authentication]` Configured non-force
     `git push origin main` exited 128 before transfer because GitHub HTTPS
     credentials are unavailable; force, remote and history were not changed.
+## Task 84 — центр качества каталога
+
+Статус: `implementation_and_verification_complete_delivery_pending`.
+
+Дата начала: 26.07.2026.
+
+Approved design:
+[`2026-07-26-catalog-quality-center-design.md`](../superpowers/specs/2026-07-26-catalog-quality-center-design.md).
+
+Detailed implementation plan:
+[`2026-07-26-catalog-quality-center.md`](../superpowers/plans/2026-07-26-catalog-quality-center.md).
+
+### Цель и root cause
+
+Для 33 002 активных episodic catalog titles требуется versioned
+`quality_score 0..100`, объяснимые текущие причины и индексируемые admin queues.
+Request-time расчёт отклонён: полный media aggregate уже превысил безопасный
+диагностический интервал.
+
+`CatalogTitle #16585` подтверждает отдельный signal: восемь шумных imported
+tags не имеют current provenance и text/genre relevance, тогда как четыре
+правдоподобных Seasonvar tags имеют current observations. Существующий
+provenance repair остаётся владельцем удаления; quality center только
+обнаруживает и объясняет.
+
+Выбран additive persisted snapshot + normalized current issues, batched
+recalculation и read-only full-page Livewire center. Public ranking/search/API
+не меняются.
+
+### Expected files и protected contracts
+
+Expected scope записан в detailed plan: две additive tables, quality
+enums/models/DTO/services/config/command/schedule, exact invalidation
+integrations, full-page admin route/navigation/view/translations, tests и
+canonical docs/README/CHANGELOG.
+
+Защищены existing public/admin route names, API/Resources/OpenAPI, search/
+recommendation/SEO ranking, route binding, tags/provenance repair, cache
+contracts, importer public command, source/media secrecy, auth/permissions,
+player/user/Premium/payment/region/legal/notification state и весь foreign
+shared-tree scope.
+
+Новая dependency, environment secret, public API, queue worker, cache store,
+production data seeder или destructive migration не планируются. Initial
+derived backfill выполняется bounded command/schedule, не migration.
+
+### Cross-feature, schema и rollout matrix
+
+| Domain | Статус | Решение / gate |
+| --- | --- | --- |
+| Catalog data model | `critical_affected` | Additive snapshot/issues with cascade and reversible down |
+| Tags/provenance | `critical_affected` | Conservative imported/no-current/no-relevance signal; no deletion |
+| Episodes/seasons | `critical_affected` | Grouped counts/gaps, existing uniqueness, ratio thresholds |
+| Media health | `critical_affected` | Existing statuses/check timestamps only; no network in scoring |
+| Import/admin edits | `affected` | Exact existing snapshots marked dirty; no mass update |
+| Admin auth/privacy | `critical_affected` | Canonical middleware + `content.view`; safe bounded evidence |
+| SQL/performance | `critical_affected` | Persisted index, grouped batch loader, paginated indexed queues |
+| Public search/recommendations/SEO/API | `protected_critical` | No ranking/shape/route/cache-key change |
+| Localization/UI/mobile/a11y | `affected` | RU/EN parity, existing light components, browser matrix |
+| Production operations | `affected` | Additive migration, bounded schedule, backup/rollback/runbook |
+| Dependencies/environment | `not_applicable` | No package or `.env` change |
+
+### Task-specific requirement-compliance matrix
+
+| Requirement/domain | Статус | Evidence / следующий gate |
+| --- | --- | --- |
+| Skills/root/index/canonical fresh read | `completed` | 26.07.2026 before Task 84 code edit |
+| Installed runtime/packages/database | `completed` | PHP 8.5, Laravel 13.22.0, Livewire 4.3.3, Tailwind 4.3.2, PHPUnit 12.5.32, SQLite |
+| Official version-dependent docs | `completed` | Laravel Boost + Context7 Laravel 13/Livewire 4 |
+| Existing implementation first | `completed` | Models/schema/import/tag/media/admin/schedule/tests traced |
+| Read-only baseline/root cause | `completed` | 33 002 titles and bounded completeness/media/tag/episode/rating/source aggregates |
+| Alternatives/user authorization | `completed` | Persisted normalized design selected under explicit autonomy |
+| Design/plan/files/contracts/risks | `completed` | Linked Task 84 documents |
+| Canonical owner before implementation | `completed` | `docs/catalog-quality.md`, administration/data/importer/performance/views/deployment/index integrations |
+| TDD RED/GREEN | `completed` | Evaluator/schema/recalculator/query/command/dirty/admin/importer tests; RED failures observed before implementation |
+| Migration/index/query plan | `completed` | Additive up/down/FK/indexes checked in disposable SQLite; targeted EXPLAIN uses score/queue/PK indexes |
+| Backend/recalculation/invalidation | `completed` | Bounded grouped loader, transactional issue replacement, exact dirty lifecycle, schema guards |
+| Admin route/UI/validation/auth | `completed` | Full-page Livewire, URL filters/reset/pagination, `content.view`, RU/EN and guest/permission matrix |
+| Security/privacy/error handling | `completed` | Allowlisted evidence, escaped output, no source URL/payload, safe unavailable/error states |
+| Public compatibility/cross-feature | `completed` | No public ranking/API/search/SEO change; cache/media/import prepared-apply and `304` regression coverage |
+| Docs/README/CHANGELOG | `completed` | Canonical owner/runbooks, visitor state/history and dated technical entry updated |
+| Full verification/browser | `completed` | 110 related tests/1 217 assertions, parity 3/76 989, Playwright 3/3, static/audits/build passed; Task 84 failures are zero |
+| Shared full-suite state | `unresolved` | Full 2 020: 2 004 passed, 11 skipped; three concurrent header/account failures and one missing foreign import-dispatch class error remain outside Task 84 scope |
+| Final diff/commit/push main | `pending` | Exact task scope; external failure honest |
+
+### Безлимитный execution order
+
+1. `[completed]` Fresh requirements, skills, versions and Git/shared-tree audit.
+2. `[completed]` Existing schema/models/import/tag/media/admin/scheduler trace.
+3. `[completed]` Safe production distributions and Flower-of-Evil root cause.
+4. `[completed]` Alternatives and approved persisted design.
+5. `[completed]` Detailed TDD plan, files/contracts/risks/compliance matrix.
+6. `[completed]` Canonical quality/data/admin/operations owner updates.
+7. `[completed]` Reread plan and create intended RED tests.
+8. `[completed]` Additive migration, enums/models/DTOs and GREEN schema.
+9. `[completed]` Batch evaluator/recalculator/dirty tracker and GREEN domain tests.
+10. `[completed]` Bounded command/schedule/import/media/admin invalidation.
+11. `[completed]` Indexed admin query, full-page component, translations and view.
+12. `[completed]` Focused GREEN, migration/EXPLAIN/query budget/security/static.
+13. `[completed_with_foreign_failures]` Related/full suite, build and
+    desktop/mobile/tablet browser QA; Task 84 is green, four remaining
+    failures belong to concurrent header/account/import-dispatch scope.
+14. `[completed]` Canonical docs, README, Russian CHANGELOG and final compliance draft.
+15. `[completed]` Final requirements/legacy/debug/secret audit; exact staged
+    diff inspection remains part of delivery step.
+16. `[pending]` Exact Task 84 commit on existing `main`.
+17. `[pending]` Configured non-force push; external failure stays `unresolved`.
+
+---

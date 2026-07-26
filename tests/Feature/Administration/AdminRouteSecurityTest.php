@@ -65,6 +65,7 @@ final class AdminRouteSecurityTest extends TestCase
         $expectedExisting = [
             'admin.calendar',
             'admin.catalog',
+            'admin.quality',
             'admin.comments',
             'admin.help',
             'admin.help.preview',

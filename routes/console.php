@@ -32,6 +32,12 @@ Schedule::command('catalog-collections:prune --limit='.(int) config('catalog-col
     ->withoutOverlapping(30)
     ->onOneServer();
 
+Schedule::command('catalog:quality-refresh --limit='.(int) config('catalog-quality.scheduled_batch_size', 250))
+    ->everyTenMinutes()
+    ->name('catalog-quality-refresh')
+    ->withoutOverlapping(10)
+    ->onOneServer();
+
 Schedule::command('catalog-collections:sync-hdrezka')
     ->dailyAt((string) config('catalog-collection-imports.hdrezka.schedule', '03:37'))
     ->name('hdrezka-editorial-collections-sync')

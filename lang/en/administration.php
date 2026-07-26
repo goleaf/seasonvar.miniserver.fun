@@ -14,6 +14,7 @@ return [
         'users' => 'Users',
         'access' => 'Roles and access',
         'catalog' => 'Catalog and collections',
+        'quality' => 'Catalog quality',
         'tags' => 'Tags',
         'calendar' => 'Release calendar',
         'comments' => 'Comments',

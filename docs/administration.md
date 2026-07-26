@@ -116,6 +116,21 @@ Resource policy остаётся authoritative поверх section/action permi
 - Изменение сериалов, сезонов, серий, связей и источников обновляет `catalog_titles.indexed_at`, сбрасывает только snapshot статистики и удаляет materialized recommendations, затронутые тайтлом. Каталог, Continue Watching и playback используют свежие SQL-boundaries без shared user cache.
 - SQL-поиск не требует отдельного search-index job. Recommendation fallback остаётся доступен, а полный materialized rebuild выполняется существующим importer lifecycle.
 
+## Центр качества каталога
+
+`/admin/catalog/quality` — отдельный read-only full-page Livewire shell с
+существующей permission `content.view`. Он показывает persisted
+`quality_score` и безопасные краткие причины в очередях критических ошибок,
+подозрительных тегов, конфликтов данных, отсутствующих постеров/видео,
+аномалий серий и просроченных проверок. Формула, evidence, batch lifecycle и
+rollback принадлежат [`catalog-quality.md`](catalog-quality.md).
+
+Экран не выполняет сетевые проверки и не изменяет каталог. Исправление
+открывается в существующем `/admin/catalog` через совместимый `catalog_q`.
+Все filters валидируются server-side, сохраняются в URL и работают с
+детерминированной pagination `15|25|50`; raw provider payload и source/media
+URL не попадают в Livewire state или HTML.
+
 ## Деплой
 
 Перед развёртыванием применяются пять additive migrations `2026_07_19_235900`—`2026_07_19_235904`, затем код/assets и штатный restart существующих long-lived workers. Preflight: backup по production runbook, `migrate:status`, доступность `users`/старого `admin_audit_events`, проверка `ADMIN_BOOTSTRAP_SUPERADMIN_EMAILS` и legacy allowlists без вывода значений. Post-deploy: `/admin`, route middleware, final-super invariant, private/no-store/noindex headers, targeted cache/search actions, queue/import status и public portal smoke.

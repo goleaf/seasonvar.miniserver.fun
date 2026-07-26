@@ -11,6 +11,7 @@ use App\Livewire\Administration\AdminAuditPage;
 use App\Livewire\Administration\AdministrationDashboardPage;
 use App\Livewire\Administration\AdminOperationsPage;
 use App\Livewire\Administration\AdminUserDirectoryPage;
+use App\Livewire\Administration\CatalogQualityCenterPage;
 use App\Livewire\Auth\ConfirmPasswordPage;
 use App\Livewire\Auth\ForgotPasswordPage;
 use App\Livewire\Auth\LoginPage;
@@ -515,6 +516,7 @@ Route::prefix('admin')
         Route::get('/calendar', ReleaseCalendarAdministrationManager::class)->middleware('can:calendar.manage')->name('calendar');
         Route::get('/premium', PremiumAdministrationManager::class)->middleware('can:premium.view')->name('premium');
         Route::get('/help', HelpCenterAdministrationPage::class)->middleware('can:help.manage')->name('help');
+        Route::get('/catalog/quality', CatalogQualityCenterPage::class)->middleware('can:content.view')->name('quality');
         Route::get('/help/articles/{helpArticle}/preview/{locale}', HelpArticlePreviewPage::class)
             ->whereUuid('helpArticle')
             ->whereIn('locale', config('help-center.supported_locales', ['ru']))

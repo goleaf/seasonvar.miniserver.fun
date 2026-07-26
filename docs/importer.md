@@ -205,6 +205,23 @@ Full shadow activation повторно проверяет целостност�
 
 Все указанные migrations additive и не делают удалений. Admin fields nullable и не требуют backfill; отсутствие editorial baseline намеренно заставляет первый repeat import считать существующее заполненное поле потенциально редакционным.
 
+## Передача изменений в центр качества
+
+`SeasonvarCatalogImporter` после полного применения prepared page помечает
+существующий `catalog_title_quality_snapshot` точным
+`catalog_title_id`. Тот же signal отправляется после безопасного
+`304/not modified`: содержимое не переписывается, но новое время проверки
+должно попасть в следующую оценку. Queued title-group finalizer сохраняет
+прежнюю точечную cache invalidation; повторная dirty-запись идемпотентна.
+
+Расчёт качества никогда не выполняется внутри importer transaction и не
+делает HTTP-запросов. Отсутствующий snapshot не создаётся importer’ом:
+bounded `catalog:quality-refresh` подберёт его как initial backlog. До
+применения additive quality migration dirty boundary возвращает `0`, поэтому
+старый import path не падает в rolling deployment window. Каноническая
+формула, evidence и rollout описаны в
+[`catalog-quality.md`](catalog-quality.md).
+
 ## Импортные и пользовательские отзывы
 
 `catalog_title_reviews` remains one table. Seasonvar importer owns only `origin=provider` rows and continues to upsert by `(catalog_title_id,body_hash)` with source page, provider author, plain body and publication date. It never assigns portal `user_id`, title/spoiler/verified/moderation ownership/submission fields, never creates helpful votes and never changes `catalog_title_user_states`.

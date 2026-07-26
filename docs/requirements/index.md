@@ -1,6 +1,6 @@
 # Канонический индекс требований
 
-Обновлено: 20.07.2026
+Обновлено: 26.07.2026
 
 Этот файл определяет обязательный порядок чтения постоянных требований. Он ссылается на существующие документы-владельцы и не копирует их доменные контракты.
 
@@ -102,7 +102,7 @@ Implementation convenience никогда не переопределяет по
 
 Оптимизация производительности никогда не отменяет безопасность данных, privacy, восстановимость или проверенную server compatibility.
 
-## Канонические feature areas 1–26
+## Канонические feature areas 1–27
 
 1. Home page — [`frontend.md`](../frontend.md), [`architecture.md`](../architecture.md), [`caching.md`](../caching.md).
 2. Search — [`catalog-search.md`](../catalog-search.md), [`api.md`](../api.md).
@@ -130,6 +130,7 @@ Implementation convenience никогда не переопределяет по
 24. Rights-holder cases — текущая product capability не установлена; permanent privacy/storage/legal boundaries принадлежат [`security.md`](../security.md), [`storage.md`](../storage.md) и [`administration.md`](../administration.md).
 25. Advertisers — текущая product capability не установлена; permanent consent/privacy/premium/admin boundaries принадлежат [`security.md`](../security.md), [`premium.md`](../premium.md) и [`administration.md`](../administration.md).
 26. Administration — [`administration.md`](../administration.md), [`authorization.md`](../authorization.md).
+27. Catalog quality — [`catalog-quality.md`](../catalog-quality.md), [`administration.md`](../administration.md), [`DATA_RELATIONS.md`](../DATA_RELATIONS.md).
 
 System-wide evidence и финальная dependency matrix принадлежат [`system-integration.md`](../system-integration.md); текущий status/compliance — [`current-task-plan.md`](../plans/current-task-plan.md), техническая история — [`CHANGELOG.md`](../../CHANGELOG.md).
 

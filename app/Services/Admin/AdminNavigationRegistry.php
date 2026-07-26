@@ -18,6 +18,7 @@ final class AdminNavigationRegistry
             $this->item('users', 'users', 'admin.users', 'users', 'fa-solid fa-users', AdminPermission::UsersView, 20),
             $this->item('access', 'users', 'admin.access', 'access', 'fa-solid fa-user-shield', AdminPermission::RolesView, 30),
             $this->item('catalog', 'content', 'admin.catalog', 'catalog', 'fa-solid fa-film', AdminPermission::ContentView, 40),
+            $this->item('quality', 'content', 'admin.quality', 'quality', 'fa-solid fa-shield-halved', AdminPermission::ContentView, 45),
             $this->item('tags', 'content', 'admin.tags', 'tags', 'fa-solid fa-tags', AdminPermission::ContentManage, 50),
             $this->item('calendar', 'content', 'admin.calendar', 'calendar', 'fa-regular fa-calendar-check', AdminPermission::CalendarManage, 60),
             $this->item('comments', 'community', 'admin.comments', 'comments', 'fa-solid fa-comments', AdminPermission::CommentsModerate, 70),

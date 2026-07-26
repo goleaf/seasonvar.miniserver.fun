@@ -156,6 +156,34 @@ Media due sources по-прежнему выбирает importer finalizer, а 
 
 Production scheduler — внешний cron, который каждую минуту вызывает Laravel `schedule:run`. Entry установлен для пользователя `www` и проверен 15.07.2026 через `crontab -T`, ручной `schedule:run` и journal cron; cache-warm fallback запускается Laravel scheduler каждые десять минут. Admin UI не заменяет cron: он даёт ручной authorized старт/retry/cancel и recovery для `running` run без heartbeat и live claims. Threshold задаёт `SEASONVAR_QUEUE_STALE_AFTER_MINUTES=120`; перед ручным recovery нужно убедиться, что workers не остановлены на долгую maintenance-паузу.
 
+## Rollout центра качества каталога от 26.07.2026
+
+Центр качества добавляет только производные таблицы
+`catalog_title_quality_snapshots` и `catalog_title_quality_issues`; исходные
+карточки, теги, серии и видео не изменяются. Перед rollout дождаться
+активных import/finalizer jobs, сделать проверяемую резервную копию SQLite,
+развернуть код и выполнить `php artisan migrate --force`. Код безопасно
+пропускает exact dirty-marking до появления таблиц, но
+`catalog:quality-refresh` до migration завершится контролируемой ошибкой,
+поэтому migration должна предшествовать запуску schedule.
+
+После migration очистить/пересобрать config и route cache в соответствии с
+обычным deploy, выполнить graceful `php artisan queue:restart`, проверить
+`php artisan route:list --name=admin.quality` и
+`php artisan schedule:list`. Начальный backfill запускать постепенно:
+`php artisan catalog:quality-refresh --limit=250`; следующие bounded batches
+подберёт существующий cron `schedule:run`. Команда не выполняет внешние
+запросы, ограничена максимумом 1 000 карточек и защищена
+`withoutOverlapping`/`onOneServer`.
+
+При partial deploy сначала остановить повторный запуск команды, вернуть
+совместимый код и сохранить производные таблицы для диагностики: старый код
+их игнорирует. Только после подтверждённого отказа от функции можно выполнить
+точечный rollback этой migration; он удалит лишь пересчитываемые snapshots и
+issues, а не исходные данные каталога. При stale cache повторить стандартную
+очистку route/config cache; при прерванном batch следующий запуск безопасно
+пересчитает оставшиеся dirty/old/stale карточки.
+
 ## Import identity и editorial baseline от 13.07.2026
 
 После уже существующих migrations применяются по timestamp:

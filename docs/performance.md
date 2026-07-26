@@ -1021,3 +1021,47 @@ follow-up `(catalog_title_id,id)` index. Новые индексы соотве�
 owner/exclusion/merge reads; genre-first и country-first indexes отклонены,
 потому что таких запросов нет. Это structural/query-plan evidence, а не p95
 или production latency SLA.
+
+## Query contract центра качества каталога
+
+`quality_score` не вычисляется в публичном или административном
+request-response цикле. `CatalogTitleQualityInputLoader` обрабатывает не более
+1 000 точных идентификаторов за batch, выбирает только необходимые колонки,
+eager-loads bounded metadata и получает episode/media aggregates
+группированными запросами без гидратации полного списка серий или
+видеоисточников. Пересчёт не выполняет HTTP и пишет один title snapshot с
+нормализованными текущими issues в короткой транзакции.
+
+Административная страница читает persisted snapshot. Сводка строится двумя
+aggregate queries, очередь использует indexed `EXISTS`, title join,
+allowlisted sort и paginator на 15, 25 или 50 строк. Query-count тест
+подтверждает постоянное число запросов для маленького и увеличенного набора.
+Индексы `catalog_quality_score_idx`,
+`catalog_quality_severity_score_idx`, `catalog_quality_refresh_idx`,
+`catalog_quality_issue_queue_idx` и `catalog_quality_issue_severity_idx`
+соответствуют score/severity/dirty/queue reads. Disposable SQLite
+`EXPLAIN QUERY PLAN` подтвердил score range index, covering queue index и
+primary-key title lookup; индекс по текстовому prefix не добавлен, потому что
+не определён переносимый case-insensitive contract для всех поддерживаемых
+СУБД.
+
+## Query и runtime contract глобального поиска Task 88
+
+Title autocomplete по-прежнему ограничивает candidate set максимумом
+`max(40, limit × 8)` и возвращает не более пяти строк для header scope.
+Страна загружается одним eager-load для всего bounded-набора и в ответе
+ограничивается двумя названиями; запросов на отдельную карточку нет.
+Query-count regression фиксирует 10 SQL-запросов для минимальной и большей
+выборки. Локальный SQLite `EXPLAIN QUERY PLAN` подтвердил
+`SEARCH catalog_title_country USING COVERING INDEX
+sqlite_autoindex_catalog_title_country_1 (catalog_title_id=?)` и lookup
+страны по integer primary key. Отдельный индекс не добавлен: остающаяся
+temporary B-tree сортирует только bounded relation result.
+
+Browser runtime делает максимум два abortable запроса после debounce
+`160 ms`, разделяет `header_titles` и `header_portal`, ограничивает memory
+cache 120 ответами и инициализирует DOM root через `WeakSet`. Passive
+scroll listener меняет только компактное состояние sticky header через
+`requestAnimationFrame`. Проверочный Vite build сформировал CSS `200,62 kB`
+(`43,49 kB` gzip) и JS `29,32 kB` (`9,49 kB` gzip); это локальный build
+snapshot, а не production SLA.

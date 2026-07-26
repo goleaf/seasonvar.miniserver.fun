@@ -285,6 +285,18 @@ class CatalogTitle extends Model
         return $this->hasMany(CatalogTitleRating::class);
     }
 
+    /** @return HasOne<CatalogTitleQualitySnapshot, $this> */
+    public function qualitySnapshot(): HasOne
+    {
+        return $this->hasOne(CatalogTitleQualitySnapshot::class);
+    }
+
+    /** @return HasMany<CatalogTitleQualityIssue, $this> */
+    public function qualityIssues(): HasMany
+    {
+        return $this->hasMany(CatalogTitleQualityIssue::class);
+    }
+
     /** @return HasMany<CatalogTitleUserState, $this> */
     public function userStates(): HasMany
     {

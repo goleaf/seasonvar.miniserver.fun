@@ -30,6 +30,7 @@ use App\Models\SourcePage;
 use App\Models\SourcePageSnapshot;
 use App\Services\Api\V1\Sync\CatalogSyncChangePublisher;
 use App\Services\Catalog\CatalogRecommendationDirtyTitleTracker;
+use App\Services\Catalog\Quality\CatalogTitleQualityDirtyTracker;
 use App\Services\Catalog\Search\CatalogSearchIndexer;
 use App\Services\Crawler\PoliteHttpClient;
 use App\Services\Media\ExternalMediaMetadata;
@@ -72,6 +73,7 @@ class SeasonvarCatalogImporter
         private readonly SeasonvarTitlePageStateSynchronizer $titlePageStateSynchronizer,
         private readonly SeasonvarImportErrorSanitizer $errors,
         private readonly CatalogSearchIndexer $searchIndexer,
+        private readonly CatalogTitleQualityDirtyTracker $quality,
         private readonly CatalogSyncChangePublisher $syncChanges,
         private readonly CatalogRecommendationDirtyTitleTracker $recommendationDirtyTitles,
         private readonly SeasonvarImportEventRecorder $eventRecorder,
@@ -439,6 +441,7 @@ class SeasonvarCatalogImporter
             && $existingCatalogTitle !== null
             && ! $needsMediaRefresh) {
             $this->titlePageStateSynchronizer->synchronize($existingCatalogTitle, $page, $importRunId);
+            $this->quality->mark([(int) $existingCatalogTitle->id]);
 
             if ($fetched->notModified) {
                 $this->report($progress, 'page-parse-skipped-not-modified', [
@@ -597,6 +600,7 @@ class SeasonvarCatalogImporter
         }
 
         $this->recommendationDirtyTitles->mark($catalogTitle->id, 'seasonvar-import');
+        $this->quality->mark([(int) $catalogTitle->id]);
 
         $this->report($progress, 'page-parse-complete', [
             'source_page_id' => $page->id,

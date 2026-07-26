@@ -119,8 +119,8 @@ class FrontendAssetContractTest extends TestCase
             ->mapWithKeys(fn (\SplFileInfo $file): array => [$file->getPathname() => File::get($file->getPathname())])
             ->filter(fn (string $contents): bool => str_contains($contents, '->links('));
 
-        $this->assertCount(41, $templates);
-        $this->assertSame(55, $templates->sum(fn (string $contents): int => substr_count($contents, '->links(')));
+        $this->assertCount(42, $templates);
+        $this->assertSame(56, $templates->sum(fn (string $contents): int => substr_count($contents, '->links(')));
 
         foreach ($templates as $path => $contents) {
             preg_match_all("/->links\\(data: \\['region' => '([^']+)'/", $contents, $matches);
