@@ -10308,3 +10308,119 @@ revert без restore, reindex или cache flush.
 14. `[completed_unresolved_authentication]` Configured non-force
     `git push origin main` exited 128 before transfer:
     `fatal: could not read Username for 'https://github.com': No such device or address`.
+
+---
+
+## Task 83 — correlated visibility для latest media главной
+
+Статус: `verified_exact_commit_pending`.
+
+Дата начала: 26.07.2026.
+
+Approved design:
+[`2026-07-26-homepage-latest-media-correlated-title-visibility-design.md`](../superpowers/specs/2026-07-26-homepage-latest-media-correlated-title-visibility-design.md).
+
+Detailed implementation plan:
+[`2026-07-26-homepage-latest-media-correlated-title-visibility.md`](../superpowers/plans/2026-07-26-homepage-latest-media-correlated-title-visibility.md).
+
+### Цель и measured root cause
+
+`CatalogHomeSnapshotCache::build()` выполняет 16 SQL statements. Семь
+read-only fresh-process builds дали median `842,075 ms` wall и `544,56 ms`
+SQL. Самый дорогой стабильный selector materialize-ит `LIST SUBQUERY` всех
+видимых `catalog_titles` до получения только 12 `latest_media_ids`.
+
+15 alternating same-snapshot samples сохранили exact 12 ordered IDs и
+SHA-256 `412fd422115fe129a5e25dea93d452af315d618a18088f0168b6388809ba8c64`.
+Текущий `IN (visible titles)` дал median `534,067 ms`, correlated
+`EXISTS` — `0,365 ms`. Existing `licensed_media_home_feed_idx` уже выбран
+обеими формами; новый index/materialized state отклонены.
+
+### Expected changed files
+
+- `app/Services/Catalog/CatalogHomeSnapshotCache.php`;
+- `tests/Feature/CatalogHomePerformanceTest.php`;
+- linked Task 83 design and detailed execution plan;
+- exact Task 83 hunks in `docs/performance.md` and this current plan;
+- exact Task 83 hunks in `README.md` and `CHANGELOG.md`.
+
+### Protected files и public contracts
+
+- `/`, `/ru`, named/localized homepage, Livewire/Blade/SEO;
+- `/api/v1/home`, full `data()` and bounded `webData()` keys and limits;
+- exact snapshot keys, latest media IDs/order and API Resource shape;
+- `content-index-v2`, dimensions, version, TTL, stale, locks, warming and
+  invalidation;
+- `published_at DESC, id DESC`, limit 12 and existing home feed index;
+- canonical title/media/season/episode visibility, audience, Premium, region,
+  legal, privacy and authorization boundaries;
+- importer/admin/search/recommendation/sitemap/notification/account flows;
+- SQLite and non-SQLite Laravel grammars;
+- every foreign Task 76/78/79/80/81/82 staged/unstaged change.
+
+### Migrations, routes, translations, cache, permissions and risks
+
+| Domain | Статус | Решение / gate |
+| --- | --- | --- |
+| Latest media ordered IDs | `critical_affected` | Exact fixture order and same-snapshot SHA-256 parity |
+| Public title visibility | `critical_affected` | Existing `CatalogTitleQuery::visibleTo(null)` with exact correlation |
+| Media/release visibility | `protected_critical` | Existing `published()` and `forAvailableReleases(null)` unchanged |
+| SQLite query plan | `critical_affected` | Home-feed index + title PK probe; no title-list materialization |
+| Other DB engines | `protected_critical` | Portable Laravel `whereExists`, no SQLite-only syntax |
+| Snapshot/API/HTML | `protected_critical` | Focused homepage/API/cache regressions |
+| Database schema/index/DML | `not_applicable` | No migration, new index, backfill or write |
+| Routes/translations/UI assets | `not_applicable` | No route/copy/markup/JS/CSS change |
+| Cache keys/TTL/invalidation | `already_compliant` | Exact existing resource/dimensions/generation |
+| Auth/security/privacy/legal | `already_compliant` | Canonical guest scopes retained; visibility fixture and full shared suite exposed no Task 83 failure |
+| Import/queue/scheduler | `already_compliant` | Read-only snapshot query only |
+| Production/rollback | `affected_low` | Code/docs revert; no restore/reindex/flush |
+| Shared Git state | `critical_risk_recorded` | Exact alternate-index Task 83 commit only |
+
+### Task-specific requirement-compliance matrix
+
+| Requirement/domain | Статус | Evidence / следующий gate |
+| --- | --- | --- |
+| Skills/root/index/canonical fresh read | `completed` | 26.07.2026 before Task 83 application edit |
+| Architecture/development/multilingual/security/performance/cache/UI/frontend/ops/maintenance/integration owners | `completed` | Homepage/snapshot/cache/deployment contracts traced |
+| Installed runtime/packages/database | `completed` | PHP 8.5.8, Laravel 13.22.0, Boost 2.4.13, Livewire 4.3.3, PHPUnit 12.5.32, SQLite 3.46.1 |
+| Official version-dependent docs | `completed` | Laravel 13 query listener, constrained eager/query builder and raw-safety guidance through Boost |
+| Existing implementation first | `completed` | Builder, snapshot, title/media scopes, cache, feed index and tests traced |
+| Read-only root-cause profile | `completed` | 33-query hit path, seven cold builds and paired query-shape parity |
+| Alternatives/user authorization | `completed` | Index/read-model rejected; explicit autonomous approval applies |
+| Design commit | `completed` | `c456bff`, exact design-only alternate-index commit |
+| Detailed plan/files/contracts/risks | `completed` | Linked unlimited TDD plan and this matrix |
+| TDD RED/GREEN | `completed` | RED failed only on global title list; GREEN 1/7 exact SQL/order/plan |
+| Implementation | `completed` | Minimal correlated title `EXISTS`; scopes/order/limit/cache unchanged |
+| Focused shared consumers | `completed` | Homepage 20/137, page 85/859, API/discovery 20/800 GREEN |
+| Repeated profile | `completed` | Same 12 IDs/hash; paired `117.984 → 0.347 ms`; cold SQL median `544.56 → 405.86 ms`, noisy wall honestly excluded |
+| Static/build/browser | `completed` | Pint/syntax/PHPStan/Rector/Vite GREEN; Chromium `/`, `/ru`, API GREEN |
+| Full-suite/shared repository state | `unresolved_foreign` | 1 956/1 969 passed, 11 skipped; one account-session failure and one missing importer class error outside Task 83 |
+| Managed docs | `completed` | Final `project:docs-refresh --check` GREEN after parallel Task 82 commit |
+| Shared repository diff | `unresolved_foreign` | Three foreign Markdown blank-line errors only; Task 83 alternate-index diff GREEN |
+| Documentation/README/CHANGELOG | `completed` | Performance owner, visitor history and dated Russian entry updated |
+| Final requirement reread/diff audit | `completed` | Owners/task reread; only distinct count/sitemap/profile list queries remain; task artifacts/secrets/legacy/Blade queries absent |
+| Commit/push in `main` | `pending` | Exact task-only delivery; external failure stays unresolved |
+
+### Безлимитный execution order
+
+1. `[completed]` Fresh skills, requirements, versions and shared-tree audit.
+2. `[completed]` Existing homepage/snapshot/cache/index/test trace.
+3. `[completed]` Cache-hit and seven-process cold-build profile.
+4. `[completed]` Index-hint/media-count/query-shape alternatives.
+5. `[completed]` 15-pair exact latest-media probe and approved design.
+6. `[completed]` Design-only commit `c456bff`.
+7. `[completed]` Detailed TDD plan, files/contracts/risks/compliance matrix.
+8. `[completed]` Plan reread and real-snapshot RED regression.
+9. `[completed]` Minimal correlated `EXISTS` implementation and focused GREEN.
+10. `[completed]` Homepage/API/cache shared-consumer regression.
+11. `[completed]` Repeated pair/cold-build/EXPLAIN parity profile and
+    diagnostic cleanup.
+12. `[completed_with_foreign_repository_limits]` Pint/static/broad/full/Vite/docs/diff
+    verification; 1 956/1 969 full-suite tests passed and two unrelated
+    shared-repository problems remain.
+13. `[completed]` Desktop/mobile/localized/API browser verification.
+14. `[completed]` Performance owner, README and Russian CHANGELOG.
+15. `[completed]` Final canonical reread and legacy/debug/secret/cache audit.
+16. `[pending]` Exact Task 83 implementation/docs commit on existing `main`.
+17. `[pending]` Configured non-force push; external failure remains
+    `unresolved`.

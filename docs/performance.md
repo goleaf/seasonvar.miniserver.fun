@@ -799,6 +799,47 @@ cache key/version/TTL/invalidation, dependency, queue или environment не
 изменены. Rollback — обычный revert PHP/tests/docs без database restore,
 cache flush или migration rollback.
 
+## Коррелированная проверка видимости новых материалов главной
+
+Follow-up 26.07.2026 локализовал самый дорогой стабильный запрос холодной
+сборки `CatalogHomeSnapshotCache`: выбор 12 `latest_media_ids` проходил по
+правильному `licensed_media_home_feed_idx`, но вложенный
+`IN (SELECT id FROM catalog_titles ...)` сначала materialize-ил полный список
+видимых тайтлов. Новый индекс, ослабление правил видимости и отдельный
+материализованный снимок отклонены: они увеличивали бы стоимость записи или
+создавали второй источник истины, не устраняя причину плана.
+
+Существующий `CatalogTitleQuery::visibleTo(null)` теперь коррелирован по
+`catalog_titles.id = licensed_media.catalog_title_id` внутри переносимого
+Laravel `whereExists()`. `LicensedMedia::published()`,
+`forAvailableReleases(null)`, порядок `published_at DESC, id DESC`, лимит 12,
+ключи/сроки/invalidation кеша и полный API-контракт не менялись. SQLite
+сохранил home-feed index, заменил `LIST SUBQUERY` на integer-primary-key probe
+текущего тайтла и не получил новую migration или схему индекса.
+
+Повторная серия из 15 чередующихся read-only samples сохранила те же 12
+ordered IDs и SHA-256
+`412fd422115fe129a5e25dea93d452af315d618a18088f0168b6388809ba8c64`.
+Под одновременной посторонней PHPUnit-нагрузкой медиана прежней формы
+составила `117,984 ms`, коррелированной — `0,347 ms`. Семь fresh-process
+вызовов приватного `build()` сохранили 16 SQL и counts `48/12/8/12`;
+медиана учтённого SQL изменилась с `544,56` до `405,86 ms` (`−25,5%`).
+Wall median в повторе вырос с `842,075` до `979,471 ms` из-за конкурентной
+нагрузки, поэтому не выдаётся за end-to-end improvement; следующими
+наблюдаемыми bottleneck остаются year buckets и episode availability.
+
+Направленная проверка прошла 1 тест с 7 утверждениями, homepage matrix —
+20/137, страница каталога — 85/859, API/discovery — 20/800. `Pint`, PHP
+syntax, task-scoped `PHPStan`, `Rector` и Vite завершились успешно. Managed
+Chromium получил `200` для desktop `/` и mobile `/ru`, H1 «Сериалы онлайн»,
+нулевое горизонтальное переполнение и отсутствие console/network/local-asset
+ошибок. `/api/v1/home` сохранил `48/12/8/12` и в отдельном HTTPS observation
+вернул первый байт за `0,244 s`, полный ответ — за `0,251 s`. Это локальные
+диагностические observations текущей нагрузки, не p95/SLA. Route,
+translation, schema/index/DML, dependency, environment или cache contract не
+изменены; rollback — обычный revert кода без restore, reindex или cache
+flush.
+
 ## Bounded name-order справочников каталога
 
 Follow-up 26.07.2026 локализовал глобальный grouped aggregate внутри

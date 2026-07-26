@@ -265,6 +265,85 @@ final class CatalogHomePerformanceTest extends TestCase
         );
     }
 
+    public function test_home_snapshot_latest_media_uses_correlated_title_visibility(): void
+    {
+        $this->travelTo(now()->setDate(2026, 7, 26)->setTime(12, 0));
+        $olderTitle = CatalogTitle::factory()->create();
+        $newerTitle = CatalogTitle::factory()->create();
+        $hiddenTitle = CatalogTitle::factory()->create(['is_published' => false]);
+        $authenticatedMediaTitle = CatalogTitle::factory()->create();
+        $olderMedia = LicensedMedia::factory()->create([
+            'catalog_title_id' => $olderTitle->id,
+            'status' => 'published',
+            'published_at' => now()->subMinutes(4),
+        ]);
+        $newerMedia = LicensedMedia::factory()->create([
+            'catalog_title_id' => $newerTitle->id,
+            'status' => 'published',
+            'published_at' => now()->subMinutes(3),
+        ]);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $authenticatedMediaTitle->id,
+            'status' => 'published',
+            'audience' => 'authenticated',
+            'published_at' => now()->subMinutes(2),
+        ]);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $hiddenTitle->id,
+            'status' => 'published',
+            'published_at' => now()->subMinute(),
+        ]);
+        $queries = [];
+        DB::listen(function (QueryExecuted $query) use (&$queries): void {
+            $normalized = str($query->sql)
+                ->replace(['`', '"'], '')
+                ->lower()
+                ->squish()
+                ->toString();
+
+            if (str_starts_with($normalized, 'select id from licensed_media')
+                && str_contains($normalized, 'order by published_at desc, id desc limit 12')) {
+                $queries[] = $query;
+            }
+        });
+
+        $snapshot = app(CatalogHomeSnapshotCache::class)->refresh();
+        $latestMediaQuery = collect($queries)->sole();
+        $normalizedSql = str($latestMediaQuery->sql)
+            ->replace(['`', '"'], '')
+            ->lower()
+            ->squish()
+            ->toString();
+
+        $this->assertSame(
+            [$newerMedia->id, $olderMedia->id],
+            $snapshot['latest_media_ids'],
+        );
+        $this->assertStringContainsString(
+            'exists (select 1 from catalog_titles',
+            $normalizedSql,
+        );
+        $this->assertStringContainsString(
+            'catalog_titles.id = licensed_media.catalog_title_id',
+            $normalizedSql,
+        );
+        $this->assertStringNotContainsString(
+            'catalog_title_id in (select id from catalog_titles',
+            $normalizedSql,
+        );
+
+        $plan = collect(DB::select('EXPLAIN QUERY PLAN '.$latestMediaQuery->toRawSql()))
+            ->pluck('detail')
+            ->implode("\n");
+
+        $this->assertStringContainsString('licensed_media_home_feed_idx', $plan);
+        $this->assertStringContainsString(
+            'SEARCH catalog_titles USING INTEGER PRIMARY KEY',
+            $plan,
+        );
+        $this->assertStringNotContainsString('LIST SUBQUERY', $plan);
+    }
+
     public function test_catalog_page_invalidation_keeps_metrics_until_the_warmer_refreshes_them(): void
     {
         Queue::fake();
