@@ -9478,7 +9478,7 @@ prototype сохранил полный catalog path около `2 296,09 ms`, �
 
 ## Task 70 — исключение API-only hydration из web главной
 
-Статус: `delivery_pending`.
+Статус: `completed_with_unresolved_push`.
 
 Дата начала: 26.07.2026.
 
@@ -9553,7 +9553,7 @@ API-only секции, их eager relations и card counts.
 | Implementation | `completed` | `webData()` skips featured/media hydration; full `data()` and scalar exclusions preserved |
 | Focused/full/static/browser verification | `completed_with_unrelated_full_suite_failures` | 37/297 focused, 173/991 broad, exact Pint/PHPStan/Rector, docs check, Vite and Chromium GREEN; full 1G suite 1 890/1 907 passed with six foreign onboarding/account/translation/import failures |
 | README/CHANGELOG/final requirement reread | `completed` | Performance, README and CHANGELOG updated; canonical reread and repository consumer/cache/TODO scan complete |
-| Commit/push in `main` | `pending` | Exact Task 70 scope only |
+| Commit/push in `main` | `completed_with_unresolved_push` | Exact seven-file commit `4b5a86c`; ordinary push exited 128 before transfer because GitHub HTTPS credentials are unavailable |
 
 ### Безлимитный execution order
 
@@ -9572,6 +9572,8 @@ API-only секции, их eager relations и card counts.
    foreign unfinished-feature failures.
 9. `[completed]` Performance/README/CHANGELOG evidence, canonical reread and
    repository consumer/cache/TODO scan complete.
-10. `[pending]` Exact isolated commit on existing `main`.
-11. `[pending]` Configured non-force push; external failure remains
-    `unresolved`.
+10. `[completed]` Exact seven-file commit `4b5a86c` created on existing
+    `main`.
+11. `[completed_unresolved_authentication]` Configured non-force push
+    attempted; GitHub rejected before transfer because HTTPS credentials are
+    unavailable.

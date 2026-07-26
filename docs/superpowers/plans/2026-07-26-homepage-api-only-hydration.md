@@ -356,7 +356,7 @@ TODO/FIXME, duplicate builder or stale cache path remains.
 **Files:**
 - All files listed in the file map, exact Task 70 hunks only.
 
-- [ ] **Step 1: Verify branch and exact staged manifest**
+- [x] **Step 1: Verify branch and exact staged manifest**
 
 ```bash
 git status --short --branch
@@ -367,13 +367,20 @@ git diff --cached --name-status
 Branch must be `main`; foreign shared-tree changes must remain outside the
 commit.
 
-- [ ] **Step 2: Commit**
+Observed: normal repository on `main`; alternate index contained exactly
+seven Task 70 files, passed cached diff check and excluded the foreign shared
+worktree/index state.
+
+- [x] **Step 2: Commit**
 
 ```bash
 git commit -m "perf: исключить API-only данные из web главной"
 ```
 
-- [ ] **Step 3: Push**
+Observed: exact implementation/documentation commit `4b5a86c` created on
+`main`; `git diff-tree` confirms only the seven planned files.
+
+- [x] **Step 3: Push**
 
 ```bash
 git push origin main
@@ -381,3 +388,7 @@ git push origin main
 
 If configured remote rejects authentication, record exact failure as
 `unresolved`; do not claim successful delivery or bypass hooks.
+
+Observed: ordinary non-force `git push origin main` exited 128 before data
+transfer because GitHub HTTPS credentials are unavailable:
+`could not read Username for 'https://github.com'`.
