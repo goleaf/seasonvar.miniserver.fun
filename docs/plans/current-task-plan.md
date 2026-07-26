@@ -8702,7 +8702,7 @@ API Resource, frontend component, job, scheduler, dependency и env change
 
 ## Task 64 — единый стандарт `lang/*` и проверка переводов
 
-Статус: `implementation_verified_delivery_in_progress`.
+Статус: `implementation_verified_committed_push_unresolved_authentication`.
 
 Дата начала: 26.07.2026.
 
@@ -8783,9 +8783,9 @@ database row, storage object, queue или production DML не планируе�
 | TDD RED | `completed` | 3 failures / 19 572 assertions: `en/tags.php` order, horizontal array, UK spelling |
 | Implementation | `completed` | 42 catalogs vertical; recommendation arrays preserved exact semantic hashes; RU/EN editorial corrections reviewed |
 | Static/build/browser verification | `completed_with_independent_browser_failures` | Global contract 3 / 72 508; focused 22 / 2 222; wider 75 / 707; PHPStan/Pint/syntax/Vite GREEN; `/discover` Playwright 3/3. Six unrelated catalog browser failures reproduce changed Top 100/episode fixture expectations |
-| Phone/tablet/TV quality program | `in_progress_separate_follow_up` | Task 65 repository-wide evidence/design/master plan is being prepared separately from locale diff |
+| Phone/tablet/TV quality program | `completed_first_tranche_separate_commit` | Task 65 repository-wide design, master plan and first implementation tranche committed separately as `3670ca6` |
 | Docs/README/CHANGELOG/final reread | `completed` | Canonical owners, visitor history and Russian changelog updated; applicable requirements reread before delivery |
-| Commit/push in `main` | `pending` | Exact Task 64 scope only |
+| Commit/push in `main` | `unresolved_external` | Exact Task 64 scope committed as `75628ce`; configured HTTPS push failed before data transfer because GitHub credentials are unavailable |
 
 ### Безлимитный execution order
 
@@ -8799,11 +8799,13 @@ database row, storage object, queue или production DML не планируе�
 8. `[completed]` Reviewed RU/EN editorial corrections and order repair.
 9. `[completed_with_independent_failures]` Focused/existing/static/build/browser verification.
 10. `[completed]` Final docs/README/CHANGELOG/compliance/legacy scan.
-11. `[in_progress]` Exact isolated commits in existing `main`.
-12. `[pending]` Configured non-force push or honest external failure.
+11. `[completed]` Exact isolated commit `75628ce` in existing `main`.
+12. `[unresolved_external]` Configured non-force HTTPS push failed before
+    data transfer because GitHub credentials are unavailable.
+
 ## Task 65 — качество телефона, планшета и TV
 
-Статус: `foundation_and_first_cross_device_fixes_verified_delivery_in_progress`.
+Статус: `first_tranche_verified_committed_push_unresolved_authentication`.
 
 Дата постановки: 26.07.2026.
 
@@ -8880,8 +8882,8 @@ production DML is planned.
 | Production/rollback | `completed_preparation` | Code/assets revert + Vite rebuild; no data restore |
 | Physical phone/tablet/TV | `unresolved_external` | Chromium evidence cannot represent real hardware/remote |
 | Implementation | `completed_first_tranche` | Extended matrix, `lg` navigation gate, `44px` filters/FAQ/player opener and large-display scale/focus implemented |
-| Browser verification | `completed_first_tranche` | Clean default 15 passed/3 skipped; extra viewports 21 passed/3 skipped; visible TV-like focus 1/1. Combined all-project run also reached 36 passed/6 skipped before the command wrapper received SIGTERM after its final report |
-| Commit/push | `pending` | Exact phase commits in existing `main` |
+| Browser verification | `completed_first_tranche` | Clean default matrix: 15 passed/3 expected skips; clean full extended matrix: 36 passed/6 expected skips |
+| Commit/push | `unresolved_external` | Exact first tranche committed as `3670ca6`; configured HTTPS push failed before data transfer because GitHub credentials are unavailable |
 
 ### Первый implementation tranche
 
@@ -8900,13 +8902,16 @@ production DML is planned.
   `200.31 kB / 43.40 kB gzip` на `200.75 kB / 43.46 kB gzip`. JavaScript
   application bundle остался `24.05 kB / 8.15 kB gzip`.
 - Финальные browser пакеты имеют чистые exit codes: default matrix —
-  15 passed/3 expected project skips, четыре дополнительные viewport —
-  21 passed/3 expected project skips; отдельный видимый TV-like focus —
-  1/1. Соседняя PHP UI-матрица прошла 46 тестов/513 проверок.
+  15 passed/3 expected project skips, полная extended matrix —
+  36 passed/6 expected project skips. Соседняя PHP UI-матрица прошла
+  46 тестов/513 проверок.
 - Routes, API, schema/data, permissions, translations, cache keys,
   dependencies, environment, importer и server query paths не менялись.
   Physical phone/tablet/Smart TV/remote evidence остаётся
   `unresolved_external`.
+- Первый tranche зафиксирован в `main` как `3670ca6`; настроенный HTTPS push
+  завершился до передачи данных из-за отсутствия учётных данных GitHub.
+
 ## Task 66 — SQLite order path для `recently_added` на главной
 
 Статус: `implementation_verified_committed_push_unresolved_authentication`.
