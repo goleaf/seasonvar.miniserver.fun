@@ -2,7 +2,6 @@
 
 return [
     'loading' => 'Loading content…',
-
     'counts' => [
         'results' => ':count series|:count series',
         'results_found' => ':count series found|:count series found',
@@ -17,7 +16,6 @@ return [
         'history_items' => ':count history item|:count history items',
         'variants' => ':count variant|:count variants',
     ],
-
     'locale' => [
         'language_name' => 'English',
         'open_graph' => 'en_US',
@@ -34,7 +32,6 @@ return [
             'return_to' => 'A safe return page could not be determined.',
         ],
     ],
-
     'search' => [
         'validation' => [
             'query_required' => 'Enter a search query.',
@@ -77,7 +74,6 @@ return [
             'subtitles' => 'subtitles',
         ],
     ],
-
     'layout' => [
         'site_name' => 'TV-series catalog',
         'search_label' => 'Search by title',
@@ -98,7 +94,6 @@ return [
         'breadcrumbs' => 'Breadcrumbs',
         'llms_document' => 'Document for language models',
     ],
-
     'header_search' => [
         'form_label' => 'Catalog search',
         'input_label' => 'Search by series title or portal section',
@@ -136,22 +131,60 @@ return [
             'section' => 'Portal section',
         ],
         'sections' => [
-            'home' => ['label' => 'Home', 'keywords' => 'start portal'],
-            'catalog' => ['label' => 'Full catalog', 'keywords' => 'all series titles search'],
-            'discovery' => ['label' => 'Discover', 'keywords' => 'popular recommendations series search'],
-            'collections' => ['label' => 'Public collections', 'keywords' => 'lists picks users'],
-            'requests' => ['label' => 'Content requests', 'keywords' => 'add series requests'],
-            'help' => ['label' => 'Help center', 'keywords' => 'help questions answers support troubleshooting'],
-            'stats' => ['label' => 'Portal statistics', 'keywords' => 'numbers catalog'],
-            'genres' => ['label' => 'Series genres', 'keywords' => 'categories catalog'],
-            'countries' => ['label' => 'Production countries', 'keywords' => 'categories catalog'],
-            'actors' => ['label' => 'Actors', 'keywords' => 'people cast catalog'],
-            'directors' => ['label' => 'Directors', 'keywords' => 'people crew catalog'],
-            'tags' => ['label' => 'Tags', 'keywords' => 'topics categories catalog'],
-            'years' => ['label' => 'Release years', 'keywords' => 'dates categories catalog'],
+            'home' => [
+                'label' => 'Home',
+                'keywords' => 'start portal',
+            ],
+            'catalog' => [
+                'label' => 'Full catalog',
+                'keywords' => 'all series titles search',
+            ],
+            'discovery' => [
+                'label' => 'Discover',
+                'keywords' => 'popular recommendations series search',
+            ],
+            'collections' => [
+                'label' => 'Public collections',
+                'keywords' => 'lists picks users',
+            ],
+            'requests' => [
+                'label' => 'Content requests',
+                'keywords' => 'add series requests',
+            ],
+            'help' => [
+                'label' => 'Help center',
+                'keywords' => 'help questions answers support troubleshooting',
+            ],
+            'stats' => [
+                'label' => 'Portal statistics',
+                'keywords' => 'numbers catalog',
+            ],
+            'genres' => [
+                'label' => 'Series genres',
+                'keywords' => 'categories catalog',
+            ],
+            'countries' => [
+                'label' => 'Production countries',
+                'keywords' => 'categories catalog',
+            ],
+            'actors' => [
+                'label' => 'Actors',
+                'keywords' => 'people cast catalog',
+            ],
+            'directors' => [
+                'label' => 'Directors',
+                'keywords' => 'people crew catalog',
+            ],
+            'tags' => [
+                'label' => 'Tags',
+                'keywords' => 'topics categories catalog',
+            ],
+            'years' => [
+                'label' => 'Release years',
+                'keywords' => 'dates categories catalog',
+            ],
         ],
     ],
-
     'global_search' => [
         'title' => 'Search results',
         'title_query' => 'Search: :query',
@@ -175,7 +208,6 @@ return [
         'open_new' => 'New series',
         'open_random' => 'Random series',
     ],
-
     'navigation' => [
         'home' => 'Home',
         'all_titles' => 'All series',
@@ -183,7 +215,6 @@ return [
         'search' => 'Search',
         'site_navigation' => 'Site navigation',
     ],
-
     'directories' => [
         'label' => 'Catalog directories',
         'breadcrumbs' => 'Breadcrumbs',
@@ -213,19 +244,62 @@ return [
             'values' => ':count value|:count values',
             'found' => ':count value found|:count values found',
         ],
-        'genres' => ['title' => 'TV series genres', 'description' => 'Genres represented by published catalog titles.', 'item' => 'genre'],
-        'countries' => ['title' => 'Production countries', 'description' => 'Production countries represented by published catalog titles.', 'item' => 'country'],
-        'actors' => ['title' => 'Actors', 'description' => 'An alphabetical actor directory with links to local filmographies.', 'item' => 'actor'],
-        'directors' => ['title' => 'Directors', 'description' => 'An alphabetical director directory with links to local filmographies.', 'item' => 'director'],
-        'age-ratings' => ['title' => 'Age ratings', 'description' => 'Age ratings used by published catalog titles.', 'item' => 'age rating'],
-        'translations' => ['title' => 'Translations', 'description' => 'Translation and dubbing values linked to published titles.', 'item' => 'translation'],
-        'statuses' => ['title' => 'Release statuses', 'description' => 'Production and release statuses used by published titles.', 'item' => 'status'],
-        'networks' => ['title' => 'Networks', 'description' => 'Networks linked to published catalog titles.', 'item' => 'network'],
-        'studios' => ['title' => 'Studios', 'description' => 'Production studios linked to published catalog titles.', 'item' => 'studio'],
-        'tags' => ['title' => 'Tags', 'description' => 'Topic tags used by published catalog titles.', 'item' => 'tag'],
-        'years' => ['title' => 'Series by year', 'description' => 'Release years from 1900 through upcoming announced titles, grouped by decade.', 'item' => 'year'],
+        'genres' => [
+            'title' => 'TV series genres',
+            'description' => 'Genres represented by published catalog titles.',
+            'item' => 'genre',
+        ],
+        'countries' => [
+            'title' => 'Production countries',
+            'description' => 'Production countries represented by published catalog titles.',
+            'item' => 'country',
+        ],
+        'actors' => [
+            'title' => 'Actors',
+            'description' => 'An alphabetical actor directory with links to local filmographies.',
+            'item' => 'actor',
+        ],
+        'directors' => [
+            'title' => 'Directors',
+            'description' => 'An alphabetical director directory with links to local filmographies.',
+            'item' => 'director',
+        ],
+        'age-ratings' => [
+            'title' => 'Age ratings',
+            'description' => 'Age ratings used by published catalog titles.',
+            'item' => 'age rating',
+        ],
+        'translations' => [
+            'title' => 'Translations',
+            'description' => 'Translation and dubbing values linked to published titles.',
+            'item' => 'translation',
+        ],
+        'statuses' => [
+            'title' => 'Release statuses',
+            'description' => 'Production and release statuses used by published titles.',
+            'item' => 'status',
+        ],
+        'networks' => [
+            'title' => 'Networks',
+            'description' => 'Networks linked to published catalog titles.',
+            'item' => 'network',
+        ],
+        'studios' => [
+            'title' => 'Studios',
+            'description' => 'Production studios linked to published catalog titles.',
+            'item' => 'studio',
+        ],
+        'tags' => [
+            'title' => 'Tags',
+            'description' => 'Topic tags used by published catalog titles.',
+            'item' => 'tag',
+        ],
+        'years' => [
+            'title' => 'Series by year',
+            'description' => 'Release years from 1900 through upcoming announced titles, grouped by decade.',
+            'item' => 'year',
+        ],
     ],
-
     'catalog' => [
         'found_now' => 'Found now: :results',
         'found' => 'Found: :results',
@@ -368,7 +442,11 @@ return [
             'description_query' => 'Search query :query is applied.',
             'description_invalid_year' => 'Year :year was not found.',
             'description_invalid_filters' => 'Some filters were not found.',
-            'keywords' => ['online series', 'series catalog', 'watch series'],
+            'keywords' => [
+                'online series',
+                'series catalog',
+                'watch series',
+            ],
             'keyword_year' => 'series from :year',
             'directory_page_title' => ':title — page :page',
             'directory_description' => ':description This directory contains :values linked to :titles.',
@@ -389,10 +467,28 @@ return [
             'link_year' => 'Series from :year',
             'link_query' => 'Search for :query',
             'phrases' => [
-                'base' => ['watch series online', 'online series catalog', 'series by genre', 'series by country', 'series by actor'],
-                'query' => ['watch :query online', 'series similar to :query', 'all :query episodes'],
-                'year' => ['series from :year', 'watch :year series online', 'new series :year'],
-                'context' => ['online series :context', 'watch series :context', 'best series :context'],
+                'base' => [
+                    'watch series online',
+                    'online series catalog',
+                    'series by genre',
+                    'series by country',
+                    'series by actor',
+                ],
+                'query' => [
+                    'watch :query online',
+                    'series similar to :query',
+                    'all :query episodes',
+                ],
+                'year' => [
+                    'series from :year',
+                    'watch :year series online',
+                    'new series :year',
+                ],
+                'context' => [
+                    'online series :context',
+                    'watch series :context',
+                    'best series :context',
+                ],
             ],
             'heading_query' => 'Series matching :query',
             'heading_year' => 'Watch series from :year online',
@@ -403,13 +499,27 @@ return [
             'lead_scoped' => ':count, :scope. Text search matches primary, original, and alternative titles; other criteria use separate filters.',
             'clusters' => [
                 'watch_title' => 'Watch online',
-                'watch_items' => ['watch series online', 'series in high quality', 'all series episodes online', 'all series seasons'],
+                'watch_items' => [
+                    'watch series online',
+                    'series in high quality',
+                    'all series episodes online',
+                    'all series seasons',
+                ],
                 'query_item' => 'watch :query online',
                 'collections_title' => 'Collections',
-                'collections_items' => ['series by genre', 'series by country', 'series by actor', 'series by director'],
+                'collections_items' => [
+                    'series by genre',
+                    'series by country',
+                    'series by actor',
+                    'series by director',
+                ],
                 'context_item' => 'online series :context',
                 'years_title' => 'Years and updates',
-                'years_items' => ['new series', 'series updates', 'new episodes'],
+                'years_items' => [
+                    'new series',
+                    'series updates',
+                    'new episodes',
+                ],
                 'year_item' => 'series from :year',
                 'year_watch_item' => 'watch :year series online',
             ],
@@ -474,7 +584,6 @@ return [
             'reset' => 'Reset filters',
         ],
     ],
-
     'seo' => [
         'default_description' => 'Online TV-series catalog with filters for genres, countries, people, years, seasons, and episodes.',
         'title_page' => 'Watch :title online',
@@ -503,7 +612,6 @@ return [
             'information_answer' => 'The page includes a description, seasons, episodes, poster, catalog relations, and available video.',
         ],
     ],
-
     'title' => [
         'untitled' => 'Title unavailable',
         'quick_access' => 'Quick access',
@@ -531,7 +639,6 @@ return [
         'questions' => 'Series questions',
         'series_type' => 'series',
     ],
-
     'taxonomy' => [
         'genre' => 'Genre',
         'genres' => 'Genres',
@@ -552,7 +659,6 @@ return [
         'tags' => 'Tags',
         'filter' => 'Filter',
     ],
-
     'release' => [
         'season' => 'Season :number',
         'season_without_number' => 'Unnumbered season',
@@ -565,7 +671,6 @@ return [
         'selected_episode' => 'Selected: :episode',
         'selected_special' => 'Selected: :episode',
     ],
-
     'viewing' => [
         'title' => 'My viewing activity',
         'seo_description' => 'Your private TV-series viewing history.',
@@ -595,7 +700,6 @@ return [
         'remove_confirmation' => 'Remove this item from viewing history?',
         'remove' => 'Remove',
     ],
-
     'importer' => [
         'title' => 'Seasonvar import',
         'seo_description' => 'Internal catalog import queue management.',
@@ -650,12 +754,11 @@ return [
         'queued' => 'Run #:id was queued.',
         'already_active' => 'Active run #:id already exists.',
         'retry_queued' => 'Retry run #:id was queued.',
-        'cancelled' => 'Run #:id was cancelled.',
+        'cancelled' => 'Run #:id was canceled.',
         'already_finished' => 'Run #:id has already finished.',
         'stale_recovered' => 'Recovered stale runs: :count.',
         'stale_missing' => 'No stale runs were found.',
     ],
-
     'download' => [
         'available' => 'Download available',
         'download_video' => 'Download video',
@@ -675,7 +778,6 @@ return [
         'size_check_failed' => 'The video file size could not be determined',
         'size_known' => 'Video file size determined',
     ],
-
     'player' => [
         'validation' => [
             'season_integer' => 'The selected season number must be an integer.',
@@ -805,15 +907,42 @@ return [
         'region_unavailable' => 'This source is unavailable in your region',
         'age_restricted' => 'This source is restricted by the profile age settings',
         'shortcuts' => [
-            'play_pause' => ['keys' => 'Space or K', 'action' => 'Play or pause'],
-            'seek' => ['keys' => '← or →', 'action' => 'Seek backward or forward'],
-            'volume' => ['keys' => '↑ or ↓', 'action' => 'Change volume'],
-            'mute' => ['keys' => 'M', 'action' => 'Mute or unmute'],
-            'fullscreen' => ['keys' => 'F', 'action' => 'Enter or exit fullscreen'],
-            'captions' => ['keys' => 'C', 'action' => 'Toggle available captions'],
-            'pip' => ['keys' => 'P', 'action' => 'Toggle picture in picture when supported'],
-            'episodes' => ['keys' => 'Shift+P / Shift+N / Shift+E', 'action' => 'Previous or next episode; Shift+E opens the episode menu'],
-            'cancel' => ['keys' => 'Esc', 'action' => 'Close the open menu or this dialog'],
+            'play_pause' => [
+                'keys' => 'Space or K',
+                'action' => 'Play or pause',
+            ],
+            'seek' => [
+                'keys' => '← or →',
+                'action' => 'Seek backward or forward',
+            ],
+            'volume' => [
+                'keys' => '↑ or ↓',
+                'action' => 'Change volume',
+            ],
+            'mute' => [
+                'keys' => 'M',
+                'action' => 'Mute or unmute',
+            ],
+            'fullscreen' => [
+                'keys' => 'F',
+                'action' => 'Enter or exit fullscreen',
+            ],
+            'captions' => [
+                'keys' => 'C',
+                'action' => 'Toggle available captions',
+            ],
+            'pip' => [
+                'keys' => 'P',
+                'action' => 'Toggle picture in picture when supported',
+            ],
+            'episodes' => [
+                'keys' => 'Shift+P / Shift+N / Shift+E',
+                'action' => 'Previous or next episode; Shift+E opens the episode menu',
+            ],
+            'cancel' => [
+                'keys' => 'Esc',
+                'action' => 'Close the open menu or this dialog',
+            ],
         ],
         'availability' => [
             'ready' => 'Video is available.',

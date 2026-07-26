@@ -1,6 +1,6 @@
 # Frontend
 
-Обновлено: 25.07.2026
+Обновлено: 26.07.2026
 
 ## Upgrade compatibility
 
@@ -146,6 +146,7 @@ composer dev
 - Страница сериала вызывает `x-ui.poster-frame` напрямую для SEO-критичного eager-постера. Video player сохраняет нативный `poster`-атрибут; защищённые миниатюры `/stats` получают только уже проверенный same-origin proxy URL.
 - Основная зона видео занимает всю ширину playback-панели; блок «Ваш сериал» расположен следующей адаптивной строкой под плеером.
 - Новые пользовательские строки Blade/Livewire добавляются в `lang/{locale}/catalog.php`; plural counts выводятся через `trans_choice()`. Интерфейсная locale управляет только UI и page metadata и не подменяет перевод, язык аудио или субтитров.
+- Все source-code interface catalogs повторяют канонические файлы, recursive key order, scalar types и placeholders `lang/ru`; непустые PHP-массивы остаются вертикальными. Русские values не содержат заменимого English prose, а `lang/en` использует единый US English. Общий gate — `php artisan test tests/Unit/TranslationCatalogParityTest.php`.
 - Essential title metadata остаётся в первом server-rendered HTML через `CatalogTitleDetail`. `CatalogShowViewModel` передаёт presentation-safe plain text; canonical и Open Graph по-прежнему готовит controller SEO shell, а вложенный Livewire player не становится их источником.
 - Ссылки сортировки, размера страницы, алфавита, фильтров и быстрого доступа используют плоские состояния без декоративной border/ring-обводки и сохраняют touch-target не менее 44 пикселей. Рамки остаются у форм, alert, player/media frames и структурных контейнеров списков.
 - Общий `focus-visible` определен в `resources/css/app.css`; составной `x-form.search-field` и локальные поиски фильтров используют `data-focus-frame`, чтобы клавиатурный focus охватывал весь control без двойного контура.

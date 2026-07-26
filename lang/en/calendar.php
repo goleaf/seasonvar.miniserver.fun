@@ -52,7 +52,7 @@ return [
         'released' => 'Released',
         'delayed' => 'Delayed',
         'postponed' => 'Postponed',
-        'cancelled' => 'Cancelled',
+        'cancelled' => 'Canceled',
         'awaiting_translation' => 'Awaiting translation',
         'awaiting_subtitles' => 'Awaiting subtitles',
         'awaiting_portal_publication' => 'Awaiting portal publication',
@@ -91,7 +91,9 @@ return [
         'all_statuses' => 'All statuses',
         'clear' => 'Clear filters',
     ],
-    'period' => ['week' => ':from — :to'],
+    'period' => [
+        'week' => ':from — :to',
+    ],
     'follow' => [
         'add' => 'Follow releases',
         'remove' => 'Unfollow',
@@ -134,7 +136,7 @@ return [
         'date_changed' => 'The release date changed',
         'released' => 'The release is available',
         'postponed' => 'The release was postponed',
-        'cancelled' => 'The release was cancelled',
+        'cancelled' => 'The release was canceled',
         'detail' => ':title · :type · :status',
         'date_changed_detail' => ':title: :from → :to',
     ],

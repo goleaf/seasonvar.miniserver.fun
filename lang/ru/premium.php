@@ -154,7 +154,7 @@ return [
         'audit_title' => 'Последние действия',
         'no_audit' => 'Событий Premium ещё нет.',
         'providers_title' => 'Платёжные провайдеры',
-        'providers_empty' => 'Ни один платёжный provider adapter не настроен.',
+        'providers_empty' => 'Не настроен ни один адаптер платёжного провайдера.',
         'system_actor' => 'Система',
         'reasons' => [
             'support_compensation' => 'Компенсация поддержки',

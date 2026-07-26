@@ -16,7 +16,10 @@ return [
         'security' => 'Security',
         'data' => 'Account data',
     ],
-    'locales' => ['ru' => 'Русский', 'en' => 'English'],
+    'locales' => [
+        'ru' => 'Русский',
+        'en' => 'English',
+    ],
     'profile' => [
         'title' => 'Profile',
         'description' => 'Core account data is edited in the existing protected profile editor.',
@@ -80,7 +83,7 @@ return [
     'playback' => [
         'title' => 'Playback',
         'description' => 'These values apply to the existing player and never change history, progress, or your library.',
-        'behaviour' => 'Player behaviour',
+        'behaviour' => 'Player behavior',
         'autoplay' => 'Autoplay',
         'autoplay_hint' => 'The player will attempt to start and continue to the next playable episode automatically; the browser may still block playback with sound.',
         'remember_volume' => 'Remember volume',
@@ -136,7 +139,7 @@ return [
         'release_subtitles' => 'New subtitles',
         'release_date_changes' => 'Release date changes',
         'release_postponed' => 'Postponed releases',
-        'release_cancelled' => 'Cancelled releases',
+        'release_cancelled' => 'Canceled releases',
         'release_portal_publications' => 'Portal publications',
         'request_voted_updates' => 'Updates to requests I voted for',
         'request_followed_updates' => 'Updates to requests I follow',
@@ -240,7 +243,13 @@ return [
         'delete_hint' => 'Deletion is irreversible, requires the current password and explicit typed confirmation, and is not the same as signing out.',
         'open_deletion' => 'Go to account deletion',
     ],
-    'actions' => ['save' => 'Save changes', 'saving' => 'Saving…', 'cancel' => 'Cancel changes', 'reset_defaults' => 'Reset values', 'loading' => 'Updating settings…'],
+    'actions' => [
+        'save' => 'Save changes',
+        'saving' => 'Saving…',
+        'cancel' => 'Cancel changes',
+        'reset_defaults' => 'Reset values',
+        'loading' => 'Updating settings…',
+    ],
     'status' => [
         'appearance_saved' => 'Language and interface settings saved.',
         'playback_saved' => 'Playback settings saved.',

@@ -1,6 +1,6 @@
 # Разработка
 
-Обновлено: 20.07.2026
+Обновлено: 26.07.2026
 
 ## Постоянный execution workflow
 
@@ -188,6 +188,7 @@ scripts/check-changelog-policy.sh CHANGELOG.md
 - `php artisan seasonvar:import --forever --sleep=60` — непрерывный локальный цикл импорта.
 - `php artisan seasonvar:import "https://seasonvar.ru/..." --force` — принудительное обновление одной страницы.
 - `php artisan catalog-collections:sync-hdrezka --dry-run` — bounded read-only обход внешних редакционных подборок и проверка сопоставления с локальными тайтлами; требует включённый `HDREZKA_COLLECTION_SYNC_ENABLED` и не относится к Seasonvar import.
+- `php artisan catalog-collections:repair-public-quality --dry-run --json` — read-only census exact legacy demo/source collection footprint, public eligibility и зависимых recommendation signals. Без `--force` команда всегда остаётся dry-run.
 - `php artisan integrations:doctor` — read-only диагностика MCP, Google, CLI tools и проектных skills без вывода секретов.
 - `php artisan app:health` — operational health по DB, Redis workloads, Memcached, workers и прогреву; `degraded`/`failed` возвращают ненулевой exit, даже если HTTP traffic readiness ещё true.
 - `php artisan app:failed-job-audit` — bounded read-only сопоставление historical finalizer rows с текущими run/group/claim states; `--json` даёт safe evidence, `--samples=0..10` ограничивает ID-only примеры на состояние. Команда не retry-ит, не забывает, не очищает и не dispatch-ит jobs.
@@ -225,6 +226,14 @@ php artisan project:docs-refresh --check
 
 Для изменений синхронизации редакционных подборок сначала запускайте focused contract `php artisan test --filter=HdRezkaCollection`, затем recommendation tests, полный backend suite и frontend build. Внешний HTTP в PHPUnit всегда закрывается через `Http::preventStrayRequests()` и fixtures/`Http::fake()`; тесты не должны обращаться к живому HDRezka.
 
+Новые demo collections всегда private, а новые HDRezka source collections
+создаются private/archived до ручной классификации и moderation. Для локальной
+проверки legacy cleanup сначала сравните JSON dry-run со read-only census.
+`--force` изменяет только exact deterministic demo UUID/owner footprint и
+ownerless uncategorized public HDRezka rows; membership, source provenance,
+comments, reports и user identity сохраняются. Активный Seasonvar import,
+HDRezka sync или незавершённая recommendation build блокируют запись.
+
 Обычные PHPUnit-процессы одного checkout не должны совместно использовать корень `Storage::fake()`: базовый `Tests\TestCase` задаёт process-local token только тогда, когда Laravel/Paratest ещё не предоставил собственный `ParallelTesting::token()`. Поэтому последовательные тесты одного процесса сохраняют привычную очистку fake-диска, независимые процессы получают разные суффиксы, а настоящий parallel-runner сохраняет свой канонический token. Удалять эту изоляцию можно только вместе с отказом от concurrent test processes в общем checkout; production storage/config она не изменяет.
 
 `scripts/ci-check.sh` является единым источником команд для локальной проверки, `pre-commit`, `pre-push` и GitHub Actions. Профили `docs`, `backend`, `frontend`, `browser`, `pre-push` и `full` используют одинаковые шаги в каждой среде; Laravel config/route/view cache проверяется только в ignored `output/ci`, поэтому локальный запуск не заменяет рабочий production cache. `docs` использует SQLite `:memory:` и проверяет managed Markdown без записи. Все профили изолируют maintenance state через process-local `cache` driver и `array` store: существующий `storage/framework/down` не даёт ложные `503` в тестах, но файл режима обслуживания не изменяется и production из него не выводится. Backend выполняет `composer rector:check` после Pint и до синтаксиса/Larastan; CI никогда не запускает `rector:fix`. Производный файловый кеш находится в ignored `output/rector`, не содержит исходных данных и может быть удалён без изменения приложения. GitHub Actions выполняет три отдельных задания на явном `ubuntu-24.04`, использует immutable action SHA без сохранения checkout credentials и загружает Playwright-отчёт даже при ошибке браузерной проверки.
@@ -236,10 +245,11 @@ Pest и `npm run lint` сейчас не установлены. Rector 2 исп
 ### Добавление interface translations
 
 1. Используйте существующий semantic domain (`home.*`, `catalog.*` и т. п.); не добавляйте JSON catalog, package или DB row для source-code UI text.
-2. Добавляйте key во все locale из `config/catalog-collections.php`. Named placeholders и plural structure должны совпадать; dynamic/provider/user text никогда не передаётся как translation key.
-3. Для homepage dates используйте `AccountDateTimeFormatter`, для чисел `Number::format(..., locale: app()->currentLocale())`, для nouns `trans_choice` с уже форматированным named `:count`.
-4. Статически выполните `php -l` для изменённых catalogs, рекурсивную key/placeholder parity сверку, scan изменённых Blade/PHP/JS на hardcoded user copy, route inspection с актуальным route source, Pint, Vite build и `project:docs-refresh --check`. Missing runtime key безопасно падает в configured `ru`, но новая parity-проверка не должна оставлять такой долг.
-5. Изменение PHP translation, используемого public home/layout, автоматически меняет translation fingerprint в full-response key; DB content translation инвалидируется через существующий Homepage/domain version path. После translation deploy выполняется обычный bounded catalog warm, который строит обе locale variants; store-wide flush не нужен.
+2. `lang/ru` задаёт канонические имена файлов, recursive keys и их порядок. Добавляйте key во все locale из `config/catalog-collections.php`, не переименовывая существующие stable keys. Named placeholders, scalar types и plural meaning должны совпадать; dynamic/provider/user text никогда не передаётся как translation key.
+3. Каждый непустой PHP-массив в `lang/*/*.php` оформляется вертикально: открывающая и закрывающая скобки находятся на отдельных строках, на каждой строке расположен один item, последний item имеет запятую. Русские values используют обычный русский текст с сохранением официальных brands/protocols/codes; английские values используют US English.
+4. Для homepage dates используйте `AccountDateTimeFormatter`, для чисел `Number::format(..., locale: app()->currentLocale())`, для nouns `trans_choice` с уже форматированным named `:count`.
+5. Запустите `php artisan test tests/Unit/TranslationCatalogParityTest.php`: общий contract проверяет набор файлов, recursive key order, scalar types, placeholders, непустые plural branches, literal duplicate keys, вертикальный source format и утверждённые варианты US English. Дополнительно выполните `php -l` для изменённых catalogs, scan изменённых Blade/PHP/JS на hardcoded user copy, route inspection с актуальным route source, Pint, Vite build и `project:docs-refresh --check`. Missing runtime key безопасно падает в configured `ru`, но parity-проверка не должна оставлять такой долг.
+6. Изменение PHP translation, используемого public home/layout, автоматически меняет translation fingerprint в full-response key; DB content translation инвалидируется через существующий Homepage/domain version path. После translation deploy выполняется обычный bounded catalog warm, который строит обе locale variants; store-wide flush не нужен.
 
 ### Изменение центра помощи
 

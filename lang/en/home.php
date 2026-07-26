@@ -85,7 +85,12 @@ return [
         'section' => 'Series catalog',
         'keywords' => 'watch series online, series catalog, new episodes, TV seasons',
         'news_keywords' => 'watch series online, new series episodes, series catalog',
-        'tags' => ['online series', 'series catalog', 'new episodes', 'TV seasons'],
+        'tags' => [
+            'online series',
+            'series catalog',
+            'new episodes',
+            'TV seasons',
+        ],
         'text' => [
             'The catalog brings together series, seasons, episodes, posters, genres, countries, cast, directors, and video available in the embedded player.',
             'The home page shows current updates from the published catalog.',
@@ -101,9 +106,32 @@ return [
             'online series updates',
         ],
         'clusters' => [
-            ['title' => 'Watch online', 'items' => ['watch series online', 'series in the player', 'new episodes online']],
-            ['title' => 'Catalog and filters', 'items' => ['series by genre', 'series by country', 'series by actor', 'series by year']],
-            ['title' => 'Seasons and episodes', 'items' => ['all series seasons', 'all series episodes', 'season updates', 'new episodes']],
+            [
+                'title' => 'Watch online',
+                'items' => [
+                    'watch series online',
+                    'series in the player',
+                    'new episodes online',
+                ],
+            ],
+            [
+                'title' => 'Catalog and filters',
+                'items' => [
+                    'series by genre',
+                    'series by country',
+                    'series by actor',
+                    'series by year',
+                ],
+            ],
+            [
+                'title' => 'Seasons and episodes',
+                'items' => [
+                    'all series seasons',
+                    'all series episodes',
+                    'season updates',
+                    'new episodes',
+                ],
+            ],
         ],
         'links' => [
             'all_titles' => 'All series online',
@@ -111,6 +139,9 @@ return [
             'rss' => 'Updates RSS feed',
         ],
         'new_titles_list' => 'New catalog series',
-        'about' => ['online series', 'series catalog'],
+        'about' => [
+            'online series',
+            'series catalog',
+        ],
     ],
 ];

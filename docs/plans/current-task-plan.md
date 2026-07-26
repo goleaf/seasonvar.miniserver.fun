@@ -8702,7 +8702,7 @@ API Resource, frontend component, job, scheduler, dependency и env change
 
 ## Task 64 — единый стандарт `lang/*` и проверка переводов
 
-Статус: `approved_design_and_plan_tdd_pending`.
+Статус: `implementation_verified_delivery_in_progress`.
 
 Дата начала: 26.07.2026.
 
@@ -8780,11 +8780,11 @@ database row, storage object, queue или production DML не планируе�
 | Canonical permanent rule first | `completed` | Multilingual owner updated before application/test edits |
 | Approved design | `completed` | Linked design includes format, editorial, testing, device and rollback decisions |
 | Detailed unlimited plan | `completed` | Linked seven-task TDD/format/editorial/device/docs/delivery plan self-reviewed |
-| TDD RED | `pending` | Global contract must fail on current 498 horizontal arrays/order/dialect |
-| Implementation | `pending` | No language source formatting before plan/RED |
-| Static/build/browser verification | `pending` | Exact matrix defined in design |
-| Phone/tablet/TV quality program | `separate_follow_up` | Task 65 repository-wide audit/design/master plan, not mixed into locale diff |
-| Docs/README/CHANGELOG/final reread | `pending` | Required after verified implementation |
+| TDD RED | `completed` | 3 failures / 19 572 assertions: `en/tags.php` order, horizontal array, UK spelling |
+| Implementation | `completed` | 42 catalogs vertical; recommendation arrays preserved exact semantic hashes; RU/EN editorial corrections reviewed |
+| Static/build/browser verification | `completed_with_independent_browser_failures` | Global contract 3 / 72 508; focused 22 / 2 222; wider 75 / 707; PHPStan/Pint/syntax/Vite GREEN; `/discover` Playwright 3/3. Six unrelated catalog browser failures reproduce changed Top 100/episode fixture expectations |
+| Phone/tablet/TV quality program | `in_progress_separate_follow_up` | Task 65 repository-wide evidence/design/master plan is being prepared separately from locale diff |
+| Docs/README/CHANGELOG/final reread | `completed` | Canonical owners, visitor history and Russian changelog updated; applicable requirements reread before delivery |
 | Commit/push in `main` | `pending` | Exact Task 64 scope only |
 
 ### Безлимитный execution order
@@ -8794,14 +8794,13 @@ database row, storage object, queue или production DML не планируе�
 3. `[completed]` Compare approaches and obtain user approval.
 4. `[completed]` Update canonical rule and approved design.
 5. `[completed]` Self-review design and write exact detailed plan.
-6. `[in_progress]` TDD RED global structural/format/editorial contract.
-7. `[pending]` AST mechanical vertical normalization with semantic snapshot.
-8. `[pending]` Reviewed RU/EN editorial corrections and order repair.
-9. `[pending]` Focused/existing/static/build/device/browser verification.
-10. `[pending]` Final docs/README/CHANGELOG/compliance/legacy scan.
-11. `[pending]` Exact isolated commits in existing `main`.
+6. `[completed]` TDD RED global structural/format/editorial contract.
+7. `[completed]` AST mechanical vertical normalization with semantic snapshot.
+8. `[completed]` Reviewed RU/EN editorial corrections and order repair.
+9. `[completed_with_independent_failures]` Focused/existing/static/build/browser verification.
+10. `[completed]` Final docs/README/CHANGELOG/compliance/legacy scan.
+11. `[in_progress]` Exact isolated commits in existing `main`.
 12. `[pending]` Configured non-force push or honest external failure.
-
 ## Task 65 — качество телефона, планшета и TV
 
 Статус: `queued_for_repository_wide_discovery_and_design`.
