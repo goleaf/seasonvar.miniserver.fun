@@ -39,6 +39,20 @@
                         <x-ui.status-pill icon="fa-solid fa-circle-info">{{ __('catalog.player.episode_not_selected') }}</x-ui.status-pill>
                     @endif
                 </div>
+                @if ($selectedEpisode)
+                    <div class="mt-2 flex flex-wrap gap-2">
+                        <x-content-requests.correction-link
+                            :url="$episodeCorrectionUrls[$selectedEpisode->id]"
+                            field="episode"
+                        />
+                        @if ($subtitleCorrectionUrl)
+                            <x-content-requests.correction-link
+                                :url="$subtitleCorrectionUrl"
+                                field="subtitles"
+                            />
+                        @endif
+                    </div>
+                @endif
 
                 <div class="relative">
                     <div
@@ -565,37 +579,46 @@
                         @if ($loop->first)
                             <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                         @endif
-                        <a
-                            href="{{ route('titles.show', $showView->episodeQuery($episodeOption)).'#player' }}"
+                        <div
                             wire:key="season-episode-{{ $episodeOption->id }}"
-                            wire:click.prevent="selectEpisode({{ $episodeOption->id }})"
-                            data-catalog-history
-                            data-player-transition-episode="{{ $episodeOption->id }}"
                             @if ($selectedEpisode?->id === $episodeOption->id) aria-current="true" @endif
                             @class([
-                                'grid min-h-20 content-center gap-1 rounded-lg px-3 py-3 text-left text-sm leading-5 transition',
+                                'grid content-between gap-2 rounded-lg p-2 text-left text-sm leading-5 transition',
                                 'bg-emerald-50 text-emerald-800' => $selectedEpisode?->id === $episodeOption->id,
-                                'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-800' => $selectedEpisode?->id !== $episodeOption->id,
+                                'bg-slate-50 text-slate-600' => $selectedEpisode?->id !== $episodeOption->id,
                             ])
                         >
-                            <span class="flex items-center gap-2 font-bold">
-                                <x-ui.icon name="fa-solid fa-circle-play text-emerald-700" />
-                                <span>{{ $this->episodeDisplayLabel($episodeOption) }}</span>
-                            </span>
-                            @if ($episodeOption->title && $episodeOption->title !== $this->episodeDisplayLabel($episodeOption))
-                                <span class="block text-xs font-semibold text-slate-500">{{ $episodeOption->title }}</span>
-                            @endif
-                            @if ($showView->episodeSelectedProfileLabel($episodeOption))
-                                <span class="flex items-center gap-1 text-xs font-bold text-emerald-700">
-                                    <x-ui.icon name="fa-solid fa-sliders" />
-                                    <span>{{ $showView->episodeSelectedProfileLabel($episodeOption) }}</span>
+                            <a
+                                href="{{ route('titles.show', $showView->episodeQuery($episodeOption)).'#player' }}"
+                                wire:click.prevent="selectEpisode({{ $episodeOption->id }})"
+                                data-catalog-history
+                                data-player-transition-episode="{{ $episodeOption->id }}"
+                                class="grid min-h-20 content-center gap-1 rounded-lg px-2 py-2 hover:bg-emerald-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+                            >
+                                <span class="flex items-center gap-2 font-bold">
+                                    <x-ui.icon name="fa-solid fa-circle-play text-emerald-700" />
+                                    <span>{{ $this->episodeDisplayLabel($episodeOption) }}</span>
                                 </span>
-                            @endif
-                            <span class="inline-flex items-center gap-1 text-xs font-semibold text-slate-600">
-                                <x-ui.icon name="fa-solid fa-file-video" />
-                                <span class="tabular-nums">{{ trans_choice('catalog.counts.videos', (int) $episodeOption->getAttribute('available_media_count')) }}</span>
-                            </span>
-                        </a>
+                                @if ($episodeOption->title && $episodeOption->title !== $this->episodeDisplayLabel($episodeOption))
+                                    <span class="block text-xs font-semibold text-slate-500">{{ $episodeOption->title }}</span>
+                                @endif
+                                @if ($showView->episodeSelectedProfileLabel($episodeOption))
+                                    <span class="flex items-center gap-1 text-xs font-bold text-emerald-700">
+                                        <x-ui.icon name="fa-solid fa-sliders" />
+                                        <span>{{ $showView->episodeSelectedProfileLabel($episodeOption) }}</span>
+                                    </span>
+                                @endif
+                                <span class="inline-flex items-center gap-1 text-xs font-semibold text-slate-600">
+                                    <x-ui.icon name="fa-solid fa-file-video" />
+                                    <span class="tabular-nums">{{ trans_choice('catalog.counts.videos', (int) $episodeOption->getAttribute('available_media_count')) }}</span>
+                                </span>
+                            </a>
+                            <x-content-requests.correction-link
+                                :url="$episodeCorrectionUrls[$episodeOption->id]"
+                                field="episode"
+                                class="w-full justify-center"
+                            />
+                        </div>
                         @if ($loop->last)
                             </div>
                         @endif

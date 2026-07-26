@@ -9,6 +9,7 @@ use App\Exceptions\ContentRequests\ContentRequestActionException;
 use App\Models\ContentRequest;
 use App\Models\ContentRequestStatusHistory;
 use App\Models\User;
+use App\Services\ContentRequests\ContentCorrectionTargetKey;
 use App\Services\ContentRequests\ContentRequestCacheInvalidator;
 use App\Services\ContentRequests\ContentRequestNotificationService;
 use Illuminate\Support\Facades\DB;
@@ -17,7 +18,11 @@ use Illuminate\Support\Str;
 
 final readonly class MergeContentRequests
 {
-    public function __construct(private ContentRequestCacheInvalidator $cache, private ContentRequestNotificationService $notifications) {}
+    public function __construct(
+        private ContentRequestCacheInvalidator $cache,
+        private ContentRequestNotificationService $notifications,
+        private ContentCorrectionTargetKey $correctionTargets,
+    ) {}
 
     public function handle(User $moderator, int $sourceId, int $canonicalId): ContentRequest
     {
@@ -152,7 +157,11 @@ final readonly class MergeContentRequests
             || $source->translation_type !== $canonical->translation_type
             || Str::lower((string) $source->translation_studio) !== Str::lower((string) $canonical->translation_studio)
             || $source->requested_quality !== $canonical->requested_quality
-            || $source->correction_field !== $canonical->correction_field) {
+            || $source->correction_field !== $canonical->correction_field
+            || ! $this->correctionTargets->equivalent(
+                $source->correction_target_key,
+                $canonical->correction_target_key,
+            )) {
             throw new ContentRequestActionException('requests.errors.incompatible_merge');
         }
     }

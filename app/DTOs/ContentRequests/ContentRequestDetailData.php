@@ -27,6 +27,7 @@ final readonly class ContentRequestDetailData
         public ?string $currentQuality,
         public ?string $requestedQuality,
         public ?string $correctionField,
+        public ?string $correctionReason,
         public ?string $currentValue,
         public ?string $proposedValue,
         public ?string $explanation,

@@ -13,7 +13,11 @@ return [
     'supported_locales' => ['ru', 'en'],
     'language_codes' => ['ru', 'en', 'uk', 'de', 'fr', 'es', 'it', 'ja', 'ko', 'zh'],
     'translation_types' => ['dubbed', 'voice_over', 'original_audio'],
-    'correction_fields' => ['title', 'description', 'year', 'country', 'genre', 'cast', 'director', 'episode_list', 'release_date', 'poster', 'translation'],
+    'correction_fields' => [
+        'title', 'description', 'year', 'country', 'genre', 'tag', 'cast',
+        'director', 'episode_list', 'subtitles', 'release_date', 'poster',
+        'translation',
+    ],
     'rate_limits' => [
         'create' => ['attempts' => 4, 'global_attempts' => 8, 'decay_seconds' => 3600],
         'edit' => ['attempts' => 10, 'global_attempts' => 20, 'decay_seconds' => 3600],

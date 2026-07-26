@@ -144,6 +144,8 @@ final readonly class CreateContentRequest
                 'current_quality' => $input->currentQuality,
                 'requested_quality' => $input->requestedQuality,
                 'correction_field' => $input->correctionField,
+                'correction_target_key' => $input->correctionTargetKey,
+                'correction_reason' => $input->correctionReason,
                 'current_value' => $input->currentValue,
                 'proposed_value' => $input->proposedValue,
                 'explanation' => $input->explanation,

@@ -30,6 +30,8 @@ use App\Models\Genre;
 use App\Models\LicensedMedia;
 use App\Models\ReleaseScheduleEntry;
 use App\Models\Season;
+use App\Models\Tag;
+use App\Models\Translation;
 use App\Models\User;
 use App\Models\UserAccountSetting;
 use Illuminate\Contracts\Console\Kernel;
@@ -96,6 +98,16 @@ $searchGenre = Genre::query()->create([
     'slug' => 'browser-smoke-category',
 ]);
 $title->genres()->attach($searchGenre);
+$tag = Tag::query()->create([
+    'name' => 'Браузерный тег',
+    'slug' => 'browser-tag',
+]);
+$title->tags()->attach($tag);
+$translation = Translation::query()->create([
+    'name' => 'Браузерный перевод',
+    'slug' => 'browser-translation',
+]);
+$title->translations()->attach($translation);
 $turkey = Country::query()->create([
     'name' => 'Турция',
     'slug' => 'turciia',

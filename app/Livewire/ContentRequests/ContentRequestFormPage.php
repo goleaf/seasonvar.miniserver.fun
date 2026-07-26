@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Livewire\ContentRequests;
 
 use App\Actions\ContentRequests\CreateContentRequest;
+use App\Enums\ContentCorrectionField;
+use App\Enums\ContentCorrectionReason;
 use App\Enums\ContentRequestExternalProvider;
 use App\Enums\ContentRequestType;
 use App\Enums\HelpFeature;
@@ -14,6 +16,7 @@ use App\Models\ContentRequest;
 use App\Models\Episode;
 use App\Models\Season;
 use App\Models\User;
+use App\Services\ContentRequests\CatalogCorrectionTargetResolver;
 use App\Services\ContentRequests\ContentRequestInputFactory;
 use App\Services\ContentRequests\ContentRequestQuery;
 use App\Services\ContentRequests\ContentRequestSchema;
@@ -75,6 +78,14 @@ final class ContentRequestFormPage extends Component
 
     public string $correctionField = '';
 
+    #[Locked]
+    public string $correctionTargetKey = '';
+
+    public string $correctionReason = '';
+
+    #[Locked]
+    public bool $correctionContextLocked = false;
+
     public string $currentValue = '';
 
     public string $proposedValue = '';
@@ -98,6 +109,13 @@ final class ContentRequestFormPage extends Component
 
     public bool $searchFailed = false;
 
+    private CatalogCorrectionTargetResolver $correctionTargets;
+
+    public function boot(CatalogCorrectionTargetResolver $correctionTargets): void
+    {
+        $this->correctionTargets = $correctionTargets;
+    }
+
     public function mount(?string $locale = null): void
     {
         Gate::authorize('create', ContentRequest::class);
@@ -108,6 +126,38 @@ final class ContentRequestFormPage extends Component
 
         if ($titleId !== false) {
             $this->selectCatalogTitle((int) $titleId);
+        }
+
+        $requestedField = request()->query('field');
+        $field = ContentCorrectionField::tryFrom(is_string($requestedField) ? $requestedField : '');
+
+        if ($field !== null && $titleId !== false) {
+            $rawTarget = request()->query('target');
+            $targetId = $rawTarget === null
+                ? null
+                : filter_var($rawTarget, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+
+            abort_if($rawTarget !== null && $targetId === false, 404);
+
+            try {
+                $target = $this->correctionTargets->resolveForTitleId(
+                    (int) $titleId,
+                    $field,
+                    $targetId === false ? null : $targetId,
+                    auth()->user(),
+                );
+            } catch (ContentRequestActionException) {
+                abort(404);
+            }
+
+            $this->type = $target->type->value;
+            $this->correctionField = $target->storedField;
+            $this->correctionTargetKey = $target->targetKey;
+            $this->currentValue = $target->currentValue;
+            $this->proposedValue = $target->proposedValue;
+            $this->seasonId = $target->seasonId !== null ? (string) $target->seasonId : '';
+            $this->episodeId = $target->episodeId !== null ? (string) $target->episodeId : '';
+            $this->correctionContextLocked = true;
         }
     }
 
@@ -136,8 +186,7 @@ final class ContentRequestFormPage extends Component
 
         if (! in_array($type, [ContentRequestType::MetadataCorrection, ContentRequestType::EpisodeListCorrection], true)) {
             $this->correctionField = '';
-            $this->currentValue = '';
-            $this->proposedValue = '';
+            $this->clearCorrectionContext();
         }
 
         $this->actionError = null;
@@ -153,6 +202,11 @@ final class ContentRequestFormPage extends Component
         $this->episodeId = '';
     }
 
+    public function updatedCorrectionField(): void
+    {
+        $this->clearCorrectionContext();
+    }
+
     public function selectCatalogTitle(int $id): void
     {
         $title = CatalogTitle::query()->availableTo(auth()->user())->findOrFail($id, ['id', 'title', 'original_title', 'year']);
@@ -163,6 +217,7 @@ final class ContentRequestFormPage extends Component
         $this->search = $title->display_title;
         $this->seasonId = '';
         $this->episodeId = '';
+        $this->clearCorrectionContext();
         $this->actionError = null;
     }
 
@@ -171,6 +226,7 @@ final class ContentRequestFormPage extends Component
         $this->catalogTitleId = '';
         $this->seasonId = '';
         $this->episodeId = '';
+        $this->clearCorrectionContext();
     }
 
     public function addSourceLink(): void
@@ -263,6 +319,11 @@ final class ContentRequestFormPage extends Component
             'translationTypeOptions' => collect((array) config('content-requests.translation_types', []))->map(fn (string $value): array => ['value' => $value, 'label' => __('requests.translation_types.'.$value)])->all(),
             'qualityOptions' => (array) config('playback.supported_qualities', []),
             'correctionOptions' => collect((array) config('content-requests.correction_fields', []))->map(fn (string $value): array => ['value' => $value, 'label' => __('requests.correction_fields.'.$value)])->all(),
+            'correctionReasonOptions' => collect(ContentCorrectionReason::cases())
+                ->map(fn (ContentCorrectionReason $reason): array => [
+                    'value' => $reason->value,
+                    'label' => $reason->label(),
+                ])->all(),
             'helpArticle' => $helpLinks->primary(
                 HelpFeature::Requests,
                 'form',
@@ -290,11 +351,27 @@ final class ContentRequestFormPage extends Component
             'seasonNumber' => ['nullable', 'integer', 'min:0', 'max:999'], 'episodeNumber' => ['nullable', 'integer', 'min:0', 'max:99999'],
             'episodeReleaseDate' => ['nullable', 'date_format:Y-m-d'], 'currentQuality' => ['nullable', 'string', 'max:16'],
             'requestedQuality' => ['nullable', 'string', 'max:16'], 'correctionField' => ['nullable', 'string', 'max:48'],
+            'correctionTargetKey' => ['nullable', 'string', 'max:191'],
+            'correctionReason' => [
+                'nullable',
+                'string',
+                'required_if:correctionField,tag',
+                'in:'.implode(',', array_column(ContentCorrectionReason::cases(), 'value')),
+            ],
             'currentValue' => ['nullable', 'string', 'max:2000'], 'proposedValue' => ['nullable', 'string', 'max:4000'],
             'explanation' => ['nullable', 'string', 'max:4000'], 'differentExplanation' => ['nullable', 'string', 'max:1000'],
             'sourceLinks' => ['array', 'max:3'], 'sourceLinks.*' => ['nullable', 'string', 'max:2048'],
             'externalIdentifiers' => ['array', 'max:5'], 'externalIdentifiers.*.provider' => ['required', 'string'],
             'externalIdentifiers.*.identifier' => ['nullable', 'string', 'max:120'],
+        ];
+    }
+
+    /** @return array<string, string> */
+    protected function messages(): array
+    {
+        return [
+            'correctionReason.required_if' => __('requests.errors.correction_reason_required'),
+            'correctionReason.in' => __('requests.errors.invalid_correction_reason'),
         ];
     }
 
@@ -311,10 +388,20 @@ final class ContentRequestFormPage extends Component
             'season_number' => $this->seasonNumber, 'season_kind' => $this->seasonKind,
             'episode_number' => $this->episodeNumber, 'episode_release_date' => $this->episodeReleaseDate,
             'current_quality' => $this->currentQuality, 'requested_quality' => $this->requestedQuality,
-            'correction_field' => $this->correctionField, 'current_value' => $this->currentValue,
+            'correction_field' => $this->correctionField, 'correction_target_key' => $this->correctionTargetKey,
+            'correction_reason' => $this->correctionReason, 'current_value' => $this->currentValue,
             'proposed_value' => $this->proposedValue, 'explanation' => $this->explanation,
             'different_explanation' => $this->differentExplanation, 'source_links' => $this->sourceLinks,
             'external_identifiers' => $this->externalIdentifiers, 'submission_token' => $this->submissionToken,
         ];
+    }
+
+    private function clearCorrectionContext(): void
+    {
+        $this->correctionTargetKey = '';
+        $this->correctionReason = '';
+        $this->correctionContextLocked = false;
+        $this->currentValue = '';
+        $this->proposedValue = '';
     }
 }

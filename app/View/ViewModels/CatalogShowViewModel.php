@@ -86,7 +86,7 @@ class CatalogShowViewModel
     public Collection $tags;
 
     /**
-     * @var array<int, array{label: string, items: Collection<int, mixed>, icon: string}>
+     * @var array<int, array{type: string, label: string, items: Collection<int, mixed>, icon: string}>
      */
     public array $taxonomyRows;
 
@@ -768,20 +768,20 @@ class CatalogShowViewModel
     }
 
     /**
-     * @return array<int, array{label: string, items: Collection<int, mixed>, icon: string}>
+     * @return array<int, array{type: string, label: string, items: Collection<int, mixed>, icon: string}>
      */
     private function buildTaxonomyRows(): array
     {
         return [
-            ['label' => __('catalog.taxonomy.genre'), 'items' => $this->genres, 'icon' => $this->taxonomyIcon('genre')],
-            ['label' => __('catalog.taxonomy.age_rating'), 'items' => $this->ageRatings, 'icon' => $this->taxonomyIcon('age_rating')],
-            ['label' => __('catalog.taxonomy.country'), 'items' => $this->countries, 'icon' => $this->taxonomyIcon('country')],
-            ['label' => __('catalog.taxonomy.director'), 'items' => $this->directors, 'icon' => $this->taxonomyIcon('director')],
-            ['label' => __('catalog.taxonomy.translation'), 'items' => $this->translations, 'icon' => $this->taxonomyIcon('translation')],
-            ['label' => __('catalog.taxonomy.status'), 'items' => $this->statuses, 'icon' => $this->taxonomyIcon('status')],
-            ['label' => __('catalog.taxonomy.network'), 'items' => $this->networks, 'icon' => $this->taxonomyIcon('network')],
-            ['label' => __('catalog.taxonomy.studio'), 'items' => $this->studios, 'icon' => $this->taxonomyIcon('studio')],
-            ['label' => __('catalog.taxonomy.tags'), 'items' => $this->tags, 'icon' => $this->taxonomyIcon('tag')],
+            ['type' => 'genre', 'label' => __('catalog.taxonomy.genre'), 'items' => $this->genres, 'icon' => $this->taxonomyIcon('genre')],
+            ['type' => 'age_rating', 'label' => __('catalog.taxonomy.age_rating'), 'items' => $this->ageRatings, 'icon' => $this->taxonomyIcon('age_rating')],
+            ['type' => 'country', 'label' => __('catalog.taxonomy.country'), 'items' => $this->countries, 'icon' => $this->taxonomyIcon('country')],
+            ['type' => 'director', 'label' => __('catalog.taxonomy.director'), 'items' => $this->directors, 'icon' => $this->taxonomyIcon('director')],
+            ['type' => 'translation', 'label' => __('catalog.taxonomy.translation'), 'items' => $this->translations, 'icon' => $this->taxonomyIcon('translation')],
+            ['type' => 'status', 'label' => __('catalog.taxonomy.status'), 'items' => $this->statuses, 'icon' => $this->taxonomyIcon('status')],
+            ['type' => 'network', 'label' => __('catalog.taxonomy.network'), 'items' => $this->networks, 'icon' => $this->taxonomyIcon('network')],
+            ['type' => 'studio', 'label' => __('catalog.taxonomy.studio'), 'items' => $this->studios, 'icon' => $this->taxonomyIcon('studio')],
+            ['type' => 'tag', 'label' => __('catalog.taxonomy.tags'), 'items' => $this->tags, 'icon' => $this->taxonomyIcon('tag')],
         ];
     }
 }

@@ -36,6 +36,12 @@ final class ContentRequestPresenter
             isFollowing: (bool) ($request->viewer_is_following ?? false),
             isRequester: $viewer !== null && $request->requester_id === $viewer->id,
             canEngage: $request->status->canEngage(),
+            correctionFieldLabel: $request->correction_field !== null
+                ? __('requests.correction_fields.'.$request->correction_field)
+                : null,
+            correctionReasonLabel: $request->correction_reason?->label(),
+            currentValue: $request->current_value,
+            proposedValue: $request->proposed_value,
             targetLabel: $target?->display_title,
             targetUrl: $target instanceof CatalogTitle ? route('titles.show', $target) : null,
             url: route('requests.show', $request),
@@ -64,6 +70,7 @@ final class ContentRequestPresenter
             currentQuality: $request->current_quality,
             requestedQuality: $request->requested_quality,
             correctionField: $request->correction_field,
+            correctionReason: $request->correction_reason?->label(),
             currentValue: $request->current_value,
             proposedValue: $request->proposed_value,
             explanation: $request->explanation,

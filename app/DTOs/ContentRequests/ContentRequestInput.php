@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\DTOs\ContentRequests;
 
+use App\Enums\ContentCorrectionReason;
 use App\Enums\ContentRequestType;
 
 final readonly class ContentRequestInput
@@ -35,6 +36,8 @@ final readonly class ContentRequestInput
         public ?string $currentQuality,
         public ?string $requestedQuality,
         public ?string $correctionField,
+        public ?string $correctionTargetKey,
+        public ?ContentCorrectionReason $correctionReason,
         public ?string $currentValue,
         public ?string $proposedValue,
         public ?string $explanation,

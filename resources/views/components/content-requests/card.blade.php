@@ -19,6 +19,32 @@
                     <span>{{ $request->targetLabel }}</span>
                 </a>
             @endif
+            @if ($request->correctionFieldLabel)
+                <dl class="mt-3 grid gap-2 rounded-control bg-amber-50 p-3 text-sm sm:grid-cols-2">
+                    <div>
+                        <dt class="text-xs font-bold uppercase tracking-wide text-amber-800">{{ __('requests.fields.correction_field') }}</dt>
+                        <dd class="mt-1 font-semibold text-slate-800">{{ $request->correctionFieldLabel }}</dd>
+                    </div>
+                    @if ($request->correctionReasonLabel)
+                        <div>
+                            <dt class="text-xs font-bold uppercase tracking-wide text-amber-800">{{ __('requests.fields.correction_reason') }}</dt>
+                            <dd class="mt-1 font-semibold text-slate-800">{{ $request->correctionReasonLabel }}</dd>
+                        </div>
+                    @endif
+                    @if ($request->currentValue)
+                        <div>
+                            <dt class="text-xs font-bold uppercase tracking-wide text-amber-800">{{ __('requests.fields.current_value') }}</dt>
+                            <dd class="mt-1 whitespace-pre-wrap break-words text-slate-700">{{ $request->currentValue }}</dd>
+                        </div>
+                    @endif
+                    @if ($request->proposedValue)
+                        <div>
+                            <dt class="text-xs font-bold uppercase tracking-wide text-amber-800">{{ __('requests.fields.proposed_value') }}</dt>
+                            <dd class="mt-1 whitespace-pre-wrap break-words text-slate-700">{{ $request->proposedValue }}</dd>
+                        </div>
+                    @endif
+                </dl>
+            @endif
         </div>
         @if ($request->year)
             <span class="shrink-0 text-sm font-bold text-slate-500">{{ $request->year }}</span>

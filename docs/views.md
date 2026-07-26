@@ -113,6 +113,8 @@ Section navigation, fieldsets, native checkbox/select/datalist/range, status/err
 
 Create view показывает search-before-submit, type descriptions, stable target selection, canonical season/episode sequence, language/translation/subtitle/quality/correction fields, bounded source/external-ID rows и probable-difference explanation. Не существует file/video upload, fake queue position/progress/ETA или public discussion. Admin presenter state выводит только допустимые текущим status transition controls: clarification, rejection, completion, merge и importer handoff не показываются в несовместимом состоянии, но каждая видимая mutation всё равно повторно authorizes server-side. Empty/error/unavailable/merged/completed/rejected/partial states ведут к реальному действию или безопасной информации; visible copy/ARIA/confirmations имеют exact `ru`/`en` key parity и user prose остаётся untranslated escaped text.
 
+`x-content-requests.correction-link` получает только подготовленный URL и stable field code. Title/player views ставят ссылку рядом с конкретным scalar, relation или episode, не вкладывая её в другую ссылку; form показывает server-resolved read-only context и пять radio-причин только для тега. Card/detail/admin presenters выводят translated field/reason и safe current/proposed values без запросов и private evidence.
+
 ## Представления рекомендаций
 
 `CatalogRecommendationPresenter` — единственная boundary для type metadata, relation labels, stored similarity badges и broad explanation templates. `CatalogRecommendationListItem` содержит уже загруженный card title, rank/reason codes и permission to dismiss; Blade не видит score breakdown, user history или query services.

@@ -10,7 +10,10 @@ use App\Services\Catalog\Search\CatalogSearchNormalizer;
 
 final readonly class ContentRequestIdentity
 {
-    public function __construct(private CatalogSearchNormalizer $normalizer) {}
+    public function __construct(
+        private CatalogSearchNormalizer $normalizer,
+        private ContentCorrectionTargetKey $correctionTargets,
+    ) {}
 
     public function normalizedTitle(ContentRequestInput $input): string
     {
@@ -42,6 +45,7 @@ final readonly class ContentRequestIdentity
             $input->translationType ?? '',
             $input->requestedQuality ?? '',
             $input->correctionField ?? '',
+            $this->correctionTargets->identity($input->correctionTargetKey),
             $externalIdentity,
         ]));
     }
@@ -61,7 +65,8 @@ final readonly class ContentRequestIdentity
             $usesStableTarget ? '' : ($request->release_year ?? ''),
             $request->audio_language ?? '', $request->subtitle_language ?? '',
             $this->normalizer->key((string) $request->translation_studio), $request->translation_type ?? '',
-            $request->requested_quality ?? '', $request->correction_field ?? '', $externalIdentity,
+            $request->requested_quality ?? '', $request->correction_field ?? '',
+            $this->correctionTargets->identity($request->correction_target_key), $externalIdentity,
         ]));
     }
 }

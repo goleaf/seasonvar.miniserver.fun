@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\ContentCorrectionReason;
 use App\Enums\ContentRequestPriority;
 use App\Enums\ContentRequestRejectionReason;
 use App\Enums\ContentRequestStatus;
@@ -25,7 +26,8 @@ use Illuminate\Support\Facades\Gate;
     'content_locale', 'original_language', 'audio_language', 'subtitle_language',
     'translation_type', 'translation_studio', 'catalog_title_id', 'season_id', 'episode_id',
     'season_number', 'season_kind', 'episode_number', 'episode_release_date', 'current_quality',
-    'requested_quality', 'correction_field', 'current_value', 'proposed_value', 'explanation',
+    'requested_quality', 'correction_field', 'correction_target_key', 'correction_reason',
+    'current_value', 'proposed_value', 'explanation',
     'different_explanation', 'exact_identity_hash', 'active_identity_key', 'submission_key',
     'probable_duplicate', 'is_public', 'rejection_reason', 'public_note',
     'private_moderator_note', 'merged_into_id', 'completed_catalog_title_id',
@@ -169,6 +171,7 @@ final class ContentRequest extends Model
             'status' => ContentRequestStatus::class,
             'priority' => ContentRequestPriority::class,
             'rejection_reason' => ContentRequestRejectionReason::class,
+            'correction_reason' => ContentCorrectionReason::class,
             'release_year' => 'integer',
             'season_number' => 'integer',
             'episode_number' => 'integer',

@@ -486,7 +486,7 @@ Additive reversible migration `2026_07_25_220709_create_release_calendar_feeds_t
 
 | Таблица | Назначение и ограничения |
 | --- | --- |
-| `content_requests` | Typed aggregate, canonical target/sequence, normalized title/hash, exact active identity, idempotent submission, public/private moderation fields, merge/completion/import references и optimistic version. |
+| `content_requests` | Typed aggregate, canonical target/sequence, normalized title/hash, nullable field-level `correction_target_key`/`correction_reason`, exact active identity, idempotent submission, public/private moderation fields, merge/completion/import references и optimistic version. |
 | `content_request_votes` | Один vote на `(content_request_id,user_id)`; count derived, voter list private. |
 | `content_request_followers` | Одна подписка на `(content_request_id,user_id)`; identities private. |
 | `content_request_status_histories` | Append-only transition/reason/private-note timeline с nullable actor и unique retry key. |
@@ -498,6 +498,8 @@ Additive reversible migration `2026_07_25_220709_create_release_calendar_feeds_t
 Exact active uniqueness обеспечивается nullable unique `active_identity_key`; terminal row очищает его, сохраняя historical `exact_identity_hash`. Composite indexes соответствуют public status pagination, type/status moderation, requester/My Requests, normalized title duplicate narrowing и title/season/episode target lookup. Vote/follow unique keys одновременно являются integrity boundary и count index prefix; history/source/external indexes обслуживают только реальные timeline/visibility/duplicate queries.
 
 Additive reversible migration `2026_07_17_160000_add_content_request_queue_indexes.php` добавляет три index без новых column или backfill: `(requester_id,updated_at,id)` для default My Requests, `(requester_id,status,updated_at,id)` для status-filtered My Requests и `(status,created_at,id)` для default moderation queue. До неё SQLite использовал requester/public prefix, но строил временное Б-дерево для фактического order; после неё каждый exact default/filter query выбирает соответствующий index. Остальные sort modes сохраняют bounded query/cached public response вместо набора малоизбирательных индексов на каждый вариант.
+
+Additive reversible migration `2026_07_26_235500_add_field_corrections_to_content_requests.php` добавляет только nullable `correction_target_key varchar(191)` и `correction_reason varchar(32)` без backfill. Новый индекс не создаётся: exact open duplicate по-прежнему хешируется в `active_identity_key`, а `EXPLAIN QUERY PLAN` выбирает существующий unique index `content_requests_active_identity_key_unique`. `down()` удаляет только эти две колонки после возврата старого кода; существующие заявки предварительно требуют backup assessment.
 
 Migration `2026_07_16_180000_create_content_request_domain.php` ничего не backfill-ит: audit не нашёл legacy request/ticket/suggestion data. Rollback `160000` удаляет только три queue index; rollback `180000` безопасно удаляет восемь tables только до появления production writes. После появления заявок сначала нужен export/backup, а importer source pages и уже доставленные notifications не откатываются.
 

@@ -170,6 +170,8 @@ Username, display name и public UUID разрешают профиль, но н
 
 `ContentRequestPolicy` и action boundaries повторно разрешают persisted request/target, не доверяют ID/type/status/priority/provider/language/quality/merge/completion values из Livewire. `/admin/requests` требует `auth`, `auth.session`, `account.private` и `manage-content-requests`, поэтому initial page и Livewire lifecycle остаются `private, no-store`. Generic status action отклоняет `clarification_needed`, `duplicate`, `merged` и `withdrawn`: эти состояния требуют dedicated clarification/merge/withdraw invariants. Public binding допускает merged public UUID только до authorized canonical redirect; hidden чужая заявка возвращает 404, а private merge между разными requester запрещён. Email/internal user ID/voter/follower list никогда не являются route или DTO полем. Все mutations идут через CSRF-protected Livewire POST, GET только читает или выполняет canonical merged redirect.
 
+Ссылка «Исправить данные» общедоступна как navigation, но форма по-прежнему требует authenticated verified account. `field`, `catalog_title_id` и необязательный target ID из query string не являются правом доступа: resolver и action повторно проверяют public title scope, принадлежность taxonomy/episode и server-derived current value. Поддержать открытую заявку может только verified user через unique vote; принять или отклонить — только `moderation.requests`/`manage-content-requests`.
+
 ## Матрица рекомендаций
 
 | Действие | Guest | Authenticated user | `manage-catalog` |

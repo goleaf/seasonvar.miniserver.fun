@@ -12,7 +12,10 @@ final class ContentRequestSchema
 
     public function ready(): bool
     {
-        return $this->ready ??= collect([
+        return $this->ready ??= Schema::hasColumns('content_requests', [
+            'correction_target_key',
+            'correction_reason',
+        ]) && collect([
             'content_requests',
             'content_request_votes',
             'content_request_followers',

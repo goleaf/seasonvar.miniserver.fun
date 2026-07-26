@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\ContentRequests;
 
 use App\DTOs\ContentRequests\ContentRequestInput;
+use App\Enums\ContentCorrectionReason;
 use App\Enums\ContentRequestType;
 use App\Exceptions\ContentRequests\ContentRequestActionException;
 use App\Services\Catalog\Search\CatalogSearchNormalizer;
@@ -36,6 +37,16 @@ final readonly class ContentRequestInputFactory
                 'provider' => Str::lower(trim((string) ($item['provider'] ?? ''))),
                 'identifier' => trim((string) ($item['identifier'] ?? '')),
             ])->values()->all();
+        $isCorrection = in_array($type, [
+            ContentRequestType::MetadataCorrection,
+            ContentRequestType::EpisodeListCorrection,
+        ], true);
+        $targetKey = $isCorrection
+            ? $this->targetKey($data['correction_target_key'] ?? null)
+            : null;
+        $reason = $isCorrection
+            ? $this->correctionReason($data['correction_reason'] ?? null)
+            : null;
 
         return new ContentRequestInput(
             type: $type,
@@ -62,8 +73,10 @@ final readonly class ContentRequestInputFactory
             correctionField: $type === ContentRequestType::EpisodeListCorrection
                 ? 'episode_list'
                 : ($type === ContentRequestType::MetadataCorrection ? $this->code($data['correction_field'] ?? null) : null),
-            currentValue: in_array($type, [ContentRequestType::MetadataCorrection, ContentRequestType::EpisodeListCorrection], true) ? $this->optionalMultiline($data['current_value'] ?? null, 2_000) : null,
-            proposedValue: in_array($type, [ContentRequestType::MetadataCorrection, ContentRequestType::EpisodeListCorrection], true) ? $this->optionalMultiline($data['proposed_value'] ?? null, 4_000) : null,
+            correctionTargetKey: $targetKey,
+            correctionReason: $reason,
+            currentValue: $isCorrection ? $this->optionalMultiline($data['current_value'] ?? null, 2_000) : null,
+            proposedValue: $isCorrection ? $this->optionalMultiline($data['proposed_value'] ?? null, 4_000) : null,
             explanation: $this->optionalMultiline($data['explanation'] ?? null, 4_000),
             differentExplanation: $this->optionalMultiline($data['different_explanation'] ?? null, 1_000),
             externalIdentifiers: $externalIdentifiers,
@@ -95,6 +108,33 @@ final readonly class ContentRequestInputFactory
         $clean = Str::lower(trim((string) $value));
 
         return $clean !== '' ? $clean : null;
+    }
+
+    private function targetKey(mixed $value): ?string
+    {
+        $key = Str::lower(trim((string) $value));
+
+        if ($key === '') {
+            return null;
+        }
+
+        if (preg_match('/\A[a-z_]+:(?:root|[1-9][0-9]*)\z/D', $key) !== 1) {
+            throw new ContentRequestActionException('requests.errors.invalid_target');
+        }
+
+        return $key;
+    }
+
+    private function correctionReason(mixed $value): ?ContentCorrectionReason
+    {
+        $reason = trim((string) $value);
+
+        if ($reason === '') {
+            return null;
+        }
+
+        return ContentCorrectionReason::tryFrom($reason)
+            ?? throw new ContentRequestActionException('requests.errors.invalid_correction_reason');
     }
 
     private function positiveInt(mixed $value): ?int

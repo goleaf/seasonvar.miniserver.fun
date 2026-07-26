@@ -154,6 +154,10 @@ final readonly class ContentRequestQuery
             'content_requests.original_title',
             'content_requests.release_year',
             'content_requests.catalog_title_id',
+            'content_requests.correction_field',
+            'content_requests.correction_reason',
+            'content_requests.current_value',
+            'content_requests.proposed_value',
             'content_requests.created_at',
             'content_requests.updated_at',
         ])

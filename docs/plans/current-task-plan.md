@@ -12072,3 +12072,34 @@ queue, scheduler, config или environment change не планируется. 
     GitHub HTTPS username could not be read with terminal prompts disabled.
 
 ---
+## Task 97 — field-level исправления данных каталога
+
+Статус: `implementation_completed_delivery_in_progress`.
+
+Канонический design и полный живой checklist:
+[`2026-07-26-field-level-catalog-corrections-design.md`](../superpowers/specs/2026-07-26-field-level-catalog-corrections-design.md)
+и
+[`2026-07-26-field-level-catalog-corrections.md`](../superpowers/plans/2026-07-26-field-level-catalog-corrections.md).
+
+### Scope
+
+- контекстная кнопка «Исправить данные» для названия, года, жанра, тега,
+  страны, актёра, постера, описания, перевода, серии и субтитров;
+- пять обязательных причин ошибочного тега;
+- reuse canonical `ContentRequest`, unique community vote и existing
+  moderation status transitions;
+- additive target/reason schema, server-side relation resolution,
+  compatibility, security, performance, tests, docs, commit и push.
+
+### Compliance snapshot
+
+| Contract | Status | Evidence |
+|---|---|---|
+| Requirements/design gate | `completed` | Root/index/owners/Boost inventory; Task 97 design |
+| Existing domain reuse | `completed` | `ContentRequest` actions/policy/schema/query audited |
+| TDD RED | `completed` | Initial 7 expected schema/class/behavior failures recorded before GREEN |
+| Implementation | `completed` | 11 field actions, five tag reasons, target resolver, identity, vote/moderation reuse |
+| Security/performance | `completed` | Target/current-value revalidation, poster URL privacy, escaped proposal, no per-chip query, active identity index plan |
+| Verification | `completed_with_foreign_full_suite_failures` | Focused 12/66; Blade/translation 83/79 084; related 95/1 818; Playwright 3/3; Vite/Pint/routes/Composer GREEN. Full 2 086: 2 056 pass, 11 skip, 18 foreign failures and 1 foreign error |
+| Managed docs refresh | `unresolved_external_scope` | `docs/MAINTENANCE_LOG.md` was already staged by another task and remains stale against concurrent repository changes |
+| Git delivery | `in_progress` | Exact alternate index on `main`; ordinary push remains |

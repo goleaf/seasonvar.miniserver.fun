@@ -13,7 +13,10 @@ use Illuminate\Support\Str;
 
 final readonly class DuplicateContentRequestService
 {
-    public function __construct(private ContentRequestIdentity $identity) {}
+    public function __construct(
+        private ContentRequestIdentity $identity,
+        private ContentCorrectionTargetKey $correctionTargets,
+    ) {}
 
     /** @param list<array{provider: string, identifier: string, normalized_identifier: string}> $externalIdentifiers */
     public function check(ContentRequestInput $input, array $externalIdentifiers): ContentRequestDuplicateResult
@@ -107,6 +110,10 @@ final readonly class DuplicateContentRequestService
             && $request->translation_type === $input->translationType
             && Str::lower((string) $request->translation_studio) === Str::lower((string) $input->translationStudio)
             && $request->requested_quality === $input->requestedQuality
-            && $request->correction_field === $input->correctionField;
+            && $request->correction_field === $input->correctionField
+            && $this->correctionTargets->equivalent(
+                $request->correction_target_key,
+                $input->correctionTargetKey,
+            );
     }
 }

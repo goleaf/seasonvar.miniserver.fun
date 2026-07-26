@@ -531,3 +531,12 @@ Dialogs/sheets должны использовать native focus semantics, bou
 Help pages повторно используют светлые panels, controls, badges, breadcrumbs, pagination, readable prose и visible focus. Search/combobox, category cards, native FAQ details, TOC, callouts, tables, feedback/report и escalation имеют localized accessible names, `aria-live`, keyboard/touch controls и минимум 44 px. Essential text не помещается только в tooltip, hover или цвет.
 
 Article column ограничивает длину строки; `min-w-0`, wrapping и responsive overflow защищают 320 px, landscape, tablet, desktop и browser zoom. Один H1 принадлежит page, editorial headings становятся H2/H3. Image media пока запрещена renderer, поэтому нет layout shift или недоступного screenshot. Полный UI contract: [`help-center.md`](help-center.md).
+
+## Контекстные исправления каталога
+
+Действие «Исправить данные» размещается рядом с конкретным значением, а не
+одной общей кнопкой страницы. Единый amber-control имеет видимый текст,
+иконку, focus, перенос подписи и сенсорную высоту не менее 44 px; relation
+chip и кнопка не образуют вложенные ссылки. На телефоне действия переносятся
+в следующую строку без page-level overflow. Полный доменный и privacy
+contract принадлежит [`catalog-quality.md`](catalog-quality.md).

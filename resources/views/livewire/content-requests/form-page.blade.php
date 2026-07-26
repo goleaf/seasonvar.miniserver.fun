@@ -84,7 +84,48 @@
             @endif
 
             @if ($type === 'metadata_correction' || $type === 'episode_list_correction')
-                <x-ui.panel :title="__('requests.form.correction_details')" icon="fa-solid fa-pen-to-square">@if ($type === 'metadata_correction')<div><label for="correction-field" class="block text-sm font-bold text-slate-700">{{ __('requests.fields.correction_field') }}</label><select id="correction-field" wire:model="correctionField" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 px-3 py-2"><option value="">{{ __('requests.fields.not_specified') }}</option>@foreach ($correctionOptions as $option)<option value="{{ $option['value'] }}">{{ $option['label'] }}</option>@endforeach</select></div>@endif<div class="mt-4 grid gap-4 md:grid-cols-2"><div><label for="current-value" class="block text-sm font-bold text-slate-700">{{ __('requests.fields.current_value') }}</label><textarea id="current-value" wire:model="currentValue" rows="4" class="mt-2 w-full rounded-control border border-slate-300 p-3"></textarea></div><div><label for="proposed-value" class="block text-sm font-bold text-slate-700">{{ __('requests.fields.proposed_value') }}</label><textarea id="proposed-value" wire:model="proposedValue" rows="4" class="mt-2 w-full rounded-control border border-slate-300 p-3"></textarea></div></div><p class="mt-3 text-xs text-slate-500">{{ __('requests.form.correction_notice') }}</p></x-ui.panel>
+                <x-ui.panel :title="__('requests.form.correction_details')" icon="fa-solid fa-pen-to-square">
+                    @if ($type === 'metadata_correction')
+                        <div>
+                            <label for="correction-field" class="block text-sm font-bold text-slate-700">{{ __('requests.fields.correction_field') }}</label>
+                            <select id="correction-field" wire:model="correctionField" @disabled($correctionContextLocked) class="mt-2 min-h-11 w-full rounded-control border border-slate-300 px-3 py-2 disabled:bg-slate-100 disabled:text-slate-600">
+                                <option value="">{{ __('requests.fields.not_specified') }}</option>
+                                @foreach ($correctionOptions as $option)
+                                    <option value="{{ $option['value'] }}">{{ $option['label'] }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @endif
+
+                    @if ($correctionField === 'tag')
+                        <fieldset class="mt-4">
+                            <legend class="text-sm font-bold text-slate-700">{{ __('requests.fields.correction_reason') }}</legend>
+                            <div class="mt-2 grid gap-2 sm:grid-cols-2">
+                                @foreach ($correctionReasonOptions as $option)
+                                    <label class="flex min-h-11 cursor-pointer items-center gap-3 rounded-control border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-emerald-300 hover:bg-emerald-50">
+                                        <input type="radio" wire:model="correctionReason" value="{{ $option['value'] }}" class="size-4 border-slate-300 text-emerald-700 focus:ring-emerald-600">
+                                        <span>{{ $option['label'] }}</span>
+                                    </label>
+                                @endforeach
+                            </div>
+                            @error('correctionReason')
+                                <p class="mt-2 text-sm font-semibold text-rose-700">{{ $message }}</p>
+                            @enderror
+                        </fieldset>
+                    @endif
+
+                    <div class="mt-4 grid gap-4 md:grid-cols-2">
+                        <div>
+                            <label for="current-value" class="block text-sm font-bold text-slate-700">{{ __('requests.fields.current_value') }}</label>
+                            <textarea id="current-value" wire:model="currentValue" rows="4" @readonly($correctionContextLocked) class="mt-2 w-full rounded-control border border-slate-300 p-3 read-only:bg-slate-100 read-only:text-slate-600"></textarea>
+                        </div>
+                        <div>
+                            <label for="proposed-value" class="block text-sm font-bold text-slate-700">{{ __('requests.fields.proposed_value') }}</label>
+                            <textarea id="proposed-value" wire:model="proposedValue" rows="4" class="mt-2 w-full rounded-control border border-slate-300 p-3"></textarea>
+                        </div>
+                    </div>
+                    <p class="mt-3 text-xs text-slate-500">{{ __('requests.form.correction_notice') }}</p>
+                </x-ui.panel>
             @endif
 
             <x-ui.panel :title="__('requests.form.evidence_title')" icon="fa-solid fa-link">

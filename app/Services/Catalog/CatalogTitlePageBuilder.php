@@ -6,9 +6,11 @@ namespace App\Services\Catalog;
 
 use App\DTOs\CatalogRecommendationItem;
 use App\DTOs\CatalogRecommendationListItem;
+use App\Enums\ContentCorrectionField;
 use App\Models\CatalogTitle;
 use App\Models\Season;
 use App\Models\User;
+use App\Services\ContentRequests\CatalogCorrectionLinkBuilder;
 use App\Services\Media\ExternalMediaMetadata;
 use App\Support\CatalogTitleDisplayName;
 use App\View\ViewModels\CatalogShowViewModel;
@@ -31,6 +33,7 @@ final class CatalogTitlePageBuilder
         private readonly CatalogRecommendationService $recommendations,
         private readonly CatalogRecommendationPresenter $recommendationPresenter,
         private readonly CatalogRecommendationFeedbackOptionQuery $feedbackOptions,
+        private readonly CatalogCorrectionLinkBuilder $correctionLinks,
     ) {}
 
     /**
@@ -56,6 +59,31 @@ final class CatalogTitlePageBuilder
             ->values();
         $taxonomiesByType = collect($this->taxonomies->relations())
             ->mapWithKeys(fn (array $config, string $filterType): array => [$filterType => $catalogTitle->{$config['relation']}->values()]);
+        $routeLocale = request()->route('locale');
+        $routeLocale = is_string($routeLocale) ? $routeLocale : null;
+        $correctionUrls = collect(ContentCorrectionField::cases())
+            ->reject(fn (ContentCorrectionField $field): bool => in_array($field, [
+                ContentCorrectionField::Episode,
+                ContentCorrectionField::Subtitles,
+            ], true))
+            ->mapWithKeys(fn (ContentCorrectionField $field): array => [
+                $field->value => $this->correctionLinks->for($catalogTitle, $field, locale: $routeLocale),
+            ])->all();
+        $taxonomyCorrectionUrls = collect([
+            ContentCorrectionField::Genre,
+            ContentCorrectionField::Tag,
+            ContentCorrectionField::Country,
+            ContentCorrectionField::Actor,
+            ContentCorrectionField::Translation,
+        ])->mapWithKeys(function (ContentCorrectionField $field) use ($catalogTitle, $routeLocale, $taxonomiesByType): array {
+            $items = $taxonomiesByType->get($field->value, collect());
+
+            return [
+                $field->value => $items->mapWithKeys(fn ($item): array => [
+                    $item->id => $this->correctionLinks->for($catalogTitle, $field, $item->id, $routeLocale),
+                ])->all(),
+            ];
+        })->all();
         $seasons = $this->playback->seasonSummaries($catalogTitle, $user);
         $episodeCount = (int) $seasons->sum('available_episodes_count');
         $taxonomyCount = $taxonomiesByType->sum(fn (Collection $items): int => $items->count());
@@ -112,6 +140,8 @@ final class CatalogTitlePageBuilder
             'ratings' => $catalogTitle->ratings,
             'topTaxonomies' => $showView->topTaxonomies,
             'showView' => $showView,
+            'correctionUrls' => $correctionUrls,
+            'taxonomyCorrectionUrls' => $taxonomyCorrectionUrls,
             'recommendationItems' => $recommendationItems,
             'relatedRecommendationItems' => $relatedRecommendationItems,
             'seo' => $this->seo->title($catalogTitle, $taxonomiesByType, $seasons, $episodeCount, $mediaCount, null, null),

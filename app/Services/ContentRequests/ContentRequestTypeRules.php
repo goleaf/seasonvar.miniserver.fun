@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\ContentRequests;
 
 use App\DTOs\ContentRequests\ContentRequestInput;
+use App\Enums\ContentCorrectionField;
 use App\Enums\ContentRequestType;
 use App\Enums\ReleaseKind;
 use App\Exceptions\ContentRequests\ContentRequestActionException;
@@ -15,6 +16,8 @@ use Illuminate\Support\Str;
 
 final class ContentRequestTypeRules
 {
+    public function __construct(private readonly CatalogCorrectionTargetResolver $correctionTargets) {}
+
     public function assert(ContentRequestInput $input): void
     {
         if (mb_strlen($input->title) < 2 || mb_strlen($input->title) > 240) {
@@ -75,6 +78,20 @@ final class ContentRequestTypeRules
                 || ! in_array($input->correctionField, (array) config('content-requests.correction_fields', []), true)
                 || $input->proposedValue === null)) {
             throw new ContentRequestActionException('requests.errors.correction_required');
+        }
+
+        if (in_array($input->type, [ContentRequestType::MetadataCorrection, ContentRequestType::EpisodeListCorrection], true)) {
+            $field = ContentCorrectionField::fromStoredField($input->correctionField, $input->correctionTargetKey);
+
+            if ($field === ContentCorrectionField::Tag && $input->correctionReason === null) {
+                throw new ContentRequestActionException('requests.errors.correction_reason_required');
+            }
+
+            if ($field !== ContentCorrectionField::Tag && $input->correctionReason !== null) {
+                throw new ContentRequestActionException('requests.errors.invalid_correction_reason');
+            }
+
+            $this->correctionTargets->assertInput($input);
         }
 
         if ($input->type === ContentRequestType::Other && mb_strlen((string) $input->explanation) < 20) {

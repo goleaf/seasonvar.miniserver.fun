@@ -10,6 +10,7 @@ use App\DTOs\CatalogPrimaryAction;
 use App\DTOs\PlaybackPreferencesData;
 use App\DTOs\PlaybackSettingsData;
 use App\Enums\CatalogWatchStatus;
+use App\Enums\ContentCorrectionField;
 use App\Enums\HelpFeature;
 use App\Enums\PlaybackCompletionSource;
 use App\Enums\ReleaseKind;
@@ -29,6 +30,7 @@ use App\Services\Catalog\CatalogUserStateService;
 use App\Services\Catalog\PlaybackQualityContext;
 use App\Services\Catalog\PlaybackQualitySchema;
 use App\Services\Catalog\PlaybackTimeFormatter;
+use App\Services\ContentRequests\CatalogCorrectionLinkBuilder;
 use App\Services\Media\ExternalMediaFileType;
 use App\Services\Media\ExternalMediaMetadata;
 use App\Services\Media\LicensedMediaDownloadFilename;
@@ -113,6 +115,8 @@ class CatalogTitlePlayer extends Component
 
     protected PlaybackQualitySchema $playbackQualitySchema;
 
+    protected CatalogCorrectionLinkBuilder $correctionLinks;
+
     protected ?AccountSettingsData $resolvedAccountSettings = null;
 
     protected ?CatalogTitle $resolvedTitle = null;
@@ -145,6 +149,7 @@ class CatalogTitlePlayer extends Component
         TechnicalIssueContext $technicalIssueContext,
         PlaybackQualityContext $playbackQualityContext,
         PlaybackQualitySchema $playbackQualitySchema,
+        CatalogCorrectionLinkBuilder $correctionLinks,
     ): void {
         $this->playback = $playback;
         $this->primaryActions = $primaryActions;
@@ -162,6 +167,7 @@ class CatalogTitlePlayer extends Component
         $this->technicalIssueContext = $technicalIssueContext;
         $this->playbackQualityContext = $playbackQualityContext;
         $this->playbackQualitySchema = $playbackQualitySchema;
+        $this->correctionLinks = $correctionLinks;
     }
 
     public function mount(int $catalogTitleId): void
@@ -852,6 +858,22 @@ class CatalogTitlePlayer extends Component
                 : null;
         $routeLocale = request()->route('locale');
         $routeLocale = is_string($routeLocale) ? $routeLocale : null;
+        $episodeCorrectionUrls = $episodes->mapWithKeys(fn (Episode $episode): array => [
+            $episode->id => $this->correctionLinks->for(
+                $title,
+                ContentCorrectionField::Episode,
+                $episode->id,
+                $routeLocale,
+            ),
+        ])->all();
+        $subtitleCorrectionUrl = $selectedEpisode !== null
+            ? $this->correctionLinks->for(
+                $title,
+                ContentCorrectionField::Subtitles,
+                $selectedEpisode->id,
+                $routeLocale,
+            )
+            : null;
         $selectedProgress = $user !== null && $selectedEpisode !== null
             ? $this->manualPlayback->progress($user, $title, $selectedEpisode->id)
             : null;
@@ -930,6 +952,8 @@ class CatalogTitlePlayer extends Component
             'playerHelpFeature' => HelpFeature::Player->value,
             'playerHelpContext' => $playbackSource->isPlayable() ? 'controls' : 'error',
             'playerHelpRouteLocale' => $routeLocale,
+            'episodeCorrectionUrls' => $episodeCorrectionUrls,
+            'subtitleCorrectionUrl' => $subtitleCorrectionUrl,
             'playerCopy' => $playerCopy->current(),
             'playerMenuBootstrap' => $playerMenuBootstrap,
             'mediaSession' => [
