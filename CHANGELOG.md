@@ -2,6 +2,25 @@
 
 ## 2026-07-27
 
+- Удалены все 16 операторов подавления ошибок `@` из прикладного слоя.
+  Новый `App\Support\NativeCall::withWarningsAsExceptions()` временно
+  преобразует `E_WARNING`/`E_USER_WARNING` в `ErrorException` и всегда
+  восстанавливает прежний обработчик. `SeasonvarImportProcessInspector`,
+  `SeasonvarSitemapBodyDecoder`, `SeasonvarImportPayloadCodec`,
+  `CatalogStatsPosterUrlGuard`, `GoogleServiceAccountAccessToken`,
+  `TechnicalIssueAttachmentService`, `UserProfileImageProcessor`,
+  `CacheVersionRegistry` и `PublicPageHtmlPayloadCodec` явно переводят
+  ожидаемое предупреждение в прежнее доменное исключение, промах кеша, отказ
+  по умолчанию, `null` либо обезличенный оперативный отчёт. Для двух
+  затронутых устаревших сервисов включён `strict_types`; маршруты, схема, SQL,
+  ключи и форматы кеша, содержимое очередей, разрешения и интерфейс не
+  менялись.
+- Добавлены `NativeCallTest`, `ModernPhpPracticeContractTest` и
+  `TechnicalIssueAttachmentServiceTest`; расширены проверки Google и профиля.
+  AST-проверка запрещает в `app` `@`, `die`/`exit`, исполняемые во время
+  работы `include`/`require` и `DB::unprepared`. Ограниченный Larastan уровня
+  6 теперь включает новую вспомогательную границу без исходного списка
+  исключений и `ignoreErrors`.
 - Завершён режим «Развернуть театр»: после схлопывания окружающих секций
   `player-navigation.js` через отменяемый вызов `requestAnimationFrame`
   возвращает проигрыватель и кнопку выхода в видимую область, а при закрытии

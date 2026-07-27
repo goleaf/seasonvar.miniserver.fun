@@ -10,6 +10,7 @@ use App\Services\Profiles\UserProfileService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use RuntimeException;
 use Tests\TestCase;
 
 final class UserProfileMediaProcessingTest extends TestCase
@@ -64,5 +65,28 @@ final class UserProfileMediaProcessingTest extends TestCase
         $this->assertIsArray($cover);
         $this->assertSame([320, 320, IMAGETYPE_WEBP, 'image/webp'], [$avatar[0], $avatar[1], $avatar[2], $avatar['mime']]);
         $this->assertSame([1280, 360, IMAGETYPE_WEBP, 'image/webp'], [$cover[0], $cover[1], $cover[2], $cover['mime']]);
+    }
+
+    public function test_malformed_profile_image_bytes_are_rejected_before_storage(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+        $profile = app(UserProfileService::class)->forUser($user);
+
+        try {
+            app(UserProfileMediaService::class)->replace(
+                $user,
+                $profile,
+                'avatar',
+                UploadedFile::fake()->createWithContent('client-avatar.png', 'not an image'),
+            );
+
+            $this->fail('Malformed profile image bytes were accepted.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('Формат или размеры изображения профиля недопустимы.', $exception->getMessage());
+        }
+
+        $this->assertSame([], Storage::disk('uploads')->allFiles());
+        $this->assertNull($profile->fresh()?->avatar_path);
     }
 }

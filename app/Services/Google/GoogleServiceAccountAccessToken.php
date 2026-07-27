@@ -1,7 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Google;
 
+use App\Support\NativeCall;
+use ErrorException;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use JsonException;
 
@@ -111,7 +115,13 @@ class GoogleServiceAccountAccessToken
             'exp' => $now + 3600,
         ]);
         $unsigned = $header.'.'.$payload;
-        $key = @openssl_pkey_get_private($privateKey);
+        try {
+            $key = NativeCall::withWarningsAsExceptions(
+                static fn () => openssl_pkey_get_private($privateKey),
+            );
+        } catch (ErrorException) {
+            throw new GoogleIntegrationException('Не удалось прочитать private_key из GOOGLE_APPLICATION_CREDENTIALS.');
+        }
 
         if ($key === false) {
             throw new GoogleIntegrationException('Не удалось прочитать private_key из GOOGLE_APPLICATION_CREDENTIALS.');

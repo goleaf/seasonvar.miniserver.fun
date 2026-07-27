@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Support\Cache;
 
+use App\Support\NativeCall;
 use DateTimeImmutable;
+use ErrorException;
 use Illuminate\Support\Facades\Cache;
 use Throwable;
 
@@ -57,10 +59,10 @@ final class CacheVersionRegistry
     public function lastModified(CacheDomain $domain, string $scope = 'public'): DateTimeImmutable
     {
         $key = $this->keys->modified($domain, $scope);
+        $fallback = $this->composerLockTimestamp();
 
         try {
             $store = Cache::memo($this->store());
-            $fallback = max(1, (int) @filemtime(base_path('composer.lock')));
             $store->add($key, $fallback, $this->retention());
             $timestamp = max(1, (int) $store->get($key, $fallback));
 
@@ -68,8 +70,30 @@ final class CacheVersionRegistry
         } catch (Throwable $exception) {
             report($exception);
 
-            return (new DateTimeImmutable)->setTimestamp(max(1, (int) @filemtime(base_path('composer.lock'))));
+            return (new DateTimeImmutable)->setTimestamp($fallback);
         }
+    }
+
+    private function composerLockTimestamp(): int
+    {
+        try {
+            $timestamp = NativeCall::withWarningsAsExceptions(
+                static fn (): int|false => filemtime(base_path('composer.lock')),
+            );
+        } catch (ErrorException) {
+            return $this->reportUnavailableComposerLockTimestamp();
+        }
+
+        return $timestamp === false
+            ? $this->reportUnavailableComposerLockTimestamp()
+            : max(1, $timestamp);
+    }
+
+    private function reportUnavailableComposerLockTimestamp(): int
+    {
+        report(new CacheVersionUnavailable('Не удалось определить время изменения composer.lock.'));
+
+        return 1;
     }
 
     private function store(): string

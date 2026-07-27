@@ -84,6 +84,32 @@
 - Пользовательские uploads хранить только через приватный disk `uploads` или явно авторизованный private-диск; публичную выдачу делать отдельным signed/authorized endpoint.
 - Notifications и emails должны быть queueable, содержать только безопасный operational context и тестироваться отдельно на dispatch и content.
 
+## Нативные PHP-вызовы, ошибки и зависимости
+
+- Оператор подавления ошибок `@` запрещён в `app`. Нативный вызов, который
+  штатно может выдать warning, выполняется через
+  `NativeCall::withWarningsAsExceptions()`, а caller явно переводит
+  `ErrorException` в существующее domain exception, fail-closed outcome либо
+  sanitized operational report. Нельзя возвращать native message, path,
+  credential, URL или body пользователю и нельзя скрывать programming
+  exception широким `catch (Throwable)`.
+- `die` и `exit` запрещены в application classes. HTTP/Livewire/API boundary
+  возвращает framework response либо бросает подходящее exception, console
+  command возвращает документированный exit code, а process termination
+  остаётся только в entrypoint/tooling scripts.
+- Runtime `include`/`require` запрещены в `app`: классы загружает Composer,
+  конфигурация и данные имеют явного repository owner. Data include внутри
+  immutable migration допустим только для versioned migration-owned payload
+  и не является runtime dependency приложения.
+- Raw SQL применяется только когда Eloquent/query builder не выражает
+  запрос безопасно. Пользовательские и runtime values всегда передаются
+  bindings; table/column/operator/order identifiers берутся из закрытого
+  allowlist, schema contract или grammar wrapping. `DB::unprepared` в
+  application code запрещён.
+- `composer.lock` остаётся единственным exact PHP dependency lock. Ручное
+  копирование libraries в `app`/`public`, создание второго autoloader и
+  добавление package без purpose/security/compatibility review запрещены.
+
 ## Правила импортера
 
 - Использовать только `https://seasonvar.ru/` как домен источника Seasonvar.

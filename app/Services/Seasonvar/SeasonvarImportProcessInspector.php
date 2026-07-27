@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Services\Seasonvar;
 
 use App\Models\SeasonvarImportRun;
+use App\Support\NativeCall;
 use Carbon\CarbonInterface;
+use ErrorException;
 use Illuminate\Support\Collection;
 use Symfony\Component\Process\Process;
 use Throwable;
@@ -227,7 +229,13 @@ class SeasonvarImportProcessInspector
             return null;
         }
 
-        $contents = @file_get_contents($path);
+        try {
+            $contents = NativeCall::withWarningsAsExceptions(
+                static fn (): string|false => file_get_contents($path),
+            );
+        } catch (ErrorException) {
+            return null;
+        }
 
         if (! is_string($contents) || $contents === '') {
             return null;

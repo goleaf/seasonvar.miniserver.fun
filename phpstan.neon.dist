@@ -8,6 +8,7 @@ parameters:
         - app/Enums
         - app/Services/Catalog/Queries
         - app/Services/Operations
+        - app/Support/NativeCall.php
         - app/Services/Admin/AdminAuditRecorder.php
         - app/Console/Commands/CheckDeploymentReadiness.php
         - app/Console/Commands/AuditFailedSeasonvarJobs.php

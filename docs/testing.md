@@ -202,3 +202,28 @@ desktop/mobile/tablet, включая URL state, touch target, отсутств�
   CSP/capped-report сообщения. Промежуточные history pages ждут
   `document.fonts.ready`; любой иной font, asset или CSP outcome остаётся
   блокирующим.
+
+## Regression matrix Task 113
+
+- `NativeCallTest` проверяет generic callback result, преобразование
+  `E_USER_WARNING` в `ErrorException` и обязательное восстановление прежнего
+  error handler после исключения.
+- `ModernPhpPracticeContractTest` AST-поиском по всему `app` запрещает
+  `ErrorSuppress`, `Exit_`, runtime `Include_` и static `unprepared`; тест не
+  сканирует migration-owned data include и test-only failure-injection SQL.
+- `SeasonvarSitemapBodyDecoderTest`, `SeasonvarImportPayloadCodecTest`,
+  `SeasonvarImportProcessInspectorTest` и
+  `PublicPageHtmlPayloadCodecTest` сохраняют bounded gzip/proc/cache outcomes
+  после удаления `@`.
+- `CatalogStatsPosterUrlGuardTest` фиксирует public literal IP, private IP и
+  unresolvable host fail-closed boundary; DNS warning не становится response
+  error и не ослабляет SSRF-проверку.
+- `GoogleServiceAccountAccessTokenTest` дополнительно проверяет неправильный
+  private key: наружный HTTP request не отправляется, а exception не содержит
+  key material.
+- `UserProfileMediaProcessingTest` и
+  `TechnicalIssueAttachmentServiceTest` проверяют успешное private
+  re-encoding и malformed bytes: повреждённое изображение не сохраняется и
+  получает существующую безопасную domain error.
+- `StaticAnalysisContractTest` требует включения `App\Support\NativeCall` в
+  bounded Larastan level 6 без baseline/`ignoreErrors`.

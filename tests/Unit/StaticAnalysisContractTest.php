@@ -28,6 +28,7 @@ class StaticAnalysisContractTest extends TestCase
             'app/DTOs',
             'app/Enums',
             'app/Services/Operations',
+            'app/Support/NativeCall.php',
             'app/Services/Admin/AdminAuditRecorder.php',
             'app/Console/Commands/CheckDeploymentReadiness.php',
             'app/Console/Commands/AuditFailedSeasonvarJobs.php',

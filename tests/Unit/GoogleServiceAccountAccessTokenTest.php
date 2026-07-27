@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Unit;
 
 use App\Services\Google\GoogleIntegrationException;
@@ -8,7 +10,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
-class GoogleServiceAccountAccessTokenTest extends TestCase
+final class GoogleServiceAccountAccessTokenTest extends TestCase
 {
     public function test_it_exchanges_service_account_credentials_for_an_access_token(): void
     {
@@ -76,15 +78,42 @@ class GoogleServiceAccountAccessTokenTest extends TestCase
         }
     }
 
-    private function credentialFile(string $tokenUri = 'https://oauth2.googleapis.com/token'): string
+    public function test_it_rejects_an_invalid_private_key_without_sending_a_request(): void
     {
-        Storage::fake('local');
-        $key = openssl_pkey_new([
-            'private_key_bits' => 2048,
-            'private_key_type' => OPENSSL_KEYTYPE_RSA,
+        Http::preventStrayRequests();
+
+        config([
+            'services.google.application_credentials' => $this->credentialFile(
+                privateKey: 'not a private key',
+            ),
         ]);
-        $privateKey = '';
-        openssl_pkey_export($key, $privateKey);
+
+        $this->expectException(GoogleIntegrationException::class);
+        $this->expectExceptionMessage('Не удалось прочитать private_key');
+
+        try {
+            app(GoogleServiceAccountAccessToken::class)
+                ->forScopes(['https://www.googleapis.com/auth/webmasters.readonly']);
+        } finally {
+            Http::assertNothingSent();
+        }
+    }
+
+    private function credentialFile(
+        string $tokenUri = 'https://oauth2.googleapis.com/token',
+        ?string $privateKey = null,
+    ): string {
+        Storage::fake('local');
+
+        if ($privateKey === null) {
+            $key = openssl_pkey_new([
+                'private_key_bits' => 2048,
+                'private_key_type' => OPENSSL_KEYTYPE_RSA,
+            ]);
+            $privateKey = '';
+            openssl_pkey_export($key, $privateKey);
+        }
+
         $path = storage_path('framework/testing/google-service-account.json');
 
         if (! is_dir(dirname($path))) {

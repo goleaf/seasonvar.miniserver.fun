@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Services\Profiles;
 
 use App\DTOs\Profiles\PreparedUserProfileImage;
+use App\Support\NativeCall;
+use ErrorException;
 use GdImage;
 use Illuminate\Http\UploadedFile;
 use RuntimeException;
@@ -37,7 +39,7 @@ final class UserProfileImageProcessor
             throw new RuntimeException('Не удалось безопасно прочитать изображение профиля.');
         }
 
-        $info = @getimagesizefromstring($bytes);
+        $info = $this->imageInfo($bytes);
         $mime = is_array($info) ? ($info['mime'] ?? null) : null;
         $width = is_array($info) ? (int) ($info[0] ?? 0) : 0;
         $height = is_array($info) ? (int) ($info[1] ?? 0) : 0;
@@ -53,7 +55,7 @@ final class UserProfileImageProcessor
             throw new RuntimeException('Формат или размеры изображения профиля недопустимы.');
         }
 
-        $source = @imagecreatefromstring($bytes);
+        $source = $this->image($bytes);
 
         if (! $source instanceof GdImage) {
             throw new RuntimeException('Изображение профиля не удалось декодировать.');
@@ -66,7 +68,7 @@ final class UserProfileImageProcessor
             imagedestroy($source);
         }
 
-        $outputInfo = @getimagesizefromstring($encoded);
+        $outputInfo = $this->imageInfo($encoded);
 
         if (! is_array($outputInfo)
             || ($outputInfo['mime'] ?? null) !== 'image/webp'
@@ -107,7 +109,9 @@ final class UserProfileImageProcessor
         }
 
         try {
-            $exif = @exif_read_data($path, 'IFD0', true, false);
+            $exif = NativeCall::withWarningsAsExceptions(
+                static fn (): array|false => exif_read_data($path, 'IFD0', true, false),
+            );
         } catch (Throwable) {
             return $image;
         }
@@ -212,5 +216,28 @@ final class UserProfileImageProcessor
         }
 
         return $bytes;
+    }
+
+    /** @return array<int|string, int|string>|false */
+    private function imageInfo(string $bytes): array|false
+    {
+        try {
+            return NativeCall::withWarningsAsExceptions(
+                static fn (): array|false => getimagesizefromstring($bytes),
+            );
+        } catch (ErrorException) {
+            return false;
+        }
+    }
+
+    private function image(string $bytes): GdImage|false
+    {
+        try {
+            return NativeCall::withWarningsAsExceptions(
+                static fn (): GdImage|false => imagecreatefromstring($bytes),
+            );
+        } catch (ErrorException) {
+            return false;
+        }
     }
 }

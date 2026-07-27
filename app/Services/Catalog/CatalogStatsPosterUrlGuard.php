@@ -1,8 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Catalog;
 
 use App\DTOs\VerifiedExternalUrlData;
+use App\Support\NativeCall;
+use ErrorException;
 use Illuminate\Support\Str;
 
 class CatalogStatsPosterUrlGuard
@@ -62,11 +66,26 @@ class CatalogStatsPosterUrlGuard
             return null;
         }
 
-        $addresses = filter_var($host, FILTER_VALIDATE_IP) !== false
-            ? [$host]
-            : (@gethostbynamel($host) ?: []);
+        if (filter_var($host, FILTER_VALIDATE_IP) !== false) {
+            $addresses = [$host];
+        } else {
+            try {
+                $addresses = NativeCall::withWarningsAsExceptions(
+                    static fn (): array|false => gethostbynamel($host),
+                ) ?: [];
+            } catch (ErrorException) {
+                return null;
+            }
+        }
 
-        $ipv6Records = @dns_get_record($host, DNS_AAAA);
+        try {
+            $ipv6Records = NativeCall::withWarningsAsExceptions(
+                static fn (): array|false => dns_get_record($host, DNS_AAAA),
+            );
+        } catch (ErrorException) {
+            return null;
+        }
+
         if (is_array($ipv6Records)) {
             foreach ($ipv6Records as $record) {
                 if (is_string($record['ipv6'] ?? null)) {

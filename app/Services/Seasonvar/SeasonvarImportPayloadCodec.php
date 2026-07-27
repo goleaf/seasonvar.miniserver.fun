@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Seasonvar;
 
+use App\Support\NativeCall;
+use ErrorException;
 use JsonException;
 use RuntimeException;
 
@@ -118,7 +120,13 @@ final class SeasonvarImportPayloadCodec
             throw new RuntimeException('Payload Seasonvar имеет недопустимый размер.');
         }
 
-        $decoded = @gzdecode($blob, $maximumBytes + 1);
+        try {
+            $decoded = NativeCall::withWarningsAsExceptions(
+                static fn (): string|false => gzdecode($blob, $maximumBytes + 1),
+            );
+        } catch (ErrorException) {
+            throw new RuntimeException('Payload Seasonvar повреждён или превышает лимит.');
+        }
 
         if (! is_string($decoded)
             || mb_strlen($decoded, '8bit') !== $uncompressedBytes

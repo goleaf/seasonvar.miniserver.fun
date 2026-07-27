@@ -2,6 +2,37 @@
 
 Проверено: 16.07.2026; operational baseline повторно сверен 24.07.2026. Корень приложения: `/www/wwwroot/seasonvar.miniserver.fun`. Этот документ — датированный evidence snapshot; устойчивые контракты остаются в тематических владельцах из [`docs/README.md`](../README.md), а активное исполнение — в [`docs/plans/current-task-plan.md`](../plans/current-task-plan.md).
 
+## Аудит современных PHP-практик Task 113 — 27.07.2026
+
+- Фактический runtime: PHP `8.5.8`, Laravel `13.22.0`, Livewire `4.3.3`,
+  SQLite; Composer `2.10.2`, Node `26.4.0`, npm `12.0.1`.
+- В `app` находится `1453` PHP-файла: `1359` имеют
+  `declare(strict_types=1)`, `94` остаются legacy без strict mode. Добавлен
+  только один новый typed support class, а strict mode включён в двух
+  затронутых low-risk legacy services; массовый rewrite не выполнялся.
+- AST inventory после исправления: `0` `ErrorSuppress`, `0` `Exit_`, `0`
+  runtime `Include_`, `0` static `unprepared`. Исходный RED-test перечислил
+  16 `@` в девяти runtime-файлах.
+- Inventory типов: `1281` named classes, из них `1137` final и `399`
+  readonly; `162` enums. Это snapshot структуры, а не требование механически
+  делать каждый service final/readonly.
+- `composer.lock` tracked, `/vendor` ignored; ручного application autoloader
+  или copied library не найдено. Bounded Larastan level 6 остаётся без
+  baseline/`ignoreErrors` и теперь явно включает `App\Support\NativeCall`.
+- В 34 API controllers (`1735` строк суммарно) не подтверждён god-controller:
+  HTML routes принадлежат full-page Livewire, API boundary использует
+  Requests/Resources/services/query objects. Новый repository/service layer
+  не добавлялся.
+- Проверка dynamic raw SQL не выявила interpolated user values:
+  значения передаются bindings, identifiers ограничиваются allowlist,
+  schema-derived constants либо grammar wrapping. Query shape, indexes,
+  pagination и schema Task 113 не меняет, поэтому новый `EXPLAIN` и migration
+  не требуются.
+- Подтверждённый дефект исправляется единым typed native-warning boundary и
+  domain-specific mapping для gzip, proc, DNS, OpenSSL, GD/EXIF, temporary
+  cleanup и cache timestamp. Credential, provider URL, body и private path
+  не попадают в пользовательскую ошибку или новый log context.
+
 ## Read-only stabilization baseline — 24.07.2026
 
 - Runtime: PHP `8.5.8`, Laravel/vendor `13.21.1`, Livewire `4.3.3`, production/debug off, SQLite, Redis и Memcached reachable. `HEAD` lock ещё содержит Laravel `13.20.0`; параллельный unstaged package diff не принадлежит этому baseline.
@@ -86,7 +117,7 @@
 | CS-07 | Confirmed problem, fixed | Baseline Blade содержал 41 `request()`, 1 `config()` и auth/gate directives | Typed prepared navigation, route/class/permission flags, prepared directory maxlength and zero-tolerance contract | Implemented and browser verified | Zero matches across 52 Blade; 42/339 focused tests; full 840/6882 suite; 21/21 browser scenarios; view cache/build; changed-scope Larastan 0 | Remaining route/translation helper migration is tracked separately; forbidden infrastructure/request/config boundary is closed |
 | CS-08 | Confirmed problem, fixed | Measured source had AppLayoutData 1,928 lines and layout 783 lines; no producer enabled `extended_seo`/`show_public_seo_blocks`, yet the complete generated matrix was built and reset | Remove unreachable query/keyword/schema matrix, return an explicit layout contract and pre-encode JSON-LD | Implemented and browser verified | 411/96 lines; rich-payload median 23.894→0.536 ms and p95 25.323→0.834 ms; 130/1198 focused, full 848/6928, Larastan 0, build and browser 21/21 | External Rich Results/URL Inspection remains a post-deploy check; no local test guarantees search appearance |
 | CS-09 | Confirmed problem | Full Larastan level 6: 547 diagnostics; configured bounded scope: 0 | Расширять scope пакетами, исправлять real types, не создавать baseline | In progress | Direct `vendor/bin/phpstan` | Большой объём требует нескольких verified batches |
-| CS-10 | Confirmed problem | 138/414 app PHP files без `strict_types` | Добавлять при изменении файлов и отдельными низкорисковыми batches | Pending | Static inventory | Массовая механическая правка без проверки запрещена |
+| CS-10 | Confirmed problem | 94/1453 app PHP files без `strict_types` после Task 113 | Добавлять при изменении файлов и отдельными низкорисковыми batches | In progress | AST inventory 27.07.2026 | Массовая механическая правка без проверки запрещена |
 | CS-11 | Confirmed problem | Snapshot/prepared storage и DB занимают гигабайты; volatile provider HTML меняет raw hash | Ввести semantic fingerprint/canonical snapshot policy и bounded retention | Pending importer/storage | DB/file size and 500-row normalization sample | Нельзя удалить forensic/source data без recovery contract |
 | CS-12 | Confirmed problem | Recommendation v3 rebuild запускается каждым import cycle и занимает ~9 min | Перестраивать по changed title set/versioned dirty marker | Pending performance | Production timing + call graph | Нужен atomic consistency contract |
 | CS-13 | Confirmed problem | Stats path и cold home path медленные под active import load | Snapshot/SQL profiling, bounded stats builder, cache recovery | Pending performance | Timed HTTP samples | Host load меняется; нужны before/after medians |

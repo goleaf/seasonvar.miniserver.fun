@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Seasonvar;
 
+use App\Support\NativeCall;
+use ErrorException;
 use RuntimeException;
 
 final class SeasonvarSitemapBodyDecoder
@@ -27,7 +29,13 @@ final class SeasonvarSitemapBodyDecoder
             return $body;
         }
 
-        $decoded = @gzdecode($body, $maximumBytes + 1);
+        try {
+            $decoded = NativeCall::withWarningsAsExceptions(
+                static fn (): string|false => gzdecode($body, $maximumBytes + 1),
+            );
+        } catch (ErrorException) {
+            throw new RuntimeException('Карта сайта Seasonvar повреждена или превышает допустимый размер.');
+        }
 
         if (! is_string($decoded)) {
             throw new RuntimeException('Карта сайта Seasonvar повреждена или превышает допустимый размер.');

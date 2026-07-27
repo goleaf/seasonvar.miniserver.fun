@@ -7,8 +7,11 @@ namespace App\Services\TechnicalIssues;
 use App\DTOs\TechnicalIssues\StoredTechnicalIssueAttachment;
 use App\Exceptions\TechnicalIssues\TechnicalIssueActionException;
 use App\Services\Storage\PrivateUploadStorage;
+use App\Support\NativeCall;
+use ErrorException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
+use RuntimeException;
 use Throwable;
 
 final readonly class TechnicalIssueAttachmentService
@@ -62,7 +65,7 @@ final readonly class TechnicalIssueAttachmentService
         }
 
         $bytes = file_get_contents($file->getRealPath());
-        $imageInfo = is_string($bytes) ? @getimagesizefromstring($bytes) : false;
+        $imageInfo = is_string($bytes) ? $this->imageInfo($bytes) : false;
         $mime = is_array($imageInfo) ? $imageInfo['mime'] : null;
         $format = match ($mime) {
             'image/jpeg' => ['extension' => 'jpg', 'encode' => 'jpeg'],
@@ -79,7 +82,7 @@ final readonly class TechnicalIssueAttachmentService
             throw new TechnicalIssueActionException('issues.errors.invalid_attachment');
         }
 
-        $image = @imagecreatefromstring($bytes);
+        $image = $this->image($bytes);
 
         if ($image === false) {
             throw new TechnicalIssueActionException('issues.errors.invalid_attachment');
@@ -123,7 +126,7 @@ final readonly class TechnicalIssueAttachmentService
             );
             $stored = $this->uploads->store($temporary, 'technical-issues/'.substr($issuePublicId, 0, 2).'/'.$issuePublicId);
         } finally {
-            @unlink($temporaryPath);
+            $this->deleteTemporaryFile($temporaryPath);
         }
 
         return new StoredTechnicalIssueAttachment(
@@ -145,6 +148,45 @@ final readonly class TechnicalIssueAttachmentService
             $this->uploads->delete($path);
         } catch (Throwable $exception) {
             report($exception);
+        }
+    }
+
+    /** @return array<int|string, int|string>|false */
+    private function imageInfo(string $bytes): array|false
+    {
+        try {
+            return NativeCall::withWarningsAsExceptions(
+                static fn (): array|false => getimagesizefromstring($bytes),
+            );
+        } catch (ErrorException) {
+            return false;
+        }
+    }
+
+    private function image(string $bytes): \GdImage|false
+    {
+        try {
+            return NativeCall::withWarningsAsExceptions(
+                static fn (): \GdImage|false => imagecreatefromstring($bytes),
+            );
+        } catch (ErrorException) {
+            return false;
+        }
+    }
+
+    private function deleteTemporaryFile(string $path): void
+    {
+        try {
+            $deleted = ! is_file($path)
+                || NativeCall::withWarningsAsExceptions(
+                    static fn (): bool => unlink($path),
+                );
+        } catch (ErrorException) {
+            $deleted = false;
+        }
+
+        if (! $deleted) {
+            report(new RuntimeException('Не удалось удалить временный файл технического обращения.'));
         }
     }
 }

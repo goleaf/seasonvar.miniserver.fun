@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Support\Cache;
 
+use App\Support\NativeCall;
+use ErrorException;
+
 final class PublicPageHtmlPayloadCodec
 {
     /** @return array{body: string, encoding: 'gzip'}|null */
@@ -44,7 +47,13 @@ final class PublicPageHtmlPayloadCodec
             return null;
         }
 
-        $html = @gzdecode($body, $this->maxUncompressedBytes() + 1);
+        try {
+            $html = NativeCall::withWarningsAsExceptions(
+                fn (): string|false => gzdecode($body, $this->maxUncompressedBytes() + 1),
+            );
+        } catch (ErrorException) {
+            return null;
+        }
 
         return is_string($html) && strlen($html) <= $this->maxUncompressedBytes()
             ? $html
