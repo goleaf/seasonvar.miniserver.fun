@@ -30,7 +30,6 @@ final class CatalogTitlePageBuilder
         private readonly CatalogUserCardStateLoader $cardStates,
         private readonly CatalogRecommendationService $recommendations,
         private readonly CatalogRecommendationPresenter $recommendationPresenter,
-        private readonly CatalogRecommendationFeedbackOptionQuery $feedbackOptions,
     ) {}
 
     /**
@@ -66,10 +65,12 @@ final class CatalogTitlePageBuilder
         $titleRecommendations = $this->recommendations->forTitle(
             $catalogTitle,
             $user,
-            max(1, (int) config('seasonvar.recommendations.max_per_title', 12)),
+            min(12, max(1, (int) config('seasonvar.recommendations.max_per_title', 12))),
         );
         $relatedRecommendationItems = $this->presentRecommendationItems($titleRecommendations['related'], $user !== null);
         $recommendationItems = $this->presentRecommendationItems($titleRecommendations['similar'], $user !== null);
+        $primaryRecommendationItems = $recommendationItems->take(6)->values();
+        $additionalRecommendationItems = $recommendationItems->slice(6, 6)->values();
         $this->cardStates->load(
             $relatedRecommendationItems->pluck('title')->concat($recommendationItems->pluck('title')),
             $user,
@@ -113,6 +114,9 @@ final class CatalogTitlePageBuilder
             'topTaxonomies' => $showView->topTaxonomies,
             'showView' => $showView,
             'recommendationItems' => $recommendationItems,
+            'primaryRecommendationItems' => $primaryRecommendationItems,
+            'additionalRecommendationItems' => $additionalRecommendationItems,
+            'additionalRecommendationCount' => $additionalRecommendationItems->count(),
             'relatedRecommendationItems' => $relatedRecommendationItems,
             'seo' => $this->seo->title($catalogTitle, $taxonomiesByType, $seasons, $episodeCount, $mediaCount, null, null),
         ];
@@ -145,10 +149,6 @@ final class CatalogTitlePageBuilder
      */
     private function presentRecommendationItems(Collection $items, bool $canDismiss): Collection
     {
-        $options = $canDismiss
-            ? $this->feedbackOptions->forTitles($items->pluck('title'))
-            : [];
-
         return $items->map(fn (CatalogRecommendationItem $item): CatalogRecommendationListItem => new CatalogRecommendationListItem(
             title: $item->title,
             rank: $item->rank,
@@ -158,7 +158,7 @@ final class CatalogTitlePageBuilder
             source: $item->source,
             relationType: $item->relationType,
             canDismiss: $canDismiss,
-            feedbackOptions: $options[$item->title->id] ?? [],
+            feedbackOptions: [],
         ));
     }
 

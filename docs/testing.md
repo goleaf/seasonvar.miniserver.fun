@@ -1,6 +1,6 @@
 # Тестирование
 
-Обновлено: 26.07.2026
+Обновлено: 27.07.2026
 
 ## Стек
 
@@ -8,6 +8,29 @@
 - PHPUnit использует SQLite в памяти через `phpunit.xml`, обычный cache — `array`, а `APP_ROUTES_CACHE` указывает на отдельный отсутствующий testing artifact, поэтому production `bootstrap/cache/routes-v7.php` не скрывает новые маршруты. Общих public request/action limiter counters нет; mobile credential endpoints используют отдельные named limiters, которые очищаются между feature-тестами вместе с application state.
 - `RUN_CACHE_INFRASTRUCTURE_TESTS=true` включает реальные Redis/Memcached tests: domain read/write, tags, critical version bump, distributed lock, queue workload, session isolation, connection isolation, readiness, Memcached outage и Redis-cache/version-registry outage. Они используют случайные exact keys/run prefixes и не выполняют full-store flush.
 - Параллельный importer проверяется в `SeasonvarParallelImportTest`, `SeasonvarImportFinalizationWatchdogTest`, `SeasonvarParallelTitleRefreshPersistenceTest`, `SeasonvarCatalogPagePreparationTest`, `SeasonvarCatalogPreparedApplyTest`, `SeasonvarImportTitleGroupDispatcherTest` и `SeasonvarImportTitleGroupFinalizerTest`: тесты фиксируют lifecycle single-flight между admin/CLI, независимый targeted refresh, durable fan-out/fan-in state, отсутствие application-level page limit, динамическое discovery, network-free apply, local-only preservation, partial groups, lease recovery, completion-driven finalizer signals без polling release, bounded watchdog и schedule locks. HTTP-поведение закрыто `Http::fake()` и `Http::preventStrayRequests()`.
+- Completion matrix дополнительно включает
+  `SeasonvarImporterFailureInjectionTest`,
+  `SeasonvarImporterLoadProfileTest`,
+  `SeasonvarImporterDecompositionTest`,
+  `SeasonvarPreparedPayloadFingerprintTest`,
+  `SeasonvarSitemapBodyDecoderTest`,
+  `SeasonvarImportCompactStorageTest` и
+  `LicensedMediaFileSizeBacklogTest`. Она проверяет crash/retry каждой
+  durable boundary, 48 000 URL, большой merge/media profile, parser
+  fingerprints/provenance, bounded gzip/XML, disabled-first storage и
+  projection fallback.
+- Итоговый Seasonvar slice 27.07.2026 прошёл `376` тестов и `2344`
+  утверждений: `357` importer/LicensedMedia contracts дали `2238`
+  утверждений, а `11` тестов live-refresh и точный admin status test —
+  ещё `82`. Focused failure/load/storage/parser matrix прошла `63` теста
+  и `497` утверждений; основной importer regression — `164` и `977`.
+  `tests/browser/import-admin-status.spec.js` прошёл в Desktop, Mobile и
+  Tablet Chromium с process-local SQLite, `sync` queue и `array` lock
+  store: HTTP 200, exact idle state, отсутствие overflow/console/page/local
+  response errors и serious/critical axe violations внутри importer manager.
+- PHPUnit memory limit равен 512 MiB только в testing configuration. Старые
+  256 MiB воспроизводимо завершали общий Livewire/importer suite аварийно;
+  production PHP-FPM/import workers этим параметром не изменяются.
 - Фоновое обновление карточки покрывают `CatalogTitleBackgroundRefreshTest`, `RefreshSeasonvarCatalogTitleJobTest` и `CatalogTitleLiveRefreshTest`: atomic dispatch/freshness, пять независимых тайтлов, 15-минутное окно только после `completed`, sanitized failure payload, трёхсекундный visible polling, полный rerender и сохранение валидного player selection. `TitleBackgroundRefreshDocumentationTest` фиксирует отдельные очереди worker pools и отсутствие application-level cap.
 - Для тестов, которые пишут в базу, использовать `RefreshDatabase`.
 - Базовый `Tests\TestCase` вызывает `withoutVite()`, поэтому feature-тесты не зависят от собранного Vite manifest.

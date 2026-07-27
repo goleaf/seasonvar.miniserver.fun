@@ -20,6 +20,7 @@ use App\Models\UserAccountSetting;
 use App\Models\UserProfile;
 use App\Models\UserTag;
 use App\Observers\EpisodeReleaseScheduleObserver;
+use App\Observers\LicensedMediaFileSizeProjectionObserver;
 use App\Observers\LicensedMediaReleaseScheduleObserver;
 use App\Observers\UserPortalCacheObserver;
 use App\Policies\AccountSettingsPolicy;
@@ -245,6 +246,7 @@ class AppServiceProvider extends ServiceProvider
 
         Episode::observe(EpisodeReleaseScheduleObserver::class);
         LicensedMedia::observe(LicensedMediaReleaseScheduleObserver::class);
+        LicensedMedia::observe(LicensedMediaFileSizeProjectionObserver::class);
 
         foreach ([
             CatalogCollection::class,

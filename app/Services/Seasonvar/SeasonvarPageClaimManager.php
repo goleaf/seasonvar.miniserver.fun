@@ -2,6 +2,7 @@
 
 namespace App\Services\Seasonvar;
 
+use App\Models\SeasonvarImportPreparedPage;
 use App\Models\SourcePage;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
@@ -129,6 +130,19 @@ class SeasonvarPageClaimManager
     {
         return SourcePage::query()
             ->where('import_claim_run_id', $runId)
+            ->update($this->releasedAttributes());
+    }
+
+    public function releaseForTitleGroup(int $groupId, int $runId): int
+    {
+        return SourcePage::query()
+            ->where('import_claim_run_id', $runId)
+            ->whereIn(
+                'id',
+                SeasonvarImportPreparedPage::query()
+                    ->select('source_page_id')
+                    ->where('seasonvar_import_title_group_id', $groupId),
+            )
             ->update($this->releasedAttributes());
     }
 

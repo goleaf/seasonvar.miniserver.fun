@@ -8,10 +8,9 @@ use App\Models\Source;
 use App\Models\SourcePage;
 use App\Services\ProjectDocumentation\ProjectDocumentationRefresher;
 use App\Services\Seasonvar\SeasonvarSitemapMirror;
+use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
-use Illuminate\Http\Client\Response;
-use Illuminate\Http\Client\ResponseSequence;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -89,6 +88,32 @@ XML;
         $this->assertCount(2, collect($events)->where('event', 'crawl-delay-wait-started'));
         $this->assertFileExists(storage_path('app/'.$this->sitemapStorageDirectory.'/archives/sitemap-serials.xml.gz'));
         $this->assertFileExists(storage_path('app/'.$this->sitemapStorageDirectory.'/xml/sitemap-serials.xml'));
+    }
+
+    public function test_it_rejects_an_oversized_compressed_sitemap_before_writing_expanded_xml(): void
+    {
+        Http::preventStrayRequests();
+        config(['seasonvar.http.sitemap_max_uncompressed_bytes' => 1024]);
+        $oversizedXml = '<?xml version="1.0"?><urlset>'.str_repeat('x', 1200).'</urlset>';
+
+        Http::fake([
+            'seasonvar.ru/robots.txt' => Http::response("User-agent: *\nAllow: /\n"),
+            'seasonvar.ru/sitemap_index.xml' => Http::response(gzencode($oversizedXml)),
+        ]);
+
+        try {
+            app(SeasonvarSitemapMirror::class)->mirror();
+            $this->fail('Oversized compressed sitemap was accepted.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame(
+                'Карта сайта Seasonvar повреждена или превышает допустимый размер.',
+                $exception->getMessage(),
+            );
+        }
+
+        $this->assertFileDoesNotExist(
+            storage_path('app/'.$this->sitemapStorageDirectory.'/xml/sitemap_index.xml'),
+        );
     }
 
     public function test_inventory_mode_classifies_every_safe_url_without_touching_catalog_records(): void
@@ -213,7 +238,7 @@ XML;
     }
 
     /**
-     * @return array<string, Response|ResponseSequence>
+     * @return array<string, PromiseInterface>
      */
     private function inventoryResponses(string $serialUrl): array
     {

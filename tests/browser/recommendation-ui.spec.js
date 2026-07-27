@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('compact catalog cards expose details and one recommendation reason', async ({ page, baseURL }, testInfo) => {
+test('title recommendations stay compact, explain similarity and reveal six more', async ({ page, baseURL }, testInfo) => {
     const browserErrors = [];
     const localOrigin = new URL(baseURL).origin;
 
@@ -21,30 +21,42 @@ test('compact catalog cards expose details and one recommendation reason', async
 
         expect(response?.status()).toBe(200);
         await expect(page.getByText('Открыть тайтл', { exact: true })).toHaveCount(0);
-        await expect(page.locator('[data-title-card-details]').first()).toBeVisible();
         expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1);
     }
 
-    await page.goto('/titles?q=Browser%20Smoke');
-    const description = page.locator('[data-title-card-description]').first();
+    await page.goto('/titles/browser-smoke');
+    await expect(page.locator('[data-title-card-details]').first()).toBeVisible();
+    const primaryRecommendationRows = page.locator('[data-recommendation-primary-list] > [data-recommendation-row]');
+    const additionalRecommendationRows = page.locator('[data-recommendation-additional-list] > [data-recommendation-row]');
 
-    await expect(description).toBeVisible();
-    await expect(description).toHaveClass(/line-clamp-3/);
-    expect(await description.evaluate((element) => {
+    await expect(primaryRecommendationRows).toHaveCount(6);
+    await expect(additionalRecommendationRows).toHaveCount(6);
+    await expect(primaryRecommendationRows.first().getByRole('link', { name: 'Рекомендованный браузерный сериал' })).toBeVisible();
+    await expect(primaryRecommendationRows.first().getByRole('link', { name: 'Подробнее' })).toBeVisible();
+    await expect(primaryRecommendationRows.first().getByText('Почему похож:', { exact: true })).toBeVisible();
+    await expect(
+        primaryRecommendationRows.first().locator('[data-recommendation-reasons] p:last-child > span:not([aria-hidden])'),
+    ).toHaveCount(3);
+    await expect(primaryRecommendationRows.first().getByText('2015', { exact: true })).toBeVisible();
+    await expect(primaryRecommendationRows.first().getByText('1 сезон', { exact: true })).toBeVisible();
+    await expect(primaryRecommendationRows.first().getByText('IMDb 7,7', { exact: true })).toBeVisible();
+
+    const recommendationDescription = primaryRecommendationRows.first().locator('[data-title-card-description]');
+
+    await expect(recommendationDescription).toHaveClass(/line-clamp-2/);
+    expect(await recommendationDescription.evaluate((element) => {
         const lineHeight = Number.parseFloat(getComputedStyle(element).lineHeight);
 
-        return element.scrollHeight <= Math.ceil(lineHeight * 3) + 1;
+        return element.clientHeight <= Math.ceil(lineHeight * 2) + 1;
     })).toBe(true);
 
-    await page.goto('/titles/browser-smoke');
-    const recommendationRows = page.locator('[data-recommendation-list] [data-recommendation-row]');
+    const firstRecommendationBox = await primaryRecommendationRows.first().boundingBox();
 
-    await expect(recommendationRows).toHaveCount(1);
-    await expect(recommendationRows.getByRole('link', { name: 'Рекомендованный браузерный сериал' })).toBeVisible();
-    await expect(recommendationRows.getByRole('link', { name: 'Подробнее' })).toBeVisible();
-    await expect(recommendationRows.getByText('Почему это показано:', { exact: true })).toBeVisible();
-    await expect(recommendationRows.getByText('Похожие жанры и темы', { exact: true })).toBeVisible();
-    const recommendationHrefs = await recommendationRows.locator('a[href*="/titles/"]').evaluateAll(
+    expect(firstRecommendationBox?.height).toBeLessThan(440);
+    await expect(additionalRecommendationRows.first()).toBeHidden();
+    await page.getByText(/^Показать ещё 6 рекомендаций$/).click();
+    await expect(additionalRecommendationRows.first()).toBeVisible();
+    const recommendationHrefs = await page.locator('[data-recommendation-row] a[href*="/titles/"]').evaluateAll(
         (links) => links.map((link) => link.getAttribute('href')),
     );
     const recommendedTitleUrl = `${baseURL}/titles/browser-recommended`;
@@ -60,6 +72,18 @@ test('compact catalog cards expose details and one recommendation reason', async
     await page.getByRole('button', { name: 'Войти' }).click();
     await expect(page).toHaveURL(/\/library(?:\/|$)/);
 
+    await page.goto('/titles/browser-smoke');
+    const compactFeedback = page.locator('[data-recommendation-feedback-compact]').first();
+    const notSimilar = compactFeedback.getByRole('button', { name: 'Не похоже', exact: true });
+
+    await expect(compactFeedback).toBeVisible();
+    await expect(notSimilar).toBeVisible();
+    expect((await notSimilar.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+    await notSimilar.focus();
+    await expect(notSimilar).toBeFocused();
+    await notSimilar.click();
+    await expect(page.getByText('Причина учтена. Этот сериал скрыт, а следующие рекомендации будут точнее.', { exact: true })).toBeVisible();
+
     const personalizedResponse = await page.goto('/discover/personalized');
     const personalizedRows = page.locator('[data-recommendation-list] [data-recommendation-row]');
 
@@ -74,11 +98,17 @@ test('compact catalog cards expose details and one recommendation reason', async
     await preferences.getByRole('button', { name: 'Больше новых' }).click();
     await expect(page.getByText('Настройки личных рекомендаций сохранены.', { exact: true })).toBeVisible();
     await expect(preferences.getByRole('button', { name: 'Больше новых' })).toHaveAttribute('aria-pressed', 'true');
-    await expect(personalizedRows.getByRole('link', { name: 'Рекомендованный браузерный сериал' })).toBeVisible();
+    await expect(
+        personalizedRows.first().getByRole('link', { name: /^Рекомендованный браузерный сериал \d{2}$/ }),
+    ).toBeVisible();
     const personalizedReasonGroup = personalizedRows.first().locator('[aria-label="Почему это показано"]');
 
     await expect(personalizedReasonGroup.getByText('Почему это показано:', { exact: true })).toBeVisible();
-    await expect(personalizedReasonGroup.locator('p > span')).toHaveCount(2);
+    const personalizedReasons = personalizedReasonGroup.locator('p:last-child > span:not([aria-hidden])');
+    const personalizedReasonCount = await personalizedReasons.count();
+
+    expect(personalizedReasonCount).toBeGreaterThanOrEqual(1);
+    expect(personalizedReasonCount).toBeLessThanOrEqual(3);
     const feedback = personalizedRows.first().locator('[data-recommendation-feedback]');
 
     await feedback.getByText('Настроить рекомендацию', { exact: true }).click();

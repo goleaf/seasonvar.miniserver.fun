@@ -67,13 +67,13 @@ final class SeasonvarSourcePageFetcher
                 'last_import_run_id' => $importRunId,
                 'failure_count' => 0,
                 'error_message' => null,
-                'provider_availability_status' => $this->sourceAvailability->detect($snapshot->html)?->value,
+                'provider_availability_status' => $this->sourceAvailability->detect($snapshot->body())?->value,
                 'provider_availability_checked_at' => now(),
             ]);
 
             return new SeasonvarFetchedPage(
                 sourcePageId: $page->id,
-                body: $snapshot->html,
+                body: $snapshot->body(),
                 contentHash: $page->content_hash,
                 httpStatus: 304,
                 contentChanged: false,

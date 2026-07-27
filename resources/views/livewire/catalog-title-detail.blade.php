@@ -294,7 +294,7 @@
                             <li wire:key="title-related-{{ $title->id }}-{{ $recommendationItem->title->id }}" data-recommendation-row>
                                 <x-catalog.title-card :title="$recommendationItem->title" layout="recommendation" :rank="$recommendationItem->rank" :reason-labels="$recommendationItem->reasonLabels" />
                                 @if ($recommendationItem->canDismiss)
-                                    <x-catalog.recommendation-feedback :title-id="$recommendationItem->title->id" action="setRecommendationFeedback" :feedback-options="$recommendationItem->feedbackOptions" />
+                                    <x-catalog.recommendation-feedback :title-id="$recommendationItem->title->id" action="setRecommendationFeedback" variant="compact" />
                                 @endif
                             </li>
                         @endforeach
@@ -303,9 +303,14 @@
             @endif
 
             <x-ui.panel :title="__('recommendations.types.similar.title')" icon="fa-solid fa-thumbs-up" :pad="false">
-                @if ($recommendationItems->isNotEmpty())
-                    <ol class="divide-y divide-slate-200" aria-label="{{ __('recommendations.types.similar.accessibility') }}" data-recommendation-list>
-                        @foreach ($recommendationItems as $recommendationItem)
+                @if ($primaryRecommendationItems->isNotEmpty())
+                    <ol
+                        class="divide-y divide-slate-200"
+                        aria-label="{{ __('recommendations.types.similar.accessibility') }}"
+                        data-recommendation-list
+                        data-recommendation-primary-list
+                    >
+                        @foreach ($primaryRecommendationItems as $recommendationItem)
                             <li
                                 wire:key="title-recommendation-{{ $title->id }}-{{ $recommendationItem->title->id }}"
                                 data-recommendation-row
@@ -315,13 +320,46 @@
                                     layout="recommendation"
                                     :rank="$recommendationItem->rank"
                                     :reason-labels="$recommendationItem->reasonLabels"
+                                    :reason-heading="__('recommendations.page.why_similar')"
                                 />
                                 @if ($recommendationItem->canDismiss)
-                                    <x-catalog.recommendation-feedback :title-id="$recommendationItem->title->id" action="setRecommendationFeedback" :feedback-options="$recommendationItem->feedbackOptions" />
+                                    <x-catalog.recommendation-feedback :title-id="$recommendationItem->title->id" action="setRecommendationFeedback" variant="compact" />
                                 @endif
                             </li>
                         @endforeach
                     </ol>
+                    @if ($additionalRecommendationItems->isNotEmpty())
+                        <details class="group border-t border-slate-200" data-recommendation-more>
+                            <summary class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-emerald-200">
+                                <span>{{ trans_choice('recommendations.page.show_more', $additionalRecommendationCount, ['count' => $additionalRecommendationCount]) }}</span>
+                                <x-ui.icon name="fa-solid fa-chevron-down text-xs transition group-open:rotate-180" />
+                            </summary>
+                            <ol
+                                start="7"
+                                class="divide-y divide-slate-200 border-t border-slate-200"
+                                aria-label="{{ __('recommendations.page.more_accessibility') }}"
+                                data-recommendation-additional-list
+                            >
+                                @foreach ($additionalRecommendationItems as $recommendationItem)
+                                    <li
+                                        wire:key="title-recommendation-additional-{{ $title->id }}-{{ $recommendationItem->title->id }}"
+                                        data-recommendation-row
+                                    >
+                                        <x-catalog.title-card
+                                            :title="$recommendationItem->title"
+                                            layout="recommendation"
+                                            :rank="$recommendationItem->rank"
+                                            :reason-labels="$recommendationItem->reasonLabels"
+                                            :reason-heading="__('recommendations.page.why_similar')"
+                                        />
+                                        @if ($recommendationItem->canDismiss)
+                                            <x-catalog.recommendation-feedback :title-id="$recommendationItem->title->id" action="setRecommendationFeedback" variant="compact" />
+                                        @endif
+                                    </li>
+                                @endforeach
+                            </ol>
+                        </details>
+                    @endif
                 @else
                     <div class="border-t border-slate-200 p-4 text-sm text-slate-600">
                         <div class="inline-flex items-center gap-2">

@@ -179,28 +179,60 @@ final class CatalogCompactTitleCardTest extends TestCase
         $this->assertStringNotContainsString('data-title-card-actions', $html);
     }
 
-    public function test_recommendation_card_renders_only_the_primary_reason(): void
+    public function test_recommendation_card_prioritizes_three_reasons_and_bounded_metadata_over_long_copy(): void
     {
-        $title = CatalogTitle::factory()->make([
-            'title' => 'Одна причина',
+        app()->setLocale('ru');
+        $title = CatalogTitle::factory()->create([
+            'title' => 'Компактная похожая рекомендация',
+            'original_title' => 'Compact Similar Recommendation',
             'slug' => 'single-reason',
             'description' => str_repeat('Короткое содержание рекомендации. ', 20),
+            'year' => 2015,
         ]);
+        CatalogTitleRating::query()->create([
+            'catalog_title_id' => $title->id,
+            'provider' => 'imdb',
+            'rating' => 7.70,
+        ]);
+        CatalogTitleRating::query()->create([
+            'catalog_title_id' => $title->id,
+            'provider' => 'kinopoisk',
+            'rating' => 8.20,
+        ]);
+        $title->load('ratings');
+        $title->setAttribute('seasons_count', 1);
         $title->setAttribute('episodes_count', 12);
 
+        $component = new TitleCard(
+            $title,
+            layout: 'recommendation',
+            reasonLabels: ['Похожие жанры и темы', 'Та же страна производства', 'Общие актёры', 'Общий режиссёр'],
+        );
         $html = Blade::render(
-            '<x-catalog.title-card :title="$title" layout="recommendation" :reason-labels="$reasons" />',
+            '<x-catalog.title-card :title="$title" layout="recommendation" :reason-labels="$reasons" reason-heading="Почему похож" />',
             [
                 'title' => $title,
-                'reasons' => ['Похожие жанры и темы', 'Та же страна производства', 'Общие актёры'],
+                'reasons' => ['Похожие жанры и темы', 'Та же страна производства', 'Общие актёры', 'Общий режиссёр'],
             ],
         );
 
-        $this->assertStringContainsString('Почему это показано', $html);
+        $this->assertLessThanOrEqual(180, mb_strlen((string) $component->descriptionExcerpt));
+        $this->assertSame(
+            ['Похожие жанры и темы', 'Та же страна производства', 'Общие актёры'],
+            $component->recommendationReasons,
+        );
+        $this->assertStringContainsString('Почему похож', $html);
         $this->assertStringContainsString('Похожие жанры и темы', $html);
-        $this->assertStringNotContainsString('Та же страна производства', $html);
-        $this->assertStringNotContainsString('Общие актёры', $html);
-        $this->assertStringContainsString('line-clamp-3', $html);
+        $this->assertStringContainsString('Та же страна производства', $html);
+        $this->assertStringContainsString('Общие актёры', $html);
+        $this->assertStringNotContainsString('Общий режиссёр', $html);
+        $this->assertStringContainsString('data-recommendation-reasons', $html);
+        $this->assertStringContainsString('line-clamp-2', $html);
+        $this->assertStringContainsString('line-clamp-1', $html);
+        $this->assertStringContainsString('2015', $html);
+        $this->assertStringContainsString('1 сезон', $html);
+        $this->assertStringContainsString('IMDb 7,7', $html);
+        $this->assertStringNotContainsString('КиноПоиск 8,2', $html);
         $this->assertStringContainsString('data-title-card-details', $html);
     }
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\DTOs;
 
 use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use InvalidArgumentException;
 
 final readonly class LicensedMediaFileSizeBacklogStatusData
@@ -72,6 +73,18 @@ final readonly class LicensedMediaFileSizeBacklogStatusData
         }
 
         return round(($this->checked / $this->eligible) * 100, 2);
+    }
+
+    public function isStale(?CarbonInterface $at = null): bool
+    {
+        $staleSeconds = max(
+            30,
+            (int) config('seasonvar.media_file_size.status_stale_seconds', 3_600),
+        );
+
+        return $this->capturedAt
+            ->addSeconds($staleSeconds)
+            ->isBefore($at ?? CarbonImmutable::now());
     }
 
     /** @return array<string, int|string> */

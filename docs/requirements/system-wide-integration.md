@@ -1,6 +1,6 @@
 # Требования к системной интеграции
 
-Обновлено: 25.07.2026
+Обновлено: 27.07.2026
 
 Этот документ обязателен для любой задачи, затрагивающей более одного feature domain, shared identity, visibility, access, notifications, audit, cache, search, SEO, account lifecycle, imports или administration. Он дополняет тематические документы-владельцы и не создаёт вторую доменную архитектуру.
 
@@ -77,7 +77,7 @@
 
 ## 13. Discovery и коллекции
 
-- Единственная публичная directory-точка рекомендаций и подборок — `/discover/{type}`; при `type=popular` она содержит независимую секцию публичных коллекций с query keys `collections_q`, `collections_sort` и `collectionsPage`.
+- Единственная публичная directory-точка рекомендаций и подборок — `/discover/{type}`; каждый поддерживаемый discovery mode содержит одну и ту же независимую секцию публичных коллекций с query keys `collections_q`, `collections_sort`, `collections_category`, `collections_subcategory` и `collectionsPage`. Секция сохраняет `#collections`, располагается перед выдачей сериалов и не меняет mode-specific ranking или filters.
 - `/collections/{slug}`, localized detail, owner/profile и read-only API остаются самостоятельными доменными boundaries, но отдельный `/collections` directory запрещён. Собственных изображений, upload/delivery route или image cache у подборок нет.
 - Единственная административная точка управления сериалами и коллекциями — `/admin/catalog`; внутренние manager-компоненты не являются full-page routes и не создают дублирующий admin contract.
 - Классификация существующих подборок остаётся human-in-the-loop: deterministic suggestions вычисляются только для уже пагинированной страницы из bounded сохранённых evidence, объясняются stable reason/confidence codes и никогда не сохраняются автоматически. Catalog-wide inference, внешний AI provider и persisted guess-state без отдельного продуктового решения запрещены.

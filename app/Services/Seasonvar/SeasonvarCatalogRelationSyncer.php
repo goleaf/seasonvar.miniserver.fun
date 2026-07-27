@@ -2,6 +2,7 @@
 
 namespace App\Services\Seasonvar;
 
+use App\DTOs\Seasonvar\SeasonvarSectionPresence;
 use App\Models\CatalogTitle;
 use App\Services\Catalog\CatalogRelationSyncer;
 use Illuminate\Support\Str;
@@ -24,7 +25,12 @@ class SeasonvarCatalogRelationSyncer
         array $taxonomies,
         ?callable $progress = null,
         bool $completeTagSnapshot = false,
+        ?SeasonvarSectionPresence $sectionPresence = null,
     ): array {
+        if ($sectionPresence !== null) {
+            $completeTagSnapshot = $sectionPresence->isAuthoritative('taxonomies');
+        }
+
         $taxonomies = collect($taxonomies)
             ->map(function (array $item): array {
                 $item['source_url'] = $this->safeSourceUrl($item['source_url'] ?? null);

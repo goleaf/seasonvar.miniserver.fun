@@ -379,32 +379,60 @@ foreach (range(185, 194) as $episodeNumber) {
     ]);
 }
 
-$recommendedTitle = CatalogTitle::factory()->create([
-    'slug' => 'browser-recommended',
-    'title' => 'Рекомендованный браузерный сериал',
-    'original_title' => 'Browser Recommended',
-    'description' => 'Детерминированная рекомендация для проверки карточки и причины.',
-    'poster_url' => $posterUrl,
-    'type' => 'show',
-    'year' => 2024,
-]);
-$recommendedTitle->genres()->attach($genre);
-LicensedMedia::factory()->for($recommendedTitle)->create([
-    'status' => 'published',
-    'published_at' => now()->subMinute(),
-]);
-CatalogTitleRecommendation::query()->create([
-    'catalog_title_id' => $title->id,
-    'recommended_title_id' => $recommendedTitle->id,
-    'score' => 1_200,
-    'rank' => 1,
-    'algorithm_version' => 'v6',
-    'matched_features_count' => 1,
-    'metadata_score' => 1_120,
-    'quality_score' => 80,
-    'reasons' => ['genre' => ['count' => 1, 'ratio' => 1.0, 'score' => 1_120]],
-    'computed_at' => now(),
-]);
+foreach (range(1, 12) as $recommendationRank) {
+    $recommendedTitle = CatalogTitle::factory()->create([
+        'slug' => $recommendationRank === 1
+            ? 'browser-recommended'
+            : sprintf('browser-recommended-%02d', $recommendationRank),
+        'title' => $recommendationRank === 1
+            ? 'Рекомендованный браузерный сериал'
+            : sprintf('Рекомендованный браузерный сериал %02d', $recommendationRank),
+        'original_title' => $recommendationRank === 1
+            ? 'Browser Recommended'
+            : sprintf('Browser Recommended %02d', $recommendationRank),
+        'description' => str_repeat(
+            'Детерминированная рекомендация для проверки карточки, причины сходства и ограничения описания. ',
+            4,
+        ),
+        'poster_url' => $posterUrl,
+        'type' => 'show',
+        'year' => 2014 + $recommendationRank,
+    ]);
+    $recommendedTitle->genres()->attach($genre);
+    $recommendedTitle->countries()->attach($russia);
+    Season::factory()->create([
+        'catalog_title_id' => $recommendedTitle->id,
+        'number' => 1,
+        'title' => 'Сезон 1',
+    ]);
+    CatalogTitleRating::query()->create([
+        'catalog_title_id' => $recommendedTitle->id,
+        'provider' => 'imdb',
+        'rating' => 7.7,
+        'votes' => 12_000,
+        'raw_value' => '7.7',
+    ]);
+    LicensedMedia::factory()->for($recommendedTitle)->create([
+        'status' => 'published',
+        'published_at' => now()->subMinute(),
+    ]);
+    CatalogTitleRecommendation::query()->create([
+        'catalog_title_id' => $title->id,
+        'recommended_title_id' => $recommendedTitle->id,
+        'score' => 1_300 - $recommendationRank,
+        'rank' => $recommendationRank,
+        'algorithm_version' => 'v6',
+        'matched_features_count' => 3,
+        'metadata_score' => 1_120,
+        'quality_score' => 80,
+        'reasons' => [
+            'genre' => ['count' => 1, 'ratio' => 1.0, 'score' => 1_120],
+            'country' => ['count' => 1, 'ratio' => 1.0, 'score' => 900],
+            'year' => ['difference' => 1, 'score' => 700],
+        ],
+        'computed_at' => now(),
+    ]);
+}
 CatalogRecommendationBuild::query()->create([
     'algorithm_version' => 'v6',
     'feature_version' => 'tokens-v2',

@@ -32,16 +32,19 @@
         </form>
     </header>
 
-    <div wire:loading.delay wire:target="search,sort,category,subcategory,applySearch,clearSearch,resetFilters" role="status" aria-live="polite">
+    <div wire:loading.delay wire:target="search,sort,category,subcategory,selectCategory,applySearch,clearSearch,resetFilters" role="status" aria-live="polite">
         <div class="flex items-center gap-2 rounded-control bg-sky-50 px-4 py-3 text-sm font-bold text-sky-700">
             <x-ui.icon name="fa-solid fa-spinner fa-spin" />
             <span>{{ __('collections.page.loading') }}</span>
         </div>
     </div>
 
-    <div class="grid min-w-0 gap-4 lg:grid-cols-[16rem_minmax(0,1fr)] lg:items-start">
-        <aside class="hidden rounded-panel border border-slate-200 bg-white p-3 shadow-panel lg:block" aria-label="{{ __('collections.directory.category_label') }}">
-            <div class="space-y-1">
+    <div class="min-w-0 space-y-4">
+        <div class="rounded-panel border border-slate-200 bg-white p-4 shadow-panel sm:p-5">
+            <input type="hidden" name="collections_category" value="{{ $category }}">
+            <input type="hidden" name="collections_subcategory" value="{{ $subcategory }}">
+
+            <nav data-collection-category-tree aria-label="{{ __('collections.directory.category_label') }}">
                 <button type="button" wire:click="$set('category', '')" @class([
                     'flex min-h-11 w-full items-center justify-between gap-3 rounded-control px-3 py-2 text-left text-sm font-bold',
                     'bg-emerald-700 text-white' => $category === '',
@@ -50,19 +53,64 @@
                     <span>{{ __('collections.directory.all_categories') }}</span>
                     <span class="text-xs">{{ $totalCount }}</span>
                 </button>
-                @foreach ($categoryNavigation as $option)
-                    <button type="button" wire:click="$set('category', '{{ $option['slug'] }}')" @class([
-                        'flex min-h-11 w-full items-center justify-between gap-3 rounded-control px-3 py-2 text-left text-sm font-bold',
-                        'bg-emerald-700 text-white' => $category === $option['slug'],
-                        'text-slate-700 hover:bg-slate-100' => $category !== $option['slug'],
-                    ])>
-                        <span class="min-w-0 break-words">{{ $option['label'] }}</span>
-                        <span class="shrink-0 text-xs">{{ $option['count'] }}</span>
-                    </button>
-                @endforeach
+
+                <ul class="mt-3 grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    @foreach ($categoryNavigation as $option)
+                        <li data-collection-category="{{ $option['slug'] }}" class="min-w-0 rounded-control border border-slate-200 bg-slate-50 p-2">
+                            @if ($option['is_filterable'])
+                                <button type="button" wire:click="$set('category', '{{ $option['slug'] }}')" @class([
+                                    'flex min-h-11 w-full items-center justify-between gap-3 rounded-control px-3 py-2 text-left text-sm font-black',
+                                    'bg-emerald-700 text-white' => $category === $option['slug'] && $subcategory === '',
+                                    'text-slate-800 hover:bg-white' => $category !== $option['slug'] || $subcategory !== '',
+                                ])>
+                                    <span class="min-w-0 break-words">{{ $option['label'] }}</span>
+                                    <span class="shrink-0 text-xs">{{ $option['count'] }}</span>
+                                </button>
+                            @else
+                                <div @class([
+                                    'flex min-h-11 items-center justify-between gap-3 rounded-control px-3 py-2 text-sm font-black',
+                                    'bg-emerald-50 text-emerald-900' => $category === $option['slug'] && $subcategory === '',
+                                    'text-slate-700' => $category !== $option['slug'] || $subcategory !== '',
+                                ])>
+                                    <span class="min-w-0 break-words">{{ $option['label'] }}</span>
+                                    <span class="shrink-0 text-xs text-slate-500">{{ $option['count'] }}</span>
+                                </div>
+                            @endif
+
+                            @if ($option['children'] !== [])
+                                <ul class="mt-1 space-y-1 border-t border-slate-200 pt-1">
+                                    @foreach ($option['children'] as $child)
+                                        <li data-collection-subcategory="{{ $child['slug'] }}">
+                                            @if ($child['is_filterable'])
+                                                <button type="button" wire:click="selectCategory('{{ $option['slug'] }}', '{{ $child['slug'] }}')" @class([
+                                                    'flex min-h-11 w-full items-center justify-between gap-3 rounded-control px-3 py-2 text-left text-sm font-semibold',
+                                                    'bg-slate-800 text-white' => $subcategory === $child['slug'],
+                                                    'text-slate-600 hover:bg-white hover:text-slate-900' => $subcategory !== $child['slug'],
+                                                ])>
+                                                    <span class="min-w-0 break-words">{{ $child['label'] }}</span>
+                                                    <span class="shrink-0 text-xs">{{ $child['count'] }}</span>
+                                                </button>
+                                            @else
+                                                <div @class([
+                                                    'flex min-h-9 items-center justify-between gap-3 rounded-control px-3 py-1.5 text-sm',
+                                                    'bg-slate-200 font-semibold text-slate-900' => $subcategory === $child['slug'],
+                                                    'text-slate-600' => $subcategory !== $child['slug'],
+                                                ])>
+                                                    <span class="min-w-0 break-words">{{ $child['label'] }}</span>
+                                                    <span class="shrink-0 text-xs text-slate-500">{{ $child['count'] }}</span>
+                                                </div>
+                                            @endif
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @endif
+                        </li>
+                    @endforeach
+                </ul>
+
                 @if ($showUncategorizedFilter)
                     <button type="button" wire:click="$set('category', 'uncategorized')" @class([
-                        'flex min-h-11 w-full items-center justify-between gap-3 rounded-control px-3 py-2 text-left text-sm font-bold',
+                        'mt-3 flex min-h-11 w-full items-center justify-between gap-3 rounded-control px-3 py-2 text-left text-sm font-bold',
                         'bg-emerald-700 text-white' => $category === 'uncategorized',
                         'text-slate-700 hover:bg-slate-100' => $category !== 'uncategorized',
                     ])>
@@ -70,95 +118,43 @@
                         <span class="text-xs">{{ $uncategorizedCount }}</span>
                     </button>
                 @endif
-            </div>
-        </aside>
+            </nav>
 
-        <div class="min-w-0 space-y-4">
-            <div class="rounded-panel border border-slate-200 bg-white p-4 shadow-panel">
-                <div class="grid gap-3 sm:grid-cols-2 lg:hidden">
-                    <div>
-                        <label for="collection-explorer-category" class="block text-sm font-bold text-slate-700">{{ __('collections.directory.category_label') }}</label>
-                        <select id="collection-explorer-category" name="collections_category" wire:model.live="category" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100">
-                            <option value="">{{ __('collections.directory.all_categories') }} ({{ $totalCount }})</option>
-                            @foreach ($categoryNavigation as $option)
-                                <option value="{{ $option['slug'] }}">{{ $option['label'] }} ({{ $option['count'] }})</option>
-                            @endforeach
-                            @if ($showUncategorizedFilter)
-                                <option value="uncategorized">{{ __('collections.directory.uncategorized') }} ({{ $uncategorizedCount }})</option>
-                            @endif
-                        </select>
-                    </div>
-                    @if ($subcategoryOptions !== [])
-                        <div>
-                            <label for="collection-explorer-subcategory" class="block text-sm font-bold text-slate-700">{{ __('collections.directory.subcategory_label') }}</label>
-                            <select id="collection-explorer-subcategory" name="collections_subcategory" wire:model.live="subcategory" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100">
-                                <option value="">{{ __('collections.directory.all_subcategories') }}</option>
-                                @foreach ($subcategoryOptions as $option)
-                                    <option value="{{ $option['slug'] }}">{{ $option['label'] }} ({{ $option['count'] }})</option>
-                                @endforeach
-                            </select>
-                        </div>
-                    @else
-                        <input type="hidden" name="collections_subcategory" value="">
-                    @endif
-                </div>
-
-                @if ($subcategoryOptions !== [])
-                    <nav class="mt-4 hidden flex-wrap gap-2 lg:flex" aria-label="{{ __('collections.directory.subcategory_label') }}">
-                        <button type="button" wire:click="$set('subcategory', '')" @class([
-                            'inline-flex min-h-11 items-center rounded-control px-3 py-2 text-sm font-bold',
-                            'bg-slate-800 text-white' => $subcategory === '',
-                            'bg-slate-100 text-slate-700 hover:bg-slate-200' => $subcategory !== '',
-                        ])>{{ __('collections.directory.all_subcategories') }}</button>
-                        @foreach ($subcategoryOptions as $option)
-                            <button type="button" wire:click="$set('subcategory', '{{ $option['slug'] }}')" @class([
-                                'inline-flex min-h-11 items-center gap-2 rounded-control px-3 py-2 text-sm font-bold',
-                                'bg-slate-800 text-white' => $subcategory === $option['slug'],
-                                'bg-slate-100 text-slate-700 hover:bg-slate-200' => $subcategory !== $option['slug'],
-                            ])>
-                                <span>{{ $option['label'] }}</span>
-                                <span class="text-xs">{{ $option['count'] }}</span>
-                            </button>
-                        @endforeach
-                    </nav>
+            <div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
+                <p class="text-sm font-bold text-slate-700">{{ __('collections.directory.results_count', ['count' => $collections->total()]) }}</p>
+                @if ($hasActiveFilters)
+                    <button type="button" wire:click="resetFilters" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200">
+                        <x-ui.icon name="fa-solid fa-xmark" />
+                        <span>{{ __('collections.directory.reset_all') }}</span>
+                    </button>
                 @endif
+            </div>
+        </div>
 
-                <div class="flex flex-wrap items-center justify-between gap-3 @if ($subcategoryOptions !== []) mt-4 border-t border-slate-200 pt-4 @endif">
-                    <p class="text-sm font-bold text-slate-700">{{ __('collections.directory.results_count', ['count' => $collections->total()]) }}</p>
+        @island(name: 'collection-explorer-pagination', always: true, with: $this->paginationIslandPage)
+        <x-ui.pagination-region name="collection-explorer-results">
+            @if ($collections->isEmpty())
+                <div class="rounded-panel border border-dashed border-slate-300 bg-white p-8 text-center">
+                    <x-ui.icon name="fa-solid fa-folder-open text-3xl text-slate-300" />
+                    <h3 class="mt-3 text-lg font-black text-slate-700">
+                        {{ $hasActiveFilters ? __('collections.directory.category_empty') : __('collections.directory.empty') }}
+                    </h3>
                     @if ($hasActiveFilters)
-                        <button type="button" wire:click="resetFilters" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200">
+                        <button type="button" wire:click="resetFilters" class="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-slate-100 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-200">
                             <x-ui.icon name="fa-solid fa-xmark" />
                             <span>{{ __('collections.directory.reset_all') }}</span>
                         </button>
                     @endif
                 </div>
-            </div>
-
-            @island(name: 'collection-explorer-pagination', always: true, with: $this->paginationIslandPage)
-            <x-ui.pagination-region name="collection-explorer-results">
-                @if ($collections->isEmpty())
-                    <div class="rounded-panel border border-dashed border-slate-300 bg-white p-8 text-center">
-                        <x-ui.icon name="fa-solid fa-folder-open text-3xl text-slate-300" />
-                        <h3 class="mt-3 text-lg font-black text-slate-700">
-                            {{ $hasActiveFilters ? __('collections.directory.category_empty') : __('collections.directory.empty') }}
-                        </h3>
-                        @if ($hasActiveFilters)
-                            <button type="button" wire:click="resetFilters" class="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-slate-100 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-200">
-                                <x-ui.icon name="fa-solid fa-xmark" />
-                                <span>{{ __('collections.directory.reset_all') }}</span>
-                            </button>
-                        @endif
-                    </div>
-                @else
-                    <div class="grid min-w-0 gap-3 sm:grid-cols-2" aria-label="{{ __('collections.navigation.public_collections') }}">
-                        @foreach ($collections as $collection)
-                            <x-collections.collection-card wire:key="discovery-collection-{{ $collection->public_id }}" :collection="$collection" compact />
-                        @endforeach
-                    </div>
-                    <nav aria-label="{{ __('collections.page.pagination') }}">{{ $collections->links(data: ['region' => 'collection-explorer-results']) }}</nav>
-                @endif
-            </x-ui.pagination-region>
-            @endisland
-        </div>
+            @else
+                <div class="grid min-w-0 gap-3 sm:grid-cols-2" aria-label="{{ __('collections.navigation.public_collections') }}">
+                    @foreach ($collections as $collection)
+                        <x-collections.collection-card wire:key="discovery-collection-{{ $collection->public_id }}" :collection="$collection" compact />
+                    @endforeach
+                </div>
+                <nav aria-label="{{ __('collections.page.pagination') }}">{{ $collections->links(data: ['region' => 'collection-explorer-results']) }}</nav>
+            @endif
+        </x-ui.pagination-region>
+        @endisland
     </div>
 </section>

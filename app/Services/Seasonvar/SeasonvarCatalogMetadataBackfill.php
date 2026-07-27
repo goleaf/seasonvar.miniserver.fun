@@ -96,7 +96,7 @@ class SeasonvarCatalogMetadataBackfill
 
             try {
                 $data = SeasonvarCatalogData::fromParsed(
-                    $this->parser->parse($page->latestSnapshot->html, $page->url),
+                    $this->parser->parse($page->latestSnapshot->body(), $page->url),
                 );
             } catch (ValidationException|InvalidArgumentException $exception) {
                 try {
@@ -135,7 +135,10 @@ class SeasonvarCatalogMetadataBackfill
                     ...$data->taxonomies,
                     ...$this->derivedTranslationTaxonomies($title),
                 ];
-                $presence = $this->parser->metadataPresence($data->taxonomies, $data->parseMeta);
+                $presence = [
+                    ...$this->parser->metadataPresence($data->taxonomies, $data->parseMeta),
+                    '_semantic_fingerprint' => $data->semanticFingerprint(),
+                ];
                 $titleWasStale = $title->relation_metadata_version < SeasonvarCatalogParser::METADATA_VERSION;
 
                 $attached = $this->databaseTransaction->run(
@@ -145,7 +148,7 @@ class SeasonvarCatalogMetadataBackfill
                                 $title,
                                 $taxonomies,
                                 $progress,
-                                completeTagSnapshot: $data->hasCompleteMetadataSnapshot(),
+                                sectionPresence: $data->sectionPresence(),
                             ),
                         );
                         $title->refresh();

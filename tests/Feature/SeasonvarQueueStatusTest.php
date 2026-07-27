@@ -6,18 +6,65 @@ namespace Tests\Feature;
 
 use App\DTOs\Seasonvar\SeasonvarQueueStatusData;
 use App\Models\SeasonvarImportRun;
+use App\Models\SeasonvarImportTitleGroup;
 use App\Models\SourcePage;
+use App\Services\Operations\QueueWorkerHeartbeat;
+use App\Services\Seasonvar\SeasonvarImportAdminService;
 use App\Services\Seasonvar\SeasonvarPageClaimManager;
 use App\Services\Seasonvar\SeasonvarQueueStatus;
 use Illuminate\Contracts\Queue\Queue as QueueContract;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Queue\Events\Looping;
 use Illuminate\Queue\QueueManager;
+use Illuminate\Support\Facades\DB;
 use Mockery;
+use Mockery\ExpectationInterface;
+use Mockery\MockInterface;
+use RuntimeException;
 use Tests\TestCase;
 
 class SeasonvarQueueStatusTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_idle_admin_status_does_not_claim_dispatch_is_running(): void
+    {
+        $this->mockQueue(
+            oldestPendingTimestamp: now()->getTimestamp(),
+            pending: 0,
+            delayed: 0,
+            reserved: 0,
+        );
+
+        $dashboard = app(SeasonvarImportAdminService::class)->dashboard();
+
+        $this->assertStringContainsString(
+            'Распределение: нет данных',
+            $dashboard['queue_status']['dispatch'],
+        );
+    }
+
+    public function test_sync_run_reports_queue_dispatch_as_not_applicable(): void
+    {
+        $run = SeasonvarImportRun::query()->create([
+            'mode' => 'sitemap',
+            'execution_mode' => 'sync',
+            'status' => 'completed',
+            'summary' => ['media_size_only' => true],
+            'finished_at' => now(),
+        ]);
+        $this->mockQueue(
+            oldestPendingTimestamp: now()->getTimestamp(),
+            pending: 0,
+            delayed: 0,
+            reserved: 0,
+        );
+
+        $status = app(SeasonvarQueueStatus::class)->read();
+
+        $this->assertSame($run->id, $status->runId);
+        $this->assertNull($status->dispatchCompleted);
+    }
 
     public function test_it_returns_typed_queue_and_import_state(): void
     {
@@ -48,7 +95,104 @@ class SeasonvarQueueStatusTest extends TestCase
         $this->assertSame(20, $status->selected);
         $this->assertSame(7, $status->parsed);
         $this->assertSame(1, $status->failed);
+        $this->assertSame('dispatching', $status->phase);
+        $this->assertFalse($status->dispatchCompleted);
+        $this->assertSame(0, $status->dispatchCursor);
+        $this->assertSame('worker_missing', $status->transportState);
         $this->assertEqualsWithDelta(300, $status->oldestPendingAgeSeconds(), 2);
+    }
+
+    public function test_zero_queue_with_nonterminal_staging_requires_transport_reconciliation(): void
+    {
+        $run = $this->queuedRun([
+            'summary' => ['dispatch_completed' => true],
+            'last_progress_at' => now(),
+            'last_heartbeat_at' => now(),
+        ]);
+        SeasonvarImportTitleGroup::query()->create([
+            'seasonvar_import_run_id' => $run->id,
+            'group_key_hash' => hash('sha256', 'status-group'),
+            'queue_name' => 'seasonvar-import',
+            'status' => 'running',
+            'expected_pages' => 3,
+            'prepared_pages' => 2,
+            'applied_pages' => 1,
+            'failed_pages' => 0,
+        ]);
+        $this->mockQueue(
+            oldestPendingTimestamp: now()->getTimestamp(),
+            pending: 0,
+            delayed: 0,
+            reserved: 0,
+        );
+
+        $status = app(SeasonvarQueueStatus::class)->read();
+
+        $this->assertSame('preparing', $status->phase);
+        $this->assertTrue($status->dispatchCompleted);
+        $this->assertSame(3, $status->expectedPages);
+        $this->assertSame(2, $status->preparedPages);
+        $this->assertSame(1, $status->appliedPages);
+        $this->assertSame('reconciliation_required', $status->transportState);
+        $this->assertSame('nonterminal_staging_without_transport', $status->staleReason);
+    }
+
+    public function test_fresh_worker_heartbeat_does_not_hide_stale_durable_progress(): void
+    {
+        $run = $this->queuedRun([
+            'summary' => ['dispatch_completed' => true],
+            'last_progress_at' => now()->subHours(3),
+            'last_heartbeat_at' => now(),
+        ]);
+        SeasonvarImportTitleGroup::query()->create([
+            'seasonvar_import_run_id' => $run->id,
+            'group_key_hash' => hash('sha256', 'stalled-group'),
+            'queue_name' => 'seasonvar-import',
+            'status' => 'running',
+            'expected_pages' => 2,
+            'prepared_pages' => 1,
+            'applied_pages' => 0,
+            'failed_pages' => 0,
+        ]);
+        $this->mockQueue(oldestPendingTimestamp: now()->subMinute()->getTimestamp());
+        app(QueueWorkerHeartbeat::class)->looping(new Looping('redis', 'seasonvar-import'));
+
+        $status = app(SeasonvarQueueStatus::class)->read();
+
+        $this->assertSame('ok', $status->workerStatus);
+        $this->assertNotNull($status->workerHeartbeatAt);
+        $this->assertSame('stalled_no_progress', $status->transportState);
+        $this->assertSame('durable_progress_stale', $status->staleReason);
+        $this->assertTrue($status->lastHeartbeatAt?->greaterThan($status->lastProgressAt));
+    }
+
+    public function test_status_query_budget_is_bounded_by_aggregate_queries(): void
+    {
+        $run = $this->queuedRun([
+            'summary' => ['dispatch_completed' => true],
+            'last_progress_at' => now(),
+        ]);
+        foreach (range(1, 50) as $group) {
+            SeasonvarImportTitleGroup::query()->create([
+                'seasonvar_import_run_id' => $run->id,
+                'group_key_hash' => hash('sha256', 'budget-group-'.$group),
+                'queue_name' => 'seasonvar-import',
+                'status' => 'completed',
+                'expected_pages' => 10,
+                'prepared_pages' => 10,
+                'applied_pages' => 10,
+                'failed_pages' => 0,
+            ]);
+        }
+        $this->mockQueue(oldestPendingTimestamp: now()->getTimestamp());
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        app(SeasonvarQueueStatus::class)->read();
+        $queries = DB::getQueryLog();
+        DB::disableQueryLog();
+
+        $this->assertLessThanOrEqual(8, count($queries));
     }
 
     public function test_status_option_reports_state_without_dispatching_import(): void
@@ -62,7 +206,11 @@ class SeasonvarQueueStatusTest extends TestCase
             ->expectsOutputToContain('Очередь Seasonvar')
             ->expectsOutputToContain('Ожидают обработки')
             ->expectsOutputToContain('Активных queued runs')
-            ->expectsOutputToContain('Глобальный active/last run')
+            ->expectsOutputToContain('Активный/последний run')
+            ->expectsOutputToContain('Фаза импорта')
+            ->expectsOutputToContain('Состояние транспорта')
+            ->expectsOutputToContain('Последний реальный прогресс')
+            ->expectsOutputToContain('Staging подготовлено')
             ->assertExitCode(0);
 
         $this->assertSame(1, SeasonvarImportRun::query()->count());
@@ -162,6 +310,60 @@ class SeasonvarQueueStatusTest extends TestCase
         $this->assertSame(7, $status->failed);
     }
 
+    public function test_it_observes_an_active_title_refresh_run_and_its_exact_transport(): void
+    {
+        $completedGlobalRun = $this->queuedRun([
+            'status' => 'completed',
+            'execution_mode' => 'sync',
+            'finished_at' => now(),
+        ]);
+        $unrelatedPage = SourcePage::factory()->create();
+        $this->assertNotNull(app(SeasonvarPageClaimManager::class)->claim(
+            $unrelatedPage,
+            $completedGlobalRun->id,
+            3600,
+        ));
+        $visitorRun = SeasonvarImportRun::query()->create([
+            'mode' => 'url',
+            'execution_mode' => 'queue',
+            'status' => 'running',
+            'selected' => 2,
+            'parsed' => 1,
+            'started_at' => now(),
+            'last_progress_at' => now(),
+            'summary' => [
+                'provider' => 'seasonvar',
+                'queue' => 'seasonvar-title-refresh',
+            ],
+        ]);
+        SeasonvarImportTitleGroup::query()->create([
+            'seasonvar_import_run_id' => $visitorRun->id,
+            'group_key_hash' => hash('sha256', 'visitor-status-group'),
+            'queue_name' => 'seasonvar-title-refresh',
+            'status' => 'running',
+            'expected_pages' => 2,
+            'prepared_pages' => 1,
+            'applied_pages' => 0,
+            'failed_pages' => 0,
+        ]);
+        $visitorPage = SourcePage::factory()->create();
+        $this->assertNotNull(app(SeasonvarPageClaimManager::class)->claim(
+            $visitorPage,
+            $visitorRun->id,
+            3600,
+        ));
+        $this->mockQueue(oldestPendingTimestamp: now()->getTimestamp());
+
+        $status = app(SeasonvarQueueStatus::class)->read();
+
+        $this->assertSame($visitorRun->id, $status->runId);
+        $this->assertSame('seasonvar-title-refresh', $status->queue);
+        $this->assertSame(1, $status->liveClaims);
+        $this->assertSame(1, $status->activeRuns);
+        $this->assertTrue($status->dispatchCompleted);
+        $this->assertSame('preparing', $status->phase);
+    }
+
     /**
      * @param  array<string, mixed>  $attributes
      */
@@ -178,18 +380,31 @@ class SeasonvarQueueStatusTest extends TestCase
         ], $attributes));
     }
 
-    private function mockQueue(int $oldestPendingTimestamp): void
-    {
+    private function mockQueue(
+        int $oldestPendingTimestamp,
+        int $pending = 12,
+        int $delayed = 2,
+        int $reserved = 1,
+    ): void {
         $queue = Mockery::mock(QueueContract::class);
-        $queue->shouldReceive('pendingSize')->with('seasonvar-import')->andReturn(12);
-        $queue->shouldReceive('delayedSize')->with('seasonvar-import')->andReturn(2);
-        $queue->shouldReceive('reservedSize')->with('seasonvar-import')->andReturn(1);
-        $queue->shouldReceive('creationTimeOfOldestPendingJob')
-            ->with('seasonvar-import')
-            ->andReturn($oldestPendingTimestamp);
+        $this->expectation($queue, 'pendingSize')->andReturn($pending);
+        $this->expectation($queue, 'delayedSize')->andReturn($delayed);
+        $this->expectation($queue, 'reservedSize')->andReturn($reserved);
+        $this->expectation($queue, 'creationTimeOfOldestPendingJob')->andReturn($oldestPendingTimestamp);
 
         $manager = Mockery::mock(QueueManager::class);
-        $manager->shouldReceive('connection')->with('redis')->andReturn($queue);
+        $this->expectation($manager, 'connection')->andReturn($queue);
         $this->app->instance(QueueManager::class, $manager);
+    }
+
+    private function expectation(MockInterface $mock, string $method): ExpectationInterface
+    {
+        $expectation = $mock->shouldReceive($method);
+
+        if (! $expectation instanceof ExpectationInterface) {
+            throw new RuntimeException("Mock expectation for [{$method}] was not created.");
+        }
+
+        return $expectation;
     }
 }

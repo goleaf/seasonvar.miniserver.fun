@@ -42,6 +42,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property string|null $file_size_source
  * @property int|null $file_size_http_status
  * @property string|null $file_size_check_error
+ * @property bool $file_size_eligible
+ * @property CarbonInterface|null $file_size_next_check_at
  * @property string|null $check_status
  * @property MediaHealthStatus $health_status
  * @property ContentAudience $audience
@@ -286,6 +288,8 @@ class LicensedMedia extends Model
             'file_size_checked_at' => 'datetime',
             'file_size_check_status' => MediaFileSizeCheckStatus::class,
             'file_size_http_status' => 'integer',
+            'file_size_eligible' => 'boolean',
+            'file_size_next_check_at' => 'datetime',
             'has_subtitles' => 'boolean',
             'last_http_status' => 'integer',
             'health_status' => MediaHealthStatus::class,

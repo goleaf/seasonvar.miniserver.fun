@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Console\Commands\Concerns\OutputsSeasonvarProgress;
+use App\Console\Presenters\SeasonvarQueueStatusPresenter;
+use App\Console\Presenters\SeasonvarSourceInventoryPresenter;
 use App\DTOs\Seasonvar\SeasonvarSourceInventoryResult;
 use App\Enums\SeasonvarPageType;
 use App\Models\SeasonvarImportRun;
@@ -58,6 +60,8 @@ class ImportSeasonvar extends Command
         CatalogCacheInvalidator $cacheInvalidator,
         HumanFileSizeFormatter $fileSizes,
         LicensedMediaFileSizeBacklog $fileSizeBacklog,
+        SeasonvarQueueStatusPresenter $statusPresenter,
+        SeasonvarSourceInventoryPresenter $inventoryPresenter,
         SeasonvarActiveRunReconciler $activeRunReconciler,
     ): int {
         $pageTypes = $this->validatedPageTypes($pageHandlers);
@@ -81,7 +85,7 @@ class ImportSeasonvar extends Command
         }
 
         if ((bool) $this->option('status')) {
-            return $this->handleStatus($queueStatus, $fileSizeBacklog, $fileSizes);
+            return $this->handleStatus($queueStatus, $fileSizeBacklog, $statusPresenter);
         }
 
         if ((bool) $this->option('queued')) {
@@ -173,7 +177,7 @@ class ImportSeasonvar extends Command
                     progress: $this->seasonvarProgress(),
                 );
 
-                return $this->outputInventoryResult($result);
+                return $this->outputInventoryResult($result, $inventoryPresenter);
             }
 
             $run = $pipeline->run(
@@ -471,63 +475,20 @@ class ImportSeasonvar extends Command
     private function handleStatus(
         SeasonvarQueueStatus $queueStatus,
         LicensedMediaFileSizeBacklog $fileSizeBacklog,
-        HumanFileSizeFormatter $fileSizes,
+        SeasonvarQueueStatusPresenter $presenter,
     ): int {
         $status = $queueStatus->read();
-        $oldestAge = $status->oldestPendingAgeSeconds();
+        $presentation = $presenter->present(
+            $status,
+            $fileSizeBacklog->status(),
+            LicensedMediaFileSizeBackfillSchedule::fromConfig(),
+        );
 
         $this->components->info('Очередь Seasonvar');
-        $this->table(['Показатель', 'Значение'], [
-            ['Подключение', $status->connection],
-            ['Очередь', $status->queue],
-            ['Ожидают обработки', $status->pending],
-            ['Отложены', $status->delayed],
-            ['Зарезервированы', $status->reserved],
-            ['Возраст старейшей job', $oldestAge === null ? 'нет' : $oldestAge.' сек.'],
-            ['Живые claims', $status->liveClaims],
-            ['Активных queued runs', $status->activeRuns],
-            ['Глобальный active/last run', $status->runId === null ? 'нет' : '#'.$status->runId],
-            ['Режим run', $status->runExecutionMode ?? 'нет'],
-            ['Статус run', $status->runStatus ?? 'нет'],
-            ['Heartbeat run', $status->lastHeartbeatAt?->format('d.m.Y H:i:s') ?? 'нет'],
-            ['Выбрано страниц', $status->selected],
-            ['Обработано страниц', $status->parsed],
-            ['Ошибок страниц', $status->failed],
-            ['Размеров проверено в run', $status->mediaSizesChecked],
-            ['Размер известен в run', $status->mediaSizesKnown],
-            ['Размер неизвестен в run', $status->mediaSizesUnknown],
-            ['Формат не поддерживается в run', $status->mediaSizesUnsupported],
-            ['Ошибок размера в run', $status->mediaSizeChecksFailed],
-            ['Известный объём в run', sprintf(
-                '%s (%d байт)',
-                $fileSizes->format($status->mediaSizeKnownBytes, 'ru') ?? '0 B',
-                $status->mediaSizeKnownBytes,
-            )],
-        ]);
-
-        $backlog = $fileSizeBacklog->status();
-        $backfillSchedule = LicensedMediaFileSizeBackfillSchedule::fromConfig();
+        $this->table(['Показатель', 'Значение'], $presentation['queue']);
 
         $this->components->info('Размеры прямых видеофайлов');
-        $this->table(['Показатель', 'Значение'], [
-            ['Подходят для проверки', $backlog->eligible],
-            ['Проверены', $backlog->checked],
-            ['Ожидают первой проверки', $backlog->pending],
-            ['Требуют проверки сейчас', $backlog->due],
-            ['Размер известен', $backlog->known],
-            ['Размер неизвестен', $backlog->unknown],
-            ['Формат не поддерживается', $backlog->unsupported],
-            ['Ошибок проверки', $backlog->failed],
-            ['Покрытие метаданных', number_format($backlog->inspectionCoveragePercentage(), 2, ',', ' ').'%'],
-            ['Сумма известных размеров', sprintf(
-                '%s (%d байт)',
-                $fileSizes->format($backlog->knownBytes, 'ru') ?? '0 B',
-                $backlog->knownBytes,
-            )],
-            ['Снимок построен', $backlog->capturedAt->format('d.m.Y H:i:s')],
-            ['Плановая пачка', $backfillSchedule->limit],
-            ['Плановый бюджет времени', $backfillSchedule->timeBudgetSeconds.' сек.'],
-        ]);
+        $this->table(['Показатель', 'Значение'], $presentation['file_sizes']);
 
         return self::SUCCESS;
     }
@@ -761,39 +722,31 @@ class ImportSeasonvar extends Command
         return $values->all();
     }
 
-    private function outputInventoryResult(SeasonvarSourceInventoryResult $result): int
-    {
-        if (! $result->successful()) {
+    private function outputInventoryResult(
+        SeasonvarSourceInventoryResult $result,
+        SeasonvarSourceInventoryPresenter $presenter,
+    ): int {
+        $presentation = $presenter->present($result);
+
+        if (! $presentation['successful']) {
             $this->error('Инвентаризация страниц Seasonvar не завершена. Успешный снимок не создан.');
 
-            foreach ($result->failureDetails as $failure) {
-                $this->line('Ошибка: '.$failure);
+            foreach ($presentation['failures'] as $failure) {
+                $this->line($failure);
             }
 
             return self::FAILURE;
         }
 
         $this->components->info('Инвентаризация страниц Seasonvar завершена');
-        $this->table(
-            ['Тип страницы', 'Количество'],
-            collect($result->countsByPageType)
-                ->map(function (int $count, string $type): array {
-                    $label = SeasonvarPageType::tryFrom($type)?->label() ?? 'неизвестный тип';
+        $this->table(['Тип страницы', 'Количество'], $presentation['rows']);
 
-                    return ["{$label} ({$type})", $count];
-                })
-                ->values()
-                ->all(),
-        );
-        $this->line('Карт сайта: '.$result->sitemapCount);
-        $this->line('Всего нормализованных URL: '.$result->totalUrlCount);
-        $this->line('Новых страниц источника: '.$result->storedUrlCount);
-        $this->line('Неизвестных URL: '.$result->unknownUrlCount);
-        $this->line('Некорректных URL: '.$result->malformedUrlCount);
-        $this->line('Заблокированных URL: '.$result->blockedUrlCount);
+        foreach ($presentation['lines'] as $line) {
+            $this->line($line);
+        }
 
-        if ($result->discoveredButUnsupportedTypes !== []) {
-            $this->warn('Нет полного локального parity: '.implode(', ', $result->discoveredButUnsupportedTypes).'.');
+        if ($presentation['warning'] !== null) {
+            $this->warn($presentation['warning']);
         }
 
         return self::SUCCESS;

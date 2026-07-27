@@ -64,6 +64,29 @@ final readonly class ContentRequestTargetMergeService
         ]);
     }
 
+    /**
+     * @param  list<int>  $episodeIds
+     * @return array<int, bool>
+     */
+    public function episodeIdsWithRequests(array $episodeIds): array
+    {
+        if ($episodeIds === [] || ! $this->schema->ready()) {
+            return [];
+        }
+
+        return ContentRequest::query()
+            ->whereIn('episode_id', $episodeIds)
+            ->orWhereIn('completed_episode_id', $episodeIds)
+            ->get(['episode_id', 'completed_episode_id'])
+            ->flatMap(static fn (ContentRequest $request): array => [
+                $request->episode_id,
+                $request->completed_episode_id,
+            ])
+            ->filter(static fn (mixed $id): bool => is_numeric($id))
+            ->mapWithKeys(static fn (mixed $id): array => [(int) $id => true])
+            ->all();
+    }
+
     /** @param callable(Builder<ContentRequest>): Builder<ContentRequest> $scope
      * @param  array<string, int|string>  $target
      */

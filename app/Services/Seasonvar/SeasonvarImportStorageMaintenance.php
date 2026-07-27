@@ -66,7 +66,7 @@ final class SeasonvarImportStorageMaintenance
                     'seasonvar_import_title_group_id',
                     $this->eligibleTitleGroups($titleGroupCutoff)->select('id'),
                 ),
-                'COALESCE(LENGTH(payload), 0) + COALESCE(LENGTH(warnings), 0)',
+                'COALESCE(LENGTH(payload), 0) + COALESCE(LENGTH(payload_blob), 0) + COALESCE(LENGTH(application_result), 0) + COALESCE(LENGTH(warnings), 0)',
                 'created_at',
             )
             : $this->emptyMetrics();

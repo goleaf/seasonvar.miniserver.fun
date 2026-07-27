@@ -19,6 +19,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 
+/**
+ * @property ContentRequestStatus $status
+ */
 #[UsePolicy(ContentRequestPolicy::class)]
 #[Fillable([
     'public_id', 'requester_id', 'type', 'status', 'priority', 'title', 'normalized_title',
@@ -49,7 +52,10 @@ final class ContentRequest extends Model
         return 'public_id';
     }
 
-    /** @param Builder<ContentRequest> $query */
+    /**
+     * @param  Builder<ContentRequest>  $query
+     * @return Builder<ContentRequest>
+     */
     public function resolveRouteBindingQuery($query, $value, $field = null): Builder
     {
         $user = Auth::user();

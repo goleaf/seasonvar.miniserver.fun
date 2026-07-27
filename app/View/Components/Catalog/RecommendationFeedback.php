@@ -10,6 +10,8 @@ use InvalidArgumentException;
 
 final class RecommendationFeedback extends Component
 {
+    private const VARIANTS = ['full', 'compact'];
+
     /**
      * @param array{
      *     genres?: list<array{id: int, name: string}>,
@@ -21,6 +23,7 @@ final class RecommendationFeedback extends Component
         public readonly int $titleId,
         public readonly string $action,
         public readonly array $feedbackOptions = [],
+        public readonly string $variant = 'full',
     ) {
         if ($titleId < 1) {
             throw new InvalidArgumentException('Recommendation feedback title ID must be positive.');
@@ -28,6 +31,10 @@ final class RecommendationFeedback extends Component
 
         if (! in_array($action, ['setFeedback', 'setRecommendationFeedback'], true)) {
             throw new InvalidArgumentException('Unsupported recommendation feedback action.');
+        }
+
+        if (! in_array($variant, self::VARIANTS, true)) {
+            throw new InvalidArgumentException('Unsupported recommendation feedback variant.');
         }
     }
 

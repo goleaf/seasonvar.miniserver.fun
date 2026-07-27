@@ -45,7 +45,13 @@ test('discovery and collection taxonomy stay text-only and responsive', async ({
     await expect(page.locator('[data-discovery-filters]')).not.toHaveAttribute('open', '');
     await expect(page.getByRole('heading', { level: 2, name: 'Подборки сериалов' })).toBeVisible();
     await expect(page.locator('[data-collection-explorer] img')).toHaveCount(0);
-    await expect(page.locator('[data-collection-explorer]').getByText('Формат', { exact: true })).toHaveCount(0);
+    const categoryTree = page.locator('[data-collection-category-tree]');
+
+    await expect(categoryTree).toBeVisible();
+    await expect(categoryTree.locator('[data-collection-category]')).toHaveCount(5);
+    await expect(categoryTree.locator('[data-collection-subcategory]')).toHaveCount(31);
+    await expect(categoryTree.getByText('Формат', { exact: true })).toBeVisible();
+    await expect(categoryTree.getByText('Мини-сериалы', { exact: true })).toBeVisible();
     await expect(page.getByText('Браузерная подборка детективов', { exact: true })).toBeVisible();
     const detectiveCollectionCard = page.locator('[data-collection-explorer] article').filter({
         hasText: 'Браузерная подборка детективов',
@@ -89,13 +95,8 @@ test('discovery and collection taxonomy stay text-only and responsive', async ({
         expect(recommendationTitleBox?.width).toBeGreaterThanOrEqual(150);
     }
 
-    if ((page.viewportSize()?.width ?? 0) >= 1024) {
-        await page.getByRole('button', { name: /Темы и жанры/ }).click();
-        await page.getByRole('button', { name: /Детективы и криминал/ }).click();
-    } else {
-        await page.locator('#collection-explorer-category').selectOption('themes-and-genres');
-        await page.locator('#collection-explorer-subcategory').selectOption('detective-and-crime');
-    }
+    await categoryTree.getByRole('button', { name: /Темы и жанры/ }).click();
+    await categoryTree.getByRole('button', { name: /Детективы и криминал/ }).click();
 
     await expect(page).toHaveURL(/collections_category=themes-and-genres/);
     await expect(page).toHaveURL(/collections_subcategory=detective-and-crime/);
@@ -114,21 +115,27 @@ test('discovery and collection taxonomy stay text-only and responsive', async ({
 
     expect(randomResponse?.status()).toBe(200);
     await expect(page.getByRole('heading', { level: 1, name: 'Случайная находка' })).toBeVisible();
-    await expect(page.locator('[data-discovery-collection-results]')).toHaveCount(0);
+    await expect(page.locator('[data-discovery-collection-results]')).toBeVisible();
+    await expect(page.locator('[data-collection-category-tree] [data-collection-category]')).toHaveCount(5);
+    await expect(page.locator('[data-collection-category-tree] [data-collection-subcategory]')).toHaveCount(31);
+    await expect(page.locator('[data-discovery-section-navigation] a[href="#discovery-titles"]')).toBeVisible();
+    await expect(page.locator('#discovery-titles')).toBeVisible();
     await assertResponsivePage(page);
 
     const editorialResponse = await page.goto('/discover/editorial');
 
     expect(editorialResponse?.status()).toBe(200);
     await expect(page.getByRole('heading', { level: 1, name: 'Выбор редакции' })).toBeVisible();
+    await expect(page.locator('[data-discovery-collection-results]')).toBeVisible();
     expect(await page.locator('[data-recommendation-row]').count()).toBeGreaterThan(0);
     await assertResponsivePage(page);
 
-    const englishResponse = await page.goto('/en/discover/popular');
+    const englishResponse = await page.goto('/en/discover/random');
 
     expect(englishResponse?.status()).toBe(200);
-    await expect(page.getByRole('heading', { level: 1, name: 'Popular' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Random discovery' })).toBeVisible();
     await expect(page.getByRole('heading', { level: 2, name: 'Series collections' })).toBeVisible();
+    await expect(page.locator('[data-collection-category-tree]').getByText('Format', { exact: true })).toBeVisible();
     await assertResponsivePage(page);
 
     await login(page, 'browser@example.com');

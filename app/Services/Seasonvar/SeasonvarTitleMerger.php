@@ -505,8 +505,44 @@ class SeasonvarTitleMerger
             'release_status_text' => $season->release_status_text ?? $targetSeason->release_status_text,
         ])->save();
 
-        $movedEpisodes = $this->mergeEpisodes($season, $targetSeason, $canonical);
-        $this->moveMediaForSeason($season->id, $canonical, $targetSeason);
+        $targetSeason->loadMissing('episodes');
+        $sourceEpisodeIds = $season->episodes->modelKeys();
+        $sourceMedia = LicensedMedia::query()
+            ->where('season_id', $season->id)
+            ->orderBy('id')
+            ->get();
+        $mediaByEpisode = $sourceMedia->groupBy(
+            static fn (LicensedMedia $media): int => (int) ($media->episode_id ?? 0),
+        );
+        $mediaLookup = $this->canonicalMediaLookup($sourceMedia, $canonical);
+        $sourceMediaIds = $sourceMedia->modelKeys();
+        $dependencyPresence = [
+            'comments' => $this->comments->episodeIdsWithComments($sourceEpisodeIds),
+            'content_requests' => $this->contentRequests->episodeIdsWithRequests($sourceEpisodeIds),
+            'technical_issues' => $this->technicalIssues->episodeIdsWithIssues($sourceEpisodeIds),
+            'release_calendar' => $this->releaseCalendar->episodeIdsWithEntries($sourceEpisodeIds),
+            'user_data' => $this->userData->episodeIdsWithUserData($sourceEpisodeIds),
+            'media_technical_issues' => $this->technicalIssues->mediaIdsWithIssues($sourceMediaIds),
+            'media_release_calendar' => $this->releaseCalendar->mediaIdsWithEntries($sourceMediaIds),
+        ];
+
+        $movedEpisodes = $this->mergeEpisodes(
+            $season,
+            $targetSeason,
+            $canonical,
+            $mediaByEpisode,
+            $mediaLookup,
+            $dependencyPresence,
+        );
+        $this->moveMediaCollection(
+            $mediaByEpisode->get(0, collect()),
+            $canonical,
+            $targetSeason,
+            null,
+            $mediaLookup,
+            $dependencyPresence['media_technical_issues'],
+            $dependencyPresence['media_release_calendar'],
+        );
         $this->comments->moveSeason($season, $targetSeason);
         $this->contentRequests->moveSeason($season, $targetSeason);
         $this->technicalIssues->moveSeason($season->id, $targetSeason->id);
@@ -541,28 +577,65 @@ class SeasonvarTitleMerger
             ->all();
     }
 
-    private function mergeEpisodes(Season $fromSeason, Season $targetSeason, CatalogTitle $canonical): int
-    {
+    /**
+     * @param  Collection<int|string, EloquentCollection<int, LicensedMedia>>  $mediaByEpisode
+     * @param  array{source_key: array<string, LicensedMedia>, playback_url: array<string, LicensedMedia>}  $mediaLookup
+     * @param  array{
+     *     comments: array<int, bool>,
+     *     content_requests: array<int, bool>,
+     *     technical_issues: array<int, bool>,
+     *     release_calendar: array<int, bool>,
+     *     user_data: array<int, bool>,
+     *     media_technical_issues: array<int, bool>,
+     *     media_release_calendar: array<int, bool>
+     * }  $dependencyPresence
+     */
+    private function mergeEpisodes(
+        Season $fromSeason,
+        Season $targetSeason,
+        CatalogTitle $canonical,
+        Collection $mediaByEpisode,
+        array $mediaLookup,
+        array $dependencyPresence,
+    ): int {
         $moved = 0;
+        $targetEpisodes = $targetSeason->episodes
+            ->keyBy(fn (Episode $episode): string => $this->episodeIdentityKey($episode));
 
         foreach ($fromSeason->episodes as $episode) {
-            $targetEpisode = Episode::query()
-                ->where('season_id', $targetSeason->id)
-                ->where('kind', $episode->kind)
-                ->where('number', $episode->number)
-                ->first();
+            $targetEpisode = $targetEpisodes->get($this->episodeIdentityKey($episode));
 
-            if ($targetEpisode === null) {
+            if (! $targetEpisode instanceof Episode) {
                 $episode->season_id = $targetSeason->id;
                 $episode->save();
-                $this->moveMediaForEpisode($episode->id, $canonical, $targetSeason, $episode);
-                $this->userData->moveEpisode($episode, $episode, $canonical);
+                $this->moveMediaCollection(
+                    $mediaByEpisode->get($episode->id, collect()),
+                    $canonical,
+                    $targetSeason,
+                    $episode,
+                    $mediaLookup,
+                    $dependencyPresence['media_technical_issues'],
+                    $dependencyPresence['media_release_calendar'],
+                );
+
+                if (isset($dependencyPresence['user_data'][$episode->id])) {
+                    $this->userData->moveEpisode($episode, $episode, $canonical);
+                }
+
                 $moved++;
 
                 continue;
             }
 
-            $this->moveMediaForEpisode($episode->id, $canonical, $targetSeason, $targetEpisode);
+            $this->moveMediaCollection(
+                $mediaByEpisode->get($episode->id, collect()),
+                $canonical,
+                $targetSeason,
+                $targetEpisode,
+                $mediaLookup,
+                $dependencyPresence['media_technical_issues'],
+                $dependencyPresence['media_release_calendar'],
+            );
 
             $targetEpisode->fill([
                 'source_page_id' => $targetEpisode->source_page_id ?? $episode->source_page_id,
@@ -574,11 +647,26 @@ class SeasonvarTitleMerger
             ])->save();
 
             $targetEpisode->setRelation('season', $targetSeason);
-            $this->comments->moveEpisode($episode, $targetEpisode);
-            $this->contentRequests->moveEpisode($episode, $targetEpisode);
-            $this->technicalIssues->moveEpisode($episode->id, $targetEpisode->id);
-            $this->releaseCalendar->moveEpisode($episode, $targetEpisode, $canonical, $targetSeason);
-            $this->userData->moveEpisode($episode, $targetEpisode, $canonical);
+
+            if (isset($dependencyPresence['comments'][$episode->id])) {
+                $this->comments->moveEpisode($episode, $targetEpisode);
+            }
+
+            if (isset($dependencyPresence['content_requests'][$episode->id])) {
+                $this->contentRequests->moveEpisode($episode, $targetEpisode);
+            }
+
+            if (isset($dependencyPresence['technical_issues'][$episode->id])) {
+                $this->technicalIssues->moveEpisode($episode->id, $targetEpisode->id);
+            }
+
+            if (isset($dependencyPresence['release_calendar'][$episode->id])) {
+                $this->releaseCalendar->moveEpisode($episode, $targetEpisode, $canonical, $targetSeason);
+            }
+
+            if (isset($dependencyPresence['user_data'][$episode->id])) {
+                $this->userData->moveEpisode($episode, $targetEpisode, $canonical);
+            }
 
             $episode->forceDelete();
             $moved++;
@@ -587,37 +675,75 @@ class SeasonvarTitleMerger
         return $moved;
     }
 
-    private function moveMediaForEpisode(int $oldEpisodeId, CatalogTitle $canonical, Season $targetSeason, Episode $targetEpisode): void
-    {
-        LicensedMedia::query()
-            ->where('episode_id', $oldEpisodeId)
-            ->get()
-            ->each(fn (LicensedMedia $media): LicensedMedia => $this->moveMedia($media, $canonical, $targetSeason, $targetEpisode));
-    }
-
-    private function moveMediaForSeason(int $oldSeasonId, CatalogTitle $canonical, Season $targetSeason): void
-    {
-        LicensedMedia::query()
-            ->where('season_id', $oldSeasonId)
-            ->whereNull('episode_id')
-            ->get()
-            ->each(fn (LicensedMedia $media): LicensedMedia => $this->moveMedia($media, $canonical, $targetSeason, null));
-    }
-
     private function moveLooseMedia(CatalogTitle $duplicate, CatalogTitle $canonical): void
     {
-        LicensedMedia::query()
+        $media = LicensedMedia::query()
             ->where('catalog_title_id', $duplicate->id)
+            ->whereNull('season_id')
+            ->whereNull('episode_id')
+            ->orderBy('id')
             ->get()
-            ->each(fn (LicensedMedia $media): LicensedMedia => $this->moveMedia($media, $canonical, null, null));
+            ->values();
+        $mediaIds = $media->modelKeys();
+
+        $this->moveMediaCollection(
+            $media,
+            $canonical,
+            null,
+            null,
+            $this->canonicalMediaLookup($media, $canonical),
+            $this->technicalIssues->mediaIdsWithIssues($mediaIds),
+            $this->releaseCalendar->mediaIdsWithEntries($mediaIds),
+        );
     }
 
-    private function moveMedia(LicensedMedia $media, CatalogTitle $canonical, ?Season $season, ?Episode $episode): LicensedMedia
-    {
-        $existing = $this->matchingCanonicalMedia($media, $canonical);
+    /**
+     * @param  Collection<int, LicensedMedia>  $mediaItems
+     * @param  array{source_key: array<string, LicensedMedia>, playback_url: array<string, LicensedMedia>}  $mediaLookup
+     * @param  array<int, bool>  $technicalIssueMediaIds
+     * @param  array<int, bool>  $releaseCalendarMediaIds
+     */
+    private function moveMediaCollection(
+        Collection $mediaItems,
+        CatalogTitle $canonical,
+        ?Season $season,
+        ?Episode $episode,
+        array $mediaLookup,
+        array $technicalIssueMediaIds,
+        array $releaseCalendarMediaIds,
+    ): void {
+        foreach ($mediaItems as $media) {
+            $this->moveMedia(
+                $media,
+                $canonical,
+                $season,
+                $episode,
+                $mediaLookup,
+                isset($technicalIssueMediaIds[$media->id]),
+                isset($releaseCalendarMediaIds[$media->id]),
+            );
+        }
+    }
+
+    /**
+     * @param  array{source_key: array<string, LicensedMedia>, playback_url: array<string, LicensedMedia>}  $mediaLookup
+     */
+    private function moveMedia(
+        LicensedMedia $media,
+        CatalogTitle $canonical,
+        ?Season $season,
+        ?Episode $episode,
+        array $mediaLookup,
+        bool $hasTechnicalIssues,
+        bool $hasReleaseCalendarEntries,
+    ): LicensedMedia {
+        $existing = $this->matchingCanonicalMedia($media, $mediaLookup);
 
         if ($existing !== null && $existing->isNot($media)) {
-            $this->technicalIssues->moveMedia($media->id, $existing->id);
+            if ($hasTechnicalIssues) {
+                $this->technicalIssues->moveMedia($media->id, $existing->id);
+            }
+
             $effectiveUrl = $media->playback_url ?: ($existing->playback_url ?: ($media->path ?: $existing->path));
             $effectiveUrlChanged = $existing->effectivePlaybackUrl() !== $effectiveUrl;
 
@@ -654,7 +780,11 @@ class SeasonvarTitleMerger
             }
 
             $existing->save();
-            $this->releaseCalendar->moveMedia($media, $existing);
+
+            if ($hasReleaseCalendarEntries) {
+                $this->releaseCalendar->moveMedia($media, $existing);
+            }
+
             $media->forceDelete();
 
             return $existing;
@@ -669,27 +799,78 @@ class SeasonvarTitleMerger
         return $media;
     }
 
-    private function matchingCanonicalMedia(LicensedMedia $media, CatalogTitle $canonical): ?LicensedMedia
+    /**
+     * @param  Collection<int, LicensedMedia>  $sourceMedia
+     * @return array{source_key: array<string, LicensedMedia>, playback_url: array<string, LicensedMedia>}
+     */
+    private function canonicalMediaLookup(Collection $sourceMedia, CatalogTitle $canonical): array
     {
-        if ($media->source_media_key !== null) {
-            $match = LicensedMedia::query()
-                ->where('catalog_title_id', $canonical->id)
-                ->where('source_media_key', $media->source_media_key)
-                ->first();
+        $sourceKeys = $sourceMedia->pluck('source_media_key')
+            ->filter(static fn (mixed $key): bool => is_string($key) && $key !== '')
+            ->unique()
+            ->values();
+        $playbackUrls = $sourceMedia->pluck('playback_url')
+            ->filter(static fn (mixed $url): bool => is_string($url) && $url !== '')
+            ->unique()
+            ->values();
 
-            if ($match !== null) {
+        if ($sourceKeys->isEmpty() && $playbackUrls->isEmpty()) {
+            return ['source_key' => [], 'playback_url' => []];
+        }
+
+        $canonicalMedia = LicensedMedia::query()
+            ->where('catalog_title_id', $canonical->id)
+            ->where(function ($query) use ($sourceKeys, $playbackUrls): void {
+                if ($sourceKeys->isNotEmpty()) {
+                    $query->whereIn('source_media_key', $sourceKeys);
+                }
+
+                if ($playbackUrls->isNotEmpty()) {
+                    $sourceKeys->isNotEmpty()
+                        ? $query->orWhereIn('playback_url', $playbackUrls)
+                        : $query->whereIn('playback_url', $playbackUrls);
+                }
+            })
+            ->orderBy('id')
+            ->get();
+        $lookup = ['source_key' => [], 'playback_url' => []];
+
+        foreach ($canonicalMedia as $media) {
+            if (is_string($media->source_media_key) && $media->source_media_key !== '') {
+                $lookup['source_key'][$media->source_media_key] ??= $media;
+            }
+
+            if (is_string($media->playback_url) && $media->playback_url !== '') {
+                $lookup['playback_url'][$media->playback_url] ??= $media;
+            }
+        }
+
+        return $lookup;
+    }
+
+    /**
+     * @param  array{source_key: array<string, LicensedMedia>, playback_url: array<string, LicensedMedia>}  $mediaLookup
+     */
+    private function matchingCanonicalMedia(LicensedMedia $media, array $mediaLookup): ?LicensedMedia
+    {
+        if (is_string($media->source_media_key) && $media->source_media_key !== '') {
+            $match = $mediaLookup['source_key'][$media->source_media_key] ?? null;
+
+            if ($match instanceof LicensedMedia) {
                 return $match;
             }
         }
 
-        if ($media->playback_url === null) {
+        if (! is_string($media->playback_url) || $media->playback_url === '') {
             return null;
         }
 
-        return LicensedMedia::query()
-            ->where('catalog_title_id', $canonical->id)
-            ->where('playback_url', $media->playback_url)
-            ->first();
+        return $mediaLookup['playback_url'][$media->playback_url] ?? null;
+    }
+
+    private function episodeIdentityKey(Episode $episode): string
+    {
+        return $episode->kind->value.'|'.$episode->number;
     }
 
     private function mergeAliases(CatalogTitle $canonical, CatalogTitle $duplicate): void

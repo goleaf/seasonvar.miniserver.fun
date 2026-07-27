@@ -108,6 +108,22 @@ final class QueueWorkerHeartbeat
         ];
     }
 
+    /** @return array{status: string, connection: string, queue: string, pending: int, delayed: int, reserved: int, oldest_pending_age_seconds: int|null, last_heartbeat_at: mixed, last_processed_at: mixed, message?: string} */
+    public function statusFor(string $name): array
+    {
+        $definition = $this->criticalQueues()[$name] ?? null;
+
+        if (! is_array($definition)) {
+            throw new \InvalidArgumentException("Unknown critical queue [{$name}].");
+        }
+
+        return $this->queueStatus(
+            $definition['connection'],
+            $definition['queue'],
+            $definition['busy_threshold'],
+        );
+    }
+
     /**
      * @return array<string, array{connection: string, queue: string, busy_threshold: int}>
      */

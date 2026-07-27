@@ -1,6 +1,6 @@
 # Каноническая администрация портала
 
-Обновлено: 25.07.2026
+Обновлено: 27.07.2026
 
 ## System-wide administration integration
 
@@ -72,6 +72,13 @@ Resource policy остаётся authoritative поверх section/action permi
 - Full-page Livewire 4 shell `App\Livewire\CatalogAdministrationPage` доступен по `/admin/catalog` пользователю с `administration.access` и `content.view`; конкретные формы требуют `content.create`, `content.manage`, `content.publish`, `content.delete`, `sources.view`, `sources.manage`, `sources.disable`, `collections.moderate` или `recommendations.manage`.
 - Route middleware и component hydration повторяют section permission, а каждую запись сервис авторизует через policy/action permission. Moderator получает read-only catalog context, нужный для collection queue, без metadata/source/publication прав; `content_editor` не может archive/publish, `media_manager` не получает metadata edit.
 - `/admin/imports` остаётся отдельным существующим экраном запусков импортёра. Из каталога на него ведёт служебная ссылка; новый importer workflow не создавался. Экран показывает per-run counters, здоровье источников и кешируемый глобальный backlog размеров direct-file media; snapshot не содержит source/playback URL и не запускает сетевую проверку при Livewire render.
+- Статус `/admin/imports` и `seasonvar:import --status` строится одним
+  `SeasonvarQueueStatus`. Экран показывает выбранный run, durable phase,
+  exact queue/transport, worker profile, heartbeat и claims только этого run.
+  Targeted refresh использует `seasonvar-title-refresh`, общий import —
+  `seasonvar-import`; cached file-size aggregate имеет отдельный timestamp и
+  не выдаётся за live progress. ETA не вычисляется и raw provider URL/error
+  в Livewire state не попадают.
 - Write actions проходят gate, policy, server-side validation и optimistic version checks без локального request budget.
 
 ## Возможности

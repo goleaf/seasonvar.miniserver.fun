@@ -7,7 +7,6 @@ namespace App\Jobs;
 use App\Actions\Seasonvar\RecordSeasonvarPageFailure;
 use App\Enums\SeasonvarImportFailureType;
 use App\Enums\SeasonvarImportStatus;
-use App\Enums\SeasonvarPreparedPageStatus;
 use App\Models\SeasonvarImportPreparedPage;
 use App\Models\SeasonvarImportRun;
 use App\Models\SeasonvarImportTitleGroup;
@@ -71,10 +70,7 @@ final class PrepareSeasonvarImportTitlePage implements ShouldBeUnique, ShouldQue
             ])
             ->findOrFail($this->preparedPageId);
 
-        if (in_array($preparedRow->status, [
-            SeasonvarPreparedPageStatus::Prepared,
-            SeasonvarPreparedPageStatus::Applied,
-        ], true)) {
+        if ($preparedRow->status->isTerminal()) {
             $token = $this->existingClaimToken($preparedRow, $claims);
 
             if ($token !== null) {
@@ -96,16 +92,19 @@ final class PrepareSeasonvarImportTitlePage implements ShouldBeUnique, ShouldQue
             return;
         }
 
+        if (! $preparedRow->beginPreparing()) {
+            return;
+        }
+
         $token = $this->existingClaimToken($preparedRow, $claims)
             ?? $claims->claim($preparedRow->sourcePage, $preparedRow->seasonvar_import_run_id);
 
         if ($token === null) {
+            $preparedRow->returnToQueue();
             $this->release(30);
 
             return;
         }
-
-        $preparedRow->markPreparing();
 
         try {
             $prepared = $preparer->prepare(
@@ -121,7 +120,14 @@ final class PrepareSeasonvarImportTitlePage implements ShouldBeUnique, ShouldQue
                     $prepared->parserVersion,
                 );
                 SeasonvarImportTitleGroup::query()->whereKey($preparedRow->group->id)->increment('prepared_pages');
-                SeasonvarImportRun::query()->whereKey($preparedRow->seasonvar_import_run_id)->increment('parsed');
+                SeasonvarImportRun::query()
+                    ->whereKey($preparedRow->seasonvar_import_run_id)
+                    ->update([
+                        'parsed' => DB::raw('parsed + 1'),
+                        'last_progress_at' => now(),
+                        'last_heartbeat_at' => now(),
+                        'updated_at' => now(),
+                    ]);
             });
         } catch (Throwable $exception) {
             $failureType = $pageFailures->handle(
@@ -133,6 +139,8 @@ final class PrepareSeasonvarImportTitlePage implements ShouldBeUnique, ShouldQue
             if ($failureType === SeasonvarImportFailureType::Permanent) {
                 $this->markTerminalFailure($preparedRow, $exception);
             } else {
+                $preparedRow->returnToQueue();
+
                 throw $exception;
             }
         } finally {
@@ -223,7 +231,14 @@ final class PrepareSeasonvarImportTitlePage implements ShouldBeUnique, ShouldQue
 
             $lockedRow->markFailed(app(SeasonvarImportErrorSanitizer::class)->fromException($exception));
             SeasonvarImportTitleGroup::query()->whereKey($lockedRow->seasonvar_import_title_group_id)->increment('failed_pages');
-            SeasonvarImportRun::query()->whereKey($lockedRow->seasonvar_import_run_id)->increment('failed');
+            SeasonvarImportRun::query()
+                ->whereKey($lockedRow->seasonvar_import_run_id)
+                ->update([
+                    'failed' => DB::raw('failed + 1'),
+                    'last_progress_at' => now(),
+                    'last_heartbeat_at' => now(),
+                    'updated_at' => now(),
+                ]);
         });
     }
 }

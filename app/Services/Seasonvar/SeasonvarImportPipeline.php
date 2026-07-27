@@ -4,24 +4,15 @@ declare(strict_types=1);
 
 namespace App\Services\Seasonvar;
 
-use App\Actions\Media\InspectLicensedMediaFileSize;
-use App\Enums\MediaHealthStatus;
+use App\Enums\SeasonvarImportFinalizationStage;
 use App\Enums\SeasonvarImportStatus;
 use App\Models\CatalogTitle;
-use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Models\SeasonvarImportRun;
 use App\Models\SourcePage;
 use App\Services\Catalog\CatalogCacheInvalidator;
-use App\Services\Catalog\CatalogMetadataDeduplicator;
 use App\Services\Catalog\CatalogRecommendationDirtyTitleTracker;
-use App\Services\Catalog\CatalogRecommendationSignalPruner;
-use App\Services\Catalog\CatalogTitleRecommendationBuilder;
 use App\Services\ContentRequests\ContentRequestImportRunLinker;
-use App\Services\Media\ExternalMediaMetadata;
-use App\Services\Media\LicensedMediaFileSizeBackfillBudget;
-use App\Services\Media\LicensedMediaFileSizeBacklog;
-use App\Services\Media\MediaSourceHealthManager;
 use App\Services\ReleaseCalendar\ReleaseCalendarCacheInvalidator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -33,8 +24,6 @@ class SeasonvarImportPipeline
 {
     private const QUEUED_FINALIZATION_CHECKPOINT = 'queued_finalization_checkpoint';
 
-    private const QUEUED_FINALIZATION_CHECKPOINT_VERSION = 1;
-
     private bool $stopRequested = false;
 
     private ?Carbon $lastRunHeartbeatAt = null;
@@ -42,22 +31,12 @@ class SeasonvarImportPipeline
     public function __construct(
         private readonly SeasonvarCatalogImporter $importer,
         private readonly SeasonvarSitemapMirror $sitemapMirror,
-        private readonly SeasonvarTitleMerger $titleMerger,
-        private readonly SeasonvarMediaAvailabilityChecker $mediaAvailabilityChecker,
-        private readonly MediaSourceHealthManager $mediaHealth,
-        private readonly ExternalMediaMetadata $mediaMetadata,
         private readonly SeasonvarRefreshPlanner $refreshPlanner,
-        private readonly CatalogTitleRecommendationBuilder $recommendations,
         private readonly CatalogRecommendationDirtyTitleTracker $recommendationDirtyTitles,
-        private readonly CatalogRecommendationSignalPruner $recommendationSignalPruner,
-        private readonly CatalogMetadataDeduplicator $metadataDeduplicator,
-        private readonly SeasonvarImportStorageMaintenance $storageMaintenance,
-        private readonly SeasonvarSourceAvailabilityBackfill $sourceAvailabilityBackfill,
-        private readonly SeasonvarCatalogMetadataBackfill $metadataBackfill,
+        private readonly SeasonvarImportMaintenancePipeline $maintenance,
         private readonly SeasonvarImportErrorSanitizer $errors,
-        private readonly InspectLicensedMediaFileSize $inspectFileSize,
-        private readonly LicensedMediaFileSizeBacklog $fileSizeBacklog,
         private readonly SeasonvarImportRunRecorder $runRecorder,
+        private readonly SeasonvarImportFinalizationCoordinator $finalization,
         private readonly ContentRequestImportRunLinker $contentRequests,
         private readonly SeasonvarImportEventRecorder $eventRecorder,
         private readonly ReleaseCalendarCacheInvalidator $releaseCalendarCache,
@@ -96,6 +75,7 @@ class SeasonvarImportPipeline
             'process_command' => $processCommand,
             'cycles' => 0,
             'started_at' => now(),
+            'last_progress_at' => now(),
             'last_heartbeat_at' => now(),
         ]);
 
@@ -156,6 +136,7 @@ class SeasonvarImportPipeline
                     ? SeasonvarImportStatus::Cancelled->value
                     : $run->completionStatus(),
                 'finished_at' => now(),
+                'last_progress_at' => now(),
                 'last_heartbeat_at' => now(),
             ];
 
@@ -194,6 +175,7 @@ class SeasonvarImportPipeline
                 'status' => 'failed',
                 'last_error' => $this->errors->fromException($exception),
                 'finished_at' => now(),
+                'last_progress_at' => now(),
                 'last_heartbeat_at' => now(),
             ])->save();
             $this->contentRequests->link($run->refresh());
@@ -219,6 +201,33 @@ class SeasonvarImportPipeline
      */
     public function finalizeQueuedRun(SeasonvarImportRun $run, ?callable $progress = null): SeasonvarImportRun
     {
+        foreach (SeasonvarImportFinalizationStage::ordered() as $_stage) {
+            $this->finalizeNextQueuedStage($run, $progress);
+            $run->refresh();
+
+            if ($run->status !== SeasonvarImportStatus::Running->value
+                || $this->finalization->nextStage($run) === null
+            ) {
+                break;
+            }
+        }
+
+        return $run->refresh();
+    }
+
+    /**
+     * @param  (callable(string, array<string, mixed>): void)|null  $progress
+     */
+    public function finalizeNextQueuedStage(
+        SeasonvarImportRun $run,
+        ?callable $progress = null,
+    ): SeasonvarImportRun {
+        $stage = $this->finalization->nextStage($run);
+
+        if ($stage === null || ! $this->finalization->beginStage($run, $stage)) {
+            return $run->refresh();
+        }
+
         $loggedProgress = fn (string $event, array $context = []) => $this->recordProgress(
             $run,
             $progress,
@@ -227,155 +236,85 @@ class SeasonvarImportPipeline
         );
 
         try {
-            $checkpoint = $this->queuedFinalizationCheckpoint($run);
-
-            if ($checkpoint === null) {
-                $storageMaintenanceResult = $this->storageMaintenance->prune();
-                $sourceAvailabilityBackfillResult = $this->sourceAvailabilityBackfill->run($loggedProgress);
-                $metadataBackfillResult = $this->metadataBackfill->run($loggedProgress);
-                $sourceStatusBackfillResult = $this->backfillParsedSourcePageStatuses($loggedProgress);
-                $mediaMetadataResult = $this->refreshMediaMetadataBacklog($loggedProgress);
-                $mediaSourceKeyResult = $this->backfillMediaSourceKeys($loggedProgress);
-                $mediaBacklogResult = $this->refreshMediaBacklog($loggedProgress);
-                $mediaSizeBacklogResult = $this->refreshMediaFileSizeBacklog($loggedProgress);
-                $relationCleanupResult = $this->metadataDeduplicator->run($loggedProgress);
-                $mergeResult = $this->titleMerger->merge($loggedProgress);
-                $checkpoint = [
-                    'version' => self::QUEUED_FINALIZATION_CHECKPOINT_VERSION,
-                    'storage_maintenance' => $storageMaintenanceResult,
-                    'provider_availability_backfill' => $sourceAvailabilityBackfillResult,
-                    'metadata_backfill' => $metadataBackfillResult,
-                    'source_status_backfill' => $sourceStatusBackfillResult,
-                    'media_metadata_backlog' => $mediaMetadataResult,
-                    'media_source_key_backlog' => $mediaSourceKeyResult,
-                    'media_backlog' => $mediaBacklogResult,
-                    'media_size_backlog' => $mediaSizeBacklogResult,
-                    'relation_cleanup' => $relationCleanupResult,
-                    'merge' => $mergeResult,
-                ];
-                $this->storeQueuedFinalizationCheckpoint($run, $checkpoint);
-                $loggedProgress('seasonvar-queued-finalization-checkpoint-stored', [
-                    'version' => self::QUEUED_FINALIZATION_CHECKPOINT_VERSION,
-                ]);
-            } else {
-                $storageMaintenanceResult = $checkpoint['storage_maintenance'];
-                $sourceAvailabilityBackfillResult = $checkpoint['provider_availability_backfill'];
-                $metadataBackfillResult = $checkpoint['metadata_backfill'];
-                $sourceStatusBackfillResult = $checkpoint['source_status_backfill'];
-                $mediaMetadataResult = $checkpoint['media_metadata_backlog'];
-                $mediaSourceKeyResult = $checkpoint['media_source_key_backlog'];
-                $mediaBacklogResult = $checkpoint['media_backlog'];
-                $mediaSizeBacklogResult = $checkpoint['media_size_backlog'];
-                $relationCleanupResult = $checkpoint['relation_cleanup'];
-                $mergeResult = $checkpoint['merge'];
-                $loggedProgress('seasonvar-queued-finalization-checkpoint-resumed', [
-                    'version' => self::QUEUED_FINALIZATION_CHECKPOINT_VERSION,
-                ]);
-            }
-
-            $recommendationResult = $this->recommendations->rebuildDirty(
-                $loggedProgress,
-                allowFullRebuild: false,
-            );
-            $recommendationSignalPruneResult = $this->pruneRecommendationSignalsAfterActivation(
-                $recommendationResult,
+            $result = $this->executeQueuedFinalizationStage(
+                $run,
+                $stage,
                 $loggedProgress,
             );
-
-            $this->addRunCounters($run, [
-                'cycles' => 1,
-                'media_updated' => $mediaBacklogResult['media_updated'],
-                'media_failed' => $mediaBacklogResult['media_failed'],
-            ], [
-                'last_storage_maintenance' => $storageMaintenanceResult,
-                'last_provider_availability_backfill' => $sourceAvailabilityBackfillResult,
-                'last_metadata_backfill' => $metadataBackfillResult,
-                'last_source_status_backfill' => $sourceStatusBackfillResult,
-                'last_media_metadata_backlog' => $mediaMetadataResult,
-                'last_media_source_key_backlog' => $mediaSourceKeyResult,
-                'last_media_backlog' => $mediaBacklogResult,
-                'last_media_size_backlog' => $mediaSizeBacklogResult,
-                'last_relation_cleanup' => $relationCleanupResult,
-                'last_merge' => $mergeResult,
-                'last_recommendations' => $recommendationResult,
-                'last_recommendation_signal_prune' => $recommendationSignalPruneResult,
+            $this->finalization->completeStage($run, $stage, $result);
+            $loggedProgress('seasonvar-queued-finalization-stage-completed', [
+                'stage' => $stage->value,
             ]);
-
-            $run->refresh();
-            $summary = $run->summary ?? [];
-            unset($summary[self::QUEUED_FINALIZATION_CHECKPOINT]);
-            $run->fill([
-                'status' => $run->completionStatus(),
-                'summary' => $summary,
-                'finished_at' => now(),
-                'last_heartbeat_at' => now(),
-            ])->save();
-            $this->contentRequests->link($run->refresh());
-
-            return $run->refresh();
         } catch (Throwable $exception) {
-            $run->refresh();
-            $summary = $run->summary ?? [];
-            unset($summary[self::QUEUED_FINALIZATION_CHECKPOINT]);
-            $run->fill([
-                'status' => 'failed',
-                'summary' => $summary,
-                'last_error' => $this->errors->fromException($exception),
-                'finished_at' => now(),
-                'last_heartbeat_at' => now(),
-            ])->save();
-            $this->contentRequests->link($run->refresh());
+            $this->finalization->failStage($run, $stage, $exception);
 
             throw $exception;
         }
+
+        return $run->refresh();
     }
 
-    /** @return array<string, mixed>|null */
-    private function queuedFinalizationCheckpoint(SeasonvarImportRun $run): ?array
-    {
-        $checkpoint = data_get($run->refresh()->summary, self::QUEUED_FINALIZATION_CHECKPOINT);
-
-        if (! is_array($checkpoint)
-            || ($checkpoint['version'] ?? null) !== self::QUEUED_FINALIZATION_CHECKPOINT_VERSION
-        ) {
-            return null;
+    /**
+     * @param  callable(string, array<string, mixed>): void  $progress
+     * @return array<string, mixed>
+     */
+    private function executeQueuedFinalizationStage(
+        SeasonvarImportRun $run,
+        SeasonvarImportFinalizationStage $stage,
+        callable $progress,
+    ): array {
+        if ($stage === SeasonvarImportFinalizationStage::Terminal) {
+            return $this->completeQueuedFinalization($run);
         }
 
-        foreach ($this->queuedFinalizationCheckpointResultKeys() as $key) {
-            if (! is_array($checkpoint[$key] ?? null)) {
-                return null;
-            }
-        }
-
-        return $checkpoint;
+        return $this->maintenance->executeQueuedStage($run, $stage, $progress);
     }
 
-    /** @param array<string, mixed> $checkpoint */
-    private function storeQueuedFinalizationCheckpoint(SeasonvarImportRun $run, array $checkpoint): void
+    /** @return array<string, mixed> */
+    private function completeQueuedFinalization(SeasonvarImportRun $run): array
     {
+        $results = $this->finalization->stageResults($run);
+        $requiredKeys = collect(SeasonvarImportFinalizationStage::ordered())
+            ->reject(
+                static fn (SeasonvarImportFinalizationStage $stage): bool => $stage === SeasonvarImportFinalizationStage::Terminal,
+            )
+            ->map(
+                static fn (SeasonvarImportFinalizationStage $stage): ?string => $stage->resultKey(),
+            )
+            ->filter()
+            ->values();
+
+        if (! $requiredKeys->every(
+            static fn (string $key): bool => isset($results[$key]),
+        )) {
+            throw new LogicException('Нельзя завершить импорт Seasonvar без всех finalization checkpoints.');
+        }
+
+        $mediaBacklog = $results['media_backlog'];
+        $this->addRunCounters($run, [
+            'cycles' => 1,
+            'media_updated' => (int) ($mediaBacklog['media_updated'] ?? 0),
+            'media_failed' => (int) ($mediaBacklog['media_failed'] ?? 0),
+        ], collect($results)->mapWithKeys(
+            static fn (array $result, string $key): array => [
+                'last_'.$key => $result,
+            ],
+        )->all());
         $run->refresh();
         $summary = $run->summary ?? [];
-        $summary[self::QUEUED_FINALIZATION_CHECKPOINT] = $checkpoint;
-        $run->update([
+        unset($summary[self::QUEUED_FINALIZATION_CHECKPOINT]);
+        $run->fill([
+            'status' => $run->completionStatus(),
             'summary' => $summary,
+            'finished_at' => now(),
+            'last_progress_at' => now(),
             'last_heartbeat_at' => now(),
-        ]);
-    }
+        ])->save();
+        $this->contentRequests->link($run->refresh());
 
-    /** @return list<string> */
-    private function queuedFinalizationCheckpointResultKeys(): array
-    {
         return [
-            'storage_maintenance',
-            'provider_availability_backfill',
-            'metadata_backfill',
-            'source_status_backfill',
-            'media_metadata_backlog',
-            'media_source_key_backlog',
-            'media_backlog',
-            'media_size_backlog',
-            'relation_cleanup',
-            'merge',
+            'status' => $run->status,
+            'completed_at' => now()->toIso8601String(),
         ];
     }
 
@@ -401,11 +340,12 @@ class SeasonvarImportPipeline
         ]);
 
         if ($refreshMediaSizes) {
-            $mediaSizeBacklogResult = $this->refreshMediaFileSizeBacklog(
+            $mediaSizeBacklogResult = $this->maintenance->refreshMediaFileSizes(
                 $progress,
                 $forceMediaSizes,
                 $mediaSizeLimit,
                 $mediaSizeTimeBudgetSeconds,
+                fn (): bool => $this->stopRequested,
             );
             $this->addRunCounters($run, ['cycles' => 1], [
                 'media_size_only' => true,
@@ -444,32 +384,33 @@ class SeasonvarImportPipeline
             return;
         }
 
-        $storageMaintenanceResult = $this->storageMaintenance->prune();
+        $storageMaintenanceResult = $this->maintenance->pruneStorage();
         $progress('seasonvar-import-storage-pruned', $storageMaintenanceResult);
 
         if ($this->finishStoppedCycle($run, $cycle, $progress, 'storage_maintenance')) {
             return;
         }
 
-        $sourceAvailabilityBackfillResult = $this->sourceAvailabilityBackfill->run($progress);
+        $sourceAvailabilityBackfillResult = $this->maintenance
+            ->backfillProviderAvailability($progress);
 
         if ($this->finishStoppedCycle($run, $cycle, $progress, 'provider_availability_backfill')) {
             return;
         }
 
-        $metadataBackfillResult = $this->metadataBackfill->run($progress);
+        $metadataBackfillResult = $this->maintenance->backfillMetadata($progress);
 
         if ($this->finishStoppedCycle($run, $cycle, $progress, 'metadata_backfill')) {
             return;
         }
 
-        $earlyRelationCleanupResult = $this->metadataDeduplicator->run($progress);
+        $earlyRelationCleanupResult = $this->maintenance->cleanRelations($progress);
 
         if ($this->finishStoppedCycle($run, $cycle, $progress, 'early_relation_cleanup')) {
             return;
         }
 
-        $sourceStatusBackfillResult = $this->backfillParsedSourcePageStatuses($progress);
+        $sourceStatusBackfillResult = $this->maintenance->backfillSourceStatuses($progress);
 
         if ($this->finishStoppedCycle($run, $cycle, $progress, 'source_status_backfill')) {
             return;
@@ -481,45 +422,48 @@ class SeasonvarImportPipeline
             return;
         }
 
-        $mediaMetadataResult = $this->refreshMediaMetadataBacklog($progress);
+        $mediaMetadataResult = $this->maintenance->refreshMediaMetadata($progress);
 
         if ($this->finishStoppedCycle($run, $cycle, $progress, 'media_metadata_backlog')) {
             return;
         }
 
-        $mediaSourceKeyResult = $this->backfillMediaSourceKeys($progress);
+        $mediaSourceKeyResult = $this->maintenance->backfillMediaSourceKeys($progress);
 
         if ($this->finishStoppedCycle($run, $cycle, $progress, 'media_source_key_backlog')) {
             return;
         }
 
-        $mediaBacklogResult = $this->refreshMediaBacklog($progress);
+        $mediaBacklogResult = $this->maintenance->refreshMediaAvailability($progress);
 
         if ($this->finishStoppedCycle($run, $cycle, $progress, 'media_availability_backlog')) {
             return;
         }
 
-        $mediaSizeBacklogResult = $this->refreshMediaFileSizeBacklog($progress);
+        $mediaSizeBacklogResult = $this->maintenance->refreshMediaFileSizes(
+            $progress,
+            shouldStop: fn (): bool => $this->stopRequested,
+        );
 
         if ($this->finishStoppedCycle($run, $cycle, $progress, 'media_size_backlog')) {
             return;
         }
 
-        $lateRelationCleanupResult = $this->metadataDeduplicator->run($progress);
+        $lateRelationCleanupResult = $this->maintenance->cleanRelations($progress);
         $relationCleanupResult = $this->mergeRelationCleanupResults($earlyRelationCleanupResult, $lateRelationCleanupResult);
 
         if ($this->finishStoppedCycle($run, $cycle, $progress, 'late_relation_cleanup')) {
             return;
         }
 
-        $mergeResult = $this->titleMerger->merge($progress);
+        $mergeResult = $this->maintenance->mergeTitles($progress);
 
         if ($this->finishStoppedCycle($run, $cycle, $progress, 'title_merge')) {
             return;
         }
 
-        $recommendationResult = $this->recommendations->rebuildDirty($progress);
-        $recommendationSignalPruneResult = $this->pruneRecommendationSignalsAfterActivation(
+        $recommendationResult = $this->maintenance->rebuildRecommendations($progress);
+        $recommendationSignalPruneResult = $this->maintenance->pruneRecommendationSignals(
             $recommendationResult,
             $progress,
         );
@@ -583,54 +527,6 @@ class SeasonvarImportPipeline
     }
 
     /**
-     * @param  array<string, mixed>  $recommendationResult
-     * @param  (callable(string, array<string, mixed>): void)|null  $progress
-     * @return array{executed: bool, checked: int, deleted: int, failure: string|null}
-     */
-    private function pruneRecommendationSignalsAfterActivation(
-        array $recommendationResult,
-        ?callable $progress,
-    ): array {
-        $activatedShadowV6 = ($recommendationResult['algorithm_version'] ?? null) === 'v6'
-            && is_numeric($recommendationResult['build_id'] ?? null)
-            && (int) $recommendationResult['build_id'] > 0
-            && ($recommendationResult['activated'] ?? false) === true
-            && ($recommendationResult['gate_passed'] ?? false) === true;
-
-        if (! $activatedShadowV6) {
-            $result = [
-                'executed' => false,
-                'checked' => 0,
-                'deleted' => 0,
-                'failure' => null,
-            ];
-            $progress?->__invoke('catalog-recommendation-signals-prune-skipped', $result);
-
-            return $result;
-        }
-
-        try {
-            $pruned = $this->recommendationSignalPruner->prune($progress);
-
-            return [
-                'executed' => true,
-                ...$pruned,
-                'failure' => null,
-            ];
-        } catch (Throwable $exception) {
-            $result = [
-                'executed' => false,
-                'checked' => 0,
-                'deleted' => 0,
-                'failure' => $this->errors->fromException($exception),
-            ];
-            $progress?->__invoke('catalog-recommendation-signals-prune-failed', $result);
-
-            return $result;
-        }
-    }
-
-    /**
      * @param  callable(string, array<string, mixed>): void  $progress
      * @param  array<string, mixed>  $context
      */
@@ -687,51 +583,6 @@ class SeasonvarImportPipeline
         }
 
         return $merged;
-    }
-
-    /**
-     * @param  callable(string, array<string, mixed>): void  $progress
-     * @return array{selected: int, backfilled: int}
-     */
-    private function backfillParsedSourcePageStatuses(callable $progress): array
-    {
-        $chunkSize = $this->importChunkSize();
-        $selected = 0;
-        $backfilled = 0;
-
-        $progress('source-pages-status-backfill-started', [
-            'chunk_size' => $chunkSize,
-        ]);
-
-        SourcePage::query()
-            ->where('parse_status', 'parsed')
-            ->where('import_status', 'pending')
-            ->lazyById($chunkSize)
-            ->chunk($chunkSize)
-            ->each(function ($pages) use (&$selected, &$backfilled, $progress): void {
-                $pages = $pages->collect();
-                $selected += $pages->count();
-                $backfilled += SourcePage::query()->whereKey($pages->pluck('id')->all())->update([
-                    'import_status' => 'parsed',
-                    'retry_after_at' => null,
-                    'last_imported_at' => DB::raw('COALESCE(last_imported_at, last_crawled_at, updated_at)'),
-                    'updated_at' => now(),
-                ]);
-
-                $progress('source-pages-status-backfill-chunk-complete', [
-                    'selected' => $selected,
-                    'backfilled' => $backfilled,
-                ]);
-            });
-
-        $result = [
-            'selected' => $selected,
-            'backfilled' => $backfilled,
-        ];
-
-        $progress('source-pages-status-backfill-complete', $result);
-
-        return $result;
     }
 
     /**
@@ -986,447 +837,6 @@ class SeasonvarImportPipeline
 
     /**
      * @param  callable(string, array<string, mixed>): void  $progress
-     * @return array{media_checked: int, media_available: int, media_unavailable: int, media_updated: int, media_failed: int}
-     */
-    private function refreshMediaBacklog(callable $progress): array
-    {
-        if (! (bool) config('seasonvar.media_check.enabled', true)) {
-            return [
-                'media_checked' => 0,
-                'media_available' => 0,
-                'media_unavailable' => 0,
-                'media_updated' => 0,
-                'media_failed' => 0,
-            ];
-        }
-
-        $chunkSize = $this->mediaCheckChunkSize();
-        $maxPerCycle = $this->mediaCheckMaxPerCycle();
-        $mediaQuery = LicensedMedia::query()
-            ->whereIn('health_status', [
-                MediaHealthStatus::Active->value,
-                MediaHealthStatus::Degraded->value,
-                MediaHealthStatus::Unavailable->value,
-            ])
-            ->where(function ($query): void {
-                $query->whereNull('next_check_at')
-                    ->orWhere('next_check_at', '<=', now());
-            })
-            ->where(function ($query): void {
-                $query->whereNotNull('playback_url')
-                    ->orWhereNotNull('path');
-            });
-
-        $progress('seasonvar-media-backlog-started', [
-            'chunk_size' => $chunkSize,
-            'max_per_cycle' => $maxPerCycle,
-        ]);
-
-        $result = [
-            'selected' => 0,
-            'media_checked' => 0,
-            'media_available' => 0,
-            'media_unavailable' => 0,
-            'media_updated' => 0,
-            'media_failed' => 0,
-        ];
-
-        foreach ($mediaQuery->lazyById($chunkSize)->take($maxPerCycle)->chunk($chunkSize) as $mediaItems) {
-            $mediaItems = $mediaItems->collect();
-            $result['selected'] += $mediaItems->count();
-
-            foreach ($mediaItems as $media) {
-                $url = $media->playback_url ?: $media->path;
-
-                $availability = $this->mediaAvailabilityChecker->check($url, $progress);
-                $media = $this->mediaHealth->record($media, $availability);
-                $this->recommendationDirtyTitles->mark((int) $media->catalog_title_id, 'media-health');
-
-                $result['media_checked']++;
-                $result['media_updated']++;
-
-                if ($availability->available) {
-                    $result['media_available']++;
-                } else {
-                    $result['media_failed']++;
-
-                    if ($media->health_status === MediaHealthStatus::Unavailable) {
-                        $result['media_unavailable']++;
-                    }
-                }
-            }
-
-            $progress('seasonvar-media-backlog-chunk-complete', $result);
-        }
-
-        $progress('seasonvar-media-backlog-complete', [
-            'media_checked' => $result['media_checked'],
-            'media_available' => $result['media_available'],
-            'media_unavailable' => $result['media_unavailable'],
-            'media_updated' => $result['media_updated'],
-            'media_failed' => $result['media_failed'],
-            'selected' => $result['selected'],
-        ]);
-
-        return [
-            'media_checked' => $result['media_checked'],
-            'media_available' => $result['media_available'],
-            'media_unavailable' => $result['media_unavailable'],
-            'media_updated' => $result['media_updated'],
-            'media_failed' => $result['media_failed'],
-        ];
-    }
-
-    /**
-     * @param  callable(string, array<string, mixed>): void  $progress
-     * @return array{selected: int, processed: int, changed: int, stopped: bool, time_budget_seconds: int|null, time_budget_exhausted: bool, elapsed_milliseconds: int}
-     */
-    private function refreshMediaFileSizeBacklog(
-        callable $progress,
-        bool $force = false,
-        ?int $requestedLimit = null,
-        ?int $requestedTimeBudgetSeconds = null,
-    ): array {
-        $budget = LicensedMediaFileSizeBackfillBudget::start($requestedTimeBudgetSeconds);
-
-        if (! (bool) config('seasonvar.media_file_size.enabled', true)) {
-            return [
-                'selected' => 0,
-                'processed' => 0,
-                'changed' => 0,
-                'stopped' => false,
-                'time_budget_seconds' => $budget->seconds,
-                'time_budget_exhausted' => false,
-                'elapsed_milliseconds' => $budget->elapsedMilliseconds(),
-            ];
-        }
-
-        $chunkSize = max(1, min(
-            500,
-            (int) config('seasonvar.media_file_size.backfill_chunk_size', 25),
-        ));
-        $limit = max(1, min(
-            100_000,
-            $requestedLimit ?? (int) config('seasonvar.media_file_size.max_checks_per_import_cycle', 20),
-        ));
-        $query = $this->fileSizeBacklog->query($force)
-            ->select([
-                'id',
-                'catalog_title_id',
-                'season_id',
-                'episode_id',
-                'path',
-                'playback_url',
-                'format',
-                'file_size_bytes',
-                'file_size_checked_at',
-                'file_size_check_status',
-                'file_size_source',
-                'file_size_http_status',
-                'file_size_check_error',
-            ])
-            ->with([
-                'catalogTitle:id,title',
-                'season:id,number',
-                'episode:id,number',
-            ]);
-
-        $progress('seasonvar-media-size-backlog-started', [
-            'chunk_size' => $chunkSize,
-            'max_per_cycle' => $limit,
-            'force' => $force,
-            ...($budget->seconds === null ? [] : [
-                'time_budget_seconds' => $budget->seconds,
-            ]),
-        ]);
-
-        $result = [
-            'selected' => 0,
-            'processed' => 0,
-            'changed' => 0,
-            'stopped' => false,
-            'time_budget_seconds' => $budget->seconds,
-            'time_budget_exhausted' => false,
-            'elapsed_milliseconds' => 0,
-        ];
-
-        foreach ($query->lazyById($chunkSize)->take($limit) as $media) {
-            if ($this->stopRequested) {
-                $result['stopped'] = true;
-
-                break;
-            }
-
-            if ($budget->exhausted()) {
-                $result['time_budget_exhausted'] = true;
-                $result['elapsed_milliseconds'] = $budget->elapsedMilliseconds();
-
-                $progress('seasonvar-media-size-backlog-time-budget-exhausted', [
-                    ...$result,
-                    'remaining_seconds' => $budget->remainingSeconds(),
-                ]);
-
-                break;
-            }
-
-            $result['selected']++;
-
-            if (! $this->inspectFileSize->shouldInspect($media, $force)) {
-                continue;
-            }
-
-            $result['processed']++;
-            $changed = $this->inspectFileSize->execute($media, $progress, $force, [
-                'catalog_title' => $media->catalogTitle?->title,
-                'season_number' => $media->season?->number,
-                'episode_number' => $media->episode?->number,
-            ]);
-            $result['changed'] += $changed ? 1 : 0;
-        }
-
-        $result['elapsed_milliseconds'] = $budget->elapsedMilliseconds();
-        $progressResult = $result;
-
-        if ($progressResult['time_budget_seconds'] === null) {
-            unset($progressResult['time_budget_seconds']);
-        }
-
-        $progress('seasonvar-media-size-backlog-complete', $progressResult);
-
-        return $result;
-    }
-
-    /**
-     * @param  callable(string, array<string, mixed>): void  $progress
-     * @return array{media_checked: int, media_updated: int}
-     */
-    private function refreshMediaMetadataBacklog(callable $progress): array
-    {
-        $chunkSize = $this->mediaMetadataChunkSize();
-        $mediaQuery = LicensedMedia::query()
-            ->where(function ($query): void {
-                $query->whereNull('format')
-                    ->orWhere('format', '')
-                    ->orWhereNull('variant_type')
-                    ->orWhere('variant_type', '')
-                    ->orWhereNull('variant_key')
-                    ->orWhere('variant_key', '');
-            })
-            ->where(function ($query): void {
-                $query->whereNotNull('playback_url')
-                    ->orWhereNotNull('path');
-            });
-
-        $progress('seasonvar-media-metadata-backlog-started', [
-            'chunk_size' => $chunkSize,
-        ]);
-
-        $result = [
-            'selected' => 0,
-            'media_checked' => 0,
-            'media_updated' => 0,
-        ];
-
-        foreach ($mediaQuery->lazyById($chunkSize)->chunk($chunkSize) as $mediaItems) {
-            $mediaItems = $mediaItems->collect();
-            $result['selected'] += $mediaItems->count();
-
-            foreach ($mediaItems as $media) {
-                $url = $media->playback_url ?: $media->path;
-
-                if (trim($url) === '') {
-                    continue;
-                }
-
-                $updates = [];
-                $quality = $this->mediaMetadata->quality($media->title, $url);
-                $format = $this->mediaMetadata->format($url);
-                $translationName = $this->mediaMetadata->translationName($media->title, $media->source_url);
-                $variant = $this->mediaMetadata->playbackVariant($media->title, $media->source_url, $url);
-
-                if ($quality !== null && $quality !== $media->quality) {
-                    $updates['quality'] = $quality;
-                }
-
-                if ($format !== '' && $format !== $media->format) {
-                    $updates['format'] = $format;
-                }
-
-                if (($translationName !== null || $variant['has_subtitles']) && $translationName !== $media->translation_name) {
-                    $updates['translation_name'] = $translationName;
-                }
-
-                foreach (['variant_type', 'variant_name', 'variant_key', 'has_subtitles', 'subtitle_language'] as $attribute) {
-                    if ($variant[$attribute] !== $media->{$attribute}) {
-                        $updates[$attribute] = $variant[$attribute];
-                    }
-                }
-
-                $result['media_checked']++;
-
-                if ($updates === []) {
-                    continue;
-                }
-
-                $media->fill($updates)->save();
-                $result['media_updated']++;
-                $this->recommendationDirtyTitles->mark((int) $media->catalog_title_id, 'media-metadata');
-
-                $progress('seasonvar-media-metadata-updated', [
-                    'licensed_media_id' => $media->id,
-                    'quality' => $media->quality,
-                    'format' => $media->format,
-                    'translation_name' => $media->translation_name,
-                    'variant_type' => $media->variant_type,
-                    'variant_name' => $media->variant_name,
-                    'variant_key' => $media->variant_key,
-                    'has_subtitles' => $media->has_subtitles,
-                    'subtitle_language' => $media->subtitle_language,
-                    'url' => $url,
-                ]);
-            }
-
-            $progress('seasonvar-media-metadata-backlog-chunk-complete', $result);
-        }
-
-        $progress('seasonvar-media-metadata-backlog-complete', [
-            'media_checked' => $result['media_checked'],
-            'media_updated' => $result['media_updated'],
-            'selected' => $result['selected'],
-        ]);
-
-        return [
-            'media_checked' => $result['media_checked'],
-            'media_updated' => $result['media_updated'],
-        ];
-    }
-
-    /**
-     * @param  callable(string, array<string, mixed>): void  $progress
-     * @return array{media_checked: int, media_updated: int, collisions: int}
-     */
-    private function backfillMediaSourceKeys(callable $progress): array
-    {
-        $chunkSize = $this->mediaIdentityChunkSize();
-        $mediaQuery = LicensedMedia::query()
-            ->with([
-                'catalogTitle:id,source_url_hash,source_url',
-                'season:id,number',
-                'episode:id,number',
-            ])
-            ->where(function ($query): void {
-                $query->whereNull('source_media_key')
-                    ->orWhere('source_media_key', '');
-            })
-            ->where(function ($query): void {
-                $query->whereNotNull('playback_url')
-                    ->orWhereNotNull('path');
-            });
-
-        $progress('seasonvar-media-source-key-backlog-started', [
-            'chunk_size' => $chunkSize,
-        ]);
-
-        $result = [
-            'selected' => 0,
-            'media_checked' => 0,
-            'media_updated' => 0,
-            'collisions' => 0,
-        ];
-
-        foreach ($mediaQuery->lazyById($chunkSize)->chunk($chunkSize) as $mediaItems) {
-            $mediaItems = $mediaItems->collect();
-            $result['selected'] += $mediaItems->count();
-
-            foreach ($mediaItems as $media) {
-                $url = $media->playback_url ?: $media->path;
-
-                if (trim($url) === '') {
-                    continue;
-                }
-
-                $quality = $media->quality ?: $this->mediaMetadata->quality($media->title, $url);
-                $format = $media->format ?: $this->mediaMetadata->format($url);
-                $source = $this->mediaIdentitySource($media);
-                $sourceMediaKey = $this->mediaMetadata->sourceMediaKey(
-                    $source,
-                    $media->catalogTitle?->source_url_hash ?: $media->catalog_title_id,
-                    $media->season?->number,
-                    $media->episode?->number,
-                    $media->source_url,
-                    $url,
-                    $media->title,
-                    $quality,
-                    $format,
-                );
-
-                if ($this->sourceMediaKeyAlreadyExists($media, $sourceMediaKey)) {
-                    $sourceMediaKey = hash('sha256', implode('|', ['legacy_media_row', $media->id, $sourceMediaKey]));
-                    $result['collisions']++;
-                }
-
-                $updates = [
-                    'source_media_key' => $sourceMediaKey,
-                ];
-
-                if ($quality !== null && $quality !== $media->quality) {
-                    $updates['quality'] = $quality;
-                }
-
-                if ($format !== '' && $format !== $media->format) {
-                    $updates['format'] = $format;
-                }
-
-                $media->fill($updates)->save();
-                $result['media_checked']++;
-                $result['media_updated']++;
-
-                $progress('seasonvar-media-source-key-updated', [
-                    'licensed_media_id' => $media->id,
-                    'source_media_key' => $sourceMediaKey,
-                    'quality' => $media->quality,
-                    'format' => $media->format,
-                    'url' => $url,
-                ]);
-            }
-
-            $progress('seasonvar-media-source-key-backlog-chunk-complete', $result);
-        }
-
-        $progress('seasonvar-media-source-key-backlog-complete', [
-            'media_checked' => $result['media_checked'],
-            'media_updated' => $result['media_updated'],
-            'collisions' => $result['collisions'],
-            'selected' => $result['selected'],
-        ]);
-
-        return [
-            'media_checked' => $result['media_checked'],
-            'media_updated' => $result['media_updated'],
-            'collisions' => $result['collisions'],
-        ];
-    }
-
-    private function mediaIdentitySource(LicensedMedia $media): string
-    {
-        return match ($media->storage_disk) {
-            'seasonvar_parsed' => 'seasonvar',
-            'external_playlist' => 'external_playlist',
-            default => $media->storage_disk ?: 'legacy_media',
-        };
-    }
-
-    private function sourceMediaKeyAlreadyExists(LicensedMedia $media, string $sourceMediaKey): bool
-    {
-        return LicensedMedia::query()
-            ->where('catalog_title_id', $media->catalog_title_id)
-            ->where('source_media_key', $sourceMediaKey)
-            ->whereKeyNot($media->id)
-            ->exists();
-    }
-
-    /**
-     * @param  callable(string, array<string, mixed>): void  $progress
      * @param  Collection<int, array<string, mixed>>  $parsedUrls
      */
     private function parseUrl(
@@ -1513,26 +923,6 @@ class SeasonvarImportPipeline
         return max(1, (int) config('seasonvar.import.chunk_size', 100));
     }
 
-    private function mediaCheckChunkSize(): int
-    {
-        return max(1, (int) config('seasonvar.media_check.chunk_size', 25));
-    }
-
-    private function mediaCheckMaxPerCycle(): int
-    {
-        return max(1, (int) config('seasonvar.media_check.max_per_cycle', 20));
-    }
-
-    private function mediaMetadataChunkSize(): int
-    {
-        return max(1, (int) config('seasonvar.media_metadata.chunk_size', 100));
-    }
-
-    private function mediaIdentityChunkSize(): int
-    {
-        return max(1, (int) config('seasonvar.media_identity.chunk_size', 250));
-    }
-
     private function isDirectSeasonvarSeasonUrl(string $url): bool
     {
         $parts = parse_url($url);
@@ -1606,9 +996,14 @@ class SeasonvarImportPipeline
             'media_failed' => (int) ($counters['media_failed'] ?? 0),
         ], fn (int $amount): bool => $amount !== 0);
 
-        $run->incrementEachQuietly($increments, [
-            'summary' => array_merge($run->summary ?? [], $summary),
-        ]);
+        SeasonvarImportRun::query()
+            ->whereKey($run->id)
+            ->incrementEach($increments, [
+                'summary' => array_merge($run->summary ?? [], $summary),
+                'last_progress_at' => now(),
+                'last_heartbeat_at' => now(),
+            ]);
+        $run->refresh();
     }
 
     /**

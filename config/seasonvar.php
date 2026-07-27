@@ -3,6 +3,7 @@
 return [
     'http' => [
         'max_response_bytes' => (int) env('SEASONVAR_HTTP_MAX_RESPONSE_BYTES', 8_388_608),
+        'sitemap_max_uncompressed_bytes' => (int) env('SEASONVAR_SITEMAP_MAX_UNCOMPRESSED_BYTES', 33_554_432),
     ],
 
     'admin_emails' => array_values(array_filter(array_map(
@@ -21,10 +22,16 @@ return [
         'sleep_seconds' => (int) env('SEASONVAR_IMPORT_SLEEP_SECONDS', 60),
         'refresh_after_hours' => (int) env('SEASONVAR_IMPORT_REFRESH_AFTER_HOURS', 24),
         'missing_data_retry_hours' => (int) env('SEASONVAR_IMPORT_MISSING_DATA_RETRY_HOURS', 24),
+        'parser_max_nesting_depth' => (int) env('SEASONVAR_IMPORT_PARSER_MAX_NESTING_DEPTH', 32),
+        'parser_max_collection_items' => (int) env('SEASONVAR_IMPORT_PARSER_MAX_COLLECTION_ITEMS', 5000),
         'lock_seconds' => (int) env('SEASONVAR_IMPORT_LOCK_SECONDS', 604800),
         'stale_after_minutes' => (int) env('SEASONVAR_IMPORT_STALE_AFTER_MINUTES', 15),
         'transaction_attempts' => (int) env('SEASONVAR_IMPORT_TRANSACTION_ATTEMPTS', 5),
         'transaction_retry_delay_ms' => (int) env('SEASONVAR_IMPORT_TRANSACTION_RETRY_DELAY_MS', 250),
+        'compact_storage_write_enabled' => filter_var(env('SEASONVAR_IMPORT_COMPACT_STORAGE_WRITE_ENABLED', false), FILTER_VALIDATE_BOOL),
+        'compact_payload_max_uncompressed_bytes' => (int) env('SEASONVAR_IMPORT_COMPACT_PAYLOAD_MAX_UNCOMPRESSED_BYTES', 16_777_216),
+        'writer_admission_enabled' => filter_var(env('SEASONVAR_IMPORT_WRITER_ADMISSION_ENABLED', false), FILTER_VALIDATE_BOOL),
+        'writer_admission_retry_seconds' => (int) env('SEASONVAR_IMPORT_WRITER_ADMISSION_RETRY_SECONDS', 5),
         'storage_maintenance_enabled' => filter_var(env('SEASONVAR_IMPORT_STORAGE_MAINTENANCE_ENABLED', true), FILTER_VALIDATE_BOOL),
         'event_retention_days' => (int) env('SEASONVAR_IMPORT_EVENT_RETENTION_DAYS', 7),
         'snapshot_retention_days' => (int) env('SEASONVAR_IMPORT_SNAPSHOT_RETENTION_DAYS', 14),
@@ -203,6 +210,8 @@ return [
     ],
     'media_file_size' => [
         'enabled' => filter_var(env('SEASONVAR_MEDIA_FILE_SIZE_ENABLED', true), FILTER_VALIDATE_BOOL),
+        'projection_enabled' => filter_var(env('SEASONVAR_MEDIA_FILE_SIZE_PROJECTION_ENABLED', false), FILTER_VALIDATE_BOOL),
+        'projection_backfill_chunk_size' => (int) env('SEASONVAR_MEDIA_FILE_SIZE_PROJECTION_BACKFILL_CHUNK_SIZE', 500),
         'connect_timeout_seconds' => (int) env('SEASONVAR_MEDIA_FILE_SIZE_CONNECT_TIMEOUT', 5),
         'timeout_seconds' => (int) env('SEASONVAR_MEDIA_FILE_SIZE_TIMEOUT', 10),
         'retry_times' => (int) env('SEASONVAR_MEDIA_FILE_SIZE_RETRY_TIMES', 2),
@@ -216,6 +225,7 @@ return [
         'scheduled_backfill_limit' => (int) env('SEASONVAR_MEDIA_FILE_SIZE_SCHEDULED_BACKFILL_LIMIT', 500),
         'scheduled_backfill_time_budget_seconds' => (int) env('SEASONVAR_MEDIA_FILE_SIZE_SCHEDULED_BACKFILL_TIME_BUDGET_SECONDS', 480),
         'status_cache_seconds' => 900,
+        'status_stale_seconds' => (int) env('SEASONVAR_MEDIA_FILE_SIZE_STATUS_STALE_SECONDS', 3600),
     ],
     'media_metadata' => [
         'chunk_size' => (int) env('SEASONVAR_MEDIA_METADATA_CHUNK_SIZE', 100),

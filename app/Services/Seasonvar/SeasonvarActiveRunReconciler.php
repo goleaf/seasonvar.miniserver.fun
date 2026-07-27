@@ -20,6 +20,7 @@ use Illuminate\Contracts\Cache\Store;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use LogicException;
 use Throwable;
@@ -30,6 +31,7 @@ final class SeasonvarActiveRunReconciler
         private readonly SeasonvarImportRunRecorder $runs,
         private readonly SeasonvarImportFinalizationDispatcher $finalizers,
         private readonly SeasonvarImportGroupKey $groupKeys,
+        private readonly SeasonvarImportDispatchBatcher $batcher,
     ) {}
 
     public function reconcile(int $runId): SeasonvarActiveRunReconciliationResult
@@ -78,30 +80,39 @@ final class SeasonvarActiveRunReconciler
         }
 
         $dispatchRecovered = false;
+        $pagesRegistered = 0;
+        $jobsDispatched = 0;
+        $dispatchHasMore = false;
 
         if (data_get($run->summary, 'dispatch_completed') === false) {
-            $durableProgressAt = $this->durableDispatchProgressAt($run);
+            $summary = $run->summary ?? [];
+            $discoveryCompleted = array_key_exists(
+                'discovery_completed',
+                $summary,
+            )
+                ? $summary['discovery_completed'] === true
+                : ! (bool) ($summary['discover'] ?? true);
 
-            if ($durableProgressAt->greaterThan($this->staleCutoff())) {
+            if (! $discoveryCompleted) {
                 return SeasonvarActiveRunReconciliationResult::ineligible();
             }
 
-            $ledgerRows = $run->preparedPages()->count();
-            $run = $this->runs->mergeSummary($run->id, [
-                'dispatch_completed' => true,
-                'queued_pages' => $ledgerRows,
-                'active_run_reconciliation' => [
-                    'reason' => 'redis_transport_reconciled',
-                    'durable_progress_at' => $durableProgressAt->toIso8601String(),
-                    'recovered_at' => now()->toIso8601String(),
-                    'prepared_page_ledger_rows' => $ledgerRows,
-                ],
-            ]) ?? $run;
-            $dispatchRecovered = true;
+            $batch = $this->batcher->dispatchNext($run->id);
+            $pagesRegistered = $batch->registeredPages;
+            $jobsDispatched = $batch->jobsDispatched;
+            $dispatchHasMore = $batch->hasMore;
+            $dispatchRecovered = $pagesRegistered > 0
+                || $batch->dispatchCompleted;
+            $run = $run->fresh();
         }
 
         $dueCutoff = now()->subSeconds($this->transportReplayAfterSeconds());
-        $batchSize = $this->batchSize();
+        $batchSize = max(0, $this->batchSize() - $jobsDispatched);
+        $hasMoreStalePreparingWork = $this->resetStalePreparingPages(
+            $run->id,
+            $dueCutoff,
+            $batchSize,
+        );
         $preparedCandidates = $this->duePreparedPages(
             $run->id,
             $dueCutoff,
@@ -109,45 +120,39 @@ final class SeasonvarActiveRunReconciler
         );
         $hasMorePreparedDueWork = $preparedCandidates->count() > $batchSize;
         $preparedPages = $preparedCandidates->take($batchSize);
-        $jobsDispatched = 0;
         /** @var array<int, SeasonvarImportTitleGroup> $groups */
         $groups = [];
-        $restoredPreparedDispatchFailure = false;
+        $preparedDispatchFailed = false;
+        $successfulPreparedIds = [];
+        $attemptedAt = now();
 
         foreach ($preparedPages as $page) {
-            $attemptedAt = now();
-            $claimed = SeasonvarImportPreparedPage::query()
-                ->whereKey($page->id)
-                ->whereIn('status', [
-                    SeasonvarPreparedPageStatus::Queued->value,
-                    SeasonvarPreparedPageStatus::Preparing->value,
-                ])
-                ->where('updated_at', '<=', $dueCutoff)
-                ->update(['updated_at' => $attemptedAt]);
-
-            if ($claimed !== 1) {
-                continue;
-            }
-
             try {
                 PrepareSeasonvarImportTitlePage::dispatch((int) $page->id)
                     ->onConnection((string) config('seasonvar.queue.connection', 'redis'))
                     ->onQueue((string) $page->group->queue_name)
                     ->afterCommit();
                 $jobsDispatched++;
+                $successfulPreparedIds[] = (int) $page->id;
                 $groups[(int) $page->group->id] = $page->group;
             } catch (Throwable $exception) {
-                $restored = SeasonvarImportPreparedPage::query()
-                    ->whereKey($page->id)
-                    ->where('updated_at', $attemptedAt)
-                    ->update(['updated_at' => $page->updated_at]);
-                $restoredPreparedDispatchFailure =
-                    $restoredPreparedDispatchFailure || $restored === 1;
+                $preparedDispatchFailed = true;
                 $this->reportDispatchFailure($run->id, $exception);
             }
         }
 
-        $remainingCapacity = max(0, $batchSize - $jobsDispatched);
+        if ($successfulPreparedIds !== []) {
+            SeasonvarImportPreparedPage::query()
+                ->whereIn('id', $successfulPreparedIds)
+                ->where('status', SeasonvarPreparedPageStatus::Queued->value)
+                ->update([
+                    'last_enqueue_attempt_at' => $attemptedAt,
+                    'enqueue_attempts' => DB::raw('enqueue_attempts + 1'),
+                ]);
+        }
+
+        $preparedJobsDispatched = count($successfulPreparedIds);
+        $remainingCapacity = max(0, $batchSize - $preparedJobsDispatched);
 
         if ($remainingCapacity > 0) {
             $jobsDispatched += $this->requeueLegacyClaimedPages(
@@ -169,11 +174,12 @@ final class SeasonvarActiveRunReconciler
             $this->finalizers->signalGlobalRun($run);
         }
 
-        $hasRemainingDueWork = $hasMorePreparedDueWork
-            || $restoredPreparedDispatchFailure
+        $hasRemainingDueWork = $hasMoreStalePreparingWork
+            || $hasMorePreparedDueWork
+            || $preparedDispatchFailed
             || $this->hasRemainingLegacyDueWork($run->id, $dueCutoff);
 
-        if ($hasRemainingDueWork) {
+        if ($hasRemainingDueWork && ! $dispatchHasMore) {
             ReconcileSeasonvarQueuedImportRun::dispatch($run->id)
                 ->onConnection((string) config('seasonvar.queue.connection', 'redis'))
                 ->onQueue((string) config('seasonvar.queue.queue', 'seasonvar-import'))
@@ -184,25 +190,10 @@ final class SeasonvarActiveRunReconciler
         return new SeasonvarActiveRunReconciliationResult(
             eligible: true,
             dispatchRecovered: $dispatchRecovered,
+            pagesRegistered: $pagesRegistered,
             jobsDispatched: $jobsDispatched,
             hasRemainingDueWork: $hasRemainingDueWork,
         );
-    }
-
-    private function durableDispatchProgressAt(SeasonvarImportRun $run): Carbon
-    {
-        $latestPreparedAt = $run->preparedPages()->max('updated_at');
-        $progressAt = $run->started_at ?? $run->created_at ?? now();
-
-        if ($latestPreparedAt !== null) {
-            $preparedAt = Carbon::parse((string) $latestPreparedAt);
-
-            if ($preparedAt->greaterThan($progressAt)) {
-                $progressAt = $preparedAt;
-            }
-        }
-
-        return $progressAt;
     }
 
     /** @return Collection<int, SeasonvarImportPreparedPage> */
@@ -213,18 +204,57 @@ final class SeasonvarActiveRunReconciler
                 'id',
                 'seasonvar_import_title_group_id',
                 'status',
+                'last_enqueue_attempt_at',
                 'updated_at',
             ])
             ->with('group:id,seasonvar_import_run_id,queue_name')
             ->where('seasonvar_import_run_id', $runId)
-            ->whereIn('status', [
-                SeasonvarPreparedPageStatus::Queued->value,
-                SeasonvarPreparedPageStatus::Preparing->value,
-            ])
-            ->where('updated_at', '<=', $cutoff)
+            ->where('status', SeasonvarPreparedPageStatus::Queued->value)
+            ->where(function ($query) use ($cutoff): void {
+                $query->whereNull('last_enqueue_attempt_at')
+                    ->orWhere('last_enqueue_attempt_at', '<=', $cutoff);
+            })
             ->orderBy('id')
             ->limit($limit)
             ->get();
+    }
+
+    private function resetStalePreparingPages(
+        int $runId,
+        Carbon $cutoff,
+        int $limit,
+    ): bool {
+        if ($limit < 1) {
+            return SeasonvarImportPreparedPage::query()
+                ->where('seasonvar_import_run_id', $runId)
+                ->where('status', SeasonvarPreparedPageStatus::Preparing->value)
+                ->where('updated_at', '<=', $cutoff)
+                ->exists();
+        }
+
+        $candidateIds = SeasonvarImportPreparedPage::query()
+            ->where('seasonvar_import_run_id', $runId)
+            ->where('status', SeasonvarPreparedPageStatus::Preparing->value)
+            ->where('updated_at', '<=', $cutoff)
+            ->orderBy('id')
+            ->limit($limit + 1)
+            ->pluck('id')
+            ->map(static fn (mixed $id): int => (int) $id);
+        $hasMore = $candidateIds->count() > $limit;
+        $resetIds = $candidateIds->take($limit)->all();
+
+        if ($resetIds !== []) {
+            SeasonvarImportPreparedPage::query()
+                ->whereIn('id', $resetIds)
+                ->where('status', SeasonvarPreparedPageStatus::Preparing->value)
+                ->where('updated_at', '<=', $cutoff)
+                ->update([
+                    'status' => SeasonvarPreparedPageStatus::Queued->value,
+                    'updated_at' => now(),
+                ]);
+        }
+
+        return $hasMore;
     }
 
     private function requeueLegacyClaimedPages(
@@ -320,11 +350,6 @@ final class SeasonvarActiveRunReconciler
             )
             ->where('updated_at', '<=', $cutoff)
             ->exists();
-    }
-
-    private function staleCutoff(): Carbon
-    {
-        return now()->subMinutes(max(5, (int) config('seasonvar.queue.stale_after_minutes', 120)));
     }
 
     private function transportReplayAfterSeconds(): int

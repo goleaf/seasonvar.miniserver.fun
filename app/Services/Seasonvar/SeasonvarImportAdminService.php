@@ -6,6 +6,7 @@ namespace App\Services\Seasonvar;
 
 use App\DTOs\LicensedMediaFileSizeBacklogStatusData;
 use App\DTOs\Seasonvar\SeasonvarImportStartResultData;
+use App\DTOs\Seasonvar\SeasonvarQueueStatusData;
 use App\Enums\SeasonvarImportStatus;
 use App\Jobs\StartSeasonvarQueuedImport;
 use App\Models\SeasonvarImportRun;
@@ -13,6 +14,7 @@ use App\Models\User;
 use App\Services\Media\LicensedMediaFileSizeBackfillSchedule;
 use App\Services\Media\LicensedMediaFileSizeBacklog;
 use App\Support\HumanFileSizeFormatter;
+use Carbon\CarbonInterface;
 use Illuminate\Contracts\Bus\Dispatcher as BusDispatcher;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\DB;
@@ -30,6 +32,7 @@ final class SeasonvarImportAdminService
         private readonly BusDispatcher $bus,
         private readonly HumanFileSizeFormatter $fileSizes,
         private readonly LicensedMediaFileSizeBacklog $fileSizeBacklog,
+        private readonly SeasonvarQueueStatus $queueStatus,
     ) {}
 
     public function start(
@@ -111,6 +114,7 @@ final class SeasonvarImportAdminService
             ->update([
                 'status' => SeasonvarImportStatus::Queued->value,
                 'last_error' => $this->errors->fromException($exception),
+                'last_progress_at' => now(),
                 'last_heartbeat_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -125,6 +129,7 @@ final class SeasonvarImportAdminService
                 'status' => SeasonvarImportStatus::Failed->value,
                 'last_error' => $this->errors->fromException($exception),
                 'finished_at' => now(),
+                'last_progress_at' => now(),
                 'last_heartbeat_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -133,7 +138,7 @@ final class SeasonvarImportAdminService
     }
 
     /**
-     * @return array{runs: list<array<string, mixed>>, has_active_run: bool, stale_count: int, media_health: list<array<string, mixed>>, media_due_count: int, media_size_backlog: array<string, mixed>}
+     * @return array{runs: list<array<string, mixed>>, has_active_run: bool, stale_count: int, queue_status: array<string, mixed>, media_health: list<array<string, mixed>>, media_due_count: int, media_size_backlog: array<string, mixed>}
      */
     public function dashboard(): array
     {
@@ -191,6 +196,7 @@ final class SeasonvarImportAdminService
             'runs' => $runs->map(fn (SeasonvarImportRun $run): array => $this->present($run))->all(),
             'has_active_run' => $this->hasActiveRun(),
             'stale_count' => $this->globalRuns->staleCount(),
+            'queue_status' => $this->presentQueueStatus($this->queueStatus->read()),
             'media_health' => collect([
                 ['status' => 'active', 'label' => 'Активно', 'icon' => 'fa-solid fa-circle-check', 'tone' => 'text-emerald-700'],
                 ['status' => 'degraded', 'label' => 'Нестабильно', 'icon' => 'fa-solid fa-triangle-exclamation', 'tone' => 'text-amber-700'],
@@ -203,6 +209,167 @@ final class SeasonvarImportAdminService
             })->all(),
             'media_due_count' => $mediaDueCount,
             'media_size_backlog' => $this->presentFileSizeBacklog($this->fileSizeBacklog->status()),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function presentQueueStatus(SeasonvarQueueStatusData $status): array
+    {
+        $locale = app()->currentLocale();
+        $number = static fn (int $value): string => Number::format($value, locale: $locale);
+        $date = static fn (?CarbonInterface $value): string => $value?->format('d.m.Y H:i:s') ?? '—';
+        $phase = $this->queuePhasePresentation($status->phase);
+        $transport = $this->queueTransportPresentation($status->transportState);
+        $worker = $this->queueWorkerPresentation($status->workerStatus);
+
+        return [
+            'phase' => $phase,
+            'transport' => $transport,
+            'worker' => $worker,
+            'metrics' => [
+                [
+                    'key' => 'pending',
+                    'label' => __('catalog.importer.queue_pending'),
+                    'value' => $number($status->pending),
+                    'icon' => 'fa-solid fa-inbox',
+                    'tone' => 'text-sky-700',
+                ],
+                [
+                    'key' => 'delayed',
+                    'label' => __('catalog.importer.queue_delayed'),
+                    'value' => $number($status->delayed),
+                    'icon' => 'fa-solid fa-clock',
+                    'tone' => 'text-amber-700',
+                ],
+                [
+                    'key' => 'reserved',
+                    'label' => __('catalog.importer.queue_reserved'),
+                    'value' => $number($status->reserved),
+                    'icon' => 'fa-solid fa-gears',
+                    'tone' => 'text-violet-700',
+                ],
+                [
+                    'key' => 'claims',
+                    'label' => __('catalog.importer.queue_claims'),
+                    'value' => $number($status->liveClaims),
+                    'icon' => 'fa-solid fa-lock',
+                    'tone' => 'text-emerald-700',
+                ],
+            ],
+            'durable_progress' => __('catalog.importer.queue_durable_progress', [
+                'expected' => $number($status->expectedPages),
+                'prepared' => $number($status->preparedPages),
+                'applied' => $number($status->appliedPages),
+                'failed' => $number($status->failedPages),
+            ]),
+            'dispatch' => __('catalog.importer.queue_dispatch', [
+                'state' => match ($status->dispatchCompleted) {
+                    true => __('catalog.importer.queue_dispatch_complete'),
+                    false => __('catalog.importer.queue_dispatch_in_progress'),
+                    null => __('catalog.importer.queue_dispatch_not_applicable'),
+                },
+                'cursor' => $number($status->dispatchCursor),
+            ]),
+            'last_progress' => __('catalog.importer.queue_last_progress', [
+                'value' => $date($status->lastProgressAt),
+            ]),
+            'worker_heartbeat' => __('catalog.importer.queue_worker_heartbeat', [
+                'value' => $date($status->workerHeartbeatAt),
+            ]),
+            'claim_expiry' => __('catalog.importer.queue_claim_expiry', [
+                'value' => $date($status->earliestClaimExpiryAt),
+            ]),
+            'finalization_stage' => $status->currentFinalizationStage === null
+                ? null
+                : __('catalog.importer.queue_finalization_stage', [
+                    'value' => $status->currentFinalizationStage,
+                ]),
+            'stale_reason' => $status->staleReason === null
+                ? null
+                : __('catalog.importer.queue_stale_reason_'.$status->staleReason),
+            'terminal_reason' => $status->lastTerminalReasonCode === null
+                ? null
+                : __('catalog.importer.queue_terminal_reason', [
+                    'value' => $status->lastTerminalReasonCode,
+                ]),
+        ];
+    }
+
+    /** @return array{code: string, label: string, tone: string, icon: string} */
+    private function queuePhasePresentation(string $phase): array
+    {
+        $normalized = in_array($phase, [
+            'idle',
+            'terminal',
+            'dispatching',
+            'preparing',
+            'applying',
+            'finalizing',
+        ], true) ? $phase : 'idle';
+
+        return [
+            'code' => $normalized,
+            'label' => __('catalog.importer.queue_phase_'.$normalized),
+            'tone' => in_array($normalized, ['dispatching', 'preparing', 'applying', 'finalizing'], true)
+                ? 'text-sky-700'
+                : 'text-slate-600',
+            'icon' => $normalized === 'terminal'
+                ? 'fa-solid fa-circle-check'
+                : ($normalized === 'idle' ? 'fa-solid fa-circle-pause' : 'fa-solid fa-spinner fa-spin'),
+        ];
+    }
+
+    /** @return array{code: string, label: string, tone: string, icon: string} */
+    private function queueTransportPresentation(string $transport): array
+    {
+        $normalized = in_array($transport, [
+            'idle',
+            'observed',
+            'worker_missing',
+            'stalled_no_progress',
+            'reconciliation_required',
+        ], true) ? $transport : 'idle';
+
+        return [
+            'code' => $normalized,
+            'label' => __('catalog.importer.queue_transport_'.$normalized),
+            'tone' => match ($normalized) {
+                'observed' => 'text-emerald-700',
+                'stalled_no_progress' => 'text-amber-700',
+                'worker_missing', 'reconciliation_required' => 'text-red-700',
+                default => 'text-slate-600',
+            },
+            'icon' => match ($normalized) {
+                'observed' => 'fa-solid fa-circle-check',
+                'stalled_no_progress' => 'fa-solid fa-triangle-exclamation',
+                'worker_missing', 'reconciliation_required' => 'fa-solid fa-circle-xmark',
+                default => 'fa-solid fa-circle-pause',
+            },
+        ];
+    }
+
+    /** @return array{code: string, label: string, tone: string, icon: string} */
+    private function queueWorkerPresentation(string $worker): array
+    {
+        $normalized = in_array($worker, ['idle', 'ok', 'degraded', 'failed'], true)
+            ? $worker
+            : 'failed';
+
+        return [
+            'code' => $normalized,
+            'label' => __('catalog.importer.queue_worker_'.$normalized),
+            'tone' => match ($normalized) {
+                'ok' => 'text-emerald-700',
+                'degraded' => 'text-amber-700',
+                'failed' => 'text-red-700',
+                default => 'text-slate-600',
+            },
+            'icon' => match ($normalized) {
+                'ok' => 'fa-solid fa-circle-check',
+                'degraded' => 'fa-solid fa-triangle-exclamation',
+                'failed' => 'fa-solid fa-circle-xmark',
+                default => 'fa-solid fa-circle-pause',
+            },
         ];
     }
 
@@ -264,6 +431,8 @@ final class SeasonvarImportAdminService
             'captured_at' => __('catalog.importer.file_size_backlog_captured_at', [
                 'value' => $backlog->capturedAt->format('d.m.Y H:i:s'),
             ]),
+            'stale' => $backlog->isStale(),
+            'stale_notice' => __('catalog.importer.file_size_backlog_stale'),
             'scheduled_batch' => __('catalog.importer.file_size_backlog_scheduled_batch', [
                 'count' => $number($backfillSchedule->limit),
                 'seconds' => $number($backfillSchedule->timeBudgetSeconds),

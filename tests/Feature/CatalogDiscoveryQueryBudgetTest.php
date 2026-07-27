@@ -34,6 +34,25 @@ final class CatalogDiscoveryQueryBudgetTest extends TestCase
         $this->assertSame($smallCatalogQueries, $largeCatalogQueries);
     }
 
+    public function test_non_popular_discovery_mounts_one_bounded_collection_explorer(): void
+    {
+        $collectionQueries = 0;
+
+        DB::listen(static function (QueryExecuted $query) use (&$collectionQueries): void {
+            if (str_contains(strtolower($query->sql), 'catalog_collection')) {
+                $collectionQueries++;
+            }
+        });
+
+        $this->get(route('discover.index', ['type' => 'random']))
+            ->assertOk()
+            ->assertSeeLivewire('collections.catalog-collection-explorer')
+            ->assertSee('data-collection-category-tree', false);
+
+        $this->assertGreaterThan(0, $collectionQueries);
+        $this->assertLessThanOrEqual(12, $collectionQueries);
+    }
+
     public function test_recently_updated_merges_bounded_event_sources_in_one_statement_without_changing_order(): void
     {
         $this->travelTo(now()->startOfSecond());

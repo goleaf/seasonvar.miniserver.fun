@@ -7,9 +7,7 @@ namespace App\Services\Seasonvar;
 use App\DTOs\Seasonvar\SeasonvarImportStartResultData;
 use App\Enums\SeasonvarImportStatus;
 use App\Enums\SeasonvarPageType;
-use App\Jobs\ImportSeasonvarSourcePage;
 use App\Jobs\WakeSeasonvarImportFinalizers;
-use App\Models\CatalogTitle;
 use App\Models\SeasonvarImportRun;
 use App\Models\SourcePage;
 use App\Services\Catalog\CatalogCacheInvalidator;
@@ -24,11 +22,9 @@ class SeasonvarQueuedImportDispatcher
         private readonly SeasonvarCatalogImporter $importer,
         private readonly SeasonvarSitemapMirror $sitemapMirror,
         private readonly SeasonvarUrl $seasonvarUrl,
-        private readonly SeasonvarRefreshPlanner $refreshPlanner,
         private readonly SeasonvarPageClaimManager $claims,
         private readonly SeasonvarImportRunRecorder $runs,
-        private readonly SeasonvarImportTitleGroupDispatcher $titleGroups,
-        private readonly SeasonvarImportGroupKey $groupKeys,
+        private readonly SeasonvarImportDispatchBatcher $batcher,
         private readonly SeasonvarImportErrorSanitizer $errors,
         private readonly CatalogCacheInvalidator $cacheInvalidator,
         private readonly SeasonvarGlobalImportRunCoordinator $globalRuns,
@@ -66,6 +62,7 @@ class SeasonvarQueuedImportDispatcher
                 'status' => SeasonvarImportStatus::Failed->value,
                 'last_error' => $this->errors->fromException($exception),
                 'finished_at' => now(),
+                'last_progress_at' => now(),
                 'last_heartbeat_at' => now(),
             ])->save();
 
@@ -75,25 +72,40 @@ class SeasonvarQueuedImportDispatcher
 
     public function dispatchRun(SeasonvarImportRun $run): SeasonvarImportRun
     {
-        $started = SeasonvarImportRun::query()
-            ->whereKey($run->id)
-            ->where('execution_mode', 'queue')
-            ->where('status', SeasonvarImportStatus::Queued->value)
-            ->update([
-                'status' => SeasonvarImportStatus::Running->value,
-                'started_at' => $run->started_at ?? now(),
-                'finished_at' => null,
-                'last_error' => null,
-                'last_heartbeat_at' => now(),
-                'updated_at' => now(),
-            ]);
+        $run = $run->fresh();
 
-        if ($started !== 1) {
-            return $run->fresh();
+        if ($run->execution_mode !== 'queue') {
+            return $run;
         }
 
-        $run->refresh();
-        $discover = (bool) data_get($run->summary, 'discover', true);
+        if ($run->status === SeasonvarImportStatus::Queued->value) {
+            $started = SeasonvarImportRun::query()
+                ->whereKey($run->id)
+                ->where('execution_mode', 'queue')
+                ->where('status', SeasonvarImportStatus::Queued->value)
+                ->update([
+                    'status' => SeasonvarImportStatus::Running->value,
+                    'started_at' => $run->started_at ?? now(),
+                    'finished_at' => null,
+                    'last_error' => null,
+                    'last_progress_at' => now(),
+                    'last_heartbeat_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+            if ($started !== 1) {
+                return $run->fresh();
+            }
+
+            $run->refresh();
+        } elseif ($run->status !== SeasonvarImportStatus::Running->value
+            || data_get($run->summary, 'dispatch_completed') !== false
+        ) {
+            return $run;
+        }
+
+        $summary = $run->summary ?? [];
+        $discover = (bool) ($summary['discover'] ?? true);
         $sitemapTailLimit = data_get($run->summary, 'sitemap_tail_limit');
 
         if ($sitemapTailLimit !== null && (! is_int($sitemapTailLimit) || $sitemapTailLimit < 1 || $sitemapTailLimit > 1000)) {
@@ -107,9 +119,15 @@ class SeasonvarQueuedImportDispatcher
         $recovered = $this->claims->recoverExpired();
         $discovered = 0;
         $stored = 0;
-        $sitemapTailUrls = null;
+        $discoveryCompleted = array_key_exists('discovery_completed', $summary)
+            ? $summary['discovery_completed'] === true
+            : ! $discover;
 
-        if ($discover) {
+        if (! $discoveryCompleted) {
+            if (! $discover) {
+                throw new LogicException('Запуск без discovery содержит незавершённый discovery barrier.');
+            }
+
             $lastHeartbeatAt = now();
             $heartbeat = function (string $_event, array $_context) use ($run, &$lastHeartbeatAt): void {
                 $now = now();
@@ -127,41 +145,46 @@ class SeasonvarQueuedImportDispatcher
             $sitemapTailUrls = $sitemapTailLimit !== null
                 ? $this->lastSerialUrls($mirror['urls'], $sitemapTailLimit)
                 : null;
-            $this->runs->heartbeat($run->id);
+            $sitemapTailPageIds = $sitemapTailUrls !== null
+                ? $this->sourcePageIdsForUrls($sitemapTailUrls)
+                : null;
+            $this->runs->addCounters($run->id, [
+                'discovered' => $discovered,
+                'stored' => $stored,
+            ]);
+            $run = $this->runs->mergeSummary($run->id, [
+                'discovery_completed' => true,
+                'expired_claims_recovered' => $recovered,
+                'sitemap_tail_page_ids' => $sitemapTailPageIds,
+                'sitemap_tail_selected' => $sitemapTailPageIds !== null
+                    ? count($sitemapTailPageIds)
+                    : null,
+            ], markProgress: true) ?? $run->fresh();
         }
 
-        if ($run->fresh()->status !== SeasonvarImportStatus::Running->value) {
+        if ($run->fresh()->status !== SeasonvarImportStatus::Running->value
+            || data_get($run->fresh()->summary, 'discovery_completed') !== true
+        ) {
             return $run->fresh();
         }
 
-        $selected = $this->dispatchEligiblePages(
-            $run,
-            (bool) $run->force,
-            is_array(data_get($run->summary, 'page_types')) ? data_get($run->summary, 'page_types') : null,
-            $sitemapTailUrls,
-        );
-        $this->runs->addCounters($run->id, [
-            'discovered' => $discovered,
-            'stored' => $stored,
-        ]);
-
-        $dispatchSummary = [
-            'dispatch_completed' => true,
+        $batch = $this->batcher->dispatchNext($run->id);
+        $run = $run->fresh();
+        $run = $this->runs->mergeSummary($run->id, [
             'expired_claims_recovered' => $recovered,
-            'queued_pages' => $selected,
-            'sitemap_tail_selected' => $sitemapTailUrls !== null ? count($sitemapTailUrls) : null,
-        ];
+            'queued_pages' => (int) $run->selected,
+        ]) ?? $run;
 
-        if ($selected === 0) {
-            $run = DB::transaction(function () use ($dispatchSummary, $run): SeasonvarImportRun {
+        if ($batch->dispatchCompleted && (int) $run->selected === 0) {
+            $run = DB::transaction(function () use ($run): SeasonvarImportRun {
                 $lockedRun = SeasonvarImportRun::query()->lockForUpdate()->findOrFail($run->id);
-                $lockedRun->summary = array_merge($lockedRun->summary ?? [], $dispatchSummary);
 
                 if ($lockedRun->status === SeasonvarImportStatus::Running->value) {
                     $lockedRun->fill([
                         'status' => $lockedRun->completionStatus(),
                         'cycles' => 1,
                         'finished_at' => now(),
+                        'last_progress_at' => now(),
                         'last_heartbeat_at' => now(),
                     ]);
                 }
@@ -175,9 +198,9 @@ class SeasonvarQueuedImportDispatcher
             return $run->refresh();
         }
 
-        $run = $this->runs->mergeSummary($run->id, $dispatchSummary) ?? $run->fresh();
-
-        if ($run->status !== SeasonvarImportStatus::Running->value) {
+        if (! $batch->dispatchCompleted
+            || $run->status !== SeasonvarImportStatus::Running->value
+        ) {
             return $run->refresh();
         }
 
@@ -187,78 +210,6 @@ class SeasonvarQueuedImportDispatcher
         );
 
         return $run->refresh();
-    }
-
-    /**
-     * @param  list<string>|null  $pageTypes
-     * @param  list<string>|null  $forcedUrls
-     */
-    private function dispatchEligiblePages(
-        SeasonvarImportRun $run,
-        bool $force,
-        ?array $pageTypes,
-        ?array $forcedUrls = null,
-    ): int {
-        $chunkSize = max(1, (int) config('seasonvar.import.chunk_size', 100));
-        $refreshAfter = now()->subHours(max(1, (int) config('seasonvar.import.refresh_after_hours', 24)));
-        $chunks = match (true) {
-            $forcedUrls !== null => $this->refreshPlanner->forcedPageChunksForUrls($forcedUrls, $chunkSize, $run->id),
-            $force => $this->refreshPlanner->forcedPageChunks($chunkSize, $run->id, pageTypes: $pageTypes),
-            default => $this->refreshPlanner->pageChunksForImportCycle($chunkSize, $refreshAfter, $run->id, pageTypes: $pageTypes),
-        };
-        $selected = 0;
-
-        foreach ($chunks as $pages) {
-            foreach ($pages as $page) {
-                if ($selected % 25 === 0 && SeasonvarImportRun::query()->whereKey($run->id)->value('status') !== SeasonvarImportStatus::Running->value) {
-                    break 2;
-                }
-
-                $claimToken = $this->claims->claim($page, $run->id);
-
-                if ($claimToken === null) {
-                    continue;
-                }
-
-                try {
-                    if ($page->page_type !== SeasonvarPageType::Serial->value) {
-                        ImportSeasonvarSourcePage::dispatch(
-                            sourcePageId: (int) $page->id,
-                            importRunId: (int) $run->id,
-                            claimToken: $claimToken,
-                            groupKey: $this->groupKeys->forUrl($page->url, $page->url_hash),
-                            force: $force,
-                        )
-                            ->onConnection((string) config('seasonvar.queue.connection', 'redis'))
-                            ->onQueue((string) config('seasonvar.queue.queue', 'seasonvar-import'))
-                            ->afterCommit();
-                        SeasonvarImportRun::query()->whereKey($run->id)->increment('selected');
-                        $selected++;
-
-                        continue;
-                    }
-
-                    $alreadyAdopted = $run->preparedPages()
-                        ->where('source_page_id', $page->id)
-                        ->exists();
-                    $this->titleGroups->adoptPage(
-                        $run,
-                        $page,
-                        (string) config('seasonvar.queue.queue', 'seasonvar-import'),
-                        $this->catalogTitleFor($page),
-                    );
-
-                    if (! $alreadyAdopted) {
-                        $selected++;
-                    }
-                } catch (Throwable) {
-                    $this->claims->release($page->id, $run->id, $claimToken);
-                    $this->runs->addCounters($run->id, ['failed' => 1]);
-                }
-            }
-        }
-
-        return $selected;
     }
 
     /** @param list<string>|null $pageTypes */
@@ -306,16 +257,26 @@ class SeasonvarQueuedImportDispatcher
         return array_reverse(array_values($selected));
     }
 
-    private function catalogTitleFor(SourcePage $page): ?CatalogTitle
+    /**
+     * @param  list<string>  $urls
+     * @return list<int>
+     */
+    private function sourcePageIdsForUrls(array $urls): array
     {
-        return CatalogTitle::query()
-            ->where('source_id', $page->source_id)
-            ->where(function ($query) use ($page): void {
-                $query->where('source_page_id', $page->id)
-                    ->orWhere('source_url_hash', $page->url_hash)
-                    ->orWhereHas('seasons', fn ($query) => $query->where('source_url_hash', $page->url_hash));
-            })
+        $pages = SourcePage::query()
+            ->select(['id', 'url'])
+            ->whereIn('url', $urls)
+            ->whereHas('source', fn ($query) => $query->where('code', 'seasonvar'))
             ->orderBy('id')
-            ->first();
+            ->get()
+            ->keyBy('url');
+
+        return collect($urls)
+            ->map(
+                static fn (string $url): ?int => $pages->get($url)?->id,
+            )
+            ->filter(static fn (?int $id): bool => $id !== null)
+            ->values()
+            ->all();
     }
 }

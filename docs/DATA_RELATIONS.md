@@ -1,6 +1,6 @@
 # Связи данных и фильтры
 
-Обновлено: 26.07.2026
+Обновлено: 27.07.2026
 
 ## Основные связи
 
@@ -209,6 +209,29 @@
 - Каждый обычный или queued full cycle локально классифицирует bounded backlog serial snapshots без `provider_availability_checked_at`; сетевые запросы для этого backfill не выполняются. Новые/повторные fetch сразу обновляют provider availability, а `region_blocked` возвращается в planner после configured retry interval.
 - При старте каждого обычного или queued цикла один ограниченный chunk страниц `missing_data` повторяется раньше общего `retry_after_at`; страницы с живыми claims отбрасываются до limit, выборка ротируется по времени попытки и не отменяет backoff для HTTP/connection failures.
 - Каждый цикл импорта нормализует старые состояния разобранных страниц источника и дозаполняет отсутствующие ключи медиа, качество, формат и перевод.
+
+## Durable staging и служебные проекции
+
+- `seasonvar_import_prepared_pages.payload` остаётся legacy JSON reader.
+  Additive `payload_blob`, `payload_codec`, `payload_uncompressed_bytes` и
+  `application_result` позволяют versioned compact storage без изменения
+  job constructors. Writer выключен по умолчанию; rollback к legacy reader
+  не требует удаления columns.
+- Prepared page хранит parser version, fingerprint и bounded parse metadata.
+  `parse_meta.section_presence` различает полный, частичный, отсутствующий,
+  неизвестный и повреждённый блок, поэтому отсутствие section не является
+  разрешением удалить существующие catalog rows.
+- `SeasonvarImportRun.summary` хранит только versioned bounded finalization
+  checkpoint/counters. URL, HTML, model graph и exception payload туда не
+  записываются; terminal run удаляет временный checkpoint.
+- `licensed_media.file_size_eligible`,
+  `licensed_media.file_size_next_check_at` и singleton-таблица
+  `licensed_media_file_size_state` образуют additive indexed projection
+  due-очереди. Observer обновляет состояние только при material change;
+  отключённый projection path использует прежний query.
+- Все новые migrations additive и имеют `down()`, но production rollback
+  выполняется code-first с сохранением данных. Drop используется только
+  после отдельного dependency/data review.
 
 ## Счетчики публичного каталога
 

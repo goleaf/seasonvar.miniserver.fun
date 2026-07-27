@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace App\Services\Seasonvar;
 
 use App\Enums\CatalogPublicationType;
-use App\Enums\SeasonvarPageType;
-use App\Services\Catalog\CatalogRelationNameSanitizer;
 use App\Support\CatalogTitleDisplayName;
 use DOMDocument;
 use DOMNode;
@@ -17,7 +15,7 @@ use InvalidArgumentException;
 
 final class SeasonvarCatalogParser
 {
-    public const METADATA_VERSION = 5;
+    public const METADATA_VERSION = 6;
 
     private const METADATA_PRESENCE_FIELDS = [
         'genres' => ['type' => 'genre', 'labels' => ['Жанр']],
@@ -31,11 +29,6 @@ final class SeasonvarCatalogParser
         'studios' => ['type' => 'studio', 'labels' => ['Студии', 'Студия']],
         'tags' => ['type' => 'tag', 'labels' => []],
     ];
-
-    /**
-     * @var list<string>
-     */
-    private const MEDIA_EXTENSIONS = ['m3u8', 'm3u', 'mp4', 'm4v', 'mov', 'webm', 'mkv', 'avi'];
 
     /**
      * @var list<string>
@@ -76,9 +69,11 @@ final class SeasonvarCatalogParser
 
     public function __construct(
         private readonly SeasonvarUrl $seasonvarUrl,
-        private readonly CatalogRelationNameSanitizer $relationNames,
-        private readonly SeasonvarRelationMetadataNormalizer $relationMetadata,
         private readonly SeasonvarSourceAvailabilityDetector $sourceAvailability,
+        private readonly SeasonvarStructuredDataParser $structuredDataParser,
+        private readonly SeasonvarEpisodeScriptParser $episodeScriptParser,
+        private readonly SeasonvarMediaCandidateParser $mediaCandidateParser,
+        private readonly SeasonvarTaxonomyParser $taxonomyParser,
     ) {}
 
     /**
@@ -99,14 +94,14 @@ final class SeasonvarCatalogParser
      *     recommendation_signals: list<array{source: string, signal_type: string, signal_key: string, signal_value: string|null, weight: int}>,
      *     aliases: list<array{name: string, type: string, source: string}>,
      *     reviews: list<array{author: string|null, body: string, published_at: string|null}>,
-     *     parse_meta: array{info_labels: list<string>, has_info_list: bool, has_season_list: bool, has_episode_script: bool, provider_availability_status: string|null}
+     *     parse_meta: array{info_labels: list<string>, has_info_list: bool, has_season_list: bool, has_episode_script: bool, provider_availability_status: string|null, section_presence: array<string, string>}
      * }
      */
     public function parse(string $html, string $url): array
     {
         $dom = $this->loadHtml($html);
         $xpath = new DOMXPath($dom);
-        $structuredData = $this->structuredData($xpath);
+        $structuredData = $this->structuredDataParser->parse($xpath);
         $infoFields = $this->infoFields($xpath);
 
         $title = $this->cleanTitle($this->firstNonEmpty([
@@ -168,9 +163,32 @@ final class SeasonvarCatalogParser
 
         $currentSeasonNumber = $this->seasonNumberFromUrl($url) ?? $this->seasonNumber($title) ?? 1;
         $seasons = $this->seasons($xpath, $url, $currentSeasonNumber);
-        $taxonomies = $this->taxonomies($xpath, $url, $structuredData, $infoFields);
+        $taxonomies = $this->taxonomyParser->parse(
+            $xpath,
+            $url,
+            $structuredData,
+            $infoFields,
+        );
         $ratings = $this->ratings($infoFields);
-        $parseMeta = $this->parseMeta($xpath, $html, $infoFields);
+        $episodes = $this->episodeScriptParser->parse($html, $url, $currentSeasonNumber);
+        $media = $this->mediaCandidateParser->parse(
+            $html,
+            $xpath,
+            $url,
+            $currentSeasonNumber,
+        );
+        $aliases = $this->aliases($infoFields, $title, $originalTitle);
+        $reviews = $this->reviews($xpath);
+        $parseMeta = $this->parseMeta(
+            $xpath,
+            $html,
+            $infoFields,
+            $episodes,
+            $media,
+            $aliases,
+            $ratings,
+            $reviews,
+        );
 
         return [
             'title' => $title,
@@ -182,13 +200,13 @@ final class SeasonvarCatalogParser
             'external_id' => $this->seasonvarUrl->externalSerialId($url),
             'current_season_number' => $currentSeasonNumber,
             'seasons' => $seasons,
-            'episodes' => $this->episodes($html, $url, $currentSeasonNumber),
-            'media' => $this->mediaCandidates($html, $xpath, $url, $currentSeasonNumber),
+            'episodes' => $episodes,
+            'media' => $media,
             'taxonomies' => $taxonomies,
             'ratings' => $ratings,
             'recommendation_signals' => [],
-            'aliases' => $this->aliases($infoFields, $title, $originalTitle),
-            'reviews' => $this->reviews($xpath),
+            'aliases' => $aliases,
+            'reviews' => $reviews,
             'parse_meta' => $parseMeta,
         ];
     }
@@ -225,7 +243,7 @@ final class SeasonvarCatalogParser
     /**
      * @param  list<array<string, mixed>>  $taxonomies
      * @param  array<string, mixed>  $parseMeta
-     * @return array<string, 'present'|'rejected_invalid'|'absent_in_source'>
+     * @return array<string, 'present'|'rejected_invalid'|'absent_in_source'|'partial_response'|array<string, string>>
      */
     public function metadataPresence(array $taxonomies, array $parseMeta): array
     {
@@ -234,9 +252,11 @@ final class SeasonvarCatalogParser
         $labels = collect(is_array($infoLabels) ? $infoLabels : [])
             ->filter(fn (mixed $label): bool => is_string($label))
             ->map(fn (string $label): string => Str::lower($label));
+        $metadataState = (string) data_get($parseMeta, 'section_presence.metadata', 'unknown');
+        $metadataIsAuthoritative = in_array($metadataState, ['complete', 'absent'], true);
 
         return collect(self::METADATA_PRESENCE_FIELDS)
-            ->mapWithKeys(function (array $definition, string $field) use ($presentTypes, $labels): array {
+            ->mapWithKeys(function (array $definition, string $field) use ($presentTypes, $labels, $metadataIsAuthoritative): array {
                 if ($presentTypes->contains($definition['type'])) {
                     return [$field => 'present'];
                 }
@@ -246,8 +266,13 @@ final class SeasonvarCatalogParser
                     ->intersect($labels)
                     ->isNotEmpty();
 
-                return [$field => $hadSourceValue ? 'rejected_invalid' : 'absent_in_source'];
+                if ($hadSourceValue) {
+                    return [$field => 'rejected_invalid'];
+                }
+
+                return [$field => $metadataIsAuthoritative ? 'absent_in_source' : 'partial_response'];
             })
+            ->put('_sections', $parseMeta['section_presence'] ?? [])
             ->all();
     }
 
@@ -412,7 +437,9 @@ final class SeasonvarCatalogParser
             $status['episodes_total'] = (int) $matches[1];
         }
 
-        $status['translation_name'] = Arr::first($this->translationNamesFromText($normalized));
+        $status['translation_name'] = Arr::first(
+            $this->taxonomyParser->translationNamesFromText($normalized),
+        );
 
         return $status;
     }
@@ -428,17 +455,131 @@ final class SeasonvarCatalogParser
 
     /**
      * @param  array<string, list<string>>  $infoFields
-     * @return array{info_labels: list<string>, has_info_list: bool, has_season_list: bool, has_episode_script: bool, provider_availability_status: string|null}
+     * @param  list<array<string, mixed>>  $episodes
+     * @param  list<array<string, mixed>>  $media
+     * @param  list<array<string, mixed>>  $aliases
+     * @param  list<array<string, mixed>>  $ratings
+     * @param  list<array<string, mixed>>  $reviews
+     * @return array{info_labels: list<string>, has_info_list: bool, has_season_list: bool, has_episode_script: bool, provider_availability_status: string|null, section_presence: array<string, string>}
      */
-    private function parseMeta(DOMXPath $xpath, string $html, array $infoFields): array
-    {
+    private function parseMeta(
+        DOMXPath $xpath,
+        string $html,
+        array $infoFields,
+        array $episodes,
+        array $media,
+        array $aliases,
+        array $ratings,
+        array $reviews,
+    ): array {
+        $hasInfoList = $this->hasNodes($xpath, '//*[contains(concat(" ", normalize-space(@class), " "), " pgs-sinfo_list ")]');
+        $hasSeasonList = $this->hasNodes($xpath, '//*[contains(concat(" ", normalize-space(@class), " "), " pgs-seaslist ")]');
+        $hasEpisodeScript = Str::contains($html, 'arEpisodes');
+        $providerAvailability = $this->sourceAvailability->detect($html)?->value;
+        $truncated = ! Str::contains(Str::lower($html), '</html>');
+        $metadataState = $this->metadataSectionState($xpath, $hasInfoList, $infoFields);
+        $seasonState = $this->seasonSectionState($xpath, $hasSeasonList);
+        $episodeState = $this->episodeSectionState($html, $hasEpisodeScript, $episodes);
+        $reviewNodes = $xpath->query('//*[contains(concat(" ", normalize-space(@class), " "), " pgs-review-post ")]');
+        $reviewsState = $reviewNodes === false || $reviewNodes->length === 0
+            ? 'unknown'
+            : ($reviews === [] ? 'invalid' : 'complete');
+
+        if ($truncated) {
+            $metadataState = $metadataState === 'complete' ? 'partial' : $metadataState;
+            $seasonState = $seasonState === 'complete' ? 'partial' : $seasonState;
+            $episodeState = $episodeState === 'complete' ? 'partial' : $episodeState;
+            $reviewsState = $reviewsState === 'complete' ? 'partial' : $reviewsState;
+        }
+
         return [
             'info_labels' => array_keys($infoFields),
-            'has_info_list' => $this->hasNodes($xpath, '//*[contains(concat(" ", normalize-space(@class), " "), " pgs-sinfo_list ")]'),
-            'has_season_list' => $this->hasNodes($xpath, '//*[contains(concat(" ", normalize-space(@class), " "), " pgs-seaslist ")]'),
-            'has_episode_script' => Str::contains($html, 'arEpisodes'),
-            'provider_availability_status' => $this->sourceAvailability->detect($html)?->value,
+            'has_info_list' => $hasInfoList,
+            'has_season_list' => $hasSeasonList,
+            'has_episode_script' => $hasEpisodeScript,
+            'provider_availability_status' => $providerAvailability,
+            'section_presence' => [
+                'metadata' => $metadataState,
+                'taxonomies' => $metadataState,
+                'seasons' => $seasonState,
+                'episodes' => $episodeState,
+                'media' => $providerAvailability !== null
+                    ? 'partial'
+                    : ($media === [] ? 'unknown' : 'partial'),
+                'aliases' => $this->dependentMetadataState($metadataState, $aliases),
+                'ratings' => $this->dependentMetadataState($metadataState, $ratings),
+                'recommendations' => 'unknown',
+                'reviews' => $reviewsState,
+            ],
         ];
+    }
+
+    /** @param array<string, list<string>> $infoFields */
+    private function metadataSectionState(DOMXPath $xpath, bool $hasInfoList, array $infoFields): string
+    {
+        if (! $hasInfoList) {
+            return 'unknown';
+        }
+
+        $nodes = $xpath->query('//*[contains(concat(" ", normalize-space(@class), " "), " pgs-sinfo_list ")]');
+        $text = $nodes !== false
+            ? collect(iterator_to_array($nodes))->map(fn (DOMNode $node): string => trim($node->textContent))->implode(' ')
+            : '';
+
+        if (trim($text) === '') {
+            return 'absent';
+        }
+
+        return $infoFields === [] ? 'invalid' : 'complete';
+    }
+
+    private function seasonSectionState(DOMXPath $xpath, bool $hasSeasonList): string
+    {
+        if (! $hasSeasonList) {
+            return 'unknown';
+        }
+
+        $links = $xpath->query('//*[contains(concat(" ", normalize-space(@class), " "), " pgs-seaslist ")]//a[@href]');
+
+        if ($links === false || $links->length === 0) {
+            return 'absent';
+        }
+
+        foreach ($links as $link) {
+            $href = $link->attributes?->getNamedItem('href')?->nodeValue;
+
+            if (is_string($href) && preg_match('~(?:season|sezon|сезон)~iu', $href) === 1) {
+                return 'complete';
+            }
+        }
+
+        return 'invalid';
+    }
+
+    /** @param list<array<string, mixed>> $episodes */
+    private function episodeSectionState(string $html, bool $hasEpisodeScript, array $episodes): string
+    {
+        if (! $hasEpisodeScript) {
+            return 'unknown';
+        }
+
+        $payload = $this->episodeScriptParser->payload($html);
+
+        if ($payload === null || ! is_array(json_decode($payload, true))) {
+            return 'invalid';
+        }
+
+        return $episodes === [] ? 'absent' : 'complete';
+    }
+
+    /** @param list<array<string, mixed>> $items */
+    private function dependentMetadataState(string $metadataState, array $items): string
+    {
+        if (! in_array($metadataState, ['complete', 'absent'], true)) {
+            return $metadataState;
+        }
+
+        return $items === [] ? 'absent' : 'complete';
     }
 
     /**
@@ -496,26 +637,6 @@ final class SeasonvarCatalogParser
         $canonical = $this->canonicalInfoLabel($label);
 
         return $canonical !== null ? ($infoFields[$canonical] ?? []) : [];
-    }
-
-    /**
-     * @param  array<string, list<string>>  $infoFields
-     * @param  list<string>  $labels
-     * @return list<string>
-     */
-    private function infoValueList(array $infoFields, array $labels): array
-    {
-        $items = [];
-
-        foreach ($labels as $label) {
-            foreach ($this->infoFieldValues($infoFields, $label) as $value) {
-                foreach ($this->valueList($value) as $name) {
-                    $items[Str::lower($name)] = $name;
-                }
-            }
-        }
-
-        return array_values($items);
     }
 
     /**
@@ -682,24 +803,6 @@ final class SeasonvarCatalogParser
     }
 
     /**
-     * @return list<string>
-     */
-    private function ageRatingNames(?string $value): array
-    {
-        $ratings = [];
-
-        foreach ($this->valueList($value) as $name) {
-            if (preg_match('/\b(\d{1,2})\s*\+?\b/u', $name, $matches) !== 1) {
-                continue;
-            }
-
-            $ratings[$matches[1].'+'] = $matches[1].'+';
-        }
-
-        return array_values($ratings);
-    }
-
-    /**
      * @return list<array{number: int, title: string|null, source_url: string|null, latest_episode_released_at: string|null, episodes_released: int|null, episodes_total: int|null, translation_name: string|null, release_status_text: string|null}>
      */
     private function seasons(DOMXPath $xpath, string $baseUrl, int $currentSeasonNumber): array
@@ -824,772 +927,6 @@ final class SeasonvarCatalogParser
     }
 
     /**
-     * @return list<array{season_number: int, number: int, title: string|null, source_url: string|null}>
-     */
-    private function episodes(string $html, string $baseUrl, int $seasonNumber): array
-    {
-        $episodes = [];
-        $payload = $this->episodePayload($html);
-        $decoded = $payload !== null ? json_decode($payload, true) : null;
-
-        if (is_array($decoded)) {
-            $this->collectEpisodesFromValue($decoded, $baseUrl, $seasonNumber, $episodes);
-        }
-
-        if ($episodes === []) {
-            foreach ($this->fallbackEpisodeNumbers($html) as $number) {
-                $episodes[$number] = [
-                    'season_number' => $seasonNumber,
-                    'number' => $number,
-                    'title' => $number.' серия',
-                    'source_url' => $baseUrl.'#'.$number.'_seriya',
-                ];
-            }
-        }
-
-        ksort($episodes);
-
-        return array_values($episodes);
-    }
-
-    private function episodePayload(string $html): ?string
-    {
-        if (preg_match('/var\s+arEpisodes\s*=\s*/u', $html, $matches, PREG_OFFSET_CAPTURE) !== 1) {
-            return null;
-        }
-
-        $start = $matches[0][1] + strlen($matches[0][0]);
-
-        return $this->balancedJavascriptValue($html, $start);
-    }
-
-    private function balancedJavascriptValue(string $text, int $start): ?string
-    {
-        $length = strlen($text);
-
-        while ($start < $length && ctype_space($text[$start])) {
-            $start++;
-        }
-
-        if ($start >= $length || ! in_array($text[$start], ['[', '{'], true)) {
-            return null;
-        }
-
-        $stack = [];
-        $stringQuote = null;
-        $escaped = false;
-
-        for ($position = $start; $position < $length; $position++) {
-            $char = $text[$position];
-
-            if ($stringQuote !== null) {
-                if ($escaped) {
-                    $escaped = false;
-
-                    continue;
-                }
-
-                if ($char === '\\') {
-                    $escaped = true;
-
-                    continue;
-                }
-
-                if ($char === $stringQuote) {
-                    $stringQuote = null;
-                }
-
-                continue;
-            }
-
-            if (in_array($char, ['"', "'"], true)) {
-                $stringQuote = $char;
-
-                continue;
-            }
-
-            if ($char === '[' || $char === '{') {
-                $stack[] = $char;
-
-                continue;
-            }
-
-            if ($char !== ']' && $char !== '}') {
-                continue;
-            }
-
-            $open = array_pop($stack);
-
-            if (($char === ']' && $open !== '[') || ($char === '}' && $open !== '{')) {
-                return null;
-            }
-
-            if ($stack === []) {
-                return substr($text, $start, $position - $start + 1);
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * @param  array<int, array{season_number: int, number: int, title: string|null, source_url: string|null}>  $episodes
-     */
-    private function collectEpisodesFromValue(mixed $value, string $baseUrl, int $seasonNumber, array &$episodes, string|int|null $key = null): void
-    {
-        if (! is_array($value)) {
-            return;
-        }
-
-        if (isset($value['n']) && is_numeric($value['n'])) {
-            $number = (int) $value['n'];
-
-            if ($number <= 0) {
-                return;
-            }
-
-            $episodeSlug = is_string($key) && $key !== '' ? $key : $number.'_seriya';
-            $episodeTitle = $this->firstNonEmpty([
-                $value['title'] ?? null,
-                $value['name'] ?? null,
-                $value['t'] ?? null,
-            ]);
-            $episodes[$number] = [
-                'season_number' => $seasonNumber,
-                'number' => $number,
-                'title' => $episodeTitle ?? $number.' серия',
-                'source_url' => $baseUrl.'#'.$episodeSlug,
-            ];
-
-            return;
-        }
-
-        foreach ($value as $childKey => $childValue) {
-            $this->collectEpisodesFromValue($childValue, $baseUrl, $seasonNumber, $episodes, $childKey);
-        }
-    }
-
-    /**
-     * @return list<int>
-     */
-    private function fallbackEpisodeNumbers(string $html): array
-    {
-        $matchesCount = preg_match_all('/["\']?n["\']?\s*:\s*["\']?(\d{1,3})["\']?/iu', $html, $matches);
-
-        if ($matchesCount === false || $matchesCount === 0) {
-            return [];
-        }
-
-        return collect($matches[1])
-            ->map(fn (string $number): int => (int) $number)
-            ->filter(fn (int $number): bool => $number > 0)
-            ->unique()
-            ->sort()
-            ->values()
-            ->all();
-    }
-
-    /**
-     * @return list<array{url: string, title: string|null, season_number: int|null, episode_number: int|null, source_url: string|null, kind: string}>
-     */
-    private function mediaCandidates(string $html, DOMXPath $xpath, string $baseUrl, int $seasonNumber): array
-    {
-        $items = [];
-
-        foreach ($xpath->query('//*[@src or @href or @data or @data-src or @data-file or @data-url]') ?: [] as $node) {
-            foreach (['src', 'href', 'data', 'data-src', 'data-file', 'data-url'] as $attribute) {
-                $value = $node->attributes?->getNamedItem($attribute)?->nodeValue;
-
-                if ($value === null) {
-                    continue;
-                }
-
-                $this->addMediaCandidate($items, $value, $baseUrl, $this->mediaTitleFromNode($node), $seasonNumber);
-            }
-        }
-
-        foreach ($this->mediaUrlsFromText($html) as $url) {
-            $this->addMediaCandidate($items, $url, $baseUrl, null, $seasonNumber);
-        }
-
-        foreach ($this->seasonvarPlaylistUrls($html) as $url) {
-            $this->addSeasonvarPlaylistCandidate($items, $url, $baseUrl, $seasonNumber);
-        }
-
-        return array_values($items);
-    }
-
-    /**
-     * @param  array<string, array{url: string, title: string|null, season_number: int|null, episode_number: int|null, source_url: string|null, kind: string}>  $items
-     */
-    private function addMediaCandidate(array &$items, string $rawUrl, string $baseUrl, ?string $title, int $seasonNumber): void
-    {
-        $url = $this->cleanMediaUrl($rawUrl);
-
-        if ($url === null || ! $this->looksLikeMediaUrl($url)) {
-            return;
-        }
-
-        $normalizedUrl = $this->normalizeRelative($url, $baseUrl);
-
-        if (! $this->looksLikeMediaUrl($normalizedUrl)) {
-            return;
-        }
-
-        $numbers = $this->mediaNumbers($normalizedUrl.' '.$title, $seasonNumber);
-        $key = Str::lower($normalizedUrl);
-        $displayTitle = $this->firstNonEmpty([
-            $title,
-            $this->fileNameFromUrl($normalizedUrl),
-        ]);
-        $candidate = [
-            'url' => $normalizedUrl,
-            'title' => $displayTitle,
-            'season_number' => $numbers['season_number'],
-            'episode_number' => $numbers['episode_number'],
-            'source_url' => $baseUrl,
-            'kind' => $this->mediaKind($normalizedUrl),
-        ];
-
-        if (! isset($items[$key]) || ($items[$key]['episode_number'] === null && $candidate['episode_number'] !== null)) {
-            $items[$key] = $candidate;
-        }
-    }
-
-    /**
-     * @param  array<string, array{url: string, title: string|null, season_number: int|null, episode_number: int|null, source_url: string|null, kind: string}>  $items
-     */
-    private function addSeasonvarPlaylistCandidate(array &$items, string $rawUrl, string $baseUrl, int $seasonNumber): void
-    {
-        $url = $this->cleanMediaUrl($rawUrl);
-
-        if ($url === null || ! $this->looksLikeSeasonvarPlaylistUrl($url)) {
-            return;
-        }
-
-        $normalizedUrl = $this->normalizeRelative($url, $baseUrl);
-
-        if (! $this->looksLikeSeasonvarPlaylistUrl($normalizedUrl)) {
-            return;
-        }
-
-        $key = Str::lower($normalizedUrl);
-        $items[$key] ??= [
-            'url' => $normalizedUrl,
-            'title' => 'Плейлист Seasonvar',
-            'season_number' => $seasonNumber,
-            'episode_number' => null,
-            'source_url' => $baseUrl,
-            'kind' => 'seasonvar_playlist',
-        ];
-    }
-
-    private function mediaTitleFromNode(DOMNode $node): ?string
-    {
-        foreach (['title', 'alt', 'data-title', 'aria-label'] as $attribute) {
-            $value = $node->attributes?->getNamedItem($attribute)?->nodeValue;
-            $title = $this->stringValue($value);
-
-            if ($title !== null) {
-                return $title;
-            }
-        }
-
-        $text = $this->stringValue($node->textContent);
-
-        return $text !== null && Str::length($text) <= 160 ? $text : null;
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function mediaUrlsFromText(string $html): array
-    {
-        $text = html_entity_decode($html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $text = str_replace(['\/', '\u002F', '\x2F'], '/', $text);
-        $extensions = implode('|', array_map(fn (string $extension): string => preg_quote($extension, '~'), self::MEDIA_EXTENSIONS));
-        $pattern = '~(?:(?:https?:)?//|/|[A-Za-z0-9._-]+/)?[A-Za-z0-9._\~:/?#\[\]@!$&()*+,;=%-]+\.(?:'.$extensions.')(?:\?[A-Za-z0-9._\~:/?#\[\]@!$&()*+,;=%-]*)?~iu';
-
-        $matchesCount = preg_match_all($pattern, $text, $matches);
-
-        if ($matchesCount === false || $matchesCount === 0) {
-            return [];
-        }
-
-        return collect($matches[0])
-            ->map(fn (string $url): string => trim($url, "\"'()[]{};,"))
-            ->filter(fn (string $url): bool => $url !== '')
-            ->unique(fn (string $url): string => Str::lower($url))
-            ->values()
-            ->all();
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function seasonvarPlaylistUrls(string $html): array
-    {
-        $text = html_entity_decode($html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $text = str_replace(['\/', '\u002F', '\x2F'], '/', $text);
-
-        $matchesCount = preg_match_all('~[\'"](?<url>(?:(?:https?:)?//[^\'"]+)?/playls2/[^\'"]*?/plist\.txt(?:\?[^\'"]*)?)[\'"]~iu', $text, $matches);
-
-        if ($matchesCount === false || $matchesCount === 0) {
-            return [];
-        }
-
-        return collect($matches['url'])
-            ->map(fn (string $url): string => trim($url))
-            ->filter(fn (string $url): bool => $url !== '')
-            ->unique(fn (string $url): string => Str::lower($url))
-            ->values()
-            ->all();
-    }
-
-    private function cleanMediaUrl(string $url): ?string
-    {
-        $url = html_entity_decode($url, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $url = str_replace(['\/', '\u002F', '\x2F'], '/', $url);
-        $url = trim($url, " \t\n\r\0\x0B\"'()[]{};,");
-
-        return $url !== '' ? $url : null;
-    }
-
-    private function looksLikeMediaUrl(string $url): bool
-    {
-        $path = (string) parse_url($url, PHP_URL_PATH);
-        $extension = Str::lower(pathinfo($path, PATHINFO_EXTENSION));
-
-        return in_array($extension, self::MEDIA_EXTENSIONS, true);
-    }
-
-    private function looksLikeSeasonvarPlaylistUrl(string $url): bool
-    {
-        $path = (string) parse_url($url, PHP_URL_PATH);
-
-        return preg_match('~/playls2/.+?/plist\.txt$~iu', $path) === 1;
-    }
-
-    /**
-     * @return array{season_number: int|null, episode_number: int|null}
-     */
-    private function mediaNumbers(string $value, int $fallbackSeasonNumber): array
-    {
-        $value = $this->normalizeMediaNumberText($value);
-        $seasonNumber = null;
-        $episodeNumber = null;
-        $patterns = [
-            '/\bs(?<season>\d{1,2})\s*e(?<episode>\d{1,3})\b/iu',
-            '/\b(?<season>\d{1,2})x(?<episode>\d{1,3})\b/iu',
-            '/(?<season>\d{1,2})\s*(?:сезон|sezon|season)\D{0,30}(?<episode>\d{1,3})\s*(?:серия|seriya|episode|ep)?/iu',
-            '/(?<episode>\d{1,3})\s*(?:серия|seriya|episode|ep)\D{0,30}(?<season>\d{1,2})\s*(?:сезон|sezon|season)/iu',
-        ];
-
-        foreach ($patterns as $pattern) {
-            if (preg_match($pattern, $value, $matches) === 1) {
-                $seasonNumber = (int) $matches['season'];
-                $episodeNumber = (int) $matches['episode'];
-
-                break;
-            }
-        }
-
-        if ($seasonNumber === null && preg_match('/(?<season>\d{1,2})\s*(?:сезон|sezon|season)\b/iu', $value, $matches) === 1) {
-            $seasonNumber = (int) $matches['season'];
-        }
-
-        if ($episodeNumber === null) {
-            foreach ([
-                '/(?:^|[^\d])(?<episode>\d{1,3})[_\-\s]*(?:серия|seriya|episode|ep)(?:[^\d]|$)/iu',
-                '/(?:серия|seriya|episode|ep)[_\-\s]*(?<episode>\d{1,3})(?:[^\d]|$)/iu',
-                '/(?:^|[^\d])e(?<episode>\d{1,3})(?:[^\d]|$)/iu',
-                '/[#?&](?:episode|seriya|e)=(?<episode>\d{1,3})(?:[^\d]|$)/iu',
-            ] as $pattern) {
-                if (preg_match($pattern, $value, $matches) === 1) {
-                    $episodeNumber = (int) $matches['episode'];
-
-                    break;
-                }
-            }
-        }
-
-        return [
-            'season_number' => $seasonNumber ?: $fallbackSeasonNumber,
-            'episode_number' => $episodeNumber ?: null,
-        ];
-    }
-
-    private function normalizeMediaNumberText(string $value): string
-    {
-        $value = urldecode($value);
-        $value = str_replace(['_', '.', '-'], ' ', $value);
-
-        return trim(preg_replace('/\s+/u', ' ', $value) ?: '');
-    }
-
-    private function mediaKind(string $url): string
-    {
-        $extension = Str::lower(pathinfo((string) parse_url($url, PHP_URL_PATH), PATHINFO_EXTENSION));
-
-        return in_array($extension, ['m3u', 'm3u8'], true) ? 'playlist' : 'file';
-    }
-
-    private function fileNameFromUrl(string $url): string
-    {
-        $fileName = basename((string) parse_url($url, PHP_URL_PATH));
-
-        return urldecode($fileName !== '' ? $fileName : 'видео');
-    }
-
-    /**
-     * @param  array<string, mixed>  $structuredData
-     * @param  array<string, list<string>>  $infoFields
-     * @return list<array{type: string, name: string, source_url: string|null}>
-     */
-    private function taxonomies(DOMXPath $xpath, string $baseUrl, array $structuredData, array $infoFields): array
-    {
-        $items = [];
-
-        foreach ($this->structuredTaxonomies($structuredData) as $item) {
-            $this->addTaxonomyItem($items, $item['type'], $item['name'], $item['source_url']);
-        }
-
-        foreach ($this->valueList($this->firstText($xpath, ['//*[@itemprop="genre"]'])) as $name) {
-            $this->addTaxonomyItem($items, 'genre', $name, null);
-        }
-
-        foreach ($this->infoValueList($infoFields, ['Жанр']) as $name) {
-            $this->addTaxonomyItem($items, 'genre', $name, null);
-        }
-
-        foreach ($this->infoValueList($infoFields, ['Страна']) as $name) {
-            $this->addTaxonomyItem($items, 'country', $name, null);
-        }
-
-        foreach ($this->ageRatingNames($this->firstInfoField($infoFields, ['Ограничение'])) as $name) {
-            $this->addTaxonomyItem($items, 'age_rating', $name, null);
-        }
-
-        foreach (['Перевод', 'Озвучка'] as $label) {
-            foreach ($this->infoValueList($infoFields, [$label]) as $name) {
-                $this->addTaxonomyItem($items, 'translation', $name, null);
-            }
-        }
-
-        foreach ($this->officialTranslationNames($xpath) as $name) {
-            $this->addTaxonomyItem($items, 'translation', $name, null);
-        }
-
-        foreach ($this->infoValueList($infoFields, ['Статус']) as $name) {
-            $this->addTaxonomyItem($items, 'status', $name, null);
-        }
-
-        foreach ($this->infoValueList($infoFields, ['Телеканал', 'Канал']) as $name) {
-            $this->addTaxonomyItem($items, 'network', $name, null);
-        }
-
-        foreach ($this->infoValueList($infoFields, ['Студии', 'Студия']) as $name) {
-            $this->addTaxonomyItem($items, 'studio', $name, null);
-        }
-
-        foreach ($this->officialDescriptionTaxonomies($xpath) as $item) {
-            $this->addTaxonomyItem($items, $item['type'], $item['name'], null);
-        }
-
-        foreach ($this->seasonListTranslations($xpath) as $name) {
-            $this->addTaxonomyItem($items, 'translation', $name, null);
-        }
-
-        foreach ($this->valueList($this->firstText($xpath, ['//*[@itemprop="directors"]//*[@itemprop="name"]'])) as $name) {
-            $this->addTaxonomyItem($items, 'director', $name, null);
-        }
-
-        foreach ($this->infoValueList($infoFields, ['Режиссер', 'Режиссёр']) as $name) {
-            $this->addTaxonomyItem($items, 'director', $name, null);
-        }
-
-        foreach (['В ролях', 'Актеры', 'Актёры'] as $label) {
-            foreach ($this->infoValueList($infoFields, [$label]) as $name) {
-                $this->addTaxonomyItem($items, 'actor', $name, null);
-            }
-        }
-
-        foreach ([
-            '//*[@data-info="actor"]//*[@itemprop="name"]',
-            '//*[@itemprop="actor"]//*[@itemprop="name"]',
-            '//*[@itemprop="actors"]//*[@itemprop="name"]',
-        ] as $actorQuery) {
-            foreach ($xpath->query($actorQuery) ?: [] as $node) {
-                $name = $this->stringValue($node->textContent);
-
-                if ($name === null) {
-                    continue;
-                }
-
-                $this->addTaxonomyItem($items, 'actor', $name, null);
-            }
-        }
-
-        foreach ($xpath->query('//a[@href]') ?: [] as $node) {
-            $href = $node->attributes?->getNamedItem('href')?->nodeValue;
-            $name = trim($node->textContent);
-
-            if ($href === null || $name === '') {
-                continue;
-            }
-
-            $type = $this->relationTypeFromHref($href);
-
-            if ($type === null) {
-                continue;
-            }
-
-            $this->addTaxonomyItem($items, $type, $name, $this->normalizeRelative($href, $baseUrl));
-        }
-
-        foreach ($this->tagListTaxonomies($xpath, $baseUrl) as $item) {
-            $this->addTaxonomyItem($items, 'tag', $item['name'], $item['source_url']);
-
-            $network = $this->relationMetadata->curatedNetwork($item['name']);
-
-            if ($network !== null) {
-                $this->addTaxonomyItem($items, 'network', $network, $item['source_url']);
-            }
-        }
-
-        if ($this->hasSubtitles($xpath)) {
-            $this->addTaxonomyItem($items, 'tag', 'субтитры', null);
-        }
-
-        return array_values($items);
-    }
-
-    private function relationTypeFromHref(string $href): ?string
-    {
-        $path = Str::lower(rawurldecode((string) parse_url($href, PHP_URL_PATH)));
-        $path = '/'.ltrim($path, '/');
-
-        return match (true) {
-            preg_match('~^/(?:genre|janr|zhanr)(?:/|-)~u', $path) === 1 => 'genre',
-            preg_match('~^/(?:country|strana)(?:/|-)~u', $path) === 1 => 'country',
-            preg_match('~^/(?:actor|akter)(?:/|-)~u', $path) === 1 => 'actor',
-            preg_match('~^/(?:director|rezhisser)(?:/|-)~u', $path) === 1 => 'director',
-            default => null,
-        };
-    }
-
-    /**
-     * @param  array<string, array{type: string, name: string, source_url: string|null}>  $items
-     */
-    private function addTaxonomyItem(array &$items, string $type, string $name, ?string $sourceUrl): void
-    {
-        $name = match ($type) {
-            'country' => $this->relationMetadata->country($name),
-            'status' => $this->relationMetadata->status($name),
-            'translation' => $this->relationMetadata->translation($name),
-            default => $name,
-        };
-
-        if ($name === null) {
-            return;
-        }
-
-        $name = $this->relationNames->normalize($name);
-
-        if (! $this->relationNames->isValid($type, $name)) {
-            return;
-        }
-
-        $key = $type.'|'.Str::lower($name);
-        $items[$key] = [
-            'type' => $type,
-            'name' => $name,
-            'source_url' => $sourceUrl,
-        ];
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function officialTranslationNames(DOMXPath $xpath): array
-    {
-        $translations = [];
-        $query = '//*[contains(concat(" ", normalize-space(@class), " "), " pgs-trans ")]//*[@data-click="translate"]';
-
-        foreach ($xpath->query($query) ?: [] as $node) {
-            $values = [$node->textContent];
-
-            foreach (['data-translate', 'data-value', 'title'] as $attribute) {
-                $values[] = $node->attributes?->getNamedItem($attribute)?->nodeValue;
-            }
-
-            foreach ($values as $value) {
-                $name = $this->relationMetadata->translation(is_string($value) ? $value : null);
-
-                if ($name !== null && $this->relationNames->isValid('translation', $name)) {
-                    $translations[Str::lower($name)] = $name;
-                }
-            }
-        }
-
-        return array_values($translations);
-    }
-
-    /**
-     * @return list<array{type: string, name: string}>
-     */
-    private function officialDescriptionTaxonomies(DOMXPath $xpath): array
-    {
-        $items = [];
-        $query = '//*[(
-            @itemprop="description"
-            or contains(concat(" ", normalize-space(@class), " "), " pgs-sinfo_text ")
-        ) and not(ancestor-or-self::*[
-            contains(concat(" ", normalize-space(@class), " "), " svc_comment ")
-            or contains(concat(" ", normalize-space(@class), " "), " pgs-review-post ")
-            or contains(concat(" ", normalize-space(@class), " "), " comment ")
-        ])]';
-
-        foreach ($xpath->query($query) ?: [] as $node) {
-            $html = $node->ownerDocument?->saveHTML($node) ?: $node->textContent;
-            $html = preg_replace('~<br\s*/?>|</(?:p|div|li|section|article|h[1-6])>~iu', "\n", $html) ?? $html;
-            $text = html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-            $text = str_replace("\xc2\xa0", ' ', $text);
-
-            foreach (preg_split('/\R/u', $text) ?: [] as $line) {
-                $line = Str::squish($line);
-
-                if (preg_match('/^(?<label>Студи(?:я|и)|Телеканал|Канал|Статус)\s*:\s*(?<value>[^\r\n]{1,120})$/iu', $line, $matches) !== 1) {
-                    continue;
-                }
-
-                $type = match (Str::lower($matches['label'])) {
-                    'студия', 'студии' => 'studio',
-                    'телеканал', 'канал' => 'network',
-                    'статус' => 'status',
-                    default => null,
-                };
-
-                if ($type === null) {
-                    continue;
-                }
-
-                $items[] = [
-                    'type' => $type,
-                    'name' => $matches['value'],
-                ];
-            }
-        }
-
-        return $items;
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function seasonListTranslations(DOMXPath $xpath): array
-    {
-        $translations = [];
-
-        foreach ($xpath->query('//*[contains(concat(" ", normalize-space(@class), " "), " pgs-seaslist ")]//a') ?: [] as $node) {
-            $text = $this->stringValue($node->textContent);
-
-            if ($text === null) {
-                continue;
-            }
-
-            foreach ($this->translationNamesFromText($text) as $name) {
-                $translations[Str::lower($name)] = $name;
-            }
-        }
-
-        return array_values($translations);
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function translationNamesFromText(string $text): array
-    {
-        $matchesCount = preg_match_all('/\(([^()]{2,80})\)/u', $text, $matches);
-
-        if ($matchesCount === false || $matchesCount === 0) {
-            return [];
-        }
-
-        $translations = [];
-
-        foreach ($matches[1] as $match) {
-            $name = $this->stringValue($match);
-
-            if ($name === null || preg_match('/^\d{2}\.\d{2}\.\d{4}/u', $name) === 1) {
-                continue;
-            }
-
-            if (preg_match('/(?:сер(?:ия|ии|ий)|из|\?\?)/iu', $name) === 1) {
-                continue;
-            }
-
-            if (! $this->relationNames->isValid('translation', $name)) {
-                continue;
-            }
-
-            $translations[Str::lower($name)] = $name;
-        }
-
-        return array_values($translations);
-    }
-
-    /**
-     * @return list<array{type: string, name: string, source_url: string|null}>
-     */
-    private function tagListTaxonomies(DOMXPath $xpath, string $baseUrl): array
-    {
-        $items = [];
-
-        foreach ($xpath->query('//*[contains(concat(" ", normalize-space(@class), " "), " b-taglist ")]//a[@href]') ?: [] as $node) {
-            $name = $this->stringValue($node->textContent);
-            $href = $node->attributes?->getNamedItem('href')?->nodeValue;
-
-            if ($name === null || $href === null || mb_strlen($name) > 80) {
-                continue;
-            }
-
-            $sourceUrl = $this->normalizeRelative($href, $baseUrl);
-
-            if ($this->seasonvarUrl->pageType($sourceUrl) !== SeasonvarPageType::Tag) {
-                continue;
-            }
-
-            $items[Str::lower($name)] = [
-                'type' => 'tag',
-                'name' => $name,
-                'source_url' => $sourceUrl,
-            ];
-        }
-
-        return array_values($items);
-    }
-
-    private function hasSubtitles(DOMXPath $xpath): bool
-    {
-        $query = '//*[contains(concat(" ", normalize-space(@class), " "), " pgs-sinfo_list ")]
-            | //*[contains(concat(" ", normalize-space(@class), " "), " pgs-seaslist ")]
-            | //*[contains(concat(" ", normalize-space(@class), " "), " pgs-trans ")]
-            | //*[contains(concat(" ", normalize-space(@class), " "), " b-taglist ")]';
-
-        foreach ($xpath->query($query) ?: [] as $node) {
-            $text = $this->stringValue($node->textContent);
-
-            if ($text !== null && preg_match('/(?:субтитр|subtitles?|subs?)/iu', $text) === 1) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
      * @return list<array{author: string|null, body: string, published_at: string|null}>
      */
     private function reviews(DOMXPath $xpath): array
@@ -1640,58 +977,6 @@ final class SeasonvarCatalogParser
     }
 
     /**
-     * @param  array<string, mixed>  $structuredData
-     * @return list<array{type: string, name: string, source_url: string|null}>
-     */
-    private function structuredTaxonomies(array $structuredData): array
-    {
-        $items = [];
-
-        foreach ($this->valueList(Arr::get($structuredData, 'genre')) as $name) {
-            $items[] = ['type' => 'genre', 'name' => $name, 'source_url' => null];
-        }
-
-        foreach ($this->valueList(Arr::get($structuredData, 'actor')) as $name) {
-            $items[] = ['type' => 'actor', 'name' => $name, 'source_url' => null];
-        }
-
-        foreach ($this->valueList(Arr::get($structuredData, 'director')) as $name) {
-            $items[] = ['type' => 'director', 'name' => $name, 'source_url' => null];
-        }
-
-        foreach ($this->valueList(Arr::get($structuredData, 'countryOfOrigin')) as $name) {
-            $items[] = ['type' => 'country', 'name' => $name, 'source_url' => null];
-        }
-
-        foreach ($this->structuredEntityNames(Arr::get($structuredData, 'productionCompany')) as $name) {
-            $items[] = ['type' => 'studio', 'name' => $name, 'source_url' => null];
-        }
-
-        return $items;
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function structuredEntityNames(mixed $value): array
-    {
-        $items = [];
-        $entities = is_array($value) && ! array_is_list($value) ? [$value] : Arr::wrap($value);
-
-        foreach ($entities as $item) {
-            $name = is_array($item)
-                ? $this->stringValue(Arr::get($item, 'name'))
-                : $this->stringValue($item);
-
-            if ($name !== null) {
-                $items[Str::lower($name)] = $name;
-            }
-        }
-
-        return array_values($items);
-    }
-
-    /**
      * @return list<string>
      */
     private function valueList(mixed $value): array
@@ -1717,59 +1002,6 @@ final class SeasonvarCatalogParser
         }
 
         return array_values($items);
-    }
-
-    /** @return array<string, mixed> */
-    private function structuredData(DOMXPath $xpath): array
-    {
-        $fallback = [];
-
-        foreach ($xpath->query('//script[contains(@type, "ld+json")]') ?: [] as $node) {
-            $decoded = json_decode(trim($node->textContent), true);
-
-            if (json_last_error() !== JSON_ERROR_NONE || ! is_array($decoded)) {
-                continue;
-            }
-
-            foreach ($this->structuredItems($decoded) as $item) {
-                $fallback = $fallback === [] ? $item : $fallback;
-                $types = array_map(
-                    fn (mixed $type): string => Str::lower((string) $type),
-                    Arr::wrap(Arr::get($item, '@type')),
-                );
-
-                if (array_intersect($types, ['tvseries', 'movie', 'creativework', 'videoobject']) !== []) {
-                    return $item;
-                }
-            }
-        }
-
-        return $fallback;
-    }
-
-    /**
-     * @param  array<array-key, mixed>  $value
-     * @return list<array<string, mixed>>
-     */
-    private function structuredItems(array $value): array
-    {
-        if (array_key_exists('@graph', $value) && is_array($value['@graph'])) {
-            return $this->structuredItems($value['@graph']);
-        }
-
-        if (! array_is_list($value)) {
-            return [$value];
-        }
-
-        $items = [];
-
-        foreach ($value as $item) {
-            if (is_array($item)) {
-                array_push($items, ...$this->structuredItems($item));
-            }
-        }
-
-        return $items;
     }
 
     private function normalizeRelative(string $url, string $baseUrl): string

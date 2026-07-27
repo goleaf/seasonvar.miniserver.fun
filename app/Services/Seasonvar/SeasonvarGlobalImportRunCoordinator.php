@@ -55,10 +55,13 @@ final class SeasonvarGlobalImportRunCoordinator
                 'forever' => false,
                 'requested_by_user_id' => $requestedByUserId,
                 'retry_of_run_id' => $retryOfRunId,
+                'last_progress_at' => now(),
                 'last_heartbeat_at' => now(),
                 'summary' => [
                     'discover' => $discover,
+                    'discovery_completed' => ! $discover,
                     'dispatch_completed' => false,
+                    'dispatch_batches' => 0,
                     'provider' => 'seasonvar',
                     'page_types' => $pageTypes,
                     'sitemap_tail_limit' => $sitemapTailLimit,
@@ -102,6 +105,7 @@ final class SeasonvarGlobalImportRunCoordinator
                 'process_host' => $processHost,
                 'process_command' => $processCommand,
                 'started_at' => now(),
+                'last_progress_at' => now(),
                 'last_heartbeat_at' => now(),
             ]));
 

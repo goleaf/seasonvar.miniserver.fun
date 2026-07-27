@@ -55,7 +55,7 @@ final class SeasonvarSourceAvailabilityBackfill
             $withoutKnownRestrictionIds = [];
 
             foreach ($chunk as $page) {
-                $status = $this->detector->detect($page->latestSnapshot->html);
+                $status = $this->detector->detect($page->latestSnapshot->body());
 
                 if ($status === SeasonvarSourceAvailability::RegionBlocked) {
                     $blockedIds[] = $page->id;

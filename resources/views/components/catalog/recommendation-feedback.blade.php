@@ -1,3 +1,40 @@
+@if ($variant === 'compact')
+    <div
+        class="relative z-20 flex flex-wrap gap-2 border-t border-slate-100 px-3 py-2"
+        data-recommendation-feedback
+        data-recommendation-feedback-compact
+        role="group"
+        aria-label="{{ __('recommendations.feedback.group') }}"
+    >
+        <button
+            type="button"
+            wire:click="{{ $action }}({{ $titleId }}, 'more_like_this')"
+            wire:loading.attr="disabled"
+            wire:target="{{ $action }}({{ $titleId }}, 'more_like_this')"
+            class="inline-flex min-h-11 items-center gap-2 rounded-control px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 disabled:cursor-wait disabled:opacity-60"
+        >
+            <x-ui.icon name="fa-solid fa-thumbs-up" />
+            <span>{{ __('recommendations.feedback.more_like_this') }}</span>
+        </button>
+        <button
+            type="button"
+            wire:click="{{ $reasonAction() }}({{ $titleId }}, 'not_similar')"
+            wire:loading.attr="disabled"
+            wire:target="{{ $reasonAction() }}({{ $titleId }}, 'not_similar')"
+            class="inline-flex min-h-11 items-center gap-2 rounded-control px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 disabled:cursor-wait disabled:opacity-60"
+        >
+            <x-ui.icon name="fa-solid fa-not-equal" />
+            <span>{{ __('recommendations.feedback.not_similar_short') }}</span>
+        </button>
+        <span
+            wire:loading
+            wire:target="{{ $action }}({{ $titleId }}, 'more_like_this'), {{ $reasonAction() }}({{ $titleId }}, 'not_similar')"
+            class="self-center text-xs font-semibold text-slate-600"
+            role="status"
+            aria-live="polite"
+        >{{ __('recommendations.feedback.saving') }}</span>
+    </div>
+@else
 <details class="relative z-20 border-t border-slate-100 bg-slate-50 px-3 py-2" data-recommendation-feedback>
     <summary class="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-control text-sm font-bold text-slate-600 hover:text-emerald-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
         <x-ui.icon name="fa-solid fa-sliders" />
@@ -96,3 +133,4 @@
         </p>
     </div>
 </details>
+@endif

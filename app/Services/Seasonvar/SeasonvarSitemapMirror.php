@@ -29,6 +29,7 @@ final class SeasonvarSitemapMirror
         private readonly SeasonvarSource $seasonvarSource,
         private readonly SeasonvarUrl $seasonvarUrl,
         private readonly SeasonvarRobotsPolicy $robotsPolicy,
+        private readonly SeasonvarSitemapBodyDecoder $sitemapBodies,
     ) {}
 
     /**
@@ -209,24 +210,15 @@ final class SeasonvarSitemapMirror
         $archivePath = $this->basePath('archives/'.$fileName);
         $xmlPath = $this->basePath('xml/'.preg_replace('/\.gz$/', '', $fileName));
 
-        file_put_contents($archivePath, $body);
+        $xml = $this->sitemapBodies->decode($body);
 
         if (substr($body, 0, 2) === chr(31).chr(139)) {
-            $decoded = gzdecode($body);
-
-            if (! is_string($decoded)) {
-                throw new RuntimeException("Не удалось распаковать карту сайта {$url}");
-            }
-
-            file_put_contents($xmlPath, $decoded);
-
-            return [
-                'archive_path' => $archivePath,
-                'xml_path' => $xmlPath,
-            ];
+            file_put_contents($archivePath, $body);
+        } else {
+            file_put_contents($archivePath, $xml);
         }
 
-        file_put_contents($xmlPath, $body);
+        file_put_contents($xmlPath, $xml);
 
         return [
             'archive_path' => $archivePath,

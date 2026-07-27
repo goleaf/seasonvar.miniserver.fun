@@ -21,6 +21,7 @@ use App\Services\ReleaseCalendar\ReleaseCalendarCacheInvalidator;
 use App\Services\Seasonvar\CatalogTitleRefreshStateStore;
 use App\Services\Seasonvar\SeasonvarCatalogImporter;
 use App\Services\Seasonvar\SeasonvarCatalogParser;
+use App\Services\Seasonvar\SeasonvarCatalogWriteAdmission;
 use App\Services\Seasonvar\SeasonvarImportErrorSanitizer;
 use App\Services\Seasonvar\SeasonvarImportEventRecorder;
 use App\Services\Seasonvar\SeasonvarImportFinalizationDispatcher;
@@ -93,6 +94,7 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
         SeasonvarImportTitleGroupReconciler $reconciler,
         SeasonvarPageClaimManager $claims,
         SeasonvarImportEventRecorder $eventRecorder,
+        SeasonvarCatalogWriteAdmission $writeAdmission,
     ): void {
         $group = $this->group();
 
@@ -148,6 +150,7 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
         $catalogTitleForSync = null;
         $syncChangePublished = false;
         $importRunId = (int) $group->seasonvar_import_run_id;
+        $writerLock = null;
 
         try {
             $group = $this->group();
@@ -195,6 +198,17 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
             $media = $this->checkpointedMedia($validRows);
             $visitorRun = $this->isVisitorRun($group->run);
 
+            if ($writeAdmission->required()) {
+                $writerLock = $writeAdmission->acquire($this->timeout + 300);
+
+                if ($writerLock === null) {
+                    $runs->heartbeat($group->seasonvar_import_run_id);
+                    $this->release($this->writerAdmissionRetryDelay());
+
+                    return;
+                }
+            }
+
             foreach ($validRows as $item) {
                 if ($item['row']->status === SeasonvarPreparedPageStatus::Applied) {
                     continue;
@@ -216,6 +230,7 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
                         afterCatalogCommit: static function (CatalogTitle $committedTitle) use (&$catalogTitleForSync): void {
                             $catalogTitleForSync = $committedTitle;
                         },
+                        syncMediaTranslations: false,
                     );
                 };
                 $result = $visitorRun
@@ -232,6 +247,7 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
                 $this->checkpointAppliedPage($group, $item['row'], $catalogTitle, $result);
             }
 
+            $importer->syncMediaTranslationsForTitle($catalogTitle);
             $mergeResult = $titleMerger->mergeForCanonicalSlug($catalogTitle->slug);
             $catalogTitle->refresh();
             $catalogTitleForSync = $catalogTitle;
@@ -264,6 +280,8 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
                 $comparison,
                 $warningCount,
             );
+            $writerLock?->release();
+            $writerLock = null;
             $cacheInvalidator->importedTitleChanged(
                 (int) $catalogTitle->id,
                 warm: $visitorRun,
@@ -286,6 +304,7 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
 
             throw $exception;
         } finally {
+            $writerLock?->release();
             $eventRecorder->flushRun($importRunId);
             $lock->release();
         }
@@ -320,7 +339,15 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
             ->with('run:id,mode,execution_mode,status,summary')
             ->find($this->groupId);
 
-        if ($group === null || $group->status->isTerminal()) {
+        if ($group === null) {
+            return;
+        }
+
+        $claims = app(SeasonvarPageClaimManager::class);
+
+        if ($group->status->isTerminal()) {
+            $claims->releaseForTitleGroup($group->id, $group->seasonvar_import_run_id);
+
             return;
         }
 
@@ -336,9 +363,12 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
                 'status' => SeasonvarImportStatus::Failed->value,
                 'last_error' => $reason->message(),
                 'finished_at' => now(),
+                'last_progress_at' => now(),
                 'last_heartbeat_at' => now(),
             ]);
         }
+
+        $claims->releaseForTitleGroup($group->id, $group->seasonvar_import_run_id);
 
         if ($group->catalog_title_id !== null && $this->isVisitorRun($group->run)) {
             app(CatalogTitleRefreshStateStore::class)->failed($group->catalog_title_id);
@@ -359,7 +389,7 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
             ->with([
                 'run:id,mode,execution_mode,status,summary',
                 'catalogTitle:id,source_id,source_page_id,external_id,title,original_title,type,year,description,poster_url,source_url,source_url_hash,content_hash,provider_field_values,slug',
-                'preparedPages:id,seasonvar_import_run_id,seasonvar_import_title_group_id,source_page_id,status,content_hash,parser_version,payload,warnings,updated_at',
+                'preparedPages:id,seasonvar_import_run_id,seasonvar_import_title_group_id,source_page_id,status,content_hash,parser_version,payload,payload_blob,payload_codec,payload_uncompressed_bytes,application_result,warnings,updated_at',
                 'preparedPages.sourcePage:id,source_id,url,url_hash,import_claim_token,import_claim_expires_at,provider_availability_status',
             ])
             ->find($this->groupId);
@@ -420,7 +450,9 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
 
         foreach ($rows as $row) {
             try {
-                $prepared = SeasonvarPreparedCatalogPage::fromPayload($row->payload ?? []);
+                $prepared = SeasonvarPreparedCatalogPage::fromPayload(
+                    $row->decodedPayload(),
+                );
 
                 if ($prepared->parserVersion !== SeasonvarCatalogParser::METADATA_VERSION
                     || $row->parser_version !== SeasonvarCatalogParser::METADATA_VERSION) {
@@ -535,6 +567,7 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
             $run->media_updated += max(0, $result['media_updated']);
             $run->media_skipped += max(0, $result['media_skipped']);
             $run->media_failed += max(0, $result['media_failed']);
+            $run->last_progress_at = now();
             $run->last_heartbeat_at = now();
             $run->save();
         }, 3);
@@ -573,6 +606,7 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
             ]);
             $run->failed += $invalidPages;
             $run->cycles = max(1, (int) $run->cycles);
+            $run->last_progress_at = now();
             $run->last_heartbeat_at = now();
 
             if ($this->isVisitorRun($run)) {
@@ -605,6 +639,7 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
                 'status' => SeasonvarImportStatus::Failed->value,
                 'last_error' => $reason->message(),
                 'finished_at' => now(),
+                'last_progress_at' => now(),
                 'last_heartbeat_at' => now(),
             ]);
         }
@@ -625,6 +660,20 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
             'seasonvar.title_refresh.finalizer_delay_seconds',
             config('seasonvar.queue.finalizer_delay_seconds', 60),
         ));
+    }
+
+    private function writerAdmissionRetryDelay(): int
+    {
+        return max(
+            1,
+            min(
+                60,
+                (int) config(
+                    'seasonvar.import.writer_admission_retry_seconds',
+                    5,
+                ),
+            ),
+        );
     }
 
     private function lockStore(): Store&LockProvider

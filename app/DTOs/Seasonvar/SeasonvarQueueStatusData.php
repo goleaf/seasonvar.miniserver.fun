@@ -30,6 +30,26 @@ class SeasonvarQueueStatusData
         public readonly int $mediaSizesUnsupported,
         public readonly int $mediaSizeChecksFailed,
         public readonly int $mediaSizeKnownBytes,
+        public readonly string $phase,
+        public readonly ?bool $dispatchCompleted,
+        public readonly int $dispatchCursor,
+        public readonly int $expectedPages,
+        public readonly int $preparedPages,
+        public readonly int $appliedPages,
+        public readonly int $failedPages,
+        public readonly ?string $currentFinalizationStage,
+        public readonly ?CarbonInterface $lastProgressAt,
+        public readonly ?CarbonInterface $workerHeartbeatAt,
+        public readonly ?CarbonInterface $workerProcessedAt,
+        public readonly string $workerStatus,
+        public readonly ?string $workerMessage,
+        public readonly string $transportState,
+        public readonly ?string $staleReason,
+        public readonly ?CarbonInterface $earliestClaimExpiryAt,
+        public readonly ?CarbonInterface $latestClaimExpiryAt,
+        public readonly ?string $lastTerminalReasonCode,
+        /** @var array<string, mixed>|null */
+        public readonly ?array $retentionSnapshot,
     ) {}
 
     public function oldestPendingAgeSeconds(): ?int

@@ -14,6 +14,7 @@ class SeasonvarDiscovery
         private readonly SeasonvarUrl $seasonvarUrl,
         private readonly SeasonvarPageHandlerRegistry $handlers,
         private readonly SeasonvarImportErrorSanitizer $errors,
+        private readonly SeasonvarSitemapBodyDecoder $sitemapBodies,
     ) {}
 
     /**
@@ -192,18 +193,14 @@ class SeasonvarDiscovery
                 'compressed_bytes' => mb_strlen($body, '8bit'),
             ]);
 
-            $decoded = gzdecode($body);
-
-            if (! is_string($decoded)) {
-                throw new RuntimeException("Не удалось распаковать XML карты сайта: {$url}");
-            }
-
-            $body = $decoded;
+            $body = $this->sitemapBodies->decode($body);
 
             $this->report($progress, 'sitemap-xml-decompressed', [
                 'url' => $url,
                 'xml_bytes' => mb_strlen($body, '8bit'),
             ]);
+        } else {
+            $body = $this->sitemapBodies->decode($body);
         }
 
         $previous = libxml_use_internal_errors(true);

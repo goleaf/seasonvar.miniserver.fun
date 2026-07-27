@@ -18,9 +18,24 @@ final class CatalogDiscoveryLayoutTest extends TestCase
         $response = $this->get(route('discover.index', ['type' => $type]))
             ->assertOk()
             ->assertSeeText(__("recommendations.types.{$type}.title"))
-            ->assertSeeText(__("recommendations.types.{$type}.description"));
+            ->assertSeeText(__("recommendations.types.{$type}.description"))
+            ->assertSee('data-discovery-section-navigation', false)
+            ->assertSee('href="#collections"', false)
+            ->assertSee('data-discovery-collection-results', false)
+            ->assertSeeLivewire('collections.catalog-collection-explorer');
 
         $this->assertSame(1, substr_count($response->getContent(), '<h1'));
+
+        if ($type === 'popular') {
+            $response
+                ->assertSee('href="#popular-titles"', false)
+                ->assertSee('id="popular-titles"', false);
+        } else {
+            $response
+                ->assertSee('href="#discovery-titles"', false)
+                ->assertSee('id="discovery-titles"', false)
+                ->assertDontSee('id="popular-titles"', false);
+        }
     }
 
     public function test_navigation_exposes_only_the_nine_implemented_discovery_modes(): void
@@ -85,13 +100,24 @@ final class CatalogDiscoveryLayoutTest extends TestCase
         );
     }
 
-    public function test_non_popular_modes_do_not_render_collection_section_navigation(): void
+    public function test_non_popular_modes_render_collection_explorer_before_their_series_results(): void
     {
-        $this->get(route('discover.index', ['type' => 'random']))
+        $response = $this->get(route('discover.index', ['type' => 'random']))
             ->assertOk()
-            ->assertDontSee('data-discovery-section-navigation', false)
-            ->assertDontSee('data-discovery-collection-results', false)
+            ->assertSee('data-discovery-section-navigation', false)
+            ->assertSee('href="#collections"', false)
+            ->assertSee('href="#discovery-titles"', false)
+            ->assertSee('data-discovery-collection-results', false)
+            ->assertSee('data-discovery-title-results', false)
+            ->assertSee('id="discovery-titles"', false)
             ->assertDontSee('id="popular-titles"', false);
+
+        $html = $response->getContent();
+
+        $this->assertLessThan(
+            strpos($html, 'data-discovery-title-results'),
+            strpos($html, 'data-discovery-collection-results'),
+        );
     }
 
     /** @return array<string, array{string}> */

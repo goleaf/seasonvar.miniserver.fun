@@ -18,6 +18,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $import_claimed_at
  * @property Carbon|null $import_claim_expires_at
  * @property list<string>|null $missing_data_flags
+ * @property array<string, mixed>|null $metadata_presence
  * @property SeasonvarSourceAvailability|null $provider_availability_status
  */
 #[Fillable([

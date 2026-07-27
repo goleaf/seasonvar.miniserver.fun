@@ -1,6 +1,6 @@
 # Logging and health
 
-Проверено: 24.07.2026.
+Проверено: 27.07.2026.
 
 ## Actual logging
 
@@ -13,6 +13,18 @@ Log access is shell/panel operational access. No unrestricted browser log viewer
 Импортёр не использует число строк `seasonvar_import_events` как точный счётчик выполненной работы. Warning/error и lifecycle/terminal events сохраняются полностью, высокочастотные success events попадают в bounded `seasonvar-import-events-aggregated`, часть диагностических событий выбирается детерминированно, а transient details остаются только в текущем CLI callback. Aggregate содержит только event counters/total и очищается тем же семидневным retention; успешная порция flush-ится каждые `SEASONVAR_IMPORT_EVENT_AGGREGATE_FLUSH_SIZE=100` событий и на queue/sync terminal boundary. Sample divisor по умолчанию равен `100`.
 
 Для расследования оператор сначала использует точные counters/status/heartbeat из `seasonvar_import_runs`, затем durable failures и aggregate telemetry. Ни admin, ни CLI не должны представлять sampled/aggregate rows как полный список обработанных media/pages. Любой event context проходит sanitization до записи, а отказ telemetry storage не должен останавливать импорт.
+
+`seasonvar:import --status` и `/admin/imports` используют один read model.
+Run выбирается до подсчёта claims/worker health; targeted title refresh
+никогда не смешивается с более старым sitemap run. `pending`, `delayed` и
+`reserved` остаются метриками configured Redis transport, durable phase —
+состоянием database run/finalization, heartbeat — отдельным признаком
+живости. Эти три сигнала нельзя объединять в один искусственный процент.
+
+После schema recovery 27.07.2026 все importer/title-refresh systemd workers
+вернулись в active state, live claims отсутствовали, а три targeted canary
+runs завершились. Backup path/checksum, provider URL и exception payload в
+health evidence не публикуются.
 
 ## Public health boundary
 

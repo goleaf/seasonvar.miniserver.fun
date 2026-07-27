@@ -1,6 +1,33 @@
 # Деплой
 
-Обновлено: 26.07.2026
+Обновлено: 27.07.2026
+
+## Production activation импортёра 27.07.2026
+
+Отказ карточки в состоянии «Обновляем данные» был вызван schema/code
+расхождением: рабочая SQLite не имела additive compact-payload columns.
+Перед изменением подтверждены terminal importer state и нулевые live claims,
+остановлены только четыре `seasonvar-import-worker@*` и восемь
+`seasonvar-title-refresh-worker@*`, создана закрытая SQLite backup и
+проверены `quick_check`/`foreign_key_check`.
+
+Миграции
+`2026_07_24_130000_add_compact_payload_storage_to_seasonvar_import_tables`
+и
+`2026_07_24_131000_add_file_size_schedule_projection_to_licensed_media`
+успешно применены через `migrate --force`. После повторной integrity
+проверки тот же worker pool восстановлен; три последовательных targeted runs
+проблемного тайтла завершились без failed pages/groups. Приватный путь и
+checksum backup не публикуются.
+
+Оба новых runtime writer path остаются disabled-first:
+`SEASONVAR_IMPORT_COMPACT_STORAGE_WRITE_ENABLED=false`,
+`SEASONVAR_IMPORT_WRITER_ADMISSION_ENABLED=false` и
+`SEASONVAR_MEDIA_FILE_SIZE_PROJECTION_ENABLED=false`. Rollback сначала
+возвращает предыдущий код, который читает legacy JSON и игнорирует additive
+columns/tables. Destructive down migrations в рабочей SQLite не являются
+штатным rollback; при повреждении данных применяется проверенная backup по
+закрытому operations runbook.
 
 ## Canonical Task 28 production strategy
 

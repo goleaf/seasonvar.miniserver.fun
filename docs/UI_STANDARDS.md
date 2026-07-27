@@ -1,6 +1,6 @@
 # Стандарты интерфейса
 
-Обновлено: 26.07.2026
+Обновлено: 27.07.2026
 
 ## Финальная cross-system UI verification
 
@@ -311,7 +311,20 @@ Blade и Livewire Blade являются только presentation layer: зап
 - `x-ui.poster-frame` явно различает `cover` и `contain`. Главный постер и технические миниатюры могут использовать `cover` с overscan, но все строки контентных списков используют точный frame `2:3`, `object-contain`, центрирование и `overscan=false`, поэтому постер не обрезается на телефоне и планшете. У изображения нет собственной ring/border/shadow/padding/rounded-рамки.
 - `x-ui.poster-card` задаёт каркасы `list`, `compact`, `recommendation` и технический `stats`. Контентные варианты являются безрамочными строками внутри одного родительского `divide-y` списка; только `stats` сохраняет отдельную вертикальную техническую карточку.
 - `x-catalog.title-card` — единый query-free вход для списков, поиска и рекомендаций `CatalogTitle`; неизвестный layout нормализуется в `list`, а счётчики и справочники берутся только из агрегатов, подготовленных scalar attributes или уже загруженных связей. Каталожные `grid`/`list` выводят максимум два жанра; совместимый `compact` сохраняет максимум три. Только `list` может показать server-side plain-text excerpt не длиннее 240 Unicode-символов с `line-clamp-3`. Полное описание остаётся на canonical title page и не прячется в DOM карточки.
-- Блок «Советуем посмотреть» всегда использует один ordered list: одна строка на rank, портретный frame `2:3` без crop, ровно одна наиболее значимая broad-причина и доступные stretched title link плюс явная ссылка «Подробнее». Нельзя возвращать featured/grid смесь, вложенную панель «Ближайшие совпадения» или отдельные genre/year колонки.
+- Блок похожих сериалов на canonical title page показывает первые шесть
+  рекомендаций и не более шести следующих под нативным раскрытием «Показать
+  ещё». Каждая безрамочная строка использует портретный frame `2:3` без crop,
+  название максимум в две строки, оригинальное название в одну, одну
+  компактную metadata-строку `год · сезоны · один рейтинг`, server-side
+  plain-text excerpt не длиннее 180 Unicode-символов с `line-clamp-2` и до
+  трёх проверяемых broad-причин под явной подписью «Почему похож». Rank и
+  полный score breakdown не конкурируют с причиной. Раскрытие работает без
+  JavaScript и не выполняет второй HTTP/SQL запрос.
+- Авторизованная строка похожего тайтла показывает доступные с клавиатуры
+  действия «Больше похожего» и «Не похоже» с областью не меньше `44×44` px.
+  «Не похоже» использует server-side reason `not_similar`, доступно не только
+  на hover и не раскрывает высокий блок детальных preference controls.
+  Полный feedback component остаётся на discovery surface.
 - Главный постер страницы сериала использует `x-ui.poster-frame` напрямую и загружается eager; HTML-атрибут `poster` у video player не является карточным изображением и этим контрактом не заменяется.
 - `x-stat` для самостоятельных счетчиков состояния: border-only surface без
   обычной или hover-тени.
@@ -397,8 +410,8 @@ Blade и Livewire Blade являются только presentation layer: зап
 - Collection directory/cards, owner dashboard, editor и public page используют существующие `x-ui.panel`, form/status/pagination components и светлую палитру; отдельный visual system не вводится.
 - Long user names/descriptions и category path переносятся, а structural grids переходят в один столбец на узком экране без horizontal overflow. Собственное collection image, image frame и fallback poster запрещены во всех этих поверхностях.
 - Все action targets не меньше 44px. Visibility radio, selector checkboxes, report dialog, delete confirmation, locale links и reorder up/down доступны keyboard. Drag-handle ручного порядка подборки также имеет touch target 44px, действует только в текущей странице и никогда не становится единственным способом действия; hover/color не несут essential semantics.
-- `/discover/{type}` использует один H1, все девять mode links и свёрнутый по умолчанию filters `<details>`; при активном URL-фильтре блок открыт. Refresh находится в заголовке результатов как secondary bordered action. В `popular` compact anchors ведут к `#collections` и `#popular-titles`, а text-only каталог подборок расположен перед serial ranking; остальные режимы не получают collection shell.
-- Подборки во всех контекстах text-only: нельзя выводить собственную обложку, fallback poster, пустой image frame или decorative image placeholder. Category path, название, описание, owner/state и счётчик формируют иерархию. Desktop category navigation использует root sidebar + child pills, mobile — root/child selects без horizontal inner-scroll. Узел с нулевым count не показывается как dead control, кроме явно выбранного bookmark state с честным empty result.
+- `/discover/{type}` использует один H1, все девять mode links и свёрнутый по умолчанию filters `<details>`; при активном URL-фильтре блок открыт. Refresh находится в заголовке результатов как secondary bordered action. Каждый mode получает одну compact section navigation и один text-only каталог подборок перед serial ranking: `#collections` стабилен, `popular` сохраняет `#popular-titles`, остальные modes используют `#discovery-titles`.
+- Подборки во всех контекстах text-only: нельзя выводить собственную обложку, fallback poster, пустой image frame или decorative image placeholder. Category path, название, описание, owner/state и счётчик формируют иерархию. Публичная category navigation на телефоне, планшете и desktop использует один вложенный root/child list без horizontal inner-scroll. Положительный узел является кнопкой-фильтром с областью не меньше `44×44 px`; узел с нулевым count остаётся видимым текстовым пунктом со счётчиком `0`, но не становится disabled/dead control. Явно выбранный bookmark state сохраняет честный empty result и доступный общий reset.
 - Центр классификации `/admin/catalog?section=collections` использует text-only адаптивные строки вместо широкой таблицы: checkbox, название, metadata, confidence, причины и category selector сохраняют читаемый порядок на телефоне и desktop. Default queue показывает public/approved rows; выбор страницы, принятие рекомендации строки и batch target являются только staging. Score никогда не скрывает причину, цвет confidence не является единственным сигналом, а массовое действие всегда разделено на подготовку preview и явное подтверждение. Выбор уверенных и сортировка confidence ограничены текущей страницей; все controls имеют минимум 44px. Форма создания и корни справочника закрыты native `<details>`, раскрываются с клавиатуры и не используют interactive buttons внутри `<summary>`.
 - Loading/success/error содержат localized live/status regions, destructive controls отделены цветом и текстом, а unavailable item не раскрывает internal removal reason.
 

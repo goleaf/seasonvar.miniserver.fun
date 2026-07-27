@@ -42,6 +42,7 @@ final class SeasonvarImportTitleGroupDispatcher
             'force' => true,
             'forever' => false,
             'selected' => 0,
+            'last_progress_at' => now(),
             'last_heartbeat_at' => now(),
             'started_at' => now(),
             'summary' => [
@@ -184,6 +185,9 @@ final class SeasonvarImportTitleGroupDispatcher
     {
         return DB::transaction(function () use ($group, $sourceId, $url): bool {
             $now = now();
+            $run = SeasonvarImportRun::query()
+                ->lockForUpdate()
+                ->findOrFail($group->seasonvar_import_run_id);
             $urlHash = $this->seasonvarUrl->hash($url);
             SourcePage::query()->insertOrIgnore([
                 'source_id' => $sourceId,
@@ -213,7 +217,10 @@ final class SeasonvarImportTitleGroupDispatcher
             }
 
             SeasonvarImportTitleGroup::query()->whereKey($group->id)->increment('expected_pages');
-            SeasonvarImportRun::query()->whereKey($group->seasonvar_import_run_id)->increment('selected');
+            $run->selected = (int) $run->selected + 1;
+            $run->last_progress_at = $now;
+            $run->last_heartbeat_at = $now;
+            $run->save();
             $prepared = SeasonvarImportPreparedPage::query()
                 ->where('seasonvar_import_title_group_id', $group->id)
                 ->where('source_page_id', $page->id)

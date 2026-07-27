@@ -8,6 +8,7 @@ use App\Models\SeasonvarImportRun;
 use App\Models\SeasonvarImportTitleGroup;
 use App\Services\Catalog\CatalogCacheInvalidator;
 use App\Services\Seasonvar\SeasonvarImportErrorSanitizer;
+use App\Services\Seasonvar\SeasonvarImportFinalizationDispatcher;
 use App\Services\Seasonvar\SeasonvarImportPipeline;
 use App\Services\Seasonvar\SeasonvarImportRunRecorder;
 use App\Services\Seasonvar\SeasonvarPageClaimManager;
@@ -127,8 +128,14 @@ class FinalizeSeasonvarQueuedImport implements ShouldBeUniqueUntilProcessing, Sh
                 $run->update(['failed' => $problemGroups]);
             }
 
-            $pipeline->finalizeQueuedRun($run);
-            $cacheInvalidator->catalogChanged();
+            $run = $pipeline->finalizeNextQueuedStage($run);
+
+            if ($run->status === 'running') {
+                app(SeasonvarImportFinalizationDispatcher::class)
+                    ->signalGlobalRun($run);
+            } else {
+                $cacheInvalidator->catalogChanged();
+            }
         } finally {
             $lock->release();
         }
@@ -204,6 +211,7 @@ class FinalizeSeasonvarQueuedImport implements ShouldBeUniqueUntilProcessing, Sh
                 'status' => 'failed',
                 'last_error' => $message,
                 'finished_at' => now(),
+                'last_progress_at' => now(),
                 'last_heartbeat_at' => now(),
                 'updated_at' => now(),
             ]);

@@ -132,6 +132,24 @@ final readonly class ReleaseCalendarTargetMergeService
         $this->cache->scheduleChanged($target->catalog_title_id);
     }
 
+    /**
+     * @param  list<int>  $episodeIds
+     * @return array<int, bool>
+     */
+    public function episodeIdsWithEntries(array $episodeIds): array
+    {
+        return $this->targetIdsWithEntries('episode_id', $episodeIds);
+    }
+
+    /**
+     * @param  list<int>  $mediaIds
+     * @return array<int, bool>
+     */
+    public function mediaIdsWithEntries(array $mediaIds): array
+    {
+        return $this->targetIdsWithEntries('licensed_media_id', $mediaIds);
+    }
+
     /** @param callable(Builder<ReleaseScheduleEntry>): Builder<ReleaseScheduleEntry> $scope
      * @param  array<string, int|null>  $targets
      */
@@ -211,5 +229,24 @@ final readonly class ReleaseCalendarTargetMergeService
                 );
             }
         });
+    }
+
+    /**
+     * @param  list<int>  $targetIds
+     * @return array<int, bool>
+     */
+    private function targetIdsWithEntries(string $column, array $targetIds): array
+    {
+        if ($targetIds === [] || ! $this->schema->ready()) {
+            return [];
+        }
+
+        return ReleaseScheduleEntry::query()
+            ->whereIn($column, $targetIds)
+            ->whereNotNull($column)
+            ->distinct()
+            ->pluck($column)
+            ->mapWithKeys(static fn (mixed $id): array => [(int) $id => true])
+            ->all();
     }
 }

@@ -19,6 +19,7 @@ use App\Models\ReleaseScheduleEntry;
 use App\Models\Source;
 use App\Models\SourcePage;
 use App\Services\Seasonvar\SeasonvarCatalogImporter;
+use App\Services\Seasonvar\SeasonvarCatalogParser;
 use App\Services\Seasonvar\SeasonvarTitleManifestBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
@@ -243,6 +244,90 @@ class SeasonvarCatalogPreparedApplyTest extends TestCase
         $this->assertNull($episode->released_at);
     }
 
+    public function test_complete_partial_complete_sequence_is_additive_until_an_authoritative_snapshot(): void
+    {
+        Http::preventStrayRequests();
+        $source = $this->seasonvarSource();
+        [$page, $base] = $this->preparedSeason($source, 1, 2, media: [[
+            'url' => 'https://media.example.com/sequence/s01e01.mp4',
+            'title' => '1 серия',
+            'season_number' => 1,
+            'episode_number' => 1,
+            'source_url' => $pageUrl = 'https://seasonvar.ru/serial-24212-Ryzhaya_psbdtie-1-season.html',
+            'kind' => 'file',
+        ]]);
+        $completeData = $base->catalogData->toArray();
+        $completeData['taxonomies'] = [[
+            'type' => 'tag',
+            'name' => 'Первый тег',
+            'source_url' => 'https://seasonvar.ru/tag/first',
+        ]];
+        $completeData['aliases'] = [[
+            'name' => 'Рыжая история',
+            'type' => 'alternative',
+            'source' => 'info',
+        ]];
+        $completeData['ratings'] = [[
+            'provider' => 'imdb',
+            'rating' => 7.5,
+            'votes' => 10,
+            'raw_value' => '7.5 (10)',
+        ]];
+        $completeData['parse_meta']['section_presence'] = $this->sectionPresence('complete');
+        $complete = $this->preparedFromData($page, $completeData, 'complete-1');
+        $canonical = CatalogTitle::factory()->for($source)->create([
+            'source_page_id' => $page->id,
+            'external_id' => '24212',
+            'slug' => 'ryzaia-sequence',
+            'title' => 'Рыжая',
+            'source_url' => $pageUrl,
+            'source_url_hash' => hash('sha256', $pageUrl),
+        ]);
+        $importer = app(SeasonvarCatalogImporter::class);
+
+        $importer->applyPreparedPage($page, $complete, $canonical);
+
+        $partialData = $completeData;
+        $partialData['episodes'] = [$partialData['episodes'][0]];
+        $partialData['media'] = [];
+        $partialData['taxonomies'] = [];
+        $partialData['aliases'] = [];
+        $partialData['ratings'] = [];
+        $partialData['parse_meta']['section_presence'] = $this->sectionPresence('partial');
+        $partial = $this->preparedFromData($page, $partialData, 'partial');
+
+        $importer->applyPreparedPage($page, $partial, $canonical);
+
+        $this->assertSame(2, $canonical->episodes()->count());
+        $this->assertSame(1, $canonical->licensedMedia()->count());
+        $this->assertSame(1, $canonical->aliases()->count());
+        $this->assertSame(1, $canonical->ratings()->count());
+        $this->assertSame(['Первый тег'], $canonical->tags()->pluck('name')->all());
+        $this->assertSame('partial', $page->fresh()->metadata_presence['_sections']['metadata']);
+
+        $nextCompleteData = $completeData;
+        $nextCompleteData['episodes'][] = [
+            'season_number' => 1,
+            'number' => 3,
+            'title' => '3 серия',
+            'source_url' => $pageUrl.'#3_seriya',
+        ];
+        $nextCompleteData['taxonomies'] = [[
+            'type' => 'tag',
+            'name' => 'Второй тег',
+            'source_url' => 'https://seasonvar.ru/tag/second',
+        ]];
+        $nextComplete = $this->preparedFromData($page, $nextCompleteData, 'complete-2');
+
+        $importer->applyPreparedPage($page, $nextComplete, $canonical);
+
+        $this->assertSame(3, $canonical->episodes()->count());
+        $this->assertSame(1, $canonical->licensedMedia()->count());
+        $this->assertSame(['Второй тег'], $canonical->tags()->pluck('name')->all());
+        $this->assertSame('complete', $page->fresh()->metadata_presence['_sections']['metadata']);
+        Http::assertNothingSent();
+    }
+
     /**
      * @param  list<array{name: string, type: string, source?: string}>  $aliases
      * @param  array<string, mixed>  $releaseStatus
@@ -326,5 +411,33 @@ class SeasonvarCatalogPreparedApplyTest extends TestCase
             'base_url' => 'https://seasonvar.ru',
             'crawl_delay_seconds' => 0,
         ]);
+    }
+
+    /** @param array<string, mixed> $data */
+    private function preparedFromData(SourcePage $page, array $data, string $content): SeasonvarPreparedCatalogPage
+    {
+        return new SeasonvarPreparedCatalogPage(
+            sourcePageId: $page->id,
+            catalogData: SeasonvarCatalogData::fromParsed($data),
+            discoveredSeasonUrls: [$page->url],
+            contentHash: hash('sha256', $content),
+            parserVersion: SeasonvarCatalogParser::METADATA_VERSION,
+        );
+    }
+
+    /** @return array<string, string> */
+    private function sectionPresence(string $state): array
+    {
+        return [
+            'metadata' => $state,
+            'taxonomies' => $state,
+            'seasons' => $state,
+            'episodes' => $state,
+            'media' => $state,
+            'aliases' => $state,
+            'ratings' => $state,
+            'recommendations' => $state,
+            'reviews' => $state,
+        ];
     }
 }

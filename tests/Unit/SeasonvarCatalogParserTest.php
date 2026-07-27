@@ -555,4 +555,103 @@ class SeasonvarCatalogParserTest extends TestCase
 
         $this->assertSame([], $data['aliases']);
     }
+
+    public function test_sanitized_fixture_corpus_has_golden_normalized_output(): void
+    {
+        $parser = app(SeasonvarCatalogParser::class);
+        $data = $parser->parse(
+            $this->fixture('complete-serial.html'),
+            'https://seasonvar.ru/serial-61000-Exact-2-season.html',
+        );
+        $expected = json_decode($this->fixture('complete-serial.json'), true, flags: JSON_THROW_ON_ERROR);
+
+        $this->assertSame($expected['title'], $data['title']);
+        $this->assertSame($expected['original_title'], $data['original_title']);
+        $this->assertSame($expected['type'], $data['type']);
+        $this->assertSame($expected['year'], $data['year']);
+        $this->assertSame($expected['current_season_number'], $data['current_season_number']);
+        $this->assertSame($expected['season_numbers'], collect($data['seasons'])->pluck('number')->all());
+        $this->assertSame($expected['episode_numbers'], collect($data['episodes'])->pluck('number')->all());
+        $this->assertSame(
+            $expected['taxonomy_names'],
+            collect($data['taxonomies'])->pluck('name')->values()->all(),
+        );
+        $this->assertCount($expected['media_count'], $data['media']);
+        $this->assertCount($expected['review_count'], $data['reviews']);
+    }
+
+    public function test_episode_script_nesting_and_collection_size_are_bounded(): void
+    {
+        config([
+            'seasonvar.import.parser_max_nesting_depth' => 4,
+            'seasonvar.import.parser_max_collection_items' => 100,
+        ]);
+        $flatEpisodes = collect(range(1, 140))
+            ->mapWithKeys(fn (int $number): array => [
+                $number.'_seriya' => ['n' => $number, 'title' => "Серия {$number}"],
+            ])
+            ->all();
+        $deepEpisodes = ['level' => ['level' => ['level' => ['level' => [
+            '999_seriya' => ['n' => 999, 'title' => 'Слишком глубоко'],
+        ]]]]];
+        $html = '<html><h1>Ограниченный сериал</h1><script>var arEpisodes = '
+            .json_encode([$flatEpisodes, $deepEpisodes], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE)
+            .';</script></html>';
+
+        $parsed = app(SeasonvarCatalogParser::class)->parse(
+            $html,
+            'https://seasonvar.ru/serial-900-Bounded-1-season.html',
+        );
+
+        $this->assertCount(100, $parsed['episodes']);
+        $this->assertSame(range(1, 100), array_column($parsed['episodes'], 'number'));
+        $this->assertNotContains(999, array_column($parsed['episodes'], 'number'));
+    }
+
+    public function test_fixture_sections_distinguish_unknown_invalid_partial_and_complete(): void
+    {
+        $parser = app(SeasonvarCatalogParser::class);
+        $url = 'https://seasonvar.ru/serial-61001-Fixture-1-season.html';
+        $missingInfo = $parser->parse($this->fixture('missing-info.html'), $url);
+        $missingSeasons = $parser->parse($this->fixture('missing-seasons.html'), $url);
+        $malformed = $parser->parse($this->fixture('malformed-script.html'), $url);
+        $blocked = $parser->parse($this->fixture('region-blocked.html'), $url);
+        $partial = $parser->parse($this->fixture('partial.html'), $url);
+
+        $this->assertSame('unknown', $missingInfo['parse_meta']['section_presence']['metadata']);
+        $this->assertSame(
+            'partial_response',
+            $parser->metadataPresence(
+                $missingInfo['taxonomies'],
+                $missingInfo['parse_meta'],
+            )['genres'],
+        );
+        $this->assertSame('unknown', $missingSeasons['parse_meta']['section_presence']['seasons']);
+        $this->assertSame('invalid', $malformed['parse_meta']['section_presence']['episodes']);
+        $this->assertSame('partial', $blocked['parse_meta']['section_presence']['media']);
+        $this->assertContains(
+            $partial['parse_meta']['section_presence']['metadata'],
+            ['partial', 'invalid'],
+        );
+    }
+
+    public function test_fixture_family_keeps_thirty_seasons_in_one_normalized_title(): void
+    {
+        $data = app(SeasonvarCatalogParser::class)->parse(
+            $this->fixture('season-family-30.html'),
+            'https://seasonvar.ru/serial-61030-Family-30-season.html',
+        );
+
+        $this->assertSame('Длинная семья', $data['title']);
+        $this->assertSame(range(1, 30), collect($data['seasons'])->pluck('number')->all());
+        $this->assertSame('complete', $data['parse_meta']['section_presence']['seasons']);
+    }
+
+    private function fixture(string $name): string
+    {
+        $contents = file_get_contents(base_path('tests/Fixtures/seasonvar/'.$name));
+        $this->assertIsString($contents);
+
+        return $contents;
+    }
 }

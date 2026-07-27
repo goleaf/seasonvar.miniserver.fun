@@ -1,6 +1,6 @@
 # Конвейер импорта Seasonvar
 
-Обновлено: 26.07.2026
+Обновлено: 27.07.2026
 
 ## Граница данных
 
@@ -17,6 +17,49 @@
 9. Новый тайтл получает `published/public`, но повторный import не меняет локальные publication status, audience, availability window, soft delete или slug. Публичный интерфейс всё равно повторно применяет `CatalogEntitlementService`.
 
 Полный sitemap import имеет одну lifecycle start-boundary независимо от способа выполнения. `SeasonvarGlobalImportRunCoordinator` под коротким distributed lock ищет active `queued/running` sitemap-run среди `sync` и `queue`; новый sync run резервируется до входа в pipeline, а повторный CLI/admin/cron start безопасно переиспользует существующую строку без второго dispatch. Lock не удерживается во время HTTP, parsing или catalog writes. Targeted URL import, `--inventory-only` и `--status` не являются полным global cycle и сохраняют независимый контракт.
+
+## Завершённая архитектура надёжности
+
+Queued dispatch регистрирует страницы через
+`SeasonvarImportDispatchBatcher`: один bounded batch создаёт prepared ledger,
+claims и counters bulk-операциями, а доставка jobs начинается только после
+успешного commit. Повторная доставка проходит через прежние claim token,
+manifest fingerprint и compare-and-swap статусы. Контрольный профиль 100
+serial pages ограничен 120 SQL queries.
+
+`SeasonvarImportFinalizationCoordinator` хранит versioned durable stage в
+summary запуска. `SeasonvarImportMaintenancePipeline` выполняет только ещё не
+подтверждённые maintenance/media/cleanup/merge/recommendation шаги, поэтому
+hard timeout или restart не начинает весь terminal pipeline заново. Terminal
+завершение очищает временный checkpoint. Счётчики прогресса изменяются только
+после durable transition, а heartbeat остаётся отдельным сигналом живости.
+
+`SeasonvarCatalogParser` является совместимым facade над
+`SeasonvarStructuredDataParser`, `SeasonvarEpisodeScriptParser`,
+`SeasonvarMediaCandidateParser` и `SeasonvarTaxonomyParser`.
+`SeasonvarSectionPresence` различает `complete`, `partial`, `absent`,
+`unknown` и `invalid`; fingerprint подготовленной страницы включает parser
+version и provenance. Частичный ответ остаётся additive и не удаляет
+подтверждённые сезоны, серии, связи или media.
+
+`SeasonvarCatalogTitleWriter` владеет multi-table записью тайтла, aliases,
+ratings, reviews, seasons и episodes. `SeasonvarCatalogMediaSynchronizer`
+владеет media identity и translation sync. Прежние публичные методы
+`SeasonvarCatalogImporter` сохранены как compatibility facade.
+
+Compact storage читает legacy JSON и versioned `payload_blob`; запись blob
+включается отдельно через
+`SEASONVAR_IMPORT_COMPACT_STORAGE_WRITE_ENABLED=false` и ограничена
+`SEASONVAR_IMPORT_COMPACT_PAYLOAD_MAX_UNCOMPRESSED_BYTES`. SQLite writer
+admission также выключен по умолчанию через
+`SEASONVAR_IMPORT_WRITER_ADMISSION_ENABLED=false`. Включение любого switch
+требует малого canary, наблюдения lock/WAL и готового code-first rollback.
+
+File-size planner по умолчанию использует прежний fallback. Indexed
+projection включается только
+`SEASONVAR_MEDIA_FILE_SIZE_PROJECTION_ENABLED=true`; observer поддерживает
+строку состояния при material change, а rebuild идёт bounded chunks.
+Projection не выполняет provider HTTP и не меняет URL-only media boundary.
 
 ## Отдельная синхронизация редакционных подборок
 

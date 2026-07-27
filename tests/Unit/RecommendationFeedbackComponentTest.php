@@ -31,4 +31,21 @@ final class RecommendationFeedbackComponentTest extends TestCase
             'injected action' => [1, "setFeedback'); alert(1); ('"],
         ];
     }
+
+    public function test_component_allows_only_full_and_compact_variants(): void
+    {
+        $this->assertSame('compact', (new RecommendationFeedback(
+            titleId: 1,
+            action: 'setRecommendationFeedback',
+            variant: 'compact',
+        ))->variant);
+
+        $this->expectException(InvalidArgumentException::class);
+
+        new RecommendationFeedback(
+            titleId: 1,
+            action: 'setRecommendationFeedback',
+            variant: 'hover-only',
+        );
+    }
 }

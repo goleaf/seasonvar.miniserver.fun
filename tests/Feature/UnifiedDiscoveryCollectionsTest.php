@@ -8,6 +8,7 @@ use App\Enums\CatalogCollectionModerationStatus;
 use App\Enums\CatalogCollectionSort;
 use App\Enums\CatalogCollectionType;
 use App\Enums\CatalogCollectionVisibility;
+use App\Enums\CatalogRecommendationType;
 use App\Livewire\CatalogAdministrationPage;
 use App\Livewire\CatalogDiscoveryPage;
 use App\Models\CatalogCollection;
@@ -25,28 +26,33 @@ final class UnifiedDiscoveryCollectionsTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_popular_discovery_contains_the_public_collection_explorer(): void
+    public function test_every_discovery_mode_contains_the_same_public_collection_explorer(): void
     {
         $collection = $this->collection();
         $this->assertSame(CatalogDiscoveryPage::class, Route::getRoutes()->getByName('discover.index')?->getActionName());
 
-        $this->get(route('discover.index', ['type' => 'popular']))
-            ->assertOk()
-            ->assertSeeLivewire('catalog-discovery-page')
-            ->assertSeeLivewire('collections.catalog-collection-explorer')
-            ->assertSee('id="collections"', false)
-            ->assertSeeText($collection->name)
-            ->assertSee('name="collections_q"', false)
-            ->assertSee('name="collections_sort"', false);
+        foreach ([CatalogRecommendationType::Personalized, ...CatalogRecommendationType::publicCases()] as $type) {
+            $this->get(route('discover.index', ['type' => $type->value]))
+                ->assertOk()
+                ->assertSeeLivewire('catalog-discovery-page')
+                ->assertSeeLivewire('collections.catalog-collection-explorer')
+                ->assertSee('id="collections"', false)
+                ->assertSee('data-collection-category-tree', false)
+                ->assertSeeText($collection->name)
+                ->assertSee('name="collections_q"', false)
+                ->assertSee('name="collections_sort"', false);
+        }
     }
 
-    public function test_localized_popular_discovery_contains_the_same_collection_explorer(): void
+    public function test_localized_non_popular_discovery_contains_the_same_collection_explorer(): void
     {
         $this->collection();
-        $this->get(route('localized.discover.index', ['locale' => 'ru', 'type' => 'popular']))
+        $this->get(route('localized.discover.index', ['locale' => 'en', 'type' => 'random']))
             ->assertOk()
             ->assertSeeLivewire('collections.catalog-collection-explorer')
-            ->assertSee('id="collections"', false);
+            ->assertSee('id="collections"', false)
+            ->assertSee('data-collection-category-tree', false)
+            ->assertSeeText('Format');
     }
 
     public function test_collection_category_state_keeps_a_clean_noindex_canonical(): void
@@ -56,27 +62,31 @@ final class UnifiedDiscoveryCollectionsTest extends TestCase
             'status' => 'published',
             'published_at' => now(),
         ]);
-        $canonical = route('discover.index', ['type' => 'popular']);
+        $popularCanonical = route('discover.index', ['type' => 'popular']);
 
-        $this->get($canonical)
+        $this->get($popularCanonical)
             ->assertOk()
             ->assertSee('<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">', false)
             ->assertSee('application/ld+json', false)
             ->assertSee('hreflang=', false);
 
-        foreach ([
-            ['collections_category' => 'themes-and-genres'],
-            [
-                'collections_category' => 'themes-and-genres',
-                'collections_subcategory' => 'detective-and-crime',
-            ],
-        ] as $query) {
-            $this->get($canonical.'?'.http_build_query($query))
-                ->assertOk()
-                ->assertSee('<link rel="canonical" href="'.$canonical.'">', false)
-                ->assertSee('<meta name="robots" content="noindex,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">', false)
-                ->assertDontSee('application/ld+json', false)
-                ->assertDontSee('hreflang=', false);
+        foreach (['popular', 'top_rated'] as $type) {
+            $canonical = route('discover.index', ['type' => $type]);
+
+            foreach ([
+                ['collections_category' => 'themes-and-genres'],
+                [
+                    'collections_category' => 'themes-and-genres',
+                    'collections_subcategory' => 'detective-and-crime',
+                ],
+            ] as $query) {
+                $this->get($canonical.'?'.http_build_query($query))
+                    ->assertOk()
+                    ->assertSee('<link rel="canonical" href="'.$canonical.'">', false)
+                    ->assertSee('<meta name="robots" content="noindex,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">', false)
+                    ->assertDontSee('application/ld+json', false)
+                    ->assertDontSee('hreflang=', false);
+            }
         }
     }
 

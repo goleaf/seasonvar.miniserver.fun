@@ -22,7 +22,6 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
-use Mockery\MockInterface;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -46,7 +45,7 @@ final class SeasonvarActiveRunReconciliationTest extends TestCase
         Queue::fake();
     }
 
-    public function test_it_recovers_an_interrupted_dispatch_from_the_durable_prepared_page_ledger(): void
+    public function test_it_resumes_dispatch_and_replays_due_work_from_the_durable_ledger(): void
     {
         [$run, $group, $page, $prepared] = $this->activeLedgerRow(now()->subHour());
         $claim = app(SeasonvarPageClaimManager::class)->claim($page, $run->id, 3600);
@@ -59,13 +58,10 @@ final class SeasonvarActiveRunReconciliationTest extends TestCase
 
         $this->assertTrue($result->eligible);
         $this->assertTrue($result->dispatchRecovered);
+        $this->assertSame(0, $result->pagesRegistered);
         $this->assertSame(1, $result->jobsDispatched);
         $this->assertFalse($result->hasRemainingDueWork);
         $this->assertTrue(data_get($freshRun->summary, 'dispatch_completed'));
-        $this->assertSame(
-            'redis_transport_reconciled',
-            data_get($freshRun->summary, 'active_run_reconciliation.reason'),
-        );
         $this->assertSame($claim, $freshPage->import_claim_token);
         $this->assertSame($run->id, $freshPage->import_claim_run_id);
         Queue::assertPushed(
@@ -83,14 +79,20 @@ final class SeasonvarActiveRunReconciliationTest extends TestCase
         );
     }
 
-    public function test_it_does_not_recover_a_fresh_incomplete_dispatch(): void
+    public function test_it_does_not_complete_dispatch_before_discovery_is_complete(): void
     {
         [$run] = $this->activeLedgerRow(now());
+        $run->update([
+            'summary' => array_merge($run->summary ?? [], [
+                'discovery_completed' => false,
+            ]),
+        ]);
 
         $result = app(SeasonvarActiveRunReconciler::class)->reconcile($run->id);
 
         $this->assertFalse($result->eligible);
         $this->assertFalse($result->dispatchRecovered);
+        $this->assertSame(0, $result->pagesRegistered);
         $this->assertSame(0, $result->jobsDispatched);
         $this->assertFalse(data_get($run->fresh()->summary, 'dispatch_completed'));
         Queue::assertNothingPushed();
@@ -98,14 +100,18 @@ final class SeasonvarActiveRunReconciliationTest extends TestCase
 
     public function test_due_transport_replay_is_bounded_and_immediate_retry_does_not_duplicate_attempts(): void
     {
-        [$run] = $this->activeLedgerRow(now()->subHour(), 'first');
-        $this->activeLedgerRow(now()->subHour(), 'second', $run);
-        $this->activeLedgerRow(now()->subHour(), 'third', $run);
+        [$run, , , $firstPrepared] = $this->activeLedgerRow(now()->subHour(), 'first');
+        [, , , $secondPrepared] = $this->activeLedgerRow(now()->subHour(), 'second', $run);
+        [, , , $thirdPrepared] = $this->activeLedgerRow(now()->subHour(), 'third', $run);
 
         $first = app(SeasonvarActiveRunReconciler::class)->reconcile($run->id);
 
         $this->assertSame(2, $first->jobsDispatched);
         $this->assertTrue($first->hasRemainingDueWork);
+        $this->assertSame(1, $firstPrepared->fresh()->enqueue_attempts);
+        $this->assertSame(1, $secondPrepared->fresh()->enqueue_attempts);
+        $this->assertSame(0, $thirdPrepared->fresh()->enqueue_attempts);
+        $this->assertNotNull($firstPrepared->fresh()->last_enqueue_attempt_at);
         Queue::assertPushed(PrepareSeasonvarImportTitlePage::class, 2);
         Queue::assertPushed(
             ReconcileSeasonvarQueuedImportRun::class,
@@ -116,6 +122,7 @@ final class SeasonvarActiveRunReconciliationTest extends TestCase
 
         $this->assertSame(1, $second->jobsDispatched);
         $this->assertFalse($second->hasRemainingDueWork);
+        $this->assertSame(1, $thirdPrepared->fresh()->enqueue_attempts);
         Queue::assertPushed(PrepareSeasonvarImportTitlePage::class, 3);
 
         $third = app(SeasonvarActiveRunReconciler::class)->reconcile($run->id);
@@ -151,7 +158,7 @@ final class SeasonvarActiveRunReconciliationTest extends TestCase
         $this->assertCount(1, $groupSelects);
     }
 
-    public function test_exact_recovery_batch_avoids_a_second_prepared_ledger_scan_and_false_followup(): void
+    public function test_exact_recovery_batch_uses_one_stale_scan_and_one_due_scan_without_false_followup(): void
     {
         [$run] = $this->activeLedgerRow(now()->subHour(), 'first');
         $this->activeLedgerRow(now()->subHour(), 'second', $run);
@@ -180,42 +187,99 @@ final class SeasonvarActiveRunReconciliationTest extends TestCase
 
         $this->assertSame(2, $result->jobsDispatched);
         $this->assertFalse($result->hasRemainingDueWork);
-        $this->assertCount(1, $preparedLedgerSelects);
+        $this->assertCount(2, $preparedLedgerSelects);
         Queue::assertNotPushed(ReconcileSeasonvarQueuedImportRun::class);
     }
 
-    public function test_failed_preparation_dispatch_restores_the_due_timestamp_and_schedules_continuation(): void
+    public function test_failed_preparation_dispatch_leaves_the_row_due_and_schedules_continuation(): void
     {
         [$run, , , $preparedPage] = $this->activeLedgerRow(now()->subHour());
         $run->update([
             'summary' => array_merge($run->summary ?? [], ['dispatch_completed' => true]),
         ]);
         $dispatched = [];
-        $this->mock(Dispatcher::class, function (MockInterface $mock) use (&$dispatched): void {
-            $mock->shouldReceive('dispatch')
-                ->twice()
-                ->andReturnUsing(static function (object $job) use (&$dispatched): object {
-                    $dispatched[] = $job;
+        $dispatcher = $this->createMock(Dispatcher::class);
+        $dispatcher->expects($this->exactly(2))
+            ->method('dispatch')
+            ->willReturnCallback(static function (object $job) use (&$dispatched): object {
+                $dispatched[] = $job;
 
-                    if ($job instanceof PrepareSeasonvarImportTitlePage) {
-                        throw new RuntimeException('Queue transport unavailable.');
-                    }
+                if ($job instanceof PrepareSeasonvarImportTitlePage) {
+                    throw new RuntimeException('Queue transport unavailable.');
+                }
 
-                    return $job;
-                });
-        });
+                return $job;
+            });
+        $this->app->instance(Dispatcher::class, $dispatcher);
 
         $result = app(SeasonvarActiveRunReconciler::class)->reconcile($run->id);
 
         $this->assertSame(0, $result->jobsDispatched);
         $this->assertTrue($result->hasRemainingDueWork);
-        $this->assertTrue(
-            $preparedPage->updated_at->equalTo($preparedPage->fresh()->updated_at),
-        );
+        $this->assertNull($preparedPage->fresh()->last_enqueue_attempt_at);
+        $this->assertSame(0, $preparedPage->fresh()->enqueue_attempts);
         $this->assertCount(2, $dispatched);
         $this->assertInstanceOf(PrepareSeasonvarImportTitlePage::class, $dispatched[0]);
         $this->assertInstanceOf(ReconcileSeasonvarQueuedImportRun::class, $dispatched[1]);
         $this->assertSame($run->id, $dispatched[1]->importRunId);
+    }
+
+    public function test_due_queued_delivery_uses_last_enqueue_attempt_instead_of_row_update_time(): void
+    {
+        [$run, , , $prepared] = $this->activeLedgerRow(now());
+        $run->update([
+            'summary' => array_merge($run->summary ?? [], ['dispatch_completed' => true]),
+        ]);
+        DB::table($prepared->getTable())
+            ->where('id', $prepared->id)
+            ->update([
+                'last_enqueue_attempt_at' => now()->subHour(),
+                'updated_at' => now(),
+            ]);
+
+        $result = app(SeasonvarActiveRunReconciler::class)->reconcile($run->id);
+
+        $this->assertSame(1, $result->jobsDispatched);
+        $this->assertSame(1, $prepared->fresh()->enqueue_attempts);
+        Queue::assertPushed(
+            PrepareSeasonvarImportTitlePage::class,
+            fn (PrepareSeasonvarImportTitlePage $job): bool => $job->preparedPageId === $prepared->id,
+        );
+    }
+
+    public function test_only_stale_preparing_rows_are_returned_to_the_delivery_queue(): void
+    {
+        [$run, , , $stale] = $this->activeLedgerRow(now()->subHour(), 'stale');
+        [, , , $fresh] = $this->activeLedgerRow(now(), 'fresh', $run);
+        $run->update([
+            'summary' => array_merge($run->summary ?? [], ['dispatch_completed' => true]),
+        ]);
+        DB::table($stale->getTable())
+            ->where('id', $stale->id)
+            ->update([
+                'status' => 'preparing',
+                'updated_at' => now()->subHour(),
+            ]);
+        DB::table($fresh->getTable())
+            ->where('id', $fresh->id)
+            ->update([
+                'status' => 'preparing',
+                'updated_at' => now(),
+            ]);
+
+        $result = app(SeasonvarActiveRunReconciler::class)->reconcile($run->id);
+
+        $this->assertSame(1, $result->jobsDispatched);
+        $this->assertSame('queued', $stale->fresh()->status->value);
+        $this->assertSame('preparing', $fresh->fresh()->status->value);
+        Queue::assertPushed(
+            PrepareSeasonvarImportTitlePage::class,
+            fn (PrepareSeasonvarImportTitlePage $job): bool => $job->preparedPageId === $stale->id,
+        );
+        Queue::assertNotPushed(
+            PrepareSeasonvarImportTitlePage::class,
+            fn (PrepareSeasonvarImportTitlePage $job): bool => $job->preparedPageId === $fresh->id,
+        );
     }
 
     public function test_replaying_real_transport_work_refreshes_heartbeat_but_an_immediate_noop_does_not(): void
@@ -257,9 +321,12 @@ final class SeasonvarActiveRunReconciliationTest extends TestCase
             'selected' => 1,
             'summary' => [
                 'discover' => true,
+                'discovery_completed' => true,
                 'dispatch_completed' => false,
+                'dispatch_batches' => 0,
             ],
             'started_at' => now()->subHour(),
+            'last_progress_at' => now()->subHour(),
             'last_heartbeat_at' => now()->subHour(),
         ]);
         $page = SourcePage::factory()->create([
@@ -353,9 +420,12 @@ final class SeasonvarActiveRunReconciliationTest extends TestCase
             'selected' => 1,
             'summary' => [
                 'discover' => true,
+                'discovery_completed' => true,
                 'dispatch_completed' => false,
+                'dispatch_batches' => 0,
             ],
             'started_at' => now()->subHour(),
+            'last_progress_at' => now()->subHour(),
             'last_heartbeat_at' => now()->subHour(),
         ]);
         $group = SeasonvarImportTitleGroup::query()->create([

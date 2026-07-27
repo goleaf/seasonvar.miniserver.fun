@@ -348,7 +348,7 @@
 <!-- project-docs:start -->
 ## Автоматически обновляемое состояние документации
 
-- Последнее автоматическое обновление блоков документации: 26.07.2026.
+- Последнее автоматическое обновление блоков документации: 27.07.2026.
 - Команда обновления: `php artisan project:docs-refresh`.
 - Хук автокоммита: `.githooks/post-commit` через `scripts/docs-autocommit-push.sh`; отправка в Git включается только через `SEASONVAR_DOCS_AUTO_PUSH=1`.
 - Основной sitemap для robots и поисковых систем: `https://seasonvar.miniserver.fun/sitemap-index.xml`.
@@ -465,6 +465,8 @@
 - `2026_07_19_235902_create_account_restrictions_table.php`
 - `2026_07_19_235903_extend_admin_audit_events_for_safe_viewing.php`
 - `2026_07_19_235904_create_admin_operational_events_table.php`
+- `2026_07_24_130000_add_compact_payload_storage_to_seasonvar_import_tables.php`
+- `2026_07_24_131000_add_file_size_schedule_projection_to_licensed_media.php`
 - `2026_07_25_120000_add_active_run_recovery_index_to_seasonvar_import_prepared_pages.php`
 - `2026_07_25_130000_add_batch_dispatch_progress_to_seasonvar_import.php`
 - `2026_07_25_140000_create_catalog_collection_categories.php`

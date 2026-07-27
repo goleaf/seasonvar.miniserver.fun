@@ -20,6 +20,33 @@ final class CatalogCollectionExplorerCategoryTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_full_category_and_subcategory_hierarchy_remains_visible_before_classification(): void
+    {
+        $root = CatalogCollectionCategory::query()
+            ->where('slug', 'themes-and-genres')
+            ->firstOrFail();
+        $child = CatalogCollectionCategory::query()
+            ->where('slug', 'detective-and-crime')
+            ->firstOrFail();
+
+        Livewire::test(CatalogCollectionExplorer::class)
+            ->assertSeeHtml('data-collection-category-tree')
+            ->assertSeeHtml('data-collection-category="themes-and-genres"')
+            ->assertSeeHtml('data-collection-subcategory="detective-and-crime"')
+            ->assertSeeHtml('data-collection-category="platforms-and-studios"')
+            ->assertSeeHtml('data-collection-subcategory="netflix"')
+            ->assertSeeText('Темы и жанры')
+            ->assertSeeText('Детективы и криминал')
+            ->assertSeeText('Платформы и студии')
+            ->assertSeeText('Netflix')
+            ->assertDontSeeHtml(
+                'wire:click="selectCategory(\'themes-and-genres\', \'detective-and-crime\')"',
+            )
+            ->call('selectCategory', $root->slug, $child->slug)
+            ->assertSet('category', $root->slug)
+            ->assertSet('subcategory', $child->slug);
+    }
+
     public function test_explorer_exposes_shareable_dependent_category_state_and_counts(): void
     {
         $root = CatalogCollectionCategory::query()->where('slug', 'themes-and-genres')->firstOrFail();
@@ -41,8 +68,8 @@ final class CatalogCollectionExplorerCategoryTest extends TestCase
             ->assertSeeHtml('name="collections_subcategory"')
             ->assertSeeText('Темы и жанры')
             ->assertSeeText('Детективы и криминал')
-            ->assertDontSeeText('Долгие истории')
-            ->assertDontSeeText('Формат')
+            ->assertSeeText('Долгие истории')
+            ->assertSeeText('Формат')
             ->assertDontSeeText(__('collections.directory.uncategorized'))
             ->assertSeeText('Дочерняя')
             ->assertDontSeeText('Корневая')
@@ -79,14 +106,14 @@ final class CatalogCollectionExplorerCategoryTest extends TestCase
             ->assertSeeText(__('collections.directory.reset_all'));
     }
 
-    public function test_uncategorized_control_is_hidden_when_it_cannot_return_results(): void
+    public function test_uncategorized_control_is_hidden_while_zero_count_taxonomy_remains_visible(): void
     {
         $root = CatalogCollectionCategory::query()->where('slug', 'themes-and-genres')->firstOrFail();
         $this->collection('Только распределённая подборка', $root);
 
         Livewire::test(CatalogCollectionExplorer::class)
             ->assertSeeText('Темы и жанры')
-            ->assertDontSeeText('Формат')
+            ->assertSeeText('Формат')
             ->assertDontSeeText(__('collections.directory.uncategorized'));
     }
 

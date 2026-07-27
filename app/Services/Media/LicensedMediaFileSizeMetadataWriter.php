@@ -23,6 +23,7 @@ final class LicensedMediaFileSizeMetadataWriter
 
     public function __construct(
         private readonly CatalogCacheInvalidator $cache,
+        private readonly LicensedMediaFileSizeScheduleProjection $projection,
     ) {}
 
     public function snapshot(LicensedMedia $media): LicensedMediaFileSizeSourceData
@@ -46,6 +47,20 @@ final class LicensedMediaFileSizeMetadataWriter
         }
 
         $attributes = $this->attributes($result);
+
+        if ($this->projection->isEnabled()) {
+            $attributes = [
+                ...$attributes,
+                ...$this->projection->attributesForValues(
+                    playbackUrl: $source->playbackUrl,
+                    path: $source->path,
+                    format: $source->format,
+                    status: $result->status,
+                    checkedAt: $result->checkedAt,
+                ),
+            ];
+        }
+
         $before = $media->only(self::MATERIAL_ATTRIBUTES);
         $updated = LicensedMedia::query()
             ->whereKey($source->mediaId)

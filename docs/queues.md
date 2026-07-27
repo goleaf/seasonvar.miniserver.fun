@@ -1,5 +1,7 @@
 # Очереди и jobs
 
+Обновлено: 27.07.2026
+
 Обновлено: 26.07.2026
 
 ## Verified recovery 26.07.2026
@@ -70,6 +72,16 @@ Task 1 не запускала workers, не останавливала schedule
 - Stale coordinator может автоматически закрыть старый queue-run только при одновременном отсутствии live claims, `queued|preparing|prepared` staging и `discovering|running|finalizing` groups. Истёкший claim сам по себе больше не уничтожает воспроизводимую работу: durable rows остаются за active-run reconciler и finalizer watchdog. Пустой старый run без таких зависимостей сохраняет прежнее terminal recovery и не удерживает global single-flight.
 - Контролируемый refresh последних страниц XML использует только `php artisan seasonvar:import --queued --force --sitemap-tail=1..1000`. Dispatcher заново зеркалирует разрешённую карту сайта, выбирает последние distinct `serial` URL в исходном XML-порядке, ищет соответствующие `source_pages` пакетами не более 500 хешей и передаёт их обычным claims/title groups/finalizers. В persisted summary остаются только limit/count; URL list, provider HTML и exception payload не сохраняются. Режим требует discovery, не совмещается с URL, sync/forever/status/inventory/media режимами или non-serial page types и не обходит global single-flight.
 - `seasonvar:import --status` оставляет Redis pending/delayed/reserved/live-claim значения транспортными метриками, но основной run выбирает через тот же canonical global sitemap boundary независимо от `sync|queue`. Persisted heartbeat и size counters этого run показываются отдельно от timestamped cached aggregate всей `licensed_media`, поэтому более новый targeted URL run не скрывает активный полный импорт и stale snapshot не выдаётся за live progress.
+- Unified status выбирает текущий active run, затем последний ожидающий
+  targeted run, затем последний sitemap run. Claims считаются только для
+  выбранного `run_id`; targeted group с заполненным expected set считается
+  завершившим dispatch и больше не выглядит как бесконечное обнаружение.
+  Worker health берётся из точного профиля: `seasonvar-title-refresh` для
+  targeted title и `seasonvar-import` для общего запуска. CLI подписывает
+  строку честно как «Активный/последний run», а не как всегда глобальный.
+- `FinalizeSeasonvarImportTitleGroup::failed()` и terminal retry освобождают
+  только claims exact group/run. Чужой run, token или продолжающаяся
+  non-terminal страница не затрагиваются.
 - Coordinator ограничен 3 attempts, timeout 900 секунд и backoff 60/300/900; `ShouldBeUnique` держит lock на ID run. Page/finalizer jobs ограничены absolute retry window, согласованным с claim lease.
 - Контракт повторов задан на каждом из десяти importer jobs. `RunSeasonvarImport`, `StartSeasonvarQueuedImport`, `WakeSeasonvarImportFinalizers` и `PruneSeasonvarImportStorage` ограничены тремя attempts, имеют соответственно timeout `900/900/120/60`, backoff `60,300,900` / `60,300,900` / `30,120,300` / `60,300,900`, unique lock и безопасный `failed()` boundary. `ImportSeasonvarSourcePage`, `PrepareSeasonvarImportTitlePage`, оба finalizer, `RefreshSeasonvarCatalogTitle` и `ReconcileSeasonvarQueuedImportRun` используют `tries=0` только вместе с абсолютным `retryUntil`, явным backoff и `failed()`; reconciliation имеет timeout `120`, остальные — `900`, и каждый остаётся ниже transport `retry_after=1200`. Page job намеренно не реализует `ShouldBeUnique`, потому что право на конкретную доставку уже задаёт проверяемый claim token; preparation, finalizers, targeted refresh и per-run reconciliation остаются unique по стабильным ID.
 - Максимальный importer timeout 900 секунд обязан оставаться меньше `retry_after=1200`: worker успевает завершить или потерять попытку до повторной доставки одного queue envelope. Изменение timeout, claim/retry windows, worker flags или `retry_after` требует одновременной проверки этой границы и regression-контракта `SeasonvarQueueJobContractTest`.

@@ -131,7 +131,8 @@ class SeasonvarTitleMergeTest extends TestCase
 
         $this->get(route('titles.taxonomy', ['type' => 'country', 'taxonomy' => 'rossiia']))
             ->assertOk()
-            ->assertSeeText('Найдено сейчас: 2');
+            ->assertSee(route('titles.show', $canonical), false)
+            ->assertSee(route('titles.show', $duplicate), false);
     }
 
     public function test_it_uses_canonical_url_family_when_stable_provider_ids_are_missing(): void

@@ -44,6 +44,7 @@ class SeasonvarImportTitleGroupDispatcherTest extends TestCase
         Queue::assertPushed(FinalizeSeasonvarImportTitleGroup::class, 1);
         $this->assertSame(9, $group->fresh()->expected_pages);
         $this->assertSame(9, $group->preparedPages()->count());
+        $this->assertNotNull($group->run->fresh()->last_progress_at);
     }
 
     public function test_fifty_urls_are_dispatched_without_an_application_limit(): void
@@ -159,6 +160,51 @@ class SeasonvarImportTitleGroupDispatcherTest extends TestCase
         $this->assertSame(1, $group->run->fresh()->failed);
     }
 
+    public function test_only_one_delivery_can_begin_preparing_the_same_queued_row(): void
+    {
+        Queue::fake();
+        $title = $this->titleWithSeasonUrls([1]);
+        $group = app(SeasonvarImportTitleGroupDispatcher::class)
+            ->start($title, 'seasonvar-title-refresh');
+        $firstDelivery = $group->preparedPages()->firstOrFail();
+        $secondDelivery = SeasonvarImportPreparedPage::query()
+            ->findOrFail($firstDelivery->id);
+
+        $this->assertTrue($firstDelivery->beginPreparing());
+        $this->assertFalse($secondDelivery->beginPreparing());
+        $this->assertSame('preparing', $firstDelivery->fresh()->status->value);
+    }
+
+    public function test_duplicate_delivery_does_not_release_the_active_workers_claim(): void
+    {
+        Queue::fake();
+        Http::preventStrayRequests();
+        $title = $this->titleWithSeasonUrls([1]);
+        $group = app(SeasonvarImportTitleGroupDispatcher::class)
+            ->start($title, 'seasonvar-title-refresh');
+        $prepared = $group->preparedPages()->with('sourcePage')->firstOrFail();
+        $claims = app(SeasonvarPageClaimManager::class);
+        $token = $claims->claim(
+            $prepared->sourcePage,
+            $group->seasonvar_import_run_id,
+            3600,
+        );
+        $this->assertNotNull($token);
+        $this->assertTrue($prepared->beginPreparing());
+
+        $this->app->call([
+            new PrepareSeasonvarImportTitlePage($prepared->id),
+            'handle',
+        ]);
+
+        $this->assertTrue($claims->owns(
+            $prepared->source_page_id,
+            $group->seasonvar_import_run_id,
+            $token,
+        ));
+        $this->assertSame('preparing', $prepared->fresh()->status->value);
+    }
+
     public function test_permanent_preparation_failure_finishes_the_page_without_retrying(): void
     {
         Queue::fake();
@@ -199,7 +245,7 @@ class SeasonvarImportTitleGroupDispatcherTest extends TestCase
 
         $this->assertInstanceOf(SeasonvarSourceRequestException::class, $exception);
         $this->assertSame(503, $exception->status);
-        $this->assertSame('preparing', $prepared->fresh()->status->value);
+        $this->assertSame('queued', $prepared->fresh()->status->value);
         $this->assertSame(0, $group->fresh()->failed_pages);
         $this->assertSame('failed', $prepared->sourcePage->fresh()->import_status);
         $this->assertSame(1, $prepared->sourcePage->fresh()->failure_count);

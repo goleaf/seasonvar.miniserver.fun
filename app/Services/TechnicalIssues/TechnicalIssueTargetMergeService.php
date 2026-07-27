@@ -43,6 +43,24 @@ final readonly class TechnicalIssueTargetMergeService
         $this->retarget('licensed_media_id', $sourceMediaId, $targetMediaId);
     }
 
+    /**
+     * @param  list<int>  $episodeIds
+     * @return array<int, bool>
+     */
+    public function episodeIdsWithIssues(array $episodeIds): array
+    {
+        return $this->targetIdsWithIssues('episode_id', $episodeIds);
+    }
+
+    /**
+     * @param  list<int>  $mediaIds
+     * @return array<int, bool>
+     */
+    public function mediaIdsWithIssues(array $mediaIds): array
+    {
+        return $this->targetIdsWithIssues('licensed_media_id', $mediaIds);
+    }
+
     private function retarget(string $column, int $sourceId, int $targetId): void
     {
         if (! $this->schema->ready() || $sourceId === $targetId) {
@@ -109,5 +127,24 @@ final readonly class TechnicalIssueTargetMergeService
                     $issue->save();
                 });
         }, attempts: 3);
+    }
+
+    /**
+     * @param  list<int>  $targetIds
+     * @return array<int, bool>
+     */
+    private function targetIdsWithIssues(string $column, array $targetIds): array
+    {
+        if ($targetIds === [] || ! $this->schema->ready()) {
+            return [];
+        }
+
+        return TechnicalIssue::query()
+            ->whereIn($column, $targetIds)
+            ->whereNotNull($column)
+            ->distinct()
+            ->pluck($column)
+            ->mapWithKeys(static fn (mixed $id): array => [(int) $id => true])
+            ->all();
     }
 }

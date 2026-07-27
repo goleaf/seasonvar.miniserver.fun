@@ -1,6 +1,29 @@
 # Производительность запросов
 
-Обновлено: 25.07.2026
+Обновлено: 27.07.2026
+
+## Профиль завершённого импортёра
+
+- Dispatch 100 serial pages выполняет не более 120 SQL queries, включая
+  ledger, claims, counters и post-commit job registration.
+- Merge 30 сезонов, 930 серий и 957 media выполняет 2708 queries при
+  regression ceiling 5000 и продолжает работу по durable season/page
+  checkpoints.
+- Повторная синхронизация 1000 неизменённых media использует не более 20
+  identity queries; per-row lookup отсутствует.
+- Dashboard importer выполняет не более 12 bounded aggregate queries.
+  Claims, worker/transport и progress относятся к одному выбранному run.
+- Load profile покрывает 48 000 sitemap URL, large title groups, interrupted
+  finalization и repeated delivery без материализации полного каталога в
+  job payload.
+- Parser profile на 2600 эпизодах проходит в отдельном процессе с hard
+  memory contract; nesting ограничен 32, collection items — 5000, sitemap
+  decompression — 32 MiB по умолчанию.
+
+Значения являются PHPUnit/query-profile ceilings, а не production SLA.
+Compact payload writer, SQLite writer admission и file-size projection
+остаются disabled-first, поэтому их включение требует отдельного canary с
+WAL/lock/latency evidence.
 
 ## Обязательный integration performance audit
 
@@ -210,12 +233,12 @@
 - Title membership selector выполняет один owner-scoped collection query с `withExists`; Apply locks one manageable set, reads one current membership snapshot, one grouped count/max set, then bulk insert/delete. Нет запроса на checkbox и загрузки всех collection items; после commit один `changedMany()` invalidates shared domains once и только уникальные changed collection scopes вместо повторного global bump на каждую checkbox membership.
 - Item page joins unique pivot once, reuses `CatalogTitleQuery::visibleTo`, taxonomy card loads and grouped title counts, then `CatalogUserCardStateLoader` once for the authenticated viewer. Search/filter remain SQL-scoped; pagination is 24 by default, deterministic secondary keys prevent skip/duplicate. Guest-visible IDs alone drive related-collection similarity, so hidden membership is neither hydrated nor used as a discovery signal.
 - Public directory/profile/sitemap/recommendations filter visibility/moderation/deleted before hydration. Visible count and unavailable owner list are separate, so guest pages do not hydrate hidden rows. Related collections use a title subquery and bounded limit rather than loading membership IDs in PHP.
-- Popularity ranking агрегирует watchlist, distinct meaningful watchers, published reviews и provider votes один раз в четырёх grouped source subqueries и присоединяет их к bounded visible-title candidate query. Коррелированные scalar subqueries на каждый `catalog_titles` row запрещены; прежние веса `35/45/8` и provider vote buckets сохранены. Объединённая discovery-страница выводит только 12 text-only collection cards за страницу и использует отдельный paginator.
+- Popularity ranking агрегирует watchlist, distinct meaningful watchers, published reviews и provider votes один раз в четырёх grouped source subqueries и присоединяет их к bounded visible-title candidate query. Коррелированные scalar subqueries на каждый `catalog_titles` row запрещены; прежние веса `35/45/8` и provider vote buckets сохранены. Каждый discovery mode монтирует один общий explorer, выводит не более 12 text-only collection cards за страницу и использует отдельный paginator; overhead остаётся фиксированным и не умножается на число recommendation cards.
 - Title merge reconciles collection membership with `eachById(500)` inside the existing merge transaction rather than materializing every affected collection. Earliest addition/lowest position semantics remain unchanged, positions normalize per touched collection and one post-commit public-domain invalidation replaces one callback per membership.
 - HDRezka index и pagination ограничены configured maxima для подборок/страниц/items, response body и crawl delay. Source/item persistence использует grouped reads, chunked `upsert` и indexed last-seen reconciliation; complete snapshot может удалить только отсутствующие source-owned rows, а partial snapshot не выполняет stale delete.
 - Matcher не делает fuzzy/full-table title scan: exact primary/original/approved-alias keys обслуживаются search-document indexes, hard year/type conflicts отсекаются до ranking, а один remote item укладывается не более чем в пять SQL-запросов. Recommendation profile индексирует максимум 32 положительных editorial collection signals на тайтл; pair scorer учитывает максимум три общих ключа с frequency penalty и общим score cap.
 - Public summary добавляет source marker через один `withExists`, только когда rolling schema доступна. Admin directory читает один latest run с allowlisted counters и выполняет три независимых bounded aggregate: empty membership использует provider index источников и `catalog_collection_items_collection_title_unique`; scope группируется по source/type последнего run через `catalog_collection_source_items_reconcile_idx` и тем же covering membership index определяет пустое состояние; status/method breakdown использует reconcile index через indexed provider source-ID subquery. В PHP остаются только bounded distinct source/type groups и allowlisted counts, а не 5 633 source rows; source URL/title/reasons/error body и неизвестные raw codes не передаются в presentation, Blade остаётся query-free. Фактический SQLite `EXPLAIN QUERY PLAN` подтвердил provider, reconcile и membership indexes; временная B-tree ограничена grouped source/type cardinality, production latency/SLA из этого не выводятся.
-- Root/category counts строятся одним grouped aggregate по public predicate; child counts не выполняют запрос на каждую категорию. Пустой category result не запускает вторую summary hydration. Нулевые root/child/uncategorized controls отбрасываются из уже подготовленного navigation array без дополнительного SQL, а выбранный bookmarked zero-count state сохраняется. `catalog_collections_category_public_order_idx` обслуживает category/public/order shape; exact plan и query-budget закреплены feature tests.
+- Root/category counts строятся одним grouped aggregate по public predicate; child counts не выполняют запрос на каждую категорию. Пустой category result не запускает вторую summary hydration. Полный active root/child tree преобразуется в bounded scalar navigation array без дополнительного SQL: положительные узлы помечаются filterable, нулевые остаются неинтерактивными labels, а выбранный bookmarked zero-count state сохраняется. `catalog_collections_category_public_order_idx` обслуживает category/public/order shape; exact plan и query-budget закреплены feature tests.
 - Административная классификация сначала пагинирует максимум 50 collection rows по `catalog_collection_category_id IS NULL`, затем загружает не более 50 первых membership rows на каждого parent через relation eager limit и grouped total count. Cold schema/source probes, owner/translations и четыре taxonomy relations дают не более 14 SQL-запросов на непустую страницу независимо от общего числа подборок и 3,29 млн memberships. Request-scoped computed reuse category tree, page, summary и suggestions не допускает повторного queue select внутри одного Livewire action/render; отдельная регрессия подтверждает один data select. SQLite `EXPLAIN QUERY PLAN` для default public/approved queue выбирает covering `catalog_collections_category_public_order_idx`; temporary B-tree относится только к bounded `updated_at,id` sort. Глобального confidence-фильтра нет: confidence переупорядочивает только уже загруженную страницу, иначе потребовался бы inference всего набора до pagination.
 - Actual collection indexes and exact query ownership are documented in `DATA_RELATIONS.md`. No likes/follows/collaborator/popularity indexes, cover hydration или request-time collage aggregate существуют.
 

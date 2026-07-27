@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Validator;
 
 final readonly class SeasonvarPreparedCatalogPage
 {
+    public string $semanticFingerprint;
+
     /**
      * @param  list<string>  $discoveredSeasonUrls
      * @param  list<array<string, mixed>>  $warnings
@@ -19,7 +21,10 @@ final readonly class SeasonvarPreparedCatalogPage
         public string $contentHash,
         public int $parserVersion,
         public array $warnings = [],
-    ) {}
+        ?string $semanticFingerprint = null,
+    ) {
+        $this->semanticFingerprint = $semanticFingerprint ?? $catalogData->semanticFingerprint();
+    }
 
     /**
      * @return array<string, mixed>
@@ -32,6 +37,7 @@ final readonly class SeasonvarPreparedCatalogPage
             'discovered_season_urls' => $this->discoveredSeasonUrls,
             'content_hash' => $this->contentHash,
             'parser_version' => $this->parserVersion,
+            'semantic_fingerprint' => $this->semanticFingerprint,
             'warnings' => $this->warnings,
         ];
     }
@@ -48,6 +54,7 @@ final readonly class SeasonvarPreparedCatalogPage
             'discovered_season_urls.*' => ['required', 'string', 'max:2048'],
             'content_hash' => ['required', 'string', 'size:64'],
             'parser_version' => ['required', 'integer', 'min:1'],
+            'semantic_fingerprint' => ['sometimes', 'string', 'size:64'],
             'warnings' => ['present', 'array', 'max:10000'],
             'warnings.*.type' => ['required', 'string', 'max:128'],
         ])->validate();
@@ -59,6 +66,7 @@ final readonly class SeasonvarPreparedCatalogPage
             contentHash: $validated['content_hash'],
             parserVersion: (int) $validated['parser_version'],
             warnings: array_values($validated['warnings']),
+            semanticFingerprint: $validated['semantic_fingerprint'] ?? null,
         );
     }
 }

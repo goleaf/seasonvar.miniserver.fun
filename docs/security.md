@@ -1,6 +1,25 @@
 # Безопасность
 
-Обновлено: 20.07.2026
+Обновлено: 27.07.2026
+
+## Hardening импортёра
+
+- Sitemap decoder ограничивает compressed HTTP response общим HTTP budget,
+  распакованный XML — `SEASONVAR_SITEMAP_MAX_UNCOMPRESSED_BYTES`, recursion и
+  число записей — configured bounds. Zip/gzip bomb не читается без лимита.
+- Parser ограничивает nesting и collection size до выделения больших
+  DTO/queue payload; malformed/oversized input даёт stable sanitized reason.
+- Job constructors сохраняют только scalar IDs/tokens/allowlisted flags.
+  Provider HTML, raw URL, credentials и exception message не входят в queue
+  payload, admin state, health или terminal diagnostics.
+- Compact payload decoder проверяет allowlisted versioned codec, заявленный
+  и фактический uncompressed размер до domain validation; legacy JSON
+  fallback остаётся доступен для rollback.
+- File-size sync не скачивает video body: разрешены HEAD и минимальный
+  `Range: bytes=0-0` после существующей SSRF/URL validation.
+- Failure injection покрывает interruption между DB commit/dispatch,
+  duplicate delivery, stale claim, finalization restart и unavailable
+  optional telemetry. Ни один recovery path не выполняет queue/cache clear.
 
 ## Обязательный system-wide security и privacy review
 

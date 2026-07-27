@@ -23,22 +23,44 @@ final class LicensedMediaFileSizeBacklog
 
     public function __construct(
         private readonly TieredCache $cache,
+        private readonly LicensedMediaFileSizeScheduleProjection $projection,
     ) {}
 
     /** @return Builder<LicensedMedia> */
     public function query(bool $force = false): Builder
     {
+        if ($this->projection->isReady()) {
+            $query = LicensedMedia::query()
+                ->where('file_size_eligible', true);
+
+            if ($force) {
+                return $query->orderBy('id');
+            }
+
+            return $query
+                ->whereNotNull('file_size_next_check_at')
+                ->where('file_size_next_check_at', '<=', now())
+                ->orderBy('file_size_next_check_at')
+                ->orderBy('id');
+        }
+
         $query = $this->eligibleQuery();
 
         if (! $force) {
             $this->applyDueConstraint($query);
         }
 
-        return $query;
+        return $query->orderBy('id');
     }
 
     public function status(): LicensedMediaFileSizeBacklogStatusData
     {
+        $stored = $this->projection->storedStatus();
+
+        if ($stored !== null) {
+            return $stored;
+        }
+
         $result = $this->cache->remember(
             CacheDomain::Operational,
             self::CACHE_RESOURCE,
@@ -58,6 +80,11 @@ final class LicensedMediaFileSizeBacklog
         }
 
         return LicensedMediaFileSizeBacklogStatusData::fromArray($result->value);
+    }
+
+    public function captureStatus(): ?LicensedMediaFileSizeBacklogStatusData
+    {
+        return $this->projection->captureStatus();
     }
 
     private function buildStatus(): LicensedMediaFileSizeBacklogStatusData

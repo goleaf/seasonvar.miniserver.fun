@@ -58,6 +58,7 @@ final class SeasonvarCatalogPagePreparer
             contentHash: $fetched->contentHash,
             parserVersion: SeasonvarCatalogParser::METADATA_VERSION,
             warnings: $resolvedMedia['warnings'],
+            semanticFingerprint: $parsed->semanticFingerprint(),
         );
     }
 

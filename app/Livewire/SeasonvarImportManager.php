@@ -97,6 +97,7 @@ final class SeasonvarImportManager extends Component
             'runs' => $dashboard['runs'],
             'hasActiveRun' => $dashboard['has_active_run'],
             'staleCount' => $dashboard['stale_count'],
+            'queueStatus' => $dashboard['queue_status'],
             'mediaHealth' => $dashboard['media_health'],
             'mediaDueCount' => $dashboard['media_due_count'],
             'mediaSizeBacklog' => $dashboard['media_size_backlog'],

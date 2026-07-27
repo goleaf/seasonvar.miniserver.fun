@@ -9,6 +9,9 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property CatalogRecommendationOnboardingTitleKind $kind
+ */
 #[Fillable(['user_id', 'catalog_title_id', 'kind'])]
 final class CatalogRecommendationOnboardingTitle extends Model
 {

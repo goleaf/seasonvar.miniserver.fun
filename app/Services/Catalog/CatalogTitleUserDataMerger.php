@@ -382,6 +382,34 @@ final class CatalogTitleUserDataMerger
         }
     }
 
+    /**
+     * @param  list<int>  $episodeIds
+     * @return array<int, bool>
+     */
+    public function episodeIdsWithUserData(array $episodeIds): array
+    {
+        if ($episodeIds === []) {
+            return [];
+        }
+
+        $ids = EpisodeViewProgress::query()
+            ->whereIn('episode_id', $episodeIds)
+            ->distinct()
+            ->pluck('episode_id');
+
+        if (Schema::hasTable('episode_playback_markers')) {
+            $ids = $ids->merge(EpisodePlaybackMarker::query()
+                ->whereIn('episode_id', $episodeIds)
+                ->distinct()
+                ->pluck('episode_id'));
+        }
+
+        return $ids
+            ->filter(static fn (mixed $id): bool => is_numeric($id))
+            ->mapWithKeys(static fn (mixed $id): array => [(int) $id => true])
+            ->all();
+    }
+
     private function mergedCompletionSource(
         EpisodeViewProgress $existing,
         EpisodeViewProgress $incoming,

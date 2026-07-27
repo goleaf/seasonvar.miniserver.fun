@@ -25,6 +25,7 @@ use App\Services\Catalog\CatalogCacheWarmRequestStore;
 use App\Services\Seasonvar\CatalogTitleRefreshStateStore;
 use App\Services\Seasonvar\SeasonvarCatalogImporter;
 use App\Services\Seasonvar\SeasonvarCatalogParser;
+use App\Services\Seasonvar\SeasonvarCatalogWriteAdmission;
 use App\Services\Seasonvar\SeasonvarImportTitleGroupDispatcher;
 use App\Services\Seasonvar\SeasonvarPageClaimManager;
 use App\Services\Seasonvar\SeasonvarTitleMerger;
@@ -98,6 +99,58 @@ class SeasonvarImportTitleGroupFinalizerTest extends TestCase
         $this->assertSame(1, $group->fresh()->applied_pages);
         $this->assertNull($row->sourcePage->fresh()->import_claim_token);
         $this->assertNull($row->sourcePage->fresh()->import_claim_run_id);
+    }
+
+    public function test_finalizer_applies_a_compact_prepared_payload_without_legacy_json(): void
+    {
+        config(['seasonvar.import.compact_storage_write_enabled' => true]);
+        $title = $this->titleWithSeasonUrls([1]);
+        $group = app(SeasonvarImportTitleGroupDispatcher::class)
+            ->start($title, 'seasonvar-title-refresh');
+        $row = $group->preparedPages()->with('sourcePage')->firstOrFail();
+        $this->prepareRow($row, 1, 2);
+
+        $this->assertNull($row->fresh()->payload);
+        $this->assertNotNull($row->fresh()->payload_blob);
+
+        $this->app->call([
+            (new FinalizeSeasonvarImportTitleGroup($group->id))
+                ->withFakeQueueInteractions(),
+            'handle',
+        ]);
+
+        $this->assertSame('completed', $group->fresh()->status->value);
+        $this->assertSame('applied', $row->fresh()->status->value);
+        $this->assertSame(1, $group->fresh()->applied_pages);
+    }
+
+    public function test_finalizer_releases_with_a_bounded_delay_while_sqlite_writer_is_busy(): void
+    {
+        config([
+            'seasonvar.import.writer_admission_enabled' => true,
+            'seasonvar.import.writer_admission_retry_seconds' => 3,
+        ]);
+        $title = $this->titleWithSeasonUrls([1]);
+        $group = app(SeasonvarImportTitleGroupDispatcher::class)
+            ->start($title, 'seasonvar-title-refresh');
+        $row = $group->preparedPages()->with('sourcePage')->firstOrFail();
+        $this->prepareRow($row, 1, 2);
+        $admission = app(SeasonvarCatalogWriteAdmission::class);
+        $writerLock = $admission->acquire(120);
+        $this->assertNotNull($writerLock);
+        $job = (new FinalizeSeasonvarImportTitleGroup($group->id))
+            ->withFakeQueueInteractions();
+
+        try {
+            $this->app->call([$job, 'handle']);
+        } finally {
+            $writerLock->release();
+        }
+
+        $job->assertReleased(delay: 3);
+        $this->assertSame('finalizing', $group->fresh()->status->value);
+        $this->assertSame(0, $group->fresh()->applied_pages);
+        $this->assertSame('prepared', $row->fresh()->status->value);
     }
 
     public function test_finalizer_fails_a_stale_group_with_a_structurally_incomplete_page_set(): void
@@ -192,6 +245,12 @@ class SeasonvarImportTitleGroupFinalizerTest extends TestCase
         $title = $this->titleWithSeasonUrls([1]);
         $group = app(SeasonvarImportTitleGroupDispatcher::class)
             ->start($title, 'seasonvar-title-refresh');
+        $row = $group->preparedPages()->with('sourcePage')->firstOrFail();
+        $this->assertNotNull(app(SeasonvarPageClaimManager::class)->claim(
+            $row->sourcePage,
+            $group->seasonvar_import_run_id,
+            3600,
+        ));
 
         (new FinalizeSeasonvarImportTitleGroup($group->id))
             ->failed(new RuntimeException('private payload https://seasonvar.ru/private?token=secret'));
@@ -202,6 +261,8 @@ class SeasonvarImportTitleGroupFinalizerTest extends TestCase
         $this->assertSame('Группа сезонов не финализирована в допустимое время.', $freshGroup->last_error);
         $this->assertStringNotContainsString('secret', (string) $freshGroup->last_error);
         $this->assertSame($freshGroup->last_error, $group->run->fresh()->last_error);
+        $this->assertNull($row->sourcePage->fresh()->import_claim_token);
+        $this->assertNull($row->sourcePage->fresh()->import_claim_run_id);
     }
 
     public function test_finalizer_applies_shuffled_pages_to_one_title_and_completes_manifest(): void
@@ -420,8 +481,7 @@ class SeasonvarImportTitleGroupFinalizerTest extends TestCase
             'media_failed' => 1,
         ]);
         $this->mock(SeasonvarCatalogImporter::class, function (MockInterface $mock) use ($pending, $title): void {
-            $mock->shouldReceive('applyPreparedPage')
-                ->once()
+            $mock->expects('applyPreparedPage')
                 ->withArgs(fn ($page): bool => (int) $page->id === (int) $pending->source_page_id)
                 ->andReturn([
                     'catalog_title' => $title,
@@ -430,6 +490,8 @@ class SeasonvarImportTitleGroupFinalizerTest extends TestCase
                     'media_skipped' => 0,
                     'media_failed' => 0,
                 ]);
+            $mock->expects('syncMediaTranslationsForTitle')
+                ->withArgs(fn (CatalogTitle $catalogTitle): bool => $catalogTitle->is($title));
         });
 
         $this->app->call([
@@ -455,12 +517,12 @@ class SeasonvarImportTitleGroupFinalizerTest extends TestCase
         $group = app(SeasonvarImportTitleGroupDispatcher::class)
             ->start($title, 'seasonvar-title-refresh');
         $this->prepareAllRows($group->preparedPages()->with('sourcePage')->get(), [1 => 2, 2 => 2]);
-        $this->mock(SeasonvarTitleMerger::class, function (MockInterface $mock): void {
-            $mock->shouldReceive('mergeForCanonicalSlug')
-                ->once()
-                ->with('ryzaia-8')
-                ->andThrow(new RuntimeException('Merge failed after prepared pages committed.'));
-        });
+        $merger = $this->createMock(SeasonvarTitleMerger::class);
+        $merger->expects($this->once())
+            ->method('mergeForCanonicalSlug')
+            ->with('ryzaia-8')
+            ->willThrowException(new RuntimeException('Merge failed after prepared pages committed.'));
+        $this->app->instance(SeasonvarTitleMerger::class, $merger);
 
         try {
             $this->app->call([

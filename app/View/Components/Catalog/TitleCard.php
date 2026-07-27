@@ -61,7 +61,15 @@ class TitleCard extends Component
     /** @var list<string> */
     public array $feedbackReasons;
 
+    /** @var list<string> */
+    public array $recommendationReasons;
+
+    /** @var list<string> */
+    public array $recommendationMetadata;
+
     public ?string $primaryReason;
+
+    public string $reasonHeading;
 
     public ?Season $latestSeason;
 
@@ -103,6 +111,7 @@ class TitleCard extends Component
         public bool $readable = false,
         public ?int $rank = null,
         public array $reasonLabels = [],
+        ?string $reasonHeading = null,
         ?bool $userInWatchlist = null,
         ?int $userRating = null,
         ?int $userProgressPercent = null,
@@ -120,8 +129,9 @@ class TitleCard extends Component
         $this->seasonsLabel = $this->countLabel('catalog.counts.seasons', $this->seasonsCount);
         $this->episodesLabel = $this->countLabel('catalog.counts.episodes', $this->episodesCount);
         $this->mediaLabel = $this->countLabel('catalog.counts.videos', $this->mediaCount);
+        $descriptionLimit = $this->layout === 'recommendation' ? 180 : self::DESCRIPTION_LIMIT;
         $this->descriptionExcerpt = $showDescription && $title->hasAttribute('description')
-            ? $this->boundedText($title->getAttribute('description'), self::DESCRIPTION_LIMIT)
+            ? $this->boundedText($title->getAttribute('description'), $descriptionLimit)
             : null;
         $ratingLabels = $this->ratingLabels($title);
         $this->ratingLabels = collect(['imdb', 'kinopoisk'])
@@ -129,14 +139,30 @@ class TitleCard extends Component
             ->filter()
             ->values()
             ->all();
-        $preferredRatingProviders = $this->layout === 'grid'
+        $preferredRatingProviders = in_array($this->layout, ['grid', 'recommendation'], true)
             ? ['imdb', 'kinopoisk']
             : ['kinopoisk', 'imdb'];
         $this->ratingLabel = collect($preferredRatingProviders)
             ->map(fn (string $provider): ?string => $ratingLabels[$provider] ?? null)
             ->filter()
             ->first();
-        $this->primaryReason = $this->boundedText($reasonLabels[0] ?? null, self::REASON_LIMIT);
+        $this->recommendationMetadata = collect([
+            $title->year === null ? null : (string) $title->year,
+            $this->seasonsCount > 0 ? $this->seasonsLabel : null,
+            $this->ratingLabel,
+        ])->filter()->values()->all();
+        $this->recommendationReasons = collect($reasonLabels)
+            ->map(fn (mixed $reason): ?string => $this->boundedText($reason, self::REASON_LIMIT))
+            ->filter()
+            ->unique()
+            ->take(3)
+            ->values()
+            ->all();
+        $this->primaryReason = $this->recommendationReasons[0] ?? null;
+        $this->reasonHeading = $this->boundedText(
+            $reasonHeading ?? __('recommendations.page.why'),
+            80,
+        ) ?? __('recommendations.page.why');
         $this->latestSeason = $title->relationLoaded('latestSeason') ? $title->latestSeason : null;
         $this->countryName = $this->boundedText(
             $title->hasAttribute('card_country_name')

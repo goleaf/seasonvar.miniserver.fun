@@ -112,17 +112,52 @@ class CatalogRecommendationListTest extends TestCase
         $this->assertStringNotContainsString('aspect-[16/10]', $html);
         $this->assertStringNotContainsString('scale-[1.02]', $html);
         $this->assertStringContainsString('Романтика', $html);
-        $this->assertStringContainsString('Почему это показано', $html);
+        $this->assertStringContainsString('Почему похож', $html);
         $this->assertStringContainsString('Легкая история любви', $html);
-        $this->assertStringContainsString('data-recommendation-rank="1"', $html);
-        $this->assertStringContainsString('data-recommendation-rank="2"', $html);
+        $this->assertStringNotContainsString('data-recommendation-rank', $html);
         $this->assertLessThan(strpos($html, 'Второй точный совет'), strpos($html, 'Первый точный совет'));
         $this->assertStringNotContainsString('Ближайшие совпадения', $html);
         $this->assertStringNotContainsString('По похожим жанрам', $html);
         $this->assertStringNotContainsString('За '.$source->year.' год', $html);
     }
 
-    public function test_authenticated_recommendation_controls_explain_all_three_feedback_actions(): void
+    public function test_title_page_shows_six_recommendations_and_reveals_at_most_six_more_without_a_second_request(): void
+    {
+        config(['seasonvar.recommendations.max_per_title' => 24]);
+        $source = CatalogTitle::factory()->create(['title' => 'Источник двенадцати рекомендаций']);
+
+        foreach (range(1, 14) as $rank) {
+            $candidate = $this->recommendableTitle("Рекомендация {$rank}");
+            $this->storeRecommendation(
+                $source,
+                $candidate,
+                $rank,
+                1000 - $rank,
+                ['genre' => ['count' => 1, 'score' => 200]],
+            );
+        }
+
+        $data = app(CatalogTitlePageBuilder::class)->data($source, null);
+
+        $this->assertCount(12, $data['recommendationItems']);
+        $this->assertCount(6, $data['primaryRecommendationItems']);
+        $this->assertCount(6, $data['additionalRecommendationItems']);
+        $this->assertSame(6, $data['additionalRecommendationCount']);
+        $this->assertSame(range(1, 6), $data['primaryRecommendationItems']->pluck('rank')->all());
+        $this->assertSame(range(7, 12), $data['additionalRecommendationItems']->pluck('rank')->all());
+
+        $html = $this->get(route('titles.show', $source))->assertOk()->getContent();
+
+        $this->assertSame(12, substr_count($html, 'data-recommendation-row'));
+        $this->assertStringContainsString('data-recommendation-primary-list', $html);
+        $this->assertStringContainsString('data-recommendation-more', $html);
+        $this->assertStringContainsString('data-recommendation-additional-list', $html);
+        $this->assertStringContainsString('Показать ещё 6', $html);
+        $this->assertStringNotContainsString('Рекомендация 13', $html);
+        $this->assertStringNotContainsString('Рекомендация 14', $html);
+    }
+
+    public function test_authenticated_title_recommendations_use_compact_feedback_without_subject_option_queries(): void
     {
         $user = User::factory()->create();
         $source = CatalogTitle::factory()->create(['title' => 'Источник рекомендаций']);
@@ -141,10 +176,9 @@ class CatalogRecommendationListTest extends TestCase
             'genre' => ['count' => 1, 'score' => 300],
         ]);
         $page = app(CatalogTitlePageBuilder::class)->data($source, $user);
-        $this->assertSame(
-            $genre->id,
-            $page['recommendationItems']->first()?->feedbackOptions['genres'][0]['id'] ?? null,
-        );
+
+        $this->assertSame([], $page['recommendationItems']->first()?->feedbackOptions);
+
         $componentHtml = Blade::render(
             '<x-catalog.recommendation-feedback :title-id="$titleId" action="setRecommendationFeedback" :feedback-options="$options" />',
             ['titleId' => $candidate->id, 'options' => $feedbackOptions[$candidate->id]],
@@ -157,34 +191,17 @@ class CatalogRecommendationListTest extends TestCase
             ->getContent();
 
         $this->assertStringContainsString('Больше похожего', $html);
-        $this->assertStringContainsString('Учтём интерес к похожим темам и признакам.', $html);
-        $this->assertStringContainsString('Почему рекомендация не подходит?', $html);
-        $this->assertStringContainsString('Уже смотрел в другом месте', $html);
-        $this->assertStringContainsString(
-            "wire:target=\"setRecommendationFeedback({$candidate->id}, 'more_like_this')\"",
-            $html,
-        );
-        $this->assertStringContainsString('Не нравится жанр', $html);
-        $this->assertStringContainsString('Не нравится страна', $html);
-        $this->assertStringContainsString('Не нравится актёр', $html);
-        $this->assertStringContainsString('Слишком много серий', $html);
-        $this->assertStringContainsString('Сериал не закончен', $html);
-        $this->assertStringContainsString('Слишком старый', $html);
-        $this->assertStringContainsString('Низкий рейтинг', $html);
-        $this->assertStringContainsString('Не хочу такое настроение', $html);
-        $this->assertStringContainsString('Не предлагать этот сериал', $html);
-        $this->assertStringContainsString('Не предлагать похожие', $html);
-        $this->assertStringContainsString('Драма причины', $html);
-        $this->assertStringContainsString('Страна причины', $html);
-        $this->assertStringContainsString('Актёр причины', $html);
+        $this->assertStringContainsString('Не похоже', $html);
         $this->assertStringContainsString(
             "wire:target=\"setRecommendationFeedback({$candidate->id}, 'more_like_this')\"",
             $html,
         );
         $this->assertStringContainsString(
-            "setRecommendationFeedbackReason({$candidate->id}, 'dislike_genre', {$genre->id})",
+            "setRecommendationFeedbackReason({$candidate->id}, 'not_similar')",
             $html,
         );
+        $this->assertStringNotContainsString('Почему рекомендация не подходит?', $html);
+        $this->assertStringNotContainsString('Драма причины', $html);
     }
 
     public function test_feedback_subject_options_use_three_queries_and_cap_the_title_batch(): void

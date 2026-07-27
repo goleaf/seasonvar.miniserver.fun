@@ -2,20 +2,15 @@
 
 namespace App\Console\Commands\Concerns;
 
+use App\Console\Presenters\SeasonvarProgressPresenter;
 use App\Enums\SeasonvarPageType;
-use App\Support\HumanFileSizeFormatter;
-use BackedEnum;
-use DateTimeInterface;
 use Illuminate\Console\Command;
-use Illuminate\Support\Carbon;
 
 /**
  * @mixin Command
  */
 trait OutputsSeasonvarProgress
 {
-    private const EUROPEAN_DATE_TIME_FORMAT = 'd.m.Y H:i';
-
     /**
      * @return callable(string, array<string, mixed>): void
      */
@@ -29,131 +24,19 @@ trait OutputsSeasonvarProgress
      */
     private function writeSeasonvarProgress(string $event, array $context = []): void
     {
-        $details = $this->formatSeasonvarContext($context);
-        $message = '['.now()->format(self::EUROPEAN_DATE_TIME_FORMAT).'] '.$this->formatSeasonvarEvent($event);
+        $presentation = app(SeasonvarProgressPresenter::class)->present(
+            $event,
+            $context,
+            self::eventLabels(),
+            self::contextLabels(),
+            self::valueLabels(),
+        );
 
-        if ($details !== '') {
-            $message .= ': '.$details;
-        }
-
-        if (str_contains($event, 'failed') || str_contains($event, 'blocked') || str_contains($event, 'invalid')) {
-            $this->warn($message);
-
-            return;
-        }
-
-        if (str_contains($event, 'complete') || str_contains($event, 'created') || str_contains($event, 'stored')) {
-            $this->info($message);
-
-            return;
-        }
-
-        $this->line($message);
-    }
-
-    private function formatSeasonvarEvent(string $event): string
-    {
-        return self::eventLabels()[$event] ?? str_replace('-', ' ', $event);
-    }
-
-    /**
-     * @param  array<string, mixed>  $context
-     */
-    private function formatSeasonvarContext(array $context): string
-    {
-        $items = [];
-
-        foreach ($context as $key => $value) {
-            $items[] = $this->formatSeasonvarKey((string) $key).'='.$this->formatSeasonvarValue($value, (string) $key);
-        }
-
-        return implode(' | ', $items);
-    }
-
-    private function formatSeasonvarValue(mixed $value, ?string $key = null): string
-    {
-        if ($value === null) {
-            return 'пусто';
-        }
-
-        if ($value === true) {
-            return 'да';
-        }
-
-        if ($value === false) {
-            return 'нет';
-        }
-
-        if ($value instanceof BackedEnum) {
-            return (string) $value->value;
-        }
-
-        if ($value instanceof DateTimeInterface) {
-            return $value->format(self::EUROPEAN_DATE_TIME_FORMAT);
-        }
-
-        if (is_string($value)) {
-            return self::valueLabels()[$value] ?? $this->formatSeasonvarString($value);
-        }
-
-        if (is_array($value)) {
-            return $this->formatSeasonvarArray($value);
-        }
-
-        if (is_float($value)) {
-            return number_format($value, 3, '.', '');
-        }
-
-        if ($key === 'file_size_bytes' && is_int($value)) {
-            $human = app(HumanFileSizeFormatter::class)->format($value, 'ru');
-
-            return $human === null ? (string) $value : $human.' ('.$value.')';
-        }
-
-        return (string) $value;
-    }
-
-    private function formatSeasonvarString(string $value): string
-    {
-        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1) {
-            return Carbon::parse($value)->format('d.m.Y');
-        }
-
-        if (preg_match('/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?$/', $value) === 1) {
-            return Carbon::parse($value)->format(self::EUROPEAN_DATE_TIME_FORMAT);
-        }
-
-        return $value;
-    }
-
-    /**
-     * @param  array<array-key, mixed>  $value
-     */
-    private function formatSeasonvarArray(array $value): string
-    {
-        if ($value === []) {
-            return '[]';
-        }
-
-        if (array_is_list($value)) {
-            return '['.implode(', ', array_map(
-                fn (mixed $item): string => $this->formatSeasonvarValue($item),
-                $value,
-            )).']';
-        }
-
-        $items = [];
-
-        foreach ($value as $key => $item) {
-            $items[] = $this->formatSeasonvarKey((string) $key).'='.$this->formatSeasonvarValue($item);
-        }
-
-        return '{'.implode(', ', $items).'}';
-    }
-
-    private function formatSeasonvarKey(string $key): string
-    {
-        return self::contextLabels()[$key] ?? self::valueLabels()[$key] ?? $key;
+        match ($presentation['level']) {
+            'warning' => $this->warn($presentation['message']),
+            'info' => $this->info($presentation['message']),
+            default => $this->line($presentation['message']),
+        };
     }
 
     /**

@@ -463,6 +463,9 @@ final class CatalogDiscoveryPage extends Component
             'collectionsPage',
         ]);
         $seo = $this->seo->discovery($type, $result, $result->items, $hasFilters || $collectionStatefulVariant);
+        $titleResultsAnchor = $type === CatalogRecommendationType::Popular
+            ? 'popular-titles'
+            : 'discovery-titles';
 
         return view('livewire.catalog-discovery-page', [
             'result' => $result,
@@ -489,13 +492,17 @@ final class CatalogDiscoveryPage extends Component
                 ? $this->feedbackOptions->activeHiddenGenres($this->user())
                 : collect(),
             'popularUrl' => $this->discoveryUrl(CatalogRecommendationType::Popular),
-            'discoverySectionNavigation' => $type === CatalogRecommendationType::Popular
-                ? [
-                    ['url' => '#collections', 'label' => __('collections.navigation.collections')],
-                    ['url' => '#popular-titles', 'label' => __('recommendations.page.popular_series')],
-                ]
-                : [],
-            'collectionExplorerKey' => 'discovery-collections-'.app()->currentLocale(),
+            'discoverySectionNavigation' => [
+                ['url' => '#collections', 'label' => __('collections.navigation.collections')],
+                [
+                    'url' => '#'.$titleResultsAnchor,
+                    'label' => $type === CatalogRecommendationType::Popular
+                        ? __('recommendations.page.popular_series')
+                        : __('recommendations.page.series_section_title'),
+                ],
+            ],
+            'collectionExplorerKey' => 'discovery-collections-'.$type->value.'-'.app()->currentLocale(),
+            'titleResultsAnchor' => $titleResultsAnchor,
             'seo' => $seo,
         ])->extends('layouts.app', [
             'title' => $seo['title'],

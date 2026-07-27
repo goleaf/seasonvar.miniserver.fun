@@ -88,7 +88,7 @@ final readonly class SeasonvarCatalogData
 
     public function hasCompleteMetadataSnapshot(): bool
     {
-        return (bool) ($this->parseMeta['has_info_list'] ?? false);
+        return $this->sectionPresence()->isAuthoritative('metadata');
     }
 
     public function hasPublicationTypeEvidence(): bool
@@ -125,12 +125,25 @@ final readonly class SeasonvarCatalogData
 
     public function hasCompleteSeasonSnapshot(): bool
     {
-        return (bool) ($this->parseMeta['has_season_list'] ?? false);
+        return $this->sectionPresence()->isAuthoritative('seasons');
     }
 
     public function hasCompleteEpisodeSnapshot(): bool
     {
-        return (bool) ($this->parseMeta['has_episode_script'] ?? false);
+        return $this->sectionPresence()->isAuthoritative('episodes');
+    }
+
+    public function sectionPresence(): SeasonvarSectionPresence
+    {
+        return SeasonvarSectionPresence::fromParseMeta($this->parseMeta);
+    }
+
+    public function semanticFingerprint(): string
+    {
+        return hash('sha256', json_encode(
+            self::canonicalize($this->toArray()),
+            JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE,
+        ));
     }
 
     /**
@@ -173,6 +186,8 @@ final readonly class SeasonvarCatalogData
             'parse_meta.has_season_list' => ['required', 'boolean'],
             'parse_meta.has_episode_script' => ['required', 'boolean'],
             'parse_meta.provider_availability_status' => ['nullable', 'string', 'in:region_blocked'],
+            'parse_meta.section_presence' => ['sometimes', 'array'],
+            'parse_meta.section_presence.*' => ['required', 'string', 'in:complete,partial,absent,unknown,invalid'],
         ];
     }
 
@@ -197,5 +212,26 @@ final readonly class SeasonvarCatalogData
     private static function uniqueList(array $items, callable $key): array
     {
         return collect($items)->unique($key)->values()->all();
+    }
+
+    private static function canonicalize(mixed $value): mixed
+    {
+        if (! is_array($value)) {
+            return $value;
+        }
+
+        if (array_is_list($value)) {
+            $items = array_map(self::canonicalize(...), $value);
+            usort($items, static fn (mixed $left, mixed $right): int => strcmp(
+                json_encode($left, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+                json_encode($right, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            ));
+
+            return $items;
+        }
+
+        ksort($value);
+
+        return array_map(self::canonicalize(...), $value);
     }
 }

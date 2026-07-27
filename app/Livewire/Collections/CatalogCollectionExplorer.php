@@ -79,31 +79,48 @@ final class CatalogCollectionExplorer extends Component
         $this->resetPage(pageName: 'collectionsPage');
     }
 
+    public function selectCategory(
+        CatalogCollectionCategoryQuery $categories,
+        string $category,
+        string $subcategory = '',
+    ): void {
+        [$this->category, $this->subcategory] = $categories->normalizeDirectorySelection(
+            $category,
+            $subcategory,
+        );
+        $this->resetPage(pageName: 'collectionsPage');
+    }
+
     public function render(
         CatalogCollectionQuery $collections,
         CatalogCollectionCategoryQuery $categories,
     ): View {
         $authenticated = Auth::check();
         $directory = $categories->publicDirectoryTree();
-        $selectedRoot = $directory['tree']->firstWhere('slug', $this->category);
         $categoryNavigation = $directory['tree']
-            ->filter(fn (CatalogCollectionCategory $root): bool => (int) $root->getAttribute('public_branch_collections_count') > 0
-                || $root->slug === $this->category)
-            ->map(fn (CatalogCollectionCategory $root): array => [
-                'slug' => $root->slug,
-                'label' => $root->display_name,
-                'count' => (int) $root->getAttribute('public_branch_collections_count'),
-                'children' => $root->children
-                    ->filter(fn (CatalogCollectionCategory $child): bool => (int) $child->getAttribute('public_collections_count') > 0
-                        || $child->slug === $this->subcategory)
-                    ->map(fn (CatalogCollectionCategory $child): array => [
-                        'slug' => $child->slug,
-                        'label' => $child->display_name,
-                        'count' => (int) $child->getAttribute('public_collections_count'),
-                    ])
-                    ->values()
-                    ->all(),
-            ])
+            ->map(function (CatalogCollectionCategory $root): array {
+                $count = (int) $root->getAttribute('public_branch_collections_count');
+
+                return [
+                    'slug' => $root->slug,
+                    'label' => $root->display_name,
+                    'count' => $count,
+                    'is_filterable' => $count > 0,
+                    'children' => $root->children
+                        ->map(function (CatalogCollectionCategory $child): array {
+                            $count = (int) $child->getAttribute('public_collections_count');
+
+                            return [
+                                'slug' => $child->slug,
+                                'label' => $child->display_name,
+                                'count' => $count,
+                                'is_filterable' => $count > 0,
+                            ];
+                        })
+                        ->values()
+                        ->all(),
+                ];
+            })
             ->values()
             ->all();
 
@@ -116,18 +133,6 @@ final class CatalogCollectionExplorer extends Component
                 subcategory: $this->subcategory !== '' ? $this->subcategory : null,
             ),
             'categoryNavigation' => $categoryNavigation,
-            'subcategoryOptions' => $selectedRoot instanceof CatalogCollectionCategory
-                ? $selectedRoot->children
-                    ->filter(fn (CatalogCollectionCategory $child): bool => (int) $child->getAttribute('public_collections_count') > 0
-                        || $child->slug === $this->subcategory)
-                    ->map(fn (CatalogCollectionCategory $child): array => [
-                        'slug' => $child->slug,
-                        'label' => $child->display_name,
-                        'count' => (int) $child->getAttribute('public_collections_count'),
-                    ])
-                    ->values()
-                    ->all()
-                : [],
             'uncategorizedCount' => $directory['uncategorized'],
             'showUncategorizedFilter' => $directory['uncategorized'] > 0
                 || $this->category === 'uncategorized',

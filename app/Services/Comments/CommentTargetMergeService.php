@@ -75,4 +75,24 @@ final class CommentTargetMergeService
                 'updated_at' => now(),
             ]);
     }
+
+    /**
+     * @param  list<int>  $episodeIds
+     * @return array<int, bool>
+     */
+    public function episodeIdsWithComments(array $episodeIds): array
+    {
+        if ($episodeIds === [] || ! $this->schema->available()) {
+            return [];
+        }
+
+        return Comment::query()
+            ->withTrashed()
+            ->where('target_type', CommentTargetType::Episode->value)
+            ->whereIn('target_id', $episodeIds)
+            ->distinct()
+            ->pluck('target_id')
+            ->mapWithKeys(static fn (mixed $id): array => [(int) $id => true])
+            ->all();
+    }
 }

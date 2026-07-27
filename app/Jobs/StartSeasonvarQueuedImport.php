@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Enums\SeasonvarImportFailureType;
+use App\Enums\SeasonvarImportStatus;
 use App\Models\SeasonvarImportRun;
 use App\Services\Seasonvar\SeasonvarImportAdminService;
 use App\Services\Seasonvar\SeasonvarImportFailureClassifier;
@@ -47,7 +48,17 @@ final class StartSeasonvarQueuedImport implements ShouldBeUnique, ShouldQueue
     ): void {
         $run = SeasonvarImportRun::query()->find($this->importRunId);
 
-        if ($run === null || $run->status !== 'queued' || $run->execution_mode !== 'queue') {
+        $resumable = $run !== null
+            && $run->execution_mode === 'queue'
+            && (
+                $run->status === SeasonvarImportStatus::Queued->value
+                || (
+                    $run->status === SeasonvarImportStatus::Running->value
+                    && data_get($run->summary, 'dispatch_completed') === false
+                )
+            );
+
+        if (! $resumable) {
             return;
         }
 
