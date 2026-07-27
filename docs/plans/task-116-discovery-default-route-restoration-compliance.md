@@ -18,7 +18,7 @@
 | TDD/verification | `completed` | RED, 58/494 focused matrix, Pint, isolated route cache, Vite и Playwright прошли |
 | Production/rollback | `completed` | Code-only additive routes; rollback без data/cache/dependency операций |
 | README/CHANGELOG/evidence | `completed` | Visitor section/history, русский changelog и archive evidence обновлены |
-| Commit/push | `in_progress_commit_unresolved_push` | Task 113 зафиксирован отдельно; Tasks 114–116 staged exact, а непроверенный `composer.lock` исключён и блокирует clean pre-push |
+| Commit/push | `unresolved` | Exact combined commit `cc77728a`; GitHub HTTPS push запросил username при отсутствии credential helper |
 
 ## Ожидаемый и фактический scope файлов
 

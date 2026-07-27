@@ -21,8 +21,8 @@
 | Routes, API, schema, cache keys и permissions | `already_compliant` | План не меняет public/data/access contracts |
 | Производительность и Blade query boundary | `already_compliant` | Новых данных, запросов и JavaScript не планируется |
 | Production rollout и rollback | `completed` | Зафиксированы в design-spec; data migration не требуется |
-| README, CHANGELOG и canonical frontend docs | `completed` | Visitor history и UI/frontend owners обновлены; полный CHANGELOG gate блокирует чужой Task 114 hunk |
-| Commit и push в `main` | `in_progress_commit_unresolved_push` | Task 113 зафиксирован отдельно; user-authorized Tasks 114–116 staged exact, а непроверенный `composer.lock` исключён |
+| README, CHANGELOG и canonical frontend docs | `completed` | Visitor history и UI/frontend owners обновлены; полный CHANGELOG gate пройден |
+| Commit и push в `main` | `unresolved` | Exact combined commit `cc77728a`; GitHub HTTPS push запросил username при отсутствии credential helper |
 
 ## Ожидаемые изменяемые файлы
 

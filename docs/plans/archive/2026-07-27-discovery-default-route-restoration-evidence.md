@@ -67,3 +67,12 @@
 Удалить два default entry routes и вернуть прежний `404` test contract.
 Migration, data restore, cache flush, asset или dependency rollback не
 нужны.
+
+## Delivery
+
+- Tasks 114–116 зафиксированы в `main` combined commit `cc77728a`.
+- Непроверенное обновление `composer.lock` не вошло в commit: перед
+  non-force push файл был адресно сохранён, а затем восстановлен без
+  изменения.
+- GitHub HTTPS запросил username при отсутствии credential helper. Данные
+  не отправлены, поэтому remote delivery честно остаётся `unresolved`.

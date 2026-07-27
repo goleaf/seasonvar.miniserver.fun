@@ -58,5 +58,6 @@
   historical планы и changelog как историю прежнего решения.
 - [x] Проверить exact staged diff, branch `main` и отсутствие
   `composer.lock` в разрешённом snapshot.
-- [ ] Commit разрешённого scope в `main` и non-force push; внешний отказ
-  зафиксировать как `unresolved`.
+- [x] Commit разрешённого scope в `main`: `cc77728a`; non-force push дошёл
+  до GitHub HTTPS username prompt, credential helper отсутствует и внешний
+  отказ зафиксирован как `unresolved`.

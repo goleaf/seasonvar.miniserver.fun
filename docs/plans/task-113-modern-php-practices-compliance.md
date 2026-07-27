@@ -24,7 +24,7 @@
 | Migrations/routes/translations/cache keys/permissions | `not_applicable` | Contracts не меняются |
 | README checked, owners и русский CHANGELOG обновлены | `completed` | Visitor history, code standards, testing, audit и changelog обновлены |
 | Full verification, legacy/dead/debug/secret scans | `completed` | Backend/frontend gates exit `0`; итоговый AST inventory clean |
-| Exact staged review, commit и push | `in_progress` | Pending verification |
+| Exact staged review, commit и push | `unresolved` | Exact commit `a7322a91`; GitHub HTTPS push запросил username при отсутствии credential helper |
 
 ## Cross-feature impact
 

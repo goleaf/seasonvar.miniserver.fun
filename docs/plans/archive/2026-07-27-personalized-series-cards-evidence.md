@@ -114,3 +114,10 @@ Delivery update 27.07.2026: Task 113 зафиксирован отдельным
 `a7322a91`. User-authorized Tasks 114–116 подготовлены одним exact reviewed
 snapshot; непроверенное обновление `composer.lock` исключено и сохраняет
 push как `unresolved` до отдельного maintenance review или штатного handoff.
+
+Final delivery update 27.07.2026: Tasks 114–116 зафиксированы в `main`
+combined commit `cc77728a`. Упомянутый выше CHANGELOG gate исправлен и
+пройден; открытым остаётся только прежний PWA poster fixture. `composer.lock`
+был адресно сохранён перед non-force push и восстановлен без изменения после
+GitHub HTTPS username prompt. Credential helper отсутствует, данные не
+отправлены, remote delivery остаётся `unresolved`.

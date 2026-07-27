@@ -69,3 +69,10 @@ dependencies не изменены. Rollback — exact code/tests/docs commit б
   state и visitor interaction не менялись.
 - `EXPLAIN`: `not_applicable`, потому что SQL shape, schema и indexes не
   менялись.
+
+## Delivery
+
+- Разрешённый scope зафиксирован в `main` отдельным commit `a7322a91`.
+- Non-force push дошёл до GitHub HTTPS username prompt. Credential helper
+  отсутствует, данные не отправлены, поэтому remote delivery остаётся
+  `unresolved`.

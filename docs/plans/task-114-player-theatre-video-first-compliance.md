@@ -18,7 +18,7 @@
 | Production/rollback/data-safety assessment | `completed` | Frontend-only rollout; migration/data/cache flush/backup не требуются |
 | README, owners и русский CHANGELOG | `completed` | UI/frontend/views/player audit, visitor history и датированный changelog обновлены |
 | Full verification и legacy/dead/debug/secret scans | `completed` | Full PHPUnit `2294` tests/`208369` assertions; syntax/docs/diff/release gates GREEN |
-| Exact staged review, commit и push | `in_progress_commit_unresolved_push` | Task 113 зафиксирован отдельно; Tasks 114–116 staged exact, а непроверенный `composer.lock` исключён и блокирует clean pre-push |
+| Exact staged review, commit и push | `unresolved` | Exact combined commit `cc77728a`; GitHub HTTPS push запросил username при отсутствии credential helper |
 
 ## Cross-feature impact
 
