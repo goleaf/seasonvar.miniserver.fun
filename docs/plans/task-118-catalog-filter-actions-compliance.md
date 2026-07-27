@@ -13,6 +13,7 @@
 | --- | --- | --- |
 | Root instructions, requirement index и существующая реализация проверены до реализации | `completed` | `AGENTS.md`, `docs/requirements/index.md`, `/titles` Blade/Livewire/JS/tests |
 | Вариант 1 утверждён пользователем | `completed` | [Design](../superpowers/specs/2026-07-27-catalog-filter-actions-design.md) |
+| Подробный TDD/verification/delivery plan | `completed` | [Implementation plan](../superpowers/plans/2026-07-27-catalog-filter-actions.md) |
 | Один mobile-first HTML/Livewire tree без второго filter draft | `already_compliant` | Изменяется только существующая action panel одной формы |
 | Действия вертикальны и не зависят от viewport breakpoint внутри узкого sidebar | `unresolved` | Ожидает RED/GREEN реализации |
 | Touch targets не меньше 44 px, keyboard/focus и длинный текст | `unresolved` | Ожидает PHPUnit и Playwright evidence |

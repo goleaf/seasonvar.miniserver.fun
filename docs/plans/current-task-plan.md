@@ -58,7 +58,7 @@ Livewire/GET filter contract: основной CTA и два служебных 
 |---|---|---|---|
 | critical | Requirements, versions и root-cause audit | `completed` | Laravel `13.22.0`, Tailwind `4.3.2`; `18rem` sidebar + `sm:flex-row` |
 | high | Visual direction и design-spec | `completed: option 1 approved` | [Design](../superpowers/specs/2026-07-27-catalog-filter-actions-design.md) |
-| high | TDD implementation plan | `pending` | Создаётся после review design-spec |
+| high | TDD implementation plan | `completed` | [Detailed plan](../superpowers/plans/2026-07-27-catalog-filter-actions.md) |
 | high | Blade implementation и focused verification | `pending` | PHPUnit, Vite и Playwright desktop/phone |
 | medium | Canonical docs, README, CHANGELOG и archive evidence | `pending` | Обновляются после GREEN |
 | critical | Exact commit и push in `main` | `pending` | Посторонние dependency/debugbar изменения исключаются |
