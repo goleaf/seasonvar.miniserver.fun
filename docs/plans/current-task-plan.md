@@ -1,4 +1,4 @@
-# Текущая задача — Task 113–117
+# Текущая задача — Task 113–118
 
 ## Реестр активных workstreams
 
@@ -9,6 +9,7 @@
 | Task 115: заметные карточки персональных рекомендаций | `completed: commit cc77728a; push unresolved authentication` | [Task 115 evidence](archive/2026-07-27-personalized-series-cards-evidence.md) |
 | Task 116: восстановление default-входа discovery | `completed: commit cc77728a; push unresolved authentication` | [Task 116 evidence](archive/2026-07-27-discovery-default-route-restoration-evidence.md) |
 | Task 117: восстановление публичных редакционных подборок | `completed: commit b2e97d80; push unresolved authentication` | [Evidence](archive/2026-07-27-public-editorial-collection-restoration-evidence.md) |
+| Task 118: адаптивная панель действий фильтров каталога | `in_progress: design approved; implementation pending` | [Design](../superpowers/specs/2026-07-27-catalog-filter-actions-design.md) |
 
 ## Реестр blocked/unresolved
 
@@ -33,6 +34,8 @@
 | Task 116 route contract | `completed` | Default/trailing-slash/RU/EN ведут к существующему `popular#collections` |
 | Task 117 root cause и canonical recovery contract | `completed` | 501 строка сохранена; exact allowlist ограничен 10 проверенными source collections |
 | Task 117 implementation и production apply | `completed` | 10 restored/listed; verified backup, quarantine и live integrity checks |
+| Task 118 root cause и утверждённая компоновка | `completed` | `18rem` sidebar конфликтует с `sm:flex-row`; пользователь выбрал три полноширинных действия |
+| Task 118 implementation и verification | `unresolved` | Ожидает RED/GREEN, build и desktop/mobile Playwright |
 
 ## Последнее подтверждённое evidence
 
@@ -42,6 +45,27 @@
 - [Task 115: compliance заметных карточек](task-115-personalized-series-cards-compliance.md)
 - [Task 116: compliance default discovery](task-116-discovery-default-route-restoration-compliance.md)
 - [Task 117: compliance восстановления редакционных подборок](task-117-public-editorial-restoration-compliance.md)
+- [Task 118: compliance панели действий фильтров](task-118-catalog-filter-actions-compliance.md)
+
+## Task 118 — цель и checklist
+
+Убрать переполнение трёх действий формы `/titles`, сохранив один
+Livewire/GET filter contract: основной CTA и два служебных действия должны
+располагаться вертикально, занимать ширину панели и оставаться удобными при
+длинном result count.
+
+| Priority | Workstream | Status | Evidence |
+|---|---|---|---|
+| critical | Requirements, versions и root-cause audit | `completed` | Laravel `13.22.0`, Tailwind `4.3.2`; `18rem` sidebar + `sm:flex-row` |
+| high | Visual direction и design-spec | `completed: option 1 approved` | [Design](../superpowers/specs/2026-07-27-catalog-filter-actions-design.md) |
+| high | TDD implementation plan | `pending` | Создаётся после review design-spec |
+| high | Blade implementation и focused verification | `pending` | PHPUnit, Vite и Playwright desktop/phone |
+| medium | Canonical docs, README, CHANGELOG и archive evidence | `pending` | Обновляются после GREEN |
+| critical | Exact commit и push in `main` | `pending` | Посторонние dependency/debugbar изменения исключаются |
+
+Task 118 не меняет migrations, routes, query semantics, API, translations,
+cache keys, permissions, importer, recommendation или persistent data.
+Rollback — revert UI/tests/docs и rebuild без data restore/cache flush.
 
 ## Task 117 — цель и checklist
 
