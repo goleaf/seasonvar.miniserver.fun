@@ -22,7 +22,7 @@
 | Производительность и passive Blade boundary | `already_compliant` | Новых данных, запросов, services или client state нет |
 | Production rollout и rollback | `completed` | Зафиксированы в design-spec; data migration не требуется |
 | README, CHANGELOG и canonical frontend docs | `completed` | Обновлены `README.md`, `CHANGELOG.md`, `docs/UI_STANDARDS.md` и `docs/frontend.md` |
-| Commit и push в `main` | `unresolved` | Ожидает завершённый implementation commit |
+| Commit и push в `main` | `unresolved` | Implementation `d6286c7c`; pre-push green; HTTPS remote credential helper отсутствует |
 
 ## Cross-feature impact
 
@@ -71,3 +71,7 @@
 - cancel/reset/apply attributes нельзя потерять при изменении presentation;
 - посторонние изменения `composer.lock` и `storage/debugbar/.gitignore`
   принадлежат пользователю и не входят в Task 118.
+
+## Итоговое evidence
+
+[Полный отчёт RED/GREEN, browser matrix, pre-push и delivery](archive/2026-07-27-catalog-filter-actions-evidence.md).

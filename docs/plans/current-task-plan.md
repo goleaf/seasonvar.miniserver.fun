@@ -9,7 +9,7 @@
 | Task 115: заметные карточки персональных рекомендаций | `completed: commit cc77728a; push unresolved authentication` | [Task 115 evidence](archive/2026-07-27-personalized-series-cards-evidence.md) |
 | Task 116: восстановление default-входа discovery | `completed: commit cc77728a; push unresolved authentication` | [Task 116 evidence](archive/2026-07-27-discovery-default-route-restoration-evidence.md) |
 | Task 117: восстановление публичных редакционных подборок | `completed: commit b2e97d80; push unresolved authentication` | [Evidence](archive/2026-07-27-public-editorial-collection-restoration-evidence.md) |
-| Task 118: адаптивная панель действий фильтров каталога | `in_progress: implementation verified; delivery pending` | [Design](../superpowers/specs/2026-07-27-catalog-filter-actions-design.md) |
+| Task 118: адаптивная панель действий фильтров каталога | `completed: commit d6286c7c; push unresolved authentication` | [Evidence](archive/2026-07-27-catalog-filter-actions-evidence.md) |
 
 ## Реестр blocked/unresolved
 
@@ -17,7 +17,7 @@
 | --- | --- | --- |
 | Task 115 inherited browser gate | `unresolved` | Старый PWA poster fixture даёт `404`; focused Task 115 gates прошли |
 | Task 117 inherited PWA browser signal | `unresolved` | Existing `/service-worker.js` возвращает `404`; collection page/local requests проходят |
-| Remote delivery Tasks 113–117 | `unresolved` | Посторонние изменения были адресно сохранены и точно восстановлены; push дошёл до GitHub HTTPS username prompt, credential helper отсутствует, данные не отправлены |
+| Remote delivery Tasks 113–118 | `unresolved` | Посторонние изменения были адресно сохранены и точно восстановлены; HTTPS remote не имеет credential helper, фактический push завершился ошибкой чтения GitHub username |
 
 ## Task-specific compliance matrix
 
@@ -35,7 +35,7 @@
 | Task 117 root cause и canonical recovery contract | `completed` | 501 строка сохранена; exact allowlist ограничен 10 проверенными source collections |
 | Task 117 implementation и production apply | `completed` | 10 restored/listed; verified backup, quarantine и live integrity checks |
 | Task 118 root cause и утверждённая компоновка | `completed` | `18rem` sidebar конфликтует с `sm:flex-row`; пользователь выбрал три полноширинных действия |
-| Task 118 implementation и verification | `completed` | RED/GREEN; `131` PHPUnit tests / `1 268` assertions; Vite build; Playwright `3/3` |
+| Task 118 implementation и verification | `completed` | [Evidence](archive/2026-07-27-catalog-filter-actions-evidence.md): RED/GREEN; focused `131` tests / `1 268` assertions; full pre-push `2 302` / `208 472`; Playwright `3/3` |
 
 ## Последнее подтверждённое evidence
 
@@ -46,6 +46,7 @@
 - [Task 116: compliance default discovery](task-116-discovery-default-route-restoration-compliance.md)
 - [Task 117: compliance восстановления редакционных подборок](task-117-public-editorial-restoration-compliance.md)
 - [Task 118: compliance панели действий фильтров](task-118-catalog-filter-actions-compliance.md)
+- [Task 118: evidence панели действий фильтров](archive/2026-07-27-catalog-filter-actions-evidence.md)
 
 ## Task 118 — цель и checklist
 
@@ -60,8 +61,8 @@ Livewire/GET filter contract: основной CTA и два служебных 
 | high | Visual direction и design-spec | `completed: option 1 approved` | [Design](../superpowers/specs/2026-07-27-catalog-filter-actions-design.md) |
 | high | TDD implementation plan | `completed` | [Detailed plan](../superpowers/plans/2026-07-27-catalog-filter-actions.md) |
 | high | Blade implementation и focused verification | `completed` | RED/GREEN; `131` PHPUnit tests / `1 268` assertions; Vite build; Playwright `3/3` |
-| medium | Canonical docs, README, CHANGELOG и archive evidence | `in_progress: canonical docs updated` | Archive evidence после финальных gates |
-| critical | Exact commit и push in `main` | `pending` | Посторонние dependency/debugbar изменения исключаются |
+| medium | Canonical docs, README, CHANGELOG и archive evidence | `completed` | [Evidence](archive/2026-07-27-catalog-filter-actions-evidence.md) |
+| critical | Exact commit и push in `main` | `unresolved: commit d6286c7c; push authentication` | Pre-push green; HTTPS remote credential helper отсутствует |
 
 Task 118 не меняет migrations, routes, query semantics, API, translations,
 cache keys, permissions, importer, recommendation или persistent data.
