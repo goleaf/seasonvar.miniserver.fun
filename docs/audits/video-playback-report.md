@@ -400,6 +400,41 @@ Screenshots desktop, mobile и landscape проверены визуально: 
 `unresolved_device` из прежней playback-матрицы; scoped theatre contract
 проверен responsive Chromium и desktop Firefox.
 
+## Task 114 — video-first theatre
+
+Task 114 сохраняет нормальную страницу без изменений, но в активном theatre
+скрывает breadcrumbs, heading «Просмотр» и текстовую сводку
+season/episode/source. Существующий media frame становится первым элементом у
+верхней safe-area границы. Реальные controls перевода, качества и субтитров
+следуют сразу после video; toggle находится поверх его правого верхнего угла,
+остаётся `44×44` и на narrow/низком landscape показывает только icon с полной
+динамической подписью в `aria-label`.
+
+Перестановка выполняется scoped CSS через presentation markers и
+`display: contents`; JavaScript не перемещает и не клонирует media DOM.
+`player-navigation.js` дополнительно сохраняет только в памяти compact-state
+site header. Это предотвращает подтверждённый browser edge case: скрытая
+шапка при theatre-scroll `0` раскрывалась с `55` до `71 px`, затем снова
+сжималась и уводила восстановленный scroll на `16 px`. Допуск browser
+regression не ослаблялся.
+
+Layout Blade добавлен к atomic player release descriptor. Routes, Livewire
+public API, source resolution, signed grants, progress, schema, cache keys,
+permissions, translations и PWA media exclusions не изменены. Один
+`wire:ignore.self`, один keyed полный `wire:ignore` и тот же `<video>`
+сохранены.
+
+GREEN evidence: focused PHPUnit — `4 tests`, `83 assertions`; extended
+Playwright workspace matrix — `19 passed`, `2 expected skips`; отдельная
+visual matrix — `7/7`. Desktop/mobile/phone-landscape screenshots подтверждают
+верхний media frame, compact toggle, controls под video и отсутствие
+горизонтального overflow. После одного transient Firefox source-selection
+сценарий RU/EN прошёл `2/2` на свежей fixture-базе. Финальный полный PHPUnit —
+`2294 tests`, `2283 passed`, `11 expected skips`, `208369 assertions`.
+Vite собрал `28 modules`; release gate подтвердил `31 sources`, `19 assets` и
+fingerprint
+`336fae52fc497e43ce048abefc6c25363bfd64275993abb5477046afad46d152`.
+
 ## Task 102 — verified formats и атомарный player release
 
 Task 102 закрепляет два release gates. Первый допускает новый media format

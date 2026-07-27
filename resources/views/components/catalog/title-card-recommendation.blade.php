@@ -50,9 +50,9 @@
     <a
         data-title-card-details
         href="{{ route('titles.show', $title) }}"
-        class="relative z-10 mt-2 inline-flex min-h-11 items-center gap-2 rounded-control px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-800"
+        class="title-card-action-primary relative z-10 mt-3 w-full sm:w-auto"
     >
-        <span>{{ __('catalog.title.more_details') }}</span>
+        <span>{{ __('catalog.title.open_series') }}</span>
         <x-ui.icon name="fa-solid fa-arrow-right text-xs" />
     </a>
 

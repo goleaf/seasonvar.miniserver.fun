@@ -25,7 +25,9 @@ final class PlayerWorkspaceAssetContractTest extends TestCase
         self::assertStringContainsString("behavior: 'auto'", $navigation);
         self::assertStringContainsString('preventScroll: true', $navigation);
         self::assertStringContainsString('theatreReturnPosition', $navigation);
+        self::assertStringContainsString('theatreHeaderCompactState', $navigation);
         self::assertStringContainsString('data-player-theatre-icon', $navigation);
+        self::assertStringContainsString("setAttribute('aria-label'", $navigation);
         self::assertStringContainsString("'fa-compress'", $navigation);
         self::assertStringContainsString('cleanupTheatre', $navigation);
         self::assertStringContainsString("closest('[data-player-theatre-toggle]')", $navigation);
@@ -38,6 +40,11 @@ final class PlayerWorkspaceAssetContractTest extends TestCase
         self::assertStringContainsString('[data-site-header]', $styles);
         self::assertStringContainsString('[data-mobile-bottom-navigation]', $styles);
         self::assertStringContainsString('[data-site-footer]', $styles);
+        self::assertStringContainsString('#main-content > [data-layout-breadcrumbs]', $styles);
+        self::assertStringContainsString('[data-player-context-summary]', $styles);
+        self::assertStringContainsString('[data-player-context-actions]', $styles);
+        self::assertStringContainsString('[data-player-video-region]', $styles);
+        self::assertStringContainsString('[data-player-theatre-label]', $styles);
         self::assertStringContainsString('[data-player-seasons-panel]', $styles);
         self::assertStringContainsString('[data-player-episode-option]', $styles);
     }

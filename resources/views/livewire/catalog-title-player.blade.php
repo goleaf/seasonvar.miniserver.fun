@@ -9,7 +9,7 @@
     <x-ui.panel data-player-stage-panel :title="__('catalog.player.watch')" icon="fa-solid fa-circle-play">
         <div data-player-context-bar class="-mx-4 -mt-4 mb-4 border-b border-slate-200 bg-slate-100 px-4 py-3 sm:-mx-5 sm:-mt-5 sm:px-5">
             <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-                <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold text-slate-700">
+                <div data-player-context-summary class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold text-slate-700">
                     @if ($activeSeason)
                         <span data-player-context-season>{{ $this->seasonDisplayLabel($activeSeason) }}</span>
                     @endif
@@ -27,7 +27,7 @@
                     @endif
                 </div>
 
-                <div class="flex flex-wrap items-center gap-2">
+                <div data-player-context-actions class="flex flex-wrap items-center gap-2">
                     @foreach ($showView->playerContextControls as $contextControl)
                         <details
                             wire:key="player-context-{{ $contextControl['key'] }}"
@@ -81,6 +81,7 @@
                         data-player-theatre-toggle
                         aria-pressed="false"
                         aria-controls="player"
+                        aria-label="{{ __('catalog.player.theatre_expand') }}"
                         data-label-expand="{{ __('catalog.player.theatre_expand') }}"
                         data-label-collapse="{{ __('catalog.player.theatre_collapse') }}"
                         class="inline-flex min-h-11 items-center gap-2 rounded-control border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-emerald-300 hover:text-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
@@ -109,9 +110,9 @@
             </button>
         </div>
 
-        <div class="mt-4 space-y-4">
+        <div data-player-video-region class="mt-4 space-y-4">
             <div data-player-primary class="min-w-0">
-                <div class="relative">
+                <div data-player-media-region class="relative">
                     <div
                         wire:loading.delay.flex
                         wire:target="selectMedia"
@@ -129,6 +130,7 @@
                             wire:key="catalog-player-media-shell-{{ $selectedMedia->id }}-{{ $authorizationVersion }}"
                             wire:ignore
                             data-player-shell
+                            data-player-frame
                             data-player-state="loading"
                             data-player-copy="{{ \Illuminate\Support\Js::encode($playerCopy) }}"
                             data-player-menu-bootstrap="{{ \Illuminate\Support\Js::encode($playerMenuBootstrap) }}"
@@ -227,7 +229,7 @@
                             </dialog>
                         </div>
                     @else
-                        <div wire:key="catalog-player-empty" class="mt-3 overflow-hidden rounded-lg border border-amber-200 bg-amber-50">
+                        <div wire:key="catalog-player-empty" data-player-frame class="mt-3 overflow-hidden rounded-lg border border-amber-200 bg-amber-50">
                             <div class="grid aspect-video place-items-center p-6 text-center text-amber-700">
                                 <div>
                                     <x-ui.icon name="fa-solid fa-circle-play text-3xl text-amber-600" />

@@ -31,6 +31,18 @@ const login = async (page, email) => {
     await expect(page).toHaveURL(/\/library(?:\?|$)/);
 };
 
+test('default discovery entry opens the complete collection hierarchy', async ({ page, baseURL }) => {
+    const browserErrors = installBrowserGuard(page, baseURL);
+    const response = await page.goto('/discover/');
+
+    expect(response?.status()).toBe(200);
+    await expect(page).toHaveURL(/\/discover\/popular#collections$/);
+    await expect(page.locator('[data-collection-category-tree] [data-collection-category]')).toHaveCount(5);
+    await expect(page.locator('[data-collection-category-tree] [data-collection-subcategory]')).toHaveCount(31);
+    await assertResponsivePage(page);
+    expect(browserErrors).toEqual([]);
+});
+
 test('discovery and collection taxonomy stay text-only and responsive', async ({ page, baseURL }, testInfo) => {
     test.setTimeout(150_000);
 

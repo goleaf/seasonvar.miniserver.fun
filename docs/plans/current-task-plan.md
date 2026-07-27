@@ -1,15 +1,20 @@
-# Текущая задача — Task 113: безопасные практики современного PHP
+# Текущая задача — Task 113–116
 
 ## Реестр активных workstreams
 
 | Workstream | Status | Evidence |
 | --- | --- | --- |
-| Task 113: безопасные практики современного PHP | `in_progress: commit и remote delivery` | [Task 113 evidence](archive/2026-07-27-modern-php-practices-evidence.md) |
+| Task 113: безопасные практики современного PHP | `completed: commit a7322a91; push pending clean tree` | [Task 113 evidence](archive/2026-07-27-modern-php-practices-evidence.md) |
+| Task 114: video-first режим «Театр» | `completed: exact combined delivery staged` | [Task 114 evidence](archive/2026-07-27-player-theatre-video-first-evidence.md) |
+| Task 115: заметные карточки персональных рекомендаций | `completed: exact combined delivery staged` | [Task 115 evidence](archive/2026-07-27-personalized-series-cards-evidence.md) |
+| Task 116: восстановление default-входа discovery | `completed: exact combined delivery staged` | [Task 116 evidence](archive/2026-07-27-discovery-default-route-restoration-evidence.md) |
 
 ## Реестр blocked/unresolved
 
 | Workstream | Status | Evidence |
 | --- | --- | --- |
+| Task 115 inherited browser/docs gates | `unresolved` | Старый PWA poster fixture даёт `404`, а чужой Task 114 hunk содержит `breadcrumbs`; focused Task 115 gates прошли |
+| Remote delivery Tasks 113–116 | `unresolved` | Отдельный непроверенный `composer.lock` остаётся unstaged; pre-push требует чистое worktree, dependency diff не включается без maintenance review |
 
 ## Task-specific compliance matrix
 
@@ -18,11 +23,80 @@
 | Native warning и architecture boundaries | `completed` | [Task 113 evidence](archive/2026-07-27-modern-php-practices-evidence.md) |
 | Routes, schema, cache keys и permissions | `already_compliant` | Публичные и data contracts не менялись |
 | Full verification | `completed` | Backend: `2294` tests, `208356` assertions; frontend: build и release-check прошли |
-| Commit и remote delivery | `in_progress` | Exact staged review и push выполняются после финального reread |
+| Commit и remote delivery | `unresolved: Task 113 committed, общий push ждёт clean tree` | Task 113 = `a7322a91`; dependency lock не входит в разрешённый scope |
+| Task 114 theatre presentation | `completed` | [Task 114 evidence](archive/2026-07-27-player-theatre-video-first-evidence.md) |
+| Task 114 public/data contracts | `already_compliant` | Routes, schema, translations, cache keys и permissions не меняются |
+| Task 115 approved green direction | `completed` | [Task 115 design](../superpowers/specs/2026-07-27-personalized-series-cards-design.md) |
+| Task 115 implementation и verification | `completed` | [Evidence](archive/2026-07-27-personalized-series-cards-evidence.md): RED/GREEN, `44` PHPUnit tests, build, focused Playwright `3/3` |
+| Task 116 route contract | `completed` | Default/trailing-slash/RU/EN ведут к существующему `popular#collections` |
 
 ## Последнее подтверждённое evidence
 
 - [Task 113: современные PHP-практики](archive/2026-07-27-modern-php-practices-evidence.md)
+- [Task 114: compliance video-first theatre](task-114-player-theatre-video-first-compliance.md)
+- [Task 114: video-first theatre evidence](archive/2026-07-27-player-theatre-video-first-evidence.md)
+- [Task 115: compliance заметных карточек](task-115-personalized-series-cards-compliance.md)
+- [Task 116: compliance default discovery](task-116-discovery-default-route-restoration-compliance.md)
+
+## Task 116 — цель и checklist
+
+Вернуть `/discover/` и localized aliases как совместимые `302` entry routes
+к существующему `/discover/popular#collections`, где уже отображается полное
+дерево из пяти категорий и 31 подкатегории.
+
+| Priority | Workstream | Status | Evidence |
+|---|---|---|---|
+| critical | Requirements, latest specs и root-cause audit | `completed` | Удалённый route найден; Task 109/110 hierarchy уже работает |
+| high | Canonical contract и task plan | `completed` | [Design](../superpowers/specs/2026-07-27-discovery-default-route-restoration-design.md), [plan](../superpowers/plans/2026-07-27-discovery-default-route-restoration.md) |
+| high | PHPUnit RED/GREEN и route implementation | `completed` | RED `404`; GREEN `58` tests / `494` assertions |
+| high | Browser hierarchy/mobile smoke | `completed` | Playwright `2/2`: `/discover/` → `popular#collections`, 5/31 tree |
+| medium | README, CHANGELOG и archive evidence | `completed` | [Evidence](archive/2026-07-27-discovery-default-route-restoration-evidence.md) |
+| critical | Exact commit и push in `main` | `in_progress_commit_unresolved_push` | Tasks 114–116 staged exact; посторонний `composer.lock` исключён |
+
+Task 116 не меняет migrations, database data, collection quality/visibility,
+API, sitemap, cache keys, permissions, recommendation ranking или imports.
+Rollback — удалить два entry routes и вернуть прежний `404` contract.
+
+## Task 115 — цель и checklist
+
+Сделать блок «Сериалы каталога» на `/discover/personalized` визуально
+отделённым светло-зелёным фоном, поместить результаты в белые карточки и
+дать каждой карточке постоянно заметную кнопку перехода к сериалу.
+
+| Priority | Workstream | Status | Evidence |
+|---|---|---|---|
+| critical | Requirements, implementation и production browser audit | `completed` | Desktop/mobile подтвердили прозрачный shell и слабую текстовую CTA |
+| high | Visual direction и design-spec | `completed` | [Design](../superpowers/specs/2026-07-27-personalized-series-cards-design.md) одобрен пользователем |
+| high | TDD implementation plan | `completed: awaiting execution choice` | [Plan](../superpowers/plans/2026-07-27-personalized-series-cards.md) |
+| high | TDD implementation и focused verification | `completed` | `44` PHPUnit tests/`81 536` assertions; focused Playwright `3/3` |
+| medium | Canonical docs, README, CHANGELOG и evidence | `completed` | [Evidence](archive/2026-07-27-personalized-series-cards-evidence.md) |
+| critical | Exact commit и push in `main` | `in_progress_commit_unresolved_push` | User-authorized Tasks 114–116 staged together; dependency lock excluded |
+
+Task 115 не меняет migrations, routes, API, cache keys, permissions,
+recommendation ranking или persistent data. Rollout требует согласованной
+публикации Blade/assets; rollback — revert UI release unit без data restore.
+
+## Task 114 — цель и checklist
+
+Только в активном режиме «Театр» сделать существующее видео первым
+визуальным элементом, скрыть breadcrumbs/«Просмотр»/текстовую сводку и
+оставить реальные source controls под video, а кнопку выхода — поверх его
+правого верхнего угла.
+
+| Priority | Workstream | Status | Evidence |
+|---|---|---|---|
+| critical | Requirements, versions, current implementation audit | `completed` | UI/frontend/views/player/production/maintenance owners и Task 112 lifecycle проверены |
+| critical | Workspace lease и exact manifest | `completed` | `task-114-player-theatre-video-first`, 19 путей после browser discovery |
+| high | RED marker/CSS/browser contracts | `completed` | Три RED-этапа подтверждены до соответствующих production edits |
+| high | Scoped Blade/CSS video-first implementation | `completed` | Video-first, compact toggle и точный scroll restore GREEN |
+| high | Vite/player release и browser matrix | `completed` | `31` sources/`19` assets; Playwright `19 passed`/`2 skipped` |
+| medium | Canonical docs, README, CHANGELOG, archive evidence | `completed` | Owners и evidence обновлены |
+| critical | Exact commit и remote delivery | `in_progress_commit_unresolved_push` | User-authorized Tasks 114–116 staged together; dependency lock excluded |
+
+Task 114 не меняет migrations, routes, translations, cache keys, policies,
+permissions, playback grants, progress, PWA media denylist или persistent
+data. Rollout требует согласованной Vite-сборки; rollback — revert frontend
+release unit и rebuild без data restore.
 
 ## Цель
 
@@ -42,7 +116,7 @@
 | high | Existing domain behavior и security compatibility | `completed` | Focused suites и полный backend gate прошли |
 | medium | Bounded PHPStan expansion и code-quality documentation | `completed` | Larastan level 6: `0` errors; owners обновлены |
 | critical | Full verification | `completed` | Backend/frontend gates exit `0` |
-| critical | Exact commit и push in `main` | `in_progress` | Pending exact staged review |
+| critical | Exact commit и push in `main` | `completed_commit_unresolved_push` | Commit `a7322a91`; push ждёт чистого worktree |
 
 ## Подтверждённые выводы
 
@@ -90,3 +164,9 @@
 - [Design](../superpowers/specs/2026-07-27-modern-php-practices-design.md)
 - [Implementation plan](../superpowers/plans/2026-07-27-modern-php-practices.md)
 - [Compliance matrix](task-113-modern-php-practices-compliance.md)
+
+## Детальные документы Task 114
+
+- [Design](../superpowers/specs/2026-07-27-player-theatre-video-first-design.md)
+- [Implementation plan](../superpowers/plans/2026-07-27-player-theatre-video-first.md)
+- [Compliance matrix](task-114-player-theatre-video-first-compliance.md)

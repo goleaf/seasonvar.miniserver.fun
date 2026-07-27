@@ -92,7 +92,7 @@
                 <x-administration.navigation :groups="$layoutAdminNavigation" />
             @endif
             @if ($showBreadcrumbs)
-                <nav aria-label="{{ __('catalog.layout.breadcrumbs') }}" class="mb-4 border-b border-slate-200 px-1 pb-3 text-sm">
+                <nav data-layout-breadcrumbs aria-label="{{ __('catalog.layout.breadcrumbs') }}" class="mb-4 border-b border-slate-200 px-1 pb-3 text-sm">
                     <ol class="flex flex-wrap items-center gap-2 text-slate-500">
                         @foreach ($breadcrumbs as $breadcrumb)
                             <li class="inline-flex min-w-0 items-center gap-2">

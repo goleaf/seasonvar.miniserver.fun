@@ -658,6 +658,7 @@ return [
         'description' => 'Описание',
         'description_missing' => 'Описание пока отсутствует.',
         'more_details' => 'Подробнее',
+        'open_series' => 'Открыть сериал',
         'card_rating' => ':provider :rating',
         'card_actions' => [
             'watch' => 'Смотреть',

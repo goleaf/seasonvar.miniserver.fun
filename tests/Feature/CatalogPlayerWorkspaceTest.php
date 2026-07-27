@@ -81,9 +81,13 @@ final class CatalogPlayerWorkspaceTest extends TestCase
         $component
             ->assertSeeHtml('data-player-workspace')
             ->assertSeeHtml('data-player-context-bar')
+            ->assertSeeHtml('data-player-context-summary')
+            ->assertSeeHtml('data-player-context-actions')
+            ->assertSeeHtml('data-player-video-region')
             ->assertSeeHtml('data-player-theatre-toggle')
             ->assertSeeHtml('aria-pressed="false"')
             ->assertSeeHtml('aria-controls="player"')
+            ->assertSeeHtml('aria-label="Развернуть театр"')
             ->assertSeeHtml('data-player-theatre-icon')
             ->assertSeeHtml('data-player-stage-panel')
             ->assertSeeHtml('data-player-seasons-panel')
@@ -112,12 +116,15 @@ final class CatalogPlayerWorkspaceTest extends TestCase
     public function test_title_page_exposes_scoped_theatre_layout_markers(): void
     {
         $detail = file_get_contents(resource_path('views/livewire/catalog-title-detail.blade.php'));
+        $layout = file_get_contents(resource_path('views/layouts/app.blade.php'));
 
         self::assertIsString($detail);
+        self::assertIsString($layout);
         self::assertStringContainsString('data-title-detail-workspace', $detail);
         self::assertStringContainsString('data-title-detail-layout', $detail);
         self::assertStringContainsString('data-title-detail-sidebar', $detail);
         self::assertStringContainsString('data-title-detail-primary', $detail);
         self::assertStringContainsString('data-player-workspace-region', $detail);
+        self::assertStringContainsString('data-layout-breadcrumbs', $layout);
     }
 }

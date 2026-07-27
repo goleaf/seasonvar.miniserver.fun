@@ -658,6 +658,7 @@ return [
         'description' => 'Description',
         'description_missing' => 'No description is available yet.',
         'more_details' => 'Details',
+        'open_series' => 'Open series',
         'card_rating' => ':provider :rating',
         'card_actions' => [
             'watch' => 'Watch',

@@ -60,6 +60,12 @@ No `.env` edit, destructive database command, queue clear, failed-job payload du
 
 The task explicitly prohibited creating or running automated tests, so its acceptance used static inspection, isolated schema/query exercises and manual Chromium flows only. No PHPUnit, Pest or Playwright test runner was invoked for this increment.
 
+> Route delta 27.07.2026: исторический `404` для bare `/discover` в таблице
+> ниже заменён совместимыми `302` routes `/discover` и
+> `/{locale}/discover` к соответствующему `popular#collections`.
+> `/collections`, `/admin/collections`, `/recommendations`, `/lists`,
+> `/selections` и `/my/lists` сохраняют прежний `404`.
+
 | Gate | Fresh evidence |
 | --- | --- |
 | Canonical routes | `/discover/popular` объединяет recommendation и collection directory, `/admin/catalog` объединяет оба manager workflow; detail/profile/API routes сохранены, cover route удалён. `/collections`, `/admin/collections`, `/discover`, `/recommendations`, `/lists`, `/selections` и `/my/lists` удалены без redirects и возвращают `404`; owner mutations остаются Livewire actions за authenticated policy checks. |

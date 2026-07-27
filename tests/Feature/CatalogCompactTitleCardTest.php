@@ -234,6 +234,12 @@ final class CatalogCompactTitleCardTest extends TestCase
         $this->assertStringContainsString('IMDb 7,7', $html);
         $this->assertStringNotContainsString('КиноПоиск 8,2', $html);
         $this->assertStringContainsString('data-title-card-details', $html);
+        $this->assertStringContainsString('Открыть сериал', $html);
+        $this->assertMatchesRegularExpression(
+            '/data-title-card-details[^>]*class="[^"]*title-card-action-primary[^"]*w-full[^"]*sm:w-auto[^"]*"/',
+            $html,
+        );
+        $this->assertStringContainsString('href="'.route('titles.show', $title).'"', $html);
     }
 
     public function test_titles_page_loads_one_bounded_card_metadata_union_for_all_cards(): void

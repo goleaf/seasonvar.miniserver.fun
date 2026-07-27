@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Models\CatalogTitle;
+use App\Models\LicensedMedia;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
@@ -118,6 +120,53 @@ final class CatalogDiscoveryLayoutTest extends TestCase
             strpos($html, 'data-discovery-title-results'),
             strpos($html, 'data-discovery-collection-results'),
         );
+    }
+
+    public function test_personalized_series_results_use_green_surface_and_white_cards_only_in_personalized_mode(): void
+    {
+        $title = CatalogTitle::factory()->create([
+            'title' => 'Заметная персональная рекомендация',
+            'indexed_at' => now(),
+        ]);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $title->id,
+            'status' => 'published',
+        ]);
+
+        $personalizedHtml = $this->get(route('discover.index', ['type' => 'personalized']))
+            ->assertOk()
+            ->assertSee('data-personalized-series-surface', false)
+            ->assertSee('data-discovery-series-card', false)
+            ->getContent();
+
+        preg_match(
+            '/<section[^>]*data-discovery-title-results[^>]*class="([^"]*)"/',
+            $personalizedHtml,
+            $personalizedSection,
+        );
+        preg_match(
+            '/<li[^>]*data-discovery-series-card[^>]*class="([^"]*)"/',
+            $personalizedHtml,
+            $personalizedCard,
+        );
+
+        $this->assertStringContainsString('bg-emerald-50', $personalizedSection[1] ?? '');
+        $this->assertStringContainsString('border-emerald-200', $personalizedSection[1] ?? '');
+        $this->assertStringContainsString('bg-white', $personalizedCard[1] ?? '');
+        $this->assertStringContainsString('border-emerald-100', $personalizedCard[1] ?? '');
+
+        $randomHtml = $this->get(route('discover.index', ['type' => 'random']))
+            ->assertOk()
+            ->assertDontSee('data-personalized-series-surface', false)
+            ->getContent();
+
+        preg_match(
+            '/<section[^>]*data-discovery-title-results[^>]*class="([^"]*)"/',
+            $randomHtml,
+            $randomSection,
+        );
+
+        $this->assertStringNotContainsString('bg-emerald-50', $randomSection[1] ?? '');
     }
 
     /** @return array<string, array{string}> */

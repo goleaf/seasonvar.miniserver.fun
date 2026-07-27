@@ -329,7 +329,18 @@
         <div class="rounded-panel border border-sky-200 bg-sky-50 p-4 text-sm leading-6 text-sky-900">{{ __('recommendations.page.upcoming_notice') }}</div>
     @endif
 
-    <section id="{{ $titleResultsAnchor }}" data-discovery-title-results aria-labelledby="discovery-results" aria-busy="false" class="scroll-mt-28 border-t border-slate-200 pt-5">
+    <section
+        id="{{ $titleResultsAnchor }}"
+        data-discovery-title-results
+        @if ($type === 'personalized') data-personalized-series-surface @endif
+        aria-labelledby="discovery-results"
+        aria-busy="false"
+        @class([
+            'scroll-mt-28',
+            'rounded-panel border border-emerald-200 bg-emerald-50 p-4 sm:p-5' => $type === 'personalized',
+            'border-t border-slate-200 pt-5' => $type !== 'personalized',
+        ])
+    >
         <div class="flex flex-wrap items-end justify-between gap-3">
             <div>
                 <p class="text-sm font-semibold text-emerald-700">{{ __('recommendations.page.series_section_eyebrow') }}</p>
@@ -367,7 +378,16 @@
         @else
             <ol class="mt-4 grid min-w-0 gap-4 xl:grid-cols-2" aria-label="{{ $presentation['accessibility'] }}" data-recommendation-list>
                 @foreach ($viewItems as $recommendationItem)
-                    <li wire:key="discovery-{{ $type }}-{{ $result->page }}-{{ $recommendationItem->title->id }}" class="min-w-0 border-b border-slate-200 last:border-b-0 xl:odd:border-r xl:odd:pr-4 xl:even:pl-4" data-recommendation-row>
+                    <li
+                        wire:key="discovery-{{ $type }}-{{ $result->page }}-{{ $recommendationItem->title->id }}"
+                        data-recommendation-row
+                        data-discovery-series-card
+                        @class([
+                            'min-w-0',
+                            'overflow-hidden rounded-panel border border-emerald-100 bg-white' => $type === 'personalized',
+                            'border-b border-slate-200 last:border-b-0 xl:odd:border-r xl:odd:pr-4 xl:even:pl-4' => $type !== 'personalized',
+                        ])
+                    >
                         <x-catalog.title-card
                             :title="$recommendationItem->title"
                             layout="recommendation"

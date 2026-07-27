@@ -132,18 +132,20 @@ const syncTheatreUi = (root, active) => {
     const theatreLabel = theatreTrigger?.querySelector('[data-player-theatre-label]');
     const theatreIcon = theatreTrigger?.querySelector('[data-player-theatre-icon]');
     const titleWorkspace = root.closest('[data-title-detail-workspace]');
+    const theatreLabelText = active
+        ? theatreTrigger?.dataset.labelCollapse || ''
+        : theatreTrigger?.dataset.labelExpand || '';
 
     document.body.classList.toggle('player-theatre-active', active);
     root.toggleAttribute('data-player-theatre-active', active);
     titleWorkspace?.toggleAttribute('data-player-theatre-active', active);
     theatreTrigger?.setAttribute('aria-pressed', active ? 'true' : 'false');
+    theatreTrigger?.setAttribute('aria-label', theatreLabelText);
     theatreIcon?.classList.toggle('fa-expand', !active);
     theatreIcon?.classList.toggle('fa-compress', active);
 
     if (theatreLabel instanceof HTMLElement && theatreTrigger instanceof HTMLElement) {
-        theatreLabel.textContent = active
-            ? theatreTrigger.dataset.labelCollapse || ''
-            : theatreTrigger.dataset.labelExpand || '';
+        theatreLabel.textContent = theatreLabelText;
     }
 };
 
@@ -168,6 +170,7 @@ const bindRoot = (root) => {
         || root.hasAttribute('data-player-theatre-active');
     let theatreFrame = null;
     let theatreReturnPosition = null;
+    let theatreHeaderCompactState;
 
     const cancelTheatreFrame = () => {
         if (theatreFrame !== null) {
@@ -191,6 +194,24 @@ const bindRoot = (root) => {
         if (theatreTrigger instanceof HTMLElement) {
             theatreTrigger.focus({ preventScroll: true });
         }
+    };
+    const captureTheatreHeaderCompactState = () => {
+        const siteHeader = document.querySelector('[data-site-header]');
+
+        theatreHeaderCompactState = siteHeader instanceof HTMLElement
+            ? siteHeader.getAttribute('data-compact')
+            : undefined;
+    };
+    const restoreTheatreHeaderCompactState = () => {
+        const siteHeader = document.querySelector('[data-site-header]');
+
+        if (siteHeader instanceof HTMLElement && theatreHeaderCompactState === null) {
+            siteHeader.removeAttribute('data-compact');
+        } else if (siteHeader instanceof HTMLElement && typeof theatreHeaderCompactState === 'string') {
+            siteHeader.setAttribute('data-compact', theatreHeaderCompactState);
+        }
+
+        theatreHeaderCompactState = undefined;
     };
     const alignTheatreWorkspace = () => {
         inNextTheatreFrame(() => {
@@ -243,6 +264,9 @@ const bindRoot = (root) => {
                 x: window.scrollX,
                 y: window.scrollY,
             };
+            captureTheatreHeaderCompactState();
+        } else {
+            restoreTheatreHeaderCompactState();
         }
 
         theatreActive = nextActive;
@@ -260,6 +284,7 @@ const bindRoot = (root) => {
     const cleanupTheatre = () => {
         cancelTheatreFrame();
         theatreReturnPosition = null;
+        restoreTheatreHeaderCompactState();
         theatreActive = false;
         syncTheatreUi(root, false);
     };

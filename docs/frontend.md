@@ -302,7 +302,14 @@ auth middleware сохраняет intended URL, а расписание исп�
 
 ## Frontend lifecycle коллекций
 
-`CatalogDiscoveryPage` остаётся единственным full-page owner `/discover/{type}`. Девять реальных режимов имеют один H1 с mode-specific summary, переносящуюся mode navigation без вложенной прокрутки и fake landing, сворачиваемые общие filters и secondary refresh рядом с результатами. Каждый mode показывает компактную навигацию секций и один `CatalogCollectionExplorer` перед serial results: `#collections` стабилен во всех modes, `popular` сохраняет совместимый `#popular-titles`, остальные используют `#discovery-titles`; глобальная RU/EN ссылка «Подборки» по-прежнему открывает popular `#collections`. Explorer имеет стабильный Livewire key по mode и locale и хранит независимые `collections_q`, `collections_sort`, `collections_category`, `collections_subcategory` и `collectionsPage`, не меняя recommendation filters или ranking. На телефоне, планшете и desktop весь активный двухуровневый справочник выводится одним переносимым nested list: положительные root/child являются Livewire-фильтрами, а zero-count узлы остаются видимыми текстовыми пунктами со счётчиком `0`, но не становятся dead controls. Выбранный bookmarked zero-count state сохраняется, а forged/stale child state нормализуется server-side. `CatalogAdministrationPage` аналогично является единственным full-page owner `/admin/catalog` и переключает catalog/collection manager fragments без второго layout или `<h1>`. Dashboard, editor, public/private/unlisted detail, owner profile и title membership используют Livewire 4 без Volt. Public properties — normalized scalar URL state, bounded draft UUIDs и locked identities/version; Eloquent graphs существуют только внутри render. Search/filter/sort/pagination используют browser history. Collection cards и detail hero text-only; image upload/control/placeholder отсутствуют.
+`CatalogDiscoveryPage` остаётся единственным full-page owner `/discover/{type}`. Совместимый `/discover` и localized aliases только временно перенаправляют к соответствующему `popular#collections` и не рендерят отдельный landing. Девять реальных режимов имеют один H1 с mode-specific summary, переносящуюся mode navigation без вложенной прокрутки и fake landing, сворачиваемые общие filters и secondary refresh рядом с результатами. Каждый mode показывает компактную навигацию секций и один `CatalogCollectionExplorer` перед serial results: `#collections` стабилен во всех modes, `popular` сохраняет совместимый `#popular-titles`, остальные используют `#discovery-titles`; глобальная RU/EN ссылка «Подборки» по-прежнему открывает popular `#collections`. Explorer имеет стабильный Livewire key по mode и locale и хранит независимые `collections_q`, `collections_sort`, `collections_category`, `collections_subcategory` и `collectionsPage`, не меняя recommendation filters или ranking. На телефоне, планшете и desktop весь активный двухуровневый справочник выводится одним переносимым nested list: положительные root/child являются Livewire-фильтрами, а zero-count узлы остаются видимыми текстовыми пунктами со счётчиком `0`, но не становятся dead controls. Выбранный bookmarked zero-count state сохраняется, а forged/stale child state нормализуется server-side. `CatalogAdministrationPage` аналогично является единственным full-page owner `/admin/catalog` и переключает catalog/collection manager fragments без второго layout или `<h1>`. Dashboard, editor, public/private/unlisted detail, owner profile и title membership используют Livewire 4 без Volt. Public properties — normalized scalar URL state, bounded draft UUIDs и locked identities/version; Eloquent graphs существуют только внутри render. Search/filter/sort/pagination используют browser history. Collection cards и detail hero text-only; image upload/control/placeholder отсутствуют.
+
+На `/discover/personalized` serial results принадлежат одному
+светло-зелёному shell с белыми result cards; feedback остаётся внутри той же
+карточки. Общий recommendation layout всегда показывает отдельную primary
+ссылку «Открыть сериал» с touch target не меньше 44 px и видимым focus:
+hover не является единственным affordance. Остальные discovery modes
+сохраняют прежний нейтральный results shell.
 
 `CatalogCollectionDashboard` позволяет verified owner выбрать manual или smart mode только при создании; smart mode принудительно private/user/no-category и предлагает шесть переводимых presets. `CatalogCollectionEditor` блокирует mode identity, держит только scalar rule draft, выполняет actor lookup после двух символов максимум на 10 вариантов, показывает field-level validation/loading/success и сохраняет metadata с rules одной optimistic transaction. Reset возвращает сохранённые rules, а preset только меняет draft. Smart detail переиспользует существующие filters/sort/pagination, показывает badge/automatic count и rule summary; manual add/remove/reorder/unavailable controls отсутствуют. RU/EN catalogs имеют одинаковую структуру, labels связаны с controls, touch targets остаются 44px, structural grid складывается на mobile; Blade не запрашивает БД и не содержит inline business JavaScript.
 
@@ -372,7 +379,7 @@ Blade получает DTO/options/paginators и prepared per-request administra
 
 `CatalogDiscoveryPage` хранит только validated scalar URL state; `type`, refresh seed и last undo ID locked, current user/history остаются server-side. Filter changes reset page/errors, pagination deterministic, refresh resolves новый набор один раз и сохраняет только фактически показанные IDs. Incremental loading keeps the page shell/results visible, disables duplicate actions and announces loading/notice/error/empty state through translated live regions.
 
-Recommendation rows reuse `x-catalog.title-card` recommendation layout and показывают только первую наиболее значимую broad-причину из сохранённого server-side списка. Type navigation is touch-scrollable with standard link fallback; result list is a responsive grid/list, not autoplay carousel. There is no inline CSS, `@php`, business JavaScript, client ranking, exposed candidate graph or polling. Keyboard focus, 44px controls, visible focus, long-label wrapping, missing poster alt, zoom/reduced-motion and phone/tablet/desktop layout follow `UI_STANDARDS.md`. No new Vite module was required.
+Recommendation rows reuse `x-catalog.title-card` recommendation layout and показывают только первую наиболее значимую broad-причину из сохранённого server-side списка. Каждая строка имеет отдельную постоянно видимую primary-ссылку «Открыть сериал»; растянутая ссылка названия и canonical `titles.show` route сохраняются. Type navigation is touch-scrollable with standard link fallback; result list is a responsive grid/list, not autoplay carousel. There is no inline CSS, `@php`, business JavaScript, client ranking, exposed candidate graph or polling. Keyboard focus, 44px controls, visible focus, long-label wrapping, missing poster alt, zoom/reduced-motion and phone/tablet/desktop layout follow `UI_STANDARDS.md`. No new Vite module was required.
 
 Confidence, source-title IDs, evidence weights and negative profile remain server-side. Видимая причина «Новое для вас» появляется только у bounded exploration row, прошедшего тот же availability/relevance boundary; cold/low/medium fallback использует фактический public display type и не обещает несуществующую глубину персонализации.
 
@@ -550,7 +557,10 @@ playback grant, не создаёт fixed overlay, не использует sto
 сначала уважает открытый dialog и fullscreen; затем закрывает theatre.
 
 До layout mutation controller сохраняет `scrollX`/`scrollY` только в памяти.
-В следующем cancellable `requestAnimationFrame` он привязывает viewport к
+Там же он запоминает compact-state скрываемой site header и возвращает его до
+восстановления normal layout: theatre-scroll к `0` не должен раскрыть шапку
+на один frame и добавить `16 px` browser scroll anchoring. В следующем
+cancellable `requestAnimationFrame` он привязывает viewport к
 `data-player-workspace-region`, чтобы toggle и video оставались видимы после
 скрытия больших секций страницы. Выход сначала восстанавливает document flow,
 затем в следующем frame возвращает точную прежнюю прокрутку и focus через
@@ -558,6 +568,16 @@ playback grant, не создаёт fixed overlay, не использует sto
 позицию на другой тайтл. Site header, footer и mobile bottom navigation
 скрываются только при активном body marker, а main/seasons panels используют
 общую тёмную сцену и сохраняют один исходный `<video>`.
+
+Presentation markers `data-layout-breadcrumbs`,
+`data-player-context-summary`, `data-player-context-actions`,
+`data-player-video-region`, `data-player-media-region` и
+`data-player-frame` задают video-first порядок только в theatre. CSS скрывает
+breadcrumbs, heading панели и текстовую сводку, поднимает media frame к
+верхней safe-area границе и оставляет реальные source controls следующим
+элементом. Toggle остаётся absolute внутри stage panel, не fixed overlay; на
+narrow и low-landscape видим только icon `44×44`, а полная текущая подпись
+остаётся в `aria-label`. Обычный режим сохраняет прежнюю иерархию.
 
 Context-bar использует server-prepared labels и real source variants. In-place
 transition обновляет сезон, серию, перевод, качество, subtitle status и
@@ -580,6 +600,9 @@ bottom sheet, все targets не меньше 44 px, player остаётся 16
 проверяется на desktop, phone, tablet, narrow phone, landscape и TV-like
 viewport; Chromium и Firefox lifecycle отдельно защищают dialog/fullscreen
 priority и неизменную identity media DOM.
+
+Layout Blade входит в `resources/player-release.json`, потому что marker
+breadcrumbs является частью атомарного player presentation contract.
 
 ## PWA frontend lifecycle Task 100
 

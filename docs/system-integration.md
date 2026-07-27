@@ -1,6 +1,6 @@
 # Системная интеграция портала
 
-Обновлено: 25.07.2026
+Обновлено: 27.07.2026
 
 Этот документ — единый владелец финальной cross-feature dependency matrix и production-readiness evidence. Постоянные правила находятся в [`requirements/system-wide-integration.md`](requirements/system-wide-integration.md), а детальные domain contracts — в [`README.md`](README.md). Статусы здесь означают только подтверждённое состояние repository; отсутствующие capabilities не изображаются реализованными.
 
@@ -65,7 +65,8 @@ Public catalog/portal/help/profile/collection search использует отд
 Canonical/localized URLs, `hreflang`, robots, structured data и sitemap
 включают только public resources. Collection JSON-LD/sitemap/API не содержат
 image URL; deprecated API `cover_url` равен `null`. `/discover/{type}` и
-localized aliases сохранены, bare `/discover` остаётся 404.
+localized routes сохранены, а bare `/discover` и localized default aliases
+выполняют `302` на соответствующий `popular#collections`.
 Auth/account/admin/ticket/payment-return/signed endpoints не индексируются;
 `/offline` и PWA snapshot endpoints также получают noindex/private cache
 boundary и не входят в sitemap.

@@ -25,6 +25,7 @@
         "resources/js/player-navigation.js",
         "resources/js/player.js",
         "resources/player-release.json",
+        "resources/views/layouts/app.blade.php",
         "resources/views/livewire/catalog-title-detail.blade.php",
         "resources/views/livewire/catalog-title-player.blade.php",
         "routes/api.php",

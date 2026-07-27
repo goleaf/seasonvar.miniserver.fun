@@ -427,6 +427,8 @@ Route::get('/playback/network-test', fn (PlaybackQualityNetworkTestResponder $ne
     ->middleware('throttle:playback-quality-network')
     ->name('playback.quality.network');
 
+Route::redirect('/discover', '/discover/popular#collections', 302)
+    ->name('discover.default');
 Route::get('/discover/{type}', CatalogDiscoveryPage::class)
     ->whereIn('type', $discoveryRouteTypes)
     ->middleware('public.page:discovery')
@@ -504,6 +506,14 @@ Route::middleware('collection.locale')->group(function () use ($discoveryRouteTy
         ->whereUuid('contentRequest')
         ->middleware('public.page:requests')
         ->name('localized.requests.show');
+    Route::get('/{locale}/discover', function (string $locale) {
+        return redirect(route('localized.discover.index', [
+            'locale' => $locale,
+            'type' => CatalogRecommendationType::Popular->value,
+        ]).'#collections', 302);
+    })
+        ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
+        ->name('localized.discover.default');
     Route::get('/{locale}/discover/{type}', CatalogDiscoveryPage::class)
         ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
         ->whereIn('type', $discoveryRouteTypes)

@@ -411,6 +411,7 @@ Blade и Livewire Blade являются только presentation layer: зап
 - Long user names/descriptions и category path переносятся, а structural grids переходят в один столбец на узком экране без horizontal overflow. Собственное collection image, image frame и fallback poster запрещены во всех этих поверхностях.
 - Все action targets не меньше 44px. Visibility radio, selector checkboxes, report dialog, delete confirmation, locale links и reorder up/down доступны keyboard. Drag-handle ручного порядка подборки также имеет touch target 44px, действует только в текущей странице и никогда не становится единственным способом действия; hover/color не несут essential semantics.
 - `/discover/{type}` использует один H1, все девять mode links и свёрнутый по умолчанию filters `<details>`; при активном URL-фильтре блок открыт. Refresh находится в заголовке результатов как secondary bordered action. Каждый mode получает одну compact section navigation и один text-only каталог подборок перед serial ranking: `#collections` стабилен, `popular` сохраняет `#popular-titles`, остальные modes используют `#discovery-titles`.
+- `/discover/personalized` отделяет serial ranking светло-зелёным panel shell, а каждую recommendation row — белым bordered surface без gradient, glass или дополнительной тени. Recommendation layout во всех контекстах имеет отдельную постоянно видимую primary-ссылку «Открыть сериал» высотой не меньше `44 px`; на телефоне она занимает удобную полную ширину, а hover не является единственным способом обнаружить действие.
 - Подборки во всех контекстах text-only: нельзя выводить собственную обложку, fallback poster, пустой image frame или decorative image placeholder. Category path, название, описание, owner/state и счётчик формируют иерархию. Публичная category navigation на телефоне, планшете и desktop использует один вложенный root/child list без horizontal inner-scroll. Положительный узел является кнопкой-фильтром с областью не меньше `44×44 px`; узел с нулевым count остаётся видимым текстовым пунктом со счётчиком `0`, но не становится disabled/dead control. Явно выбранный bookmark state сохраняет честный empty result и доступный общий reset.
 - Центр классификации `/admin/catalog?section=collections` использует text-only адаптивные строки вместо широкой таблицы: checkbox, название, metadata, confidence, причины и category selector сохраняют читаемый порядок на телефоне и desktop. Default queue показывает public/approved rows; выбор страницы, принятие рекомендации строки и batch target являются только staging. Score никогда не скрывает причину, цвет confidence не является единственным сигналом, а массовое действие всегда разделено на подготовку preview и явное подтверждение. Выбор уверенных и сортировка confidence ограничены текущей страницей; все controls имеют минимум 44px. Форма создания и корни справочника закрыты native `<details>`, раскрываются с клавиатуры и не используют interactive buttons внутри `<summary>`.
 - Loading/success/error содержат localized live/status regions, destructive controls отделены цветом и текстом, а unavailable item не раскрывает internal removal reason.
@@ -587,10 +588,11 @@ Article column ограничивает длину строки; `min-w-0`, wrap
 
 ## Рабочее пространство player
 
-- Player остаётся главным рабочим местом страницы тайтла: над video surface
-  находится одна компактная context-bar с сезоном, серией, переводом,
-  качеством и честным статусом субтитров; рядом размещаются только реальные
-  source-variant controls. Каждое значение не превращается в отдельную panel.
+- Player остаётся главным рабочим местом страницы тайтла. В обычном режиме над
+  video surface находится одна компактная context-bar с сезоном, серией,
+  переводом, качеством и честным статусом субтитров; рядом размещаются только
+  реальные source-variant controls. Каждое значение не превращается в
+  отдельную panel.
 - Кнопка «Развернуть театр» включает временное scoped-состояние только страницы
   тайтла: окружение player становится `slate-950`, боковая навигация и
   вторичные разделы скрываются, player расширяется, а навигация по сериям,
@@ -605,6 +607,12 @@ Article column ограничивает длину строки; `min-w-0`, wrap
 - Main и seasons panels образуют одну контрастную тёмную сцену. Player
   ограничивается доступной высотой viewport в landscape, но video element
   остаётся тем же DOM-узлом при входе, Livewire refresh и выходе.
+- Только в theatre breadcrumbs, заголовок «Просмотр» и текстовая сводка
+  context-bar скрываются; существующий video shell становится первым
+  элементом у верхней safe-area границы. Реальные controls перевода, качества
+  и субтитров идут сразу после video, а выход расположен поверх его правого
+  верхнего угла. На narrow/низком landscape это icon-only `44×44` с полной
+  динамической подписью в `aria-label`; desktop сохраняет видимый текст.
 - В открытом dialog, native/Plyr fullscreen или системном fullscreen первый
   `Escape` принадлежит текущей модальности. Theatre закрывается только после
   неё; выход не разрушает media element, не сбрасывает прогресс и не хранится

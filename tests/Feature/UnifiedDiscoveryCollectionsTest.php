@@ -92,8 +92,30 @@ final class UnifiedDiscoveryCollectionsTest extends TestCase
 
     public function test_removed_directory_and_legacy_urls_return_404_without_redirects(): void
     {
-        foreach (['/collections', '/ru/collections', '/lists', '/lists/old-list', '/selections/old-selection', '/discover', '/ru/discover', '/recommendations', '/ru/recommendations', '/admin/collections'] as $uri) {
+        foreach (['/collections', '/ru/collections', '/lists', '/lists/old-list', '/selections/old-selection', '/recommendations', '/ru/recommendations', '/admin/collections'] as $uri) {
             $this->get($uri)->assertNotFound();
+        }
+    }
+
+    public function test_default_discovery_routes_redirect_to_popular_collections(): void
+    {
+        $popularCollections = route('discover.index', [
+            'type' => CatalogRecommendationType::Popular->value,
+        ]).'#collections';
+
+        foreach (['/discover', '/discover/'] as $uri) {
+            $this->get($uri)
+                ->assertStatus(302)
+                ->assertRedirect($popularCollections);
+        }
+
+        foreach (['ru', 'en'] as $locale) {
+            $this->get("/{$locale}/discover")
+                ->assertStatus(302)
+                ->assertRedirect(route('localized.discover.index', [
+                    'locale' => $locale,
+                    'type' => CatalogRecommendationType::Popular->value,
+                ]).'#collections');
         }
     }
 

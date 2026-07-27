@@ -115,6 +115,13 @@ class CatalogRecommendationListTest extends TestCase
         $this->assertStringContainsString('Почему похож', $html);
         $this->assertStringContainsString('Легкая история любви', $html);
         $this->assertStringNotContainsString('data-recommendation-rank', $html);
+        $this->assertSame(2, substr_count($html, 'Открыть сериал'));
+        preg_match_all(
+            '/<a(?=[^>]*data-title-card-details)(?=[^>]*title-card-action-primary)[^>]*>/',
+            $html,
+            $recommendationActions,
+        );
+        $this->assertCount(2, $recommendationActions[0]);
         $this->assertLessThan(strpos($html, 'Второй точный совет'), strpos($html, 'Первый точный совет'));
         $this->assertStringNotContainsString('Ближайшие совпадения', $html);
         $this->assertStringNotContainsString('По похожим жанрам', $html);

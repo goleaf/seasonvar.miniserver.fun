@@ -8,7 +8,7 @@ test.afterEach(async ({ page }) => {
     await page.unrouteAll({ behavior: 'ignoreErrors' });
 });
 
-test('player workspace keeps theatre mode scoped and keyboard reversible', async ({ page }) => {
+test('player workspace keeps theatre mode scoped and keyboard reversible', async ({ page }, testInfo) => {
     await installPlayerMediaFixtures(page);
     await page.goto('/titles/browser-smoke?episode=1&format=mp4#player');
 
@@ -17,9 +17,18 @@ test('player workspace keeps theatre mode scoped and keyboard reversible', async
     const theatreIcon = theatre.locator('[data-player-theatre-icon]');
     const region = page.locator('[data-player-workspace-region]');
     const seasonsPanel = page.locator('[data-player-seasons-panel]');
+    const breadcrumbs = page.locator('[data-layout-breadcrumbs]');
+    const stageHeading = page.locator('[data-player-stage-panel] > div:first-child');
+    const contextBar = page.locator('[data-player-context-bar]');
+    const contextSummary = page.locator('[data-player-context-summary]');
+    const contextActions = page.locator('[data-player-context-actions]');
 
     await expect(video).toHaveAttribute('data-player-ready', '1');
-    await expect(page.locator('[data-player-context-bar]')).toBeVisible();
+    await expect(breadcrumbs).toBeVisible();
+    await expect(stageHeading).toBeVisible();
+    await expect(contextBar).toBeVisible();
+    await expect(contextSummary).toBeVisible();
+    await expect(contextActions).toBeVisible();
     const returnPosition = await page.evaluate(() => {
         window.__playerTheatreVideo = document.querySelector('video.js-catalog-player');
 
@@ -28,6 +37,7 @@ test('player workspace keeps theatre mode scoped and keyboard reversible', async
     await theatre.click();
     await expect(page.locator('body')).toHaveClass(/player-theatre-active/);
     await expect(theatre).toHaveAttribute('aria-pressed', 'true');
+    await expect(theatre).toHaveAttribute('aria-label', /Свернуть театр|Collapse theatre/);
     await expect(theatreIcon).toHaveClass(/fa-compress/);
     await expect(theatre).toBeInViewport();
     await expect(video).toBeInViewport();
@@ -35,18 +45,69 @@ test('player workspace keeps theatre mode scoped and keyboard reversible', async
     await expect(page.locator('[data-site-header]')).toBeHidden();
     await expect(page.locator('[data-mobile-bottom-navigation]')).toBeHidden();
     await expect(page.locator('[data-site-footer]')).toBeHidden();
+    await expect(breadcrumbs).toBeHidden();
+    await expect(stageHeading).toBeHidden();
+    await expect(contextSummary).toBeHidden();
+    await expect(contextActions).toBeVisible();
 
-    const theatreGeometry = await region.evaluate((element) => ({
-        regionWidth: element.getBoundingClientRect().width,
-        viewportWidth: window.innerWidth,
-        overflow: document.documentElement.scrollWidth - window.innerWidth,
-    }));
+    const theatreGeometry = await page.evaluate(() => {
+        const regionElement = document.querySelector('[data-player-workspace-region]');
+        const shellElement = document.querySelector('[data-player-shell]');
+        const toggleElement = document.querySelector('[data-player-theatre-toggle]');
+        const contextElement = document.querySelector('[data-player-context-actions]');
+
+        if (
+            !(regionElement instanceof HTMLElement)
+            || !(shellElement instanceof HTMLElement)
+            || !(toggleElement instanceof HTMLElement)
+            || !(contextElement instanceof HTMLElement)
+        ) {
+            throw new Error('Theatre geometry elements are unavailable.');
+        }
+
+        const shell = shellElement.getBoundingClientRect();
+        const toggle = toggleElement.getBoundingClientRect();
+        const context = contextElement.getBoundingClientRect();
+
+        return {
+            regionWidth: regionElement.getBoundingClientRect().width,
+            viewportWidth: window.innerWidth,
+            overflow: document.documentElement.scrollWidth - window.innerWidth,
+            shellTop: shell.top,
+            shellRight: shell.right,
+            shellBottom: shell.bottom,
+            toggleTop: toggle.top,
+            toggleRight: toggle.right,
+            toggleBottom: toggle.bottom,
+            toggleWidth: toggle.width,
+            toggleHeight: toggle.height,
+            contextTop: context.top,
+        };
+    });
 
     expect(Math.abs(theatreGeometry.regionWidth - theatreGeometry.viewportWidth)).toBeLessThanOrEqual(2);
     expect(theatreGeometry.overflow).toBeLessThanOrEqual(1);
+    expect(theatreGeometry.shellTop).toBeGreaterThanOrEqual(-1);
+    expect(theatreGeometry.shellTop).toBeLessThanOrEqual(20);
+    expect(theatreGeometry.toggleTop).toBeGreaterThanOrEqual(theatreGeometry.shellTop);
+    expect(theatreGeometry.toggleBottom).toBeLessThanOrEqual(theatreGeometry.shellBottom);
+    expect(theatreGeometry.shellRight - theatreGeometry.toggleRight).toBeGreaterThanOrEqual(-1);
+    expect(theatreGeometry.shellRight - theatreGeometry.toggleRight).toBeLessThanOrEqual(20);
+    expect(theatreGeometry.toggleWidth).toBeGreaterThanOrEqual(44);
+    expect(theatreGeometry.toggleHeight).toBeGreaterThanOrEqual(44);
+    if (
+        theatreGeometry.viewportWidth < 768
+        || (page.viewportSize()?.height || 0) <= 600
+    ) {
+        expect(theatreGeometry.toggleWidth).toBeLessThanOrEqual(52);
+    }
+    expect(theatreGeometry.contextTop).toBeGreaterThanOrEqual(theatreGeometry.shellBottom - 1);
     expect(await seasonsPanel.evaluate(
         (element) => getComputedStyle(element).backgroundColor,
     )).not.toBe('rgb(255, 255, 255)');
+    await page.screenshot({
+        path: `output/playwright/task-114-theatre-${testInfo.project.name.toLowerCase().replaceAll(' ', '-')}.png`,
+    });
 
     await page.evaluate(async () => {
         const root = document.querySelector('[data-active-player-session]');

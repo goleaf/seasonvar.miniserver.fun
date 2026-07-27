@@ -1,5 +1,27 @@
 import { expect, test } from '@playwright/test';
 
+test('personalized series surface keeps cards and primary actions visible', async ({ page }) => {
+    const response = await page.goto('/discover/personalized');
+    const section = page.locator('[data-personalized-series-surface]');
+    const card = section.locator('[data-discovery-series-card]').first();
+    const action = card.getByRole('link', { name: 'Открыть сериал' });
+
+    expect(response?.status()).toBe(200);
+    await expect(section).toBeVisible();
+    await expect(section).toHaveClass(/bg-emerald-50/);
+    await expect(section).toHaveClass(/border-emerald-200/);
+    await expect(card).toBeVisible();
+    await expect(card).toHaveClass(/bg-white/);
+    await expect(card).toHaveClass(/border-emerald-100/);
+    await expect(action).toBeVisible();
+    await expect(action).toHaveClass(/title-card-action-primary/);
+    expect((await action.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1);
+
+    await action.focus();
+    await expect(action).toBeFocused();
+});
+
 test('title recommendations stay compact, explain similarity and reveal six more', async ({ page, baseURL }, testInfo) => {
     const browserErrors = [];
     const localOrigin = new URL(baseURL).origin;
@@ -32,7 +54,7 @@ test('title recommendations stay compact, explain similarity and reveal six more
     await expect(primaryRecommendationRows).toHaveCount(6);
     await expect(additionalRecommendationRows).toHaveCount(6);
     await expect(primaryRecommendationRows.first().getByRole('link', { name: 'Рекомендованный браузерный сериал' })).toBeVisible();
-    await expect(primaryRecommendationRows.first().getByRole('link', { name: 'Подробнее' })).toBeVisible();
+    await expect(primaryRecommendationRows.first().getByRole('link', { name: 'Открыть сериал' })).toBeVisible();
     await expect(primaryRecommendationRows.first().getByText('Почему похож:', { exact: true })).toBeVisible();
     await expect(
         primaryRecommendationRows.first().locator('[data-recommendation-reasons] p:last-child > span:not([aria-hidden])'),

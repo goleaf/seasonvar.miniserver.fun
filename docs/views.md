@@ -290,9 +290,15 @@ scroll.
 `data-player-season-content`, `data-player-season-options` и
 `data-player-episode-option` позволяют scoped theatre CSS согласованно
 оформить main/seasons surfaces без query или client-owned business state.
+`data-player-context-summary`, `data-player-context-actions`,
+`data-player-video-region`, `data-player-media-region` и `data-player-frame`
+дают theatre CSS стабильный video-first порядок: summary скрывается, media
+frame идёт первым, а real source controls — сразу после него. Layout marker
+`data-layout-breadcrumbs` скрывает цепочку только под active body state.
 `data-player-theatre-secondary` скрывает только дублирующие вторичные
 действия. Toggle связан с player через `aria-controls`, а
-`data-player-theatre-icon` отражает expand/compress без второго control.
+`data-player-theatre-icon` отражает expand/compress без второго control;
+динамический `aria-label` сохраняет полную подпись у compact icon-only toggle.
 Scroll/focus lifecycle остаётся владельцем `player-navigation.js`; Blade не
 сохраняет координаты и не перемещает media shell.
 
