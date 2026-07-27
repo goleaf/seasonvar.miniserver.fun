@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Catalog;
 
-use App\Models\Episode;
-use App\Models\LicensedMedia;
-use App\Models\Season;
+use App\Services\Catalog\Queries\CatalogHomeMetricsQuery;
 use App\Support\Cache\CacheDomain;
 use App\Support\Cache\CacheTtlPolicy;
 use App\Support\Cache\CacheVersionRegistry;
@@ -17,7 +15,7 @@ final class CatalogHomeMetricsCache
     private const VERSION_SCOPE = 'metrics';
 
     public function __construct(
-        private readonly CatalogTitleQuery $titles,
+        private readonly CatalogHomeMetricsQuery $query,
         private readonly TieredCache $cache,
         private readonly CacheTtlPolicy $ttl,
         private readonly CacheVersionRegistry $versions,
@@ -45,7 +43,7 @@ final class CatalogHomeMetricsCache
             'metrics',
             ['audience' => 'public', 'locale' => app()->getLocale()],
             $this->ttl->for(CacheDomain::CatalogStats),
-            fn (): array => $this->build(),
+            fn (): array => $this->query->handle(),
             false,
             self::VERSION_SCOPE,
         ];
@@ -59,27 +57,5 @@ final class CatalogHomeMetricsCache
     public function forget(): void
     {
         $this->versions->bump(CacheDomain::Homepage, self::VERSION_SCOPE);
-    }
-
-    /**
-     * @return array{titles: int, episodes: int, videos: int}
-     */
-    private function build(): array
-    {
-        return [
-            'titles' => $this->titles->visibleTo(null)->count(),
-            'episodes' => Episode::query()
-                ->published()
-                ->whereIn('season_id', Season::query()
-                    ->published()
-                    ->select('id')
-                    ->whereIn('catalog_title_id', $this->titles->visibleTo(null)->select('id')))
-                ->count(),
-            'videos' => LicensedMedia::query()
-                ->published()
-                ->forAvailableReleases(null)
-                ->whereIn('catalog_title_id', $this->titles->visibleTo(null)->select('id'))
-                ->count(),
-        ];
     }
 }

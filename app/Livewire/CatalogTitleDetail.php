@@ -40,6 +40,17 @@ class CatalogTitleDetail extends Component
     #[Locked]
     public ?int $highlightedCommentId = null;
 
+    /** @var array{season: int|string, episode: int|string, media: int|string, variant: string, quality: string, format: string} */
+    #[Locked]
+    public array $initialPlayerSelection = [
+        'season' => '',
+        'episode' => '',
+        'media' => '',
+        'variant' => '',
+        'quality' => '',
+        'format' => '',
+    ];
+
     protected CatalogTitlePageBuilder $pages;
 
     protected CatalogTitleRefreshCoordinator $refreshes;
@@ -90,6 +101,17 @@ class CatalogTitleDetail extends Component
         $this->highlightedReviewId = $highlightedReviewId > 0 ? $highlightedReviewId : null;
         $highlightedCommentId = $request->integer('comment');
         $this->highlightedCommentId = $highlightedCommentId > 0 ? $highlightedCommentId : null;
+        $seasonId = $request->integer('season');
+        $episodeId = $request->episodeId();
+        $mediaId = $request->mediaId();
+        $this->initialPlayerSelection = [
+            'season' => $seasonId > 0 ? $seasonId : '',
+            'episode' => $episodeId > 0 ? $episodeId : '',
+            'media' => $mediaId > 0 ? $mediaId : '',
+            'variant' => $request->variantKey() ?? '',
+            'quality' => $request->quality() ?? '',
+            'format' => $request->mediaFormat() ?? '',
+        ];
     }
 
     public function startRefresh(): void

@@ -203,9 +203,9 @@ final class CheckDeploymentReadinessCommandTest extends TestCase
             ];
         }
 
-        collect($rows)->chunk(90)->each(
-            fn ($chunk) => DB::table('failed_jobs')->insert($chunk->all()),
-        );
+        collect($rows)->chunk(90)->each(function ($chunk): void {
+            DB::table('failed_jobs')->insert($chunk->all());
+        });
 
         $summary = app(FailedJobSummaryBuilder::class)->build();
         $serialized = json_encode($summary, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);

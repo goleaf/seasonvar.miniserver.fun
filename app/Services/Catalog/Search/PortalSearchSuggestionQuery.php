@@ -281,7 +281,9 @@ final readonly class PortalSearchSuggestionQuery
     /** @param Collection<int, string> $variants */
     private function applyNameSearch(Builder $query, string $column, Collection $variants): Builder
     {
-        $variants->each(fn (string $variant): Builder => $query->orWhere($column, 'like', "%{$variant}%"));
+        $variants->each(function (string $variant) use ($query, $column): void {
+            $query->orWhere($column, 'like', "%{$variant}%");
+        });
 
         return $query;
     }

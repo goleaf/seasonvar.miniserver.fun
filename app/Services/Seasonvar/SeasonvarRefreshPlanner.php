@@ -167,7 +167,9 @@ final class SeasonvarRefreshPlanner
             $this->forcedUrlQuery($importRunId)
                 ->whereIn('url_hash', $hashes->all())
                 ->get()
-                ->each(fn (SourcePage $page) => $pagesByHash->put($page->url_hash, $page));
+                ->each(function (SourcePage $page) use ($pagesByHash): void {
+                    $pagesByHash->put($page->url_hash, $page);
+                });
         }
 
         $selected = $orderedHashes
@@ -214,7 +216,9 @@ final class SeasonvarRefreshPlanner
             $this->forcedUrlQuery($importRunId)
                 ->whereKey($ids->all())
                 ->get()
-                ->each(fn (SourcePage $page) => $pagesById->put((int) $page->id, $page));
+                ->each(function (SourcePage $page) use ($pagesById): void {
+                    $pagesById->put((int) $page->id, $page);
+                });
         }
 
         $selected = $orderedIds

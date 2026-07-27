@@ -61,6 +61,15 @@ public function roles(): Collection
 
 Multiple calls return the cached result without re-executing. Use `once()` for expensive computations called multiple times per request. Use `Cache::memo()` when you also want cross-request caching.
 
+## Share Stateful Read Services with the Correct Container Lifetime
+
+If a service memoizes schema checks or request-specific reads on its object,
+bind it with `scopedIf()` so every consumer in one HTTP request, queue job, or
+Octane scope shares the result. Use `singletonIf()` only for immutable,
+process-safe registries that must survive across requests. Verify that the same
+instance is returned inside a scope and a new instance appears after scoped
+instances are flushed.
+
 ## Configure Failover Cache Stores in Production
 
 If Redis goes down, the app falls back to a secondary store automatically.

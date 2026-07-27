@@ -162,7 +162,7 @@ Target boundaries:
 - Входные параметры списка каталога нормализует и проверяет `CatalogTitlesRequest`.
 - URL-состояние `/titles` хранит `CatalogSeriesFilters`: только скаляры и ограниченные массивы slug/годов. Route-контекст года и taxonomy защищён `#[Locked]`; paginator, Eloquent-модели, фасеты и SEO не сериализуются в публичный Livewire snapshot.
 - Проект использует только Laravel 13.x и conventional class-based Livewire 4.x: PHP-класс находится в `app/Livewire`, view — отдельно в `resources/views/livewire`. Volt, anonymous component classes и implementation PHP в Blade запрещены. Form Objects, `#[Locked]`, `#[Url]`, `#[Renderless]`, bounded pagination, `wire:poll.visible`, `wire:ignore`, `wire:intersect`, `wire:text`, `wire:dirty`, `wire:transition`, loading/confirm/navigation directives применяются только по реальной UI-boundary. `wire:text` допускается для локальной presentation-only производной от уже entangled/deferred state при сохранённом SSR fallback; `wire:dirty` допускается только для точно указанного draft, где следующая синхронизация совпадает с каноническим Apply/Cancel boundary и не изображает database truth. `wire:transition` применяется только к ограниченным add/remove/change boundaries; встроенные `prefers-reduced-motion` и мгновенный fallback браузеров без View Transitions API не переопределяются custom animation. Authorization и persistence остаются server-side. Layout подключает Livewire styles/scripts один раз для всех routes, поэтому новые full-page компоненты не требуют route-specific asset condition.
-- Единственный application `wire:ignore` принадлежит keyed media shell `CatalogTitlePlayer`, потомками которого управляют Plyr/HLS и `player-menu.js`. Полный ignore обязателен: `.self` не защитил бы library-generated descendants. Loading overlay, media selection, errors и portal/personal controls остаются вне shell; другие native/server-owned widgets не получают ignore без подтверждённого third-party DOM ownership. Внутри этой же boundary разрешены только JavaScript-owned меню сезонов/серий/переводов и его локальные loading/error states, необходимые для сохранения fullscreen DOM identity; Livewire-owned controls, второй `wire:ignore` и client-trusted access state запрещены. Данные и один signed source grant выдают последовательные bounded `#[Renderless]` actions после повторной server-side проверки. `#[Json]` для этой границы запрещён, потому что установленный Livewire `4.3.3` автоматически включает для него параллельное выполнение.
+- Единственный полный application `wire:ignore` принадлежит keyed media shell `CatalogTitlePlayer`, потомками которого управляют Plyr/HLS и `player-menu.js`; `.self` не защитил бы эти library-generated descendants. Корень workspace отдельно использует `wire:ignore.self`, чтобы Livewire не заменял client-owned session attributes после hot swap, но продолжал morph дочернего server-owned UI. Loading overlay, media selection, errors и portal/personal controls остаются вне полного shell; другие native/server-owned widgets не получают ignore без подтверждённого DOM ownership. Внутри media boundary разрешены только JavaScript-owned меню сезонов/серий/переводов и локальные loading/error states, необходимые для сохранения fullscreen DOM identity; второй полный `wire:ignore` и client-trusted access state запрещены. Данные и один signed source grant выдают последовательные bounded `#[Renderless]` actions после повторной server-side проверки. `#[Json]` для этой границы запрещён, потому что установленный Livewire `4.3.3` автоматически включает для него параллельное выполнение.
 - `wire:replace` inventory ограничен четырьмя template pattern `wire:replace.self` на leaf-checkbox contextual filters каталога с `wire:model.live`: новый input принимает authoritative checked state после grouped island response, а окружающие labels/groups продолжают morphing. Bare subtree replacement отсутствует. Новый replacement допустим только после воспроизводимого DOM reuse/internal-state defect, когда более узкие `wire:key`, component boundary и explicit lifecycle не устраняют проблему; player остаётся под keyed `wire:ignore`, а native dialogs/forms/editors и text/search inputs сохраняют focus, draft и DOM identity через обычный morphing.
 - Единственный application `wire:show` без modifiers принадлежит малой форме outdated-report публичной help-статьи: form остаётся в DOM, false initial state закрыт `wire:cloak`, а toggle связан через `aria-controls`/`aria-expanded`. Visibility не является authorization; validation, actor identity, deduplication и persistence выполняются только server action. Native collection dialog сохраняет add/remove + Vite focus lifecycle, а create-collection form — отдельный `wire:transition` contract.
 - Shared computed/persisted computed, `#[Session]` и Teleport намеренно не добавляются без отдельного измеримого use case. Lazy island каталога и именованные pagination islands являются проверенными исключениями: Livewire сам добавляет `wire:intersect.once="__lazyLoadIsland"` к busy placeholder фасетов, а приложение не вызывает internal action напрямую и не дублирует observer в Alpine/JavaScript. Каждый paginator обновляет только собственный подготовленный presentation array и region, сохраняя server-owned URL state, authorization и обычные ссылки. Общий `InteractsWithPaginationIslands` переиспользует данные normal render и вызывает типизированный `render()` через container только для isolated fallback, не сохраняя Eloquent graph в public state. Domain cache имеет явные version/invalidation contracts; SEO-critical shell рендерится сразу; mutations влияют на UI синхронно; modal использует native dialog.
@@ -697,3 +697,51 @@ Failure UI вызывает существующие bounded retry/fallback/repo
 Ни theatre, ни recovery controls не записывают global source health, не
 создают второй report service и не логируют raw URL/grant. PWA/service worker
 по-прежнему исключает video, HLS, playback и download requests из cache.
+
+## Query Classes и главная страница Task 111
+
+Сложные повторно проверяемые чтения главной страницы находятся в
+`App\Services\Catalog\Queries`: `CatalogHomeSnapshotQuery`,
+`CatalogHomeMetricsQuery` и `CatalogHomeFacetGroupsQuery`. Каждый класс
+является `final readonly`, имеет один публичный `handle()` и закрытые детали
+сборки. `CatalogHomeSnapshotCache` и `CatalogHomeMetricsCache` сохранили свои
+публичные методы и делегируют только cache miss; generic repository или
+обёртки над простыми Eloquent-связями не добавлены.
+
+`CatalogHomePageBuilder` остаётся владельцем web/API projection. Один union
+query получает жанры и страны, web получает все доступные жанры, страны и
+валидные годы, а совместимый `/api/v1/home` сохраняет 18 жанров и 12 годов.
+Authenticated web не запрашивает редакционные подборки, которые его Blade не
+показывает. Query Class contract проверяется reflection-тестом.
+
+Последний внешний blueprint крупных Laravel-проектов применён выборочно:
+существующие services, view models, API Resources, config owners и Blade
+components уже обеспечивают полезные границы. Механические interfaces для
+каждого сервиса, global view composer, repository на каждую модель и полный
+переезд по domain folders не добавлены: у них нет второго implementation,
+измеримого выигрыша тестируемости или необходимости для Task 111. Заявление
+о zero-downtime deployment также не добавлено без production automation
+evidence; миграция индекса сохраняет явный backup/writer-pause contract.
+
+Full-page `CatalogTitleDetail` остаётся владельцем начального request state:
+он получает только данные из `CatalogShowRequest` и явно передаёт
+`season`/`episode`/`media`/`variant`/`quality`/`format` вложенному
+`CatalogTitlePlayer`. Nullable аргументы `mount()` применяются только когда
+переданы родителем, поэтому прямой mount компонента сохраняет официальную
+Livewire-гидратацию `#[Url]`. Authorization и source resolution по-прежнему
+выполняются внутри существующей server-side player boundary.
+`CatalogTitleDetail` входит в `resources/player-release.json`, поэтому это
+изменение участвует в едином PHP/JS/CSS release fingerprint и readiness
+проверке проигрывателя.
+
+Корень `CatalogTitlePlayer` использует `wire:ignore.self`: client transition
+владеет текущим opaque session key, а Livewire продолжает обновлять дочерний
+workspace. Это предотвращает возврат корневого атрибута к прежней server
+identity при сохранённом `wire:ignore` media owner; progress/navigation
+по-прежнему сравнивают exact session key и fail closed для stale events.
+
+`CatalogTitlesPageBuilder` и `TagPageData` остаются владельцами подсказок
+каталога и связанных тегов: Blade только отображает подготовленные данные.
+`CatalogTopListItem::ratingProvider` передаётся в существующий `TitleCard`
+как presentation preference, чтобы отображаемое значение совпадало с
+критерием ранжирования без дополнительного запроса или нового repository.

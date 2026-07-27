@@ -123,6 +123,25 @@ $turkey = Country::query()->create([
     'slug' => 'turciia',
 ]);
 
+foreach (range(1, 20) as $index) {
+    $fixtureGenre = Genre::query()->create([
+        'name' => sprintf('Полный жанр %02d', $index),
+        'slug' => sprintf('full-genre-%02d', $index),
+    ]);
+    $fixtureCountry = Country::query()->create([
+        'name' => sprintf('Полная страна %02d', $index),
+        'slug' => sprintf('full-country-%02d', $index),
+    ]);
+    $title->genres()->attach($fixtureGenre);
+    $title->countries()->attach($fixtureCountry);
+    CatalogTitle::factory()->create([
+        'title' => sprintf('Сериал для года %d', 1999 + $index),
+        'slug' => sprintf('full-year-%d', 1999 + $index),
+        'year' => 1999 + $index,
+        'poster_url' => $posterUrl,
+    ]);
+}
+
 CatalogTitle::factory()->count(30)->sequence(
     fn (Sequence $sequence): array => [
         'title' => sprintf('Турецкий браузерный сериал %02d', $sequence->index + 1),
@@ -130,7 +149,9 @@ CatalogTitle::factory()->count(30)->sequence(
         'poster_url' => $posterUrl,
         'indexed_at' => now()->subMinutes($sequence->index + 1),
     ],
-)->create()->each(fn (CatalogTitle $catalogTitle) => $catalogTitle->countries()->attach($turkey));
+)->create()->each(function (CatalogTitle $catalogTitle) use ($turkey): void {
+    $catalogTitle->countries()->attach($turkey);
+});
 
 collect([
     ['name' => 'Борис Актёр', 'slug' => 'boris-akter'],

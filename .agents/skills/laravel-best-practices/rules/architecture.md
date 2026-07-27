@@ -19,6 +19,15 @@ class CreateOrderAction
 }
 ```
 
+## Use Named Query Classes for Reusable Complex Reads
+
+Extract a read into a final readonly Query Class when it combines multiple
+filters/aggregates, is reused, or deserves an isolated SQL/performance test.
+Give it one public `handle()` method with a typed result; keep its construction
+helpers private. Preserve existing cache/controller APIs by delegating to the
+query class. Do not introduce a generic repository or one class for every
+trivial Eloquent expression.
+
 ## Use Dependency Injection
 
 Always use constructor injection. Avoid `app()` or `resolve()` inside classes.

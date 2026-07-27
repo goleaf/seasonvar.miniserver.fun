@@ -1,8 +1,11 @@
 # Database Performance Best Practices
 
-## Always Eager Load Relationships
+## Eager Load Only Relationships the Response Uses
 
-Lazy loading causes N+1 query problems — one query per loop iteration. Always use `with()` to load relationships upfront.
+Lazy loading in loops causes N+1 queries, but eager-loading unused or unbounded
+relationships wastes queries and memory. Inspect the Blade/resource/serializer,
+load only what it reads, constrain columns, and keep large has-many collections
+bounded or aggregated.
 
 Incorrect (N+1 — executes 1 + N queries):
 ```php
@@ -91,9 +94,13 @@ User::where('active', false)->chunkById(200, function ($users) {
 });
 ```
 
-## Add Database Indexes
+## Add Query-Evidenced Database Indexes
 
-Index columns that appear in `WHERE`, `ORDER BY`, `JOIN`, and `GROUP BY` clauses.
+Do not index every column that appears in `WHERE`, `ORDER BY`, `JOIN`, or
+`GROUP BY`. Capture the actual query, inspect existing/duplicate indexes, test
+representative cardinality with `EXPLAIN`, and prefer one composite index that
+matches its equality/range/order access path. Document migration and rollback
+cost because every index also increases writes and storage.
 
 Incorrect:
 ```php

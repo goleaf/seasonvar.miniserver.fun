@@ -19,6 +19,8 @@ class CatalogShowRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'review' => ['nullable', 'integer', 'min:1'],
+            'comment' => ['nullable', 'integer', 'min:1'],
             'season' => ['nullable', 'integer', 'min:1'],
             'episode' => ['nullable', 'integer', 'min:1'],
             'media' => ['nullable', 'integer', 'min:1'],
@@ -34,6 +36,10 @@ class CatalogShowRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'review.integer' => __('catalog.player.validation.review_integer'),
+            'review.min' => __('catalog.player.validation.review_minimum'),
+            'comment.integer' => __('catalog.player.validation.comment_integer'),
+            'comment.min' => __('catalog.player.validation.comment_minimum'),
             'season.integer' => __('catalog.player.validation.season_integer'),
             'season.min' => __('catalog.player.validation.season_minimum'),
             'episode.integer' => __('catalog.player.validation.episode_integer'),
@@ -58,6 +64,8 @@ class CatalogShowRequest extends FormRequest
     public function attributes(): array
     {
         return [
+            'review' => __('catalog.player.attributes.review'),
+            'comment' => __('catalog.player.attributes.comment'),
             'season' => __('catalog.player.attributes.season'),
             'episode' => __('catalog.player.attributes.episode'),
             'media' => __('catalog.player.attributes.media'),

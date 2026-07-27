@@ -28,7 +28,7 @@ class CatalogFacetQuery
      * Build every bounded relation facet in one database round trip.
      *
      * @param  list<string>  $filterTypes
-     * @param  array<string, int>  $limits
+     * @param  array<string, int|null>  $limits
      * @param  array<string, string>  $searches
      * @return Collection<string, Collection<int, Model>>
      */
@@ -89,9 +89,11 @@ class CatalogFacetQuery
                 $query->orderBy($model->qualifyColumn('name'));
             }
 
-            $query
-                ->orderBy($model->qualifyColumn('id'))
-                ->limit(max(1, (int) ($limits[$filterType] ?? 1)));
+            $query->orderBy($model->qualifyColumn('id'));
+
+            if (($limits[$filterType] ?? null) !== null) {
+                $query->limit(max(1, (int) $limits[$filterType]));
+            }
 
             return DB::query()
                 ->fromSub($query, 'bounded_'.$filterType.'_facets')
@@ -131,7 +133,7 @@ class CatalogFacetQuery
             : $rowsQuery())
             ->groupBy(fn (array $row): string => $row['filter_type']);
 
-        return collect($filterTypes)->mapWithKeys(function (string $filterType) use ($rows): array {
+        return collect($filterTypes)->mapWithKeys(function (string $filterType) use ($criteria, $rows): array {
             $modelClass = $this->taxonomies->modelClass($filterType);
             $group = $rows->get($filterType);
 
@@ -139,14 +141,20 @@ class CatalogFacetQuery
                 return [$filterType => $this->emptyTaxonomyCollection()];
             }
 
-            $records = $group->map(function (array $row) use ($modelClass): Model {
+            $records = $group->map(function (array $row) use ($criteria, $modelClass): Model {
                 $record = (new $modelClass)->newInstance([], true);
-                $record->setRawAttributes([
+                $attributes = [
                     'id' => $row['id'],
                     'name' => $row['name'],
                     'slug' => $row['slug'],
                     'context_titles_count' => $row['context_titles_count'],
-                ], true);
+                ];
+
+                if ($criteria === null) {
+                    $attributes['catalog_titles_count'] = $row['context_titles_count'];
+                }
+
+                $record->setRawAttributes($attributes, true);
 
                 return $record;
             })->values();

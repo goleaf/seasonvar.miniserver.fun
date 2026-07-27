@@ -218,6 +218,17 @@ Task 16 explicitly prohibited creating or running automated tests. Acceptance th
 | Browser flow and failure handling | Managed Chromium was used because Playwright CLI required an unavailable system Chrome. The isolated seeded admin flow covered default/localized settings, locale save and same-section English redirect, IANA timezone, reduced motion, playback, notifications, collection default, back/forward, desktop/mobile geometry and local storage with no console/page/local-asset failures. A second seeded account sent an anonymous merge, received 204, loaded migrated autoplay/speed and removed cross-device fields from local storage. An intentionally immediate full navigation caused the PHP built-in server/Playwright transport to report that already-acknowledged nonessential fetch as `ERR_ABORTED`; login and authoritative server state remained correct, demonstrating the documented non-blocking/idempotent failure boundary rather than a production dependency. |
 | Framework/docs/assets | Temporary config, route and all Blade caches compile. `project:docs-refresh --check` reports current managed blocks. Vite 8.1.4 builds 16 modules successfully: app CSS 165.42 kB / 34.60 gzip, app JS 20.84 / 6.95 gzip, player JS 14.34 / 4.53 gzip, with Plyr/HLS remaining split. |
 
+## Task 111: главная страница, обсуждения и query boundaries — 27.07.2026
+
+| Проверка | Фактический результат |
+| --- | --- |
+| Focused RED/GREEN | Первичный набор — `64` теста и `402` утверждения; связанный catalog/player набор — `35` тестов и `255` утверждений; финальная группа найденных regressions — `13` тестов и `150` утверждений. Все пройдены. |
+| Полный backend gate | `scripts/ci-check.sh backend` прошёл: Composer strict validation/audit, policy журнала, Pint, Rector dry-run, синтаксис всех PHP-файлов, Larastan без ошибок, managed docs, config/routes/views cache и PHPUnit. Итог PHPUnit: `2286` тестов, `2275` успешно, `11` пропущено, `208315` утверждений. |
+| Frontend gate | `npm audit --audit-level=high` нашёл `0` уязвимостей. Vite 8.1.4 собрал production assets; `player:release-check` вернул `ready: true`, `30` исходников и `19` assets. |
+| Browser acceptance | Изолированная homepage fixture прошла `6/6`: guest/authenticated на Desktop Chromium, Mobile Chromium и Tablet Chromium. Player lifecycle на Desktop Chromium и Desktop Firefox дал `16` passed и `6` project-specific skipped из `22` тестов. Проверены все жанры, страны и допустимые годы, keyboard-focusable области, отсутствие горизонтального overflow, единая recovery action и сохранение client-owned player session identity после Livewire morph. Первый технический homepage-запуск не выполнял тесты из-за занятого `8013`; повтор использовал отдельный порт и SQLite-файл. |
+| Skills и документация | Все `23` project skills прошли `quick_validate.py`; `project:docs-refresh --check`, политика README/CHANGELOG и `git diff --check` прошли. |
+| Ограничение production evidence | Локальный `EXPLAIN QUERY PLAN` подтверждает новый индекс, однако production backup/restore и timing создания индекса не выполнялись и остаются `unresolved` до целевого operational rehearsal. |
+
 ## Task 23 mobile/responsive verification (без automated tests)
 
 Task 23 прямо запрещает создавать или запускать automated tests. Приёмка использовала полный Markdown/code audit, статические проверки, production Vite build и интерактивный Chromium через Playwright CLI; PHPUnit/Pest/Playwright test runner и новые test files не запускались и не создавались.

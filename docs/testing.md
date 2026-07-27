@@ -161,3 +161,44 @@ provider-tag confidence. Связанный quality/tag/import regression suite
 карточки. `tests/browser/catalog-quality.spec.js` проверяет тот же центр на
 desktop/mobile/tablet, включая URL state, touch target, отсутствие
 горизонтального overflow и ошибок браузера.
+
+## Regression matrix Task 111
+
+- `CommentDiscussionGuestTest` проверяет одинаковую aggregate-проекцию корня
+  и replies у гостя.
+- `CatalogHomeFacetQueryTest`, `CatalogHomeWebProjectionTest`,
+  `CatalogHomepageRedesignTest` и `CatalogHomePerformanceTest` фиксируют один
+  grouped facet query, полную web-выдачу, прежние API-лимиты и обе сессии.
+- `CatalogQueryClassArchitectureTest` требует три `final readonly` класса с
+  единственным публичным `handle()`.
+- `CatalogPersonalUpdateQueryPlanTest` проверяет exact columns и SQLite
+  `EXPLAIN QUERY PLAN` нового release lookup index.
+- `CollectionEachCallbackSafetyTest` AST-поиском запрещает arrow callback как
+  первый аргумент `each`/`eachSpread` во всём `app` и `tests`.
+- `ContentRequestExternalIdentifierValidationTest` покрывает неизвестный
+  provider, лишний nested key, normalized composite duplicate и разрешённую
+  одинаковую цифру у разных providers.
+- `tests/browser/homepage-facets.spec.js` проверяет полный блок у гостя и
+  вошедшего пользователя на desktop/mobile.
+- Регрессии `CatalogPageTest`, `CatalogPlayerWorkspaceTest`,
+  `CatalogSearchPageTest`, `CatalogTopListPageTest`,
+  `ExternalPlaylistImportTest` и `LegacyTagSchemaCompatibilityTest`
+  проверяют initial player query-state, подготовленные подсказки
+  каталогов/тегов, совпадение источника рейтинга Top‑100 и текущие SSR
+  contracts проигрывателя.
+- `CiQualityGateContractTest` запускает сценарий отсутствующего owner без
+  унаследованных lease-переменных текущего test runner.
+- Player browser guard не относит к отказам проигрывателя только точный
+  необязательный `404 /pwa/posters/*` и коды отмены текущей навигации
+  `net::ERR_ABORTED`/`NS_BINDING_ABORTED`; остальные same-origin failures,
+  console и page errors остаются блокирующими.
+- Playwright web-server разрешает `media.example.com` и `data:` только в
+  report-only CSP своей deterministic media fixture. Login helper ждёт
+  `document.fonts.ready`, а media option проверяется и нажимается одним
+  browser task после доказанной видимости; production security config это не
+  изменяет.
+- Firefox navigation diagnostics распознаются только по коду
+  `0x804b0002`, локальному hashed FontAwesome path и точной форме report-only
+  CSP/capped-report сообщения. Промежуточные history pages ждут
+  `document.fonts.ready`; любой иной font, asset или CSP outcome остаётся
+  блокирующим.

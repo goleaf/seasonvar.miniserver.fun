@@ -58,7 +58,9 @@ final class CatalogTitleDetailQuery
     public function seasons(CatalogTitle $title, ?User $user): Collection
     {
         return $this->playback->seasonSummaries($title, $user)
-            ->each(fn (Season $season): Season => $season->setAttribute('api_title_slug', $title->slug));
+            ->each(function (Season $season) use ($title): void {
+                $season->setAttribute('api_title_slug', $title->slug);
+            });
     }
 
     /** @return Collection<int, Episode> */

@@ -73,3 +73,12 @@ public function after(): array
     ];
 }
 ```
+
+## Validate Nested Identity as a Normalized Composite
+
+`distinct` on `items.*.provider` or `items.*.identifier` is wrong when the real
+identity is their pair. First restrict allowed row keys (`array:provider,identifier`)
+and validate the backed enum/value format. Then normalize both values and add a
+field-level error for a duplicate composite key. Enforce the same invariant
+again in the domain service or database constraint so non-HTTP callers cannot
+silently deduplicate invalid input.

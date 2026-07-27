@@ -1,5 +1,6 @@
 <div
     id="player"
+    wire:ignore.self
     class="scroll-mt-40 space-y-5 sm:scroll-mt-44 lg:scroll-mt-48"
     data-active-player-session="{{ $playerSessionKey }}"
     data-player-workspace
@@ -147,15 +148,6 @@
                                     <x-ui.icon name="fa-solid fa-circle-notch fa-spin text-sky-400" data-player-status-icon />
                                     <span data-player-status-text>{{ __('catalog.player.preparing') }}</span>
                                 </span>
-                                <button
-                                    type="button"
-                                    data-player-retry
-                                    hidden
-                                    class="inline-flex min-h-11 items-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100"
-                                >
-                                    <x-ui.icon name="fa-solid fa-rotate-right" />
-                                    <span>{{ __('catalog.player.retry') }}</span>
-                                </button>
                             </div>
                             <video
                                 controls

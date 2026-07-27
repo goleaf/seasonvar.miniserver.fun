@@ -57,13 +57,14 @@ final class CatalogHomepageRedesignTest extends TestCase
             'trending',
             'latest-updates',
             'account-tools',
+            'catalog-facets',
         ]);
         $response
             ->assertDontSee('data-home-section="statistics"', false)
             ->assertDontSee('data-home-section="new-titles"', false)
             ->assertDontSee('data-home-section="watch-now"', false)
             ->assertDontSee('data-home-section="featured-collections"', false)
-            ->assertDontSee('data-home-section="catalog-facets"', false);
+            ->assertSee('data-home-section="catalog-facets"', false);
     }
 
     public function test_authenticated_homepage_only_renders_the_owners_viewing_and_library_updates(): void

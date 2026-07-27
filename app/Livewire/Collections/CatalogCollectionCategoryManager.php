@@ -834,8 +834,7 @@ final class CatalogCollectionCategoryManager extends Component
         $this->classificationVersionByCollection = [];
     }
 
-    /** @return never */
-    private function classificationValidation(string $field, string $message): void
+    private function classificationValidation(string $field, string $message): never
     {
         throw ValidationException::withMessages([$field => [$message]]);
     }

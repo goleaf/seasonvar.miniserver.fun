@@ -6,6 +6,7 @@ parameters:
     paths:
         - app/DTOs
         - app/Enums
+        - app/Services/Catalog/Queries
         - app/Services/Operations
         - app/Services/Admin/AdminAuditRecorder.php
         - app/Console/Commands/CheckDeploymentReadiness.php

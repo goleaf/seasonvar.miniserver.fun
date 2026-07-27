@@ -121,6 +121,23 @@
                                 <p class="mt-2 whitespace-pre-line text-sm leading-6 text-slate-700">{{ $tagPage->description }}</p>
                             </details>
                         @endif
+                        @if ($tagPage->related !== [])
+                            <div class="mt-4" aria-label="{{ __('tags.page.related') }}">
+                                <h3 class="text-sm font-semibold text-slate-700">{{ __('tags.page.related') }}</h3>
+                                <div class="mt-2 flex flex-wrap gap-2">
+                                    @foreach ($tagPage->related as $relatedTag)
+                                        <a
+                                            href="{{ route('titles.taxonomy', ['type' => 'tag', 'taxonomy' => $relatedTag['slug']]) }}"
+                                            class="inline-flex min-h-11 items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
+                                        >
+                                            <x-ui.icon name="fa-solid fa-tag text-slate-500" />
+                                            <span>{{ $relatedTag['name'] }}</span>
+                                            <span class="text-xs text-slate-500">{{ $relatedTag['count'] }}</span>
+                                        </a>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
                     </section>
                 @endif
 
@@ -137,6 +154,26 @@
                     :selected-taxonomies="$selectedTaxonomies"
                     :excluded-taxonomies="$excludedTaxonomies"
                 />
+
+                @if ($directorySuggestions->isNotEmpty())
+                    <section aria-labelledby="catalog-directory-suggestions-title" class="rounded-xl border border-slate-200 bg-white p-4">
+                        <h2 id="catalog-directory-suggestions-title" class="flex items-center gap-2 text-base font-semibold text-slate-900">
+                            <x-ui.icon name="fa-solid fa-folder-tree text-emerald-700" />
+                            <span>{{ __('catalog.directories.label') }}</span>
+                        </h2>
+                        <div class="mt-3 flex flex-wrap gap-2">
+                            @foreach ($directorySuggestions as $directorySuggestion)
+                                <a
+                                    href="{{ route($directorySuggestion->indexRouteName) }}"
+                                    class="inline-flex min-h-11 items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
+                                >
+                                    <x-ui.icon :name="$directorySuggestion->icon" />
+                                    <span>{{ __('catalog.directories.search_suggestion') }}: {{ $directorySuggestion->title }}</span>
+                                </a>
+                            @endforeach
+                        </div>
+                    </section>
+                @endif
 
                 @if ($collectionSuggestions->isNotEmpty())
                     <section aria-labelledby="catalog-collection-suggestions-title">

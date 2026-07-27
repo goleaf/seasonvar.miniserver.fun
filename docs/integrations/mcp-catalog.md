@@ -105,3 +105,14 @@ codex mcp list
 Официальный каталог Google MCP: <https://github.com/google/mcp>
 
 Список Google Cloud remote MCP products: <https://docs.cloud.google.com/mcp/supported-products>
+
+## Решение по внешним skills Task 111
+
+Поиск в public skill catalogs выполнен как read-only discovery. Кандидаты
+Laravel architecture/security/performance отклонены из-за generic overlap,
+устаревшего Laravel Mix/repository-by-default подхода, чрезмерного
+supply-chain scope или отсутствия конкретного проектного gap. GitHub
+`andreapollastri/checkpoint` также не добавлен: его audit может раскрывать
+совпавшие строки секретов и fail-open при ошибках process/JSON, одновременно
+дублируя существующие repository hooks и CI. Project/global MCP config,
+OAuth, plugins и dependencies не менялись.

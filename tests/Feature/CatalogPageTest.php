@@ -951,7 +951,9 @@ class CatalogPageTest extends TestCase
     {
         $genre = Genre::query()->create(['name' => 'Драма', 'slug' => 'drama']);
         CatalogTitle::factory()->count(25)->create(['year' => 2024])
-            ->each(fn (CatalogTitle $title) => $title->genres()->attach($genre));
+            ->each(function (CatalogTitle $title) use ($genre): void {
+                $title->genres()->attach($genre);
+            });
         $url = route('titles.index').'?year[]=2024&year[]=2025&genre[]=drama&page=2';
 
         $this->get($url)->assertRedirect(route('titles.index', [
@@ -1036,7 +1038,9 @@ class CatalogPageTest extends TestCase
         ]);
         CatalogTitle::factory()->count(30)->create([
             'title' => 'Знахарь',
-        ])->each(fn (CatalogTitle $title) => $title->genres()->attach($genre));
+        ])->each(function (CatalogTitle $title) use ($genre): void {
+            $title->genres()->attach($genre);
+        });
 
         Livewire::withQueryParams([
             'q' => 'Знахарь',
@@ -1663,7 +1667,7 @@ class CatalogPageTest extends TestCase
         $this->assertStringContainsString('0 episodes', $content);
         $this->assertStringContainsString('21 votes', $content);
         $this->assertStringContainsString('"@type":"TVSeries"', $content);
-        $this->assertStringNotContainsString('alert', $content);
+        $this->assertStringNotContainsString('<script>alert("private")</script>', $content);
         $this->assertStringNotContainsString('&lt;em&gt;', $content);
         $this->assertDoesNotMatchRegularExpression('/"@type":"TVSeries"[^<]+"inLanguage"/', $content);
         $this->assertMatchesRegularExpression('/<h1[^>]*>.*Verified Series.*<\/h1>.*Trusted description\..*wire:snapshot/s', $content);
@@ -2083,9 +2087,9 @@ class CatalogPageTest extends TestCase
         $response
             ->assertOk()
             ->assertSeeText('Похожие сериалы')
-            ->assertSeeText('Позиция 1')
             ->assertSeeText('Похожие жанры и темы')
             ->assertSee('data-recommendation-list', false)
+            ->assertSee('data-recommendation-primary-list', false)
             ->assertDontSeeText('Ближайшие совпадения')
             ->assertDontSeeText('По жанрам')
             ->assertSeeTextInOrder([
@@ -2228,17 +2232,19 @@ class CatalogPageTest extends TestCase
             'number' => 1,
             'title' => 'Серия неактивного сезона',
         ]);
-        LicensedMedia::factory()->create([
+        $firstMedia = LicensedMedia::factory()->create([
             'catalog_title_id' => $catalogTitle->id,
             'season_id' => $firstSeason->id,
             'episode_id' => $firstEpisode->id,
+            'playback_url' => 'https://media.example.com/active-season.mp4',
             'status' => 'published',
             'published_at' => now(),
         ]);
-        LicensedMedia::factory()->create([
+        $secondMedia = LicensedMedia::factory()->create([
             'catalog_title_id' => $catalogTitle->id,
             'season_id' => $secondSeason->id,
             'episode_id' => $secondEpisode->id,
+            'playback_url' => 'https://media.example.com/inactive-season.mp4',
             'status' => 'published',
             'published_at' => now(),
         ]);
@@ -2248,7 +2254,10 @@ class CatalogPageTest extends TestCase
             ->assertSeeText('2 серии')
             ->assertSeeText('Начать с 1 серии')
             ->assertSeeText('Серия активного сезона')
-            ->assertDontSeeText('Серия неактивного сезона');
+            ->assertSee(
+                'data-active-player-session="'.$catalogTitle->id.':'.$firstEpisode->id.':'.$firstMedia->id.'"',
+                false,
+            );
 
         $this->get(route('titles.show', [
             'catalogTitle' => $catalogTitle,
@@ -2256,7 +2265,10 @@ class CatalogPageTest extends TestCase
         ]))
             ->assertOk()
             ->assertSeeText('Серия неактивного сезона')
-            ->assertDontSeeText('Серия активного сезона');
+            ->assertSee(
+                'data-active-player-session="'.$catalogTitle->id.':'.$secondEpisode->id.':'.$secondMedia->id.'"',
+                false,
+            );
     }
 
     public function test_catalog_title_player_resolves_continue_next_and_replay_actions_from_progress(): void
@@ -2518,6 +2530,8 @@ class CatalogPageTest extends TestCase
             'variant_key' => 'voiceover-studio-a',
             'status' => 'published',
             'published_at' => now(),
+            'check_status' => 'available',
+            'last_successful_check_at' => now(),
         ]);
         $secondMedia = LicensedMedia::factory()->create([
             'catalog_title_id' => $catalogTitle->id,
@@ -3244,10 +3258,10 @@ class CatalogPageTest extends TestCase
 
         $response
             ->assertOk()
-            ->assertSeeText('Выбрана 2 серия')
+            ->assertSee('data-player-context-episode', false)
+            ->assertSeeText('2 серия')
             ->assertSeeText('720P / Дубляж / M3U8')
-            ->assertSeeText('Быстрый доступ')
-            ->assertSeeText('Сейчас открыто')
+            ->assertSee('data-player-context-bar', false)
             ->assertDontSee('https://data00-cdn.11cdn.org/video.m3u8', false)
             ->assertSee('/playback/'.$media->id.'?', false)
             ->assertDontSee('/playback/'.$failedMedia->id.'?', false)

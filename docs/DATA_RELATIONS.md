@@ -776,3 +776,15 @@ duplicate lookup, `catalog_collections_quality_refresh_idx` — dirty/stale
 записи. `down()` сначала снимает verification FK/derived columns, затем
 удаляет quality tables; после накопления production evidence такой
 destructive rollback допустим только при остановленных writers и backup.
+
+## Дополнение Task 111
+
+`release_schedule_title_released_idx` покрывает owner-library lookup по
+`catalog_title_id`, released `status`, nullable/range `released_at` и stable
+`id`. Он дополняет, а не заменяет
+`release_schedule_title_time_idx`, используемый календарём по `starts_at`.
+Миграция additive и снимает только новый индекс в `down()`.
+
+Внешний идентификатор заявки сохраняет каноническую составную identity
+`(provider, normalized_identifier)`. Повтор этой пары в одном входном массиве
+является ошибкой; совпадающий numeric identifier у разных providers допустим.

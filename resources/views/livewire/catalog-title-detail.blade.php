@@ -182,6 +182,12 @@
             <div data-player-workspace-region>
                 <livewire:catalog-title-player
                     :catalog-title-id="$title->id"
+                    :initial-season="$initialPlayerSelection['season']"
+                    :initial-episode="$initialPlayerSelection['episode']"
+                    :initial-media="$initialPlayerSelection['media']"
+                    :initial-variant="$initialPlayerSelection['variant']"
+                    :initial-quality="$initialPlayerSelection['quality']"
+                    :initial-format="$initialPlayerSelection['format']"
                     wire:ref="player"
                     :wire:key="'catalog-title-player-'.$title->id"
                 />

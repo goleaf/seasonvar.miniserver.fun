@@ -226,7 +226,7 @@ composer dev
 - Player-код для Plyr/HLS находится в `resources/js/player.js` и загружается dynamic import только на страницах с `video.js-catalog-player`.
 - Player создаёт одну guarded browser-session на точный `title:episode:media` source, восстанавливает позицию после metadata load и отправляет bounded progress только для verified authenticated markup после реального события `play`: обычное открытие страницы и lifecycle cleanup не могут сбросить сохранённую позицию в ноль. Первый `play` создаёт start event, 30-секундный heartbeat работает лишь во время воспроизведения, а pause, stable seek, hidden visibility, navigation, pagehide и ended принудительно фиксируют позицию уже начатой browser-session. Unverified пользователь видит предложение подтвердить email, а progress отправка для него отключена. Каждый разрешённый event несёт opaque server-issued progress token и возрастающий sequence; browser duration остаётся только sanity signal и не становится trusted duration. `AbortController` освобождает listeners/timers/Plyr/HLS, generation token отменяет stale async-init, а cleanup очищает и media node, восстановленный `Plyr.destroy()`.
 - `CatalogPlayerCopy` формирует allowlisted JSON из semantic `catalog.player.runtime.*` и всех scalar Plyr `catalog.player.controls.*` ключей активной `ru`/`en` locale. Blade передаёт его через escaped `data-player-copy` внутрь того же `wire:ignore` island; JavaScript не выполняет translation lookup и не содержит языкового fallback-текста. Locale приходит из серверного render и поэтому сохраняется после Livewire hydration/navigation так же, как остальная страница. Provider URL, exception text, raw media errors и missing translation keys в status region не выводятся.
-- Repository содержит ровно один полный `wire:ignore`: `catalog-player-media-shell-{media}-{authorization}`. `.self` намеренно не применяется, потому что Plyr/HLS создают и изменяют потомков; фактический runtime пока не включает в boundary Livewire loading, выбор варианта, ошибки и portal/personal actions. Согласованный implementation-pending дизайн 24.07.2026 добавляет туда только JavaScript-owned player menu и его локальные состояния, чтобы не заменять fullscreen element; Livewire остаётся server-data/action boundary через bounded последовательный `#[Renderless]`, а автоматически параллельный в Livewire `4.3.3` `#[Json]`, второй ignore, raw provider URL и client-owned authorization не допускаются. Native server-owned dialogs, help editor, filters и forms продолжают morphing и не получают speculative ignore.
+- Repository содержит ровно один полный `wire:ignore`: `catalog-player-media-shell-{media}-{authorization}`. Для этого shell `.self` недостаточен, потому что Plyr/HLS создают и изменяют потомков. Отдельный `wire:ignore.self` на корне workspace защищает только принадлежащие browser runtime атрибуты session identity после hot swap; его дочерние loading, выбор варианта, ошибки и portal/personal actions продолжают обычный Livewire morph. В media boundary входят только JavaScript-owned player menu и локальные состояния, необходимые для сохранения fullscreen element; Livewire остаётся server-data/action boundary через bounded последовательный `#[Renderless]`, а автоматически параллельный в Livewire `4.3.3` `#[Json]`, второй полный ignore, raw provider URL и client-owned authorization не допускаются. Native server-owned dialogs, help editor, filters и forms продолжают morphing и не получают speculative ignore.
 - Четыре template pattern `wire:replace.self` принадлежат только leaf-checkbox contextual filters каталога с `wire:model.live`: после grouped island response заменяется input с checked state, но не его label, group или filter form. Bare `wire:replace`, custom elements и shadow DOM отсутствуют. Player не переводится с keyed `wire:ignore` на replacement, а native dialogs, editors и text/search inputs продолжают обычный morphing, чтобы не терять focus и browser-owned draft state. Новый scope требует воспроизводимого дефекта и проверки более узкого key/component/lifecycle решения.
 - Одна запись `WeakMap` на точный media shell владеет Plyr, HLS, listeners и timers. Source replacement, `livewire:navigating`, `pagehide` и удаление island вызывают единый cleanup; resize и повторный `livewire:navigated` не создают второй session. Fatal HLS network retry создаёт новый HLS instance, terminal/manual retry отменяют устаревший timer, а native HLS остаётся fallback только для браузера без HLS.js/MSE support. Ошибка существующего `<track>` показывает отдельное локализованное polite-предупреждение и не делает video fatal; production subtitle-track relation/editor по-прежнему отсутствуют.
 - Поиск вариантов актёров и режиссёров внутри `/titles` принадлежит `CatalogSeries::$optionSearch`: `wire:model.live.debounce.300ms` запускает bounded contextual facet query внутри deferred `catalog-live`, а одноимённые islands фильтров и выдачи обновляются группой. Отдельный wrapper `wire:loading.delay` с точным property `wire:target` показывает spinner только для активного поля; FontAwesome-иконка не скрывает себя Tailwind-классом. Выбор результата остаётся touch-sized `wire:model.live` checkbox и обычным повторяемым URL-фильтром. Duplicate people `fetch` в `app.js` отсутствует; read-only `/api/catalog/people` сохраняется для внешних API-клиентов. Локальный поиск остальных длинных групп остаётся progressive enhancement по уже загруженному ограниченному списку.
@@ -613,3 +613,29 @@ hardware decoder, OS-owned native fullscreen и host WebKit codecs не были
 доступны и остаются `unresolved_device`. Новая format/quality/audio/subtitle
 option появляется только из реально доступной source row/track identity;
 пустой label или boolean не создаёт UI control.
+
+## Полные facets главной страницы Task 111
+
+Один общий `data-home-section="catalog-facets"` расположен после guest или
+personalized последовательности, поэтому доступен в обеих сессиях. Blade
+перебирает все подготовленные `$genres`, `$countries` и `$yearBuckets` без
+`take()`. Каждая из трёх колонок имеет подписанный `tabindex="0"` scroll
+region с `max-h-72`, поэтому длинный набор остаётся в DOM, доступен клавиатуре
+и не растягивает страницу бесконтрольно. Desktop `1440×1200` и mobile
+`390×844` проверяются Playwright без horizontal overflow.
+
+Начальное состояние проигрывателя для full-page маршрута передаётся из
+валидированного `CatalogShowRequest` через `CatalogTitleDetail` во вложенный
+`CatalogTitlePlayer`. Прямые query-параметры самого player-компонента
+продолжают гидратировать `#[Url]` свойства; родительские значения применяются
+только при явной передаче. Это сохраняет browser back/forward и прямые ссылки
+без доверия к client-side availability.
+
+В failure state показывается одна recovery-панель с повтором, выбором
+источника и ссылкой сообщения о проблеме; строка статуса сообщает причину, но
+не дублирует кнопку повтора.
+
+После бесшовной смены серии или варианта корневой `data-active-player-session`
+остаётся client-owned благодаря `wire:ignore.self`, а дочерний Livewire UI
+продолжает обновляться. Video и root поэтому сохраняют один session key для
+progress, navigation и stale-event rejection.

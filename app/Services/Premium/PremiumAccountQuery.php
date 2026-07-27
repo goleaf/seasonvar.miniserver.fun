@@ -252,14 +252,14 @@ final class PremiumAccountQuery
             ]);
         $subscriptionsById = $subscriptions->keyBy('id');
 
-        $entitlements->each(
-            static fn (PremiumEntitlement $entitlement): PremiumEntitlement => $entitlement->setRelation(
+        $entitlements->each(static function (PremiumEntitlement $entitlement) use ($subscriptionsById): void {
+            $entitlement->setRelation(
                 'subscription',
                 $entitlement->premium_subscription_id !== null
                     ? $subscriptionsById->get($entitlement->premium_subscription_id)
                     : null,
-            ),
-        );
+            );
+        });
 
         return [
             'entitlements' => $entitlements,

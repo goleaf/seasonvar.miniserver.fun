@@ -372,7 +372,14 @@ final class CiQualityGateContractTest extends TestCase
             File::put($repositoryPath.'/staged.txt', "подготовлено\n");
             $this->runGit($repositoryPath, 'add', '--', 'staged.txt');
 
-            $process = new Process(['bash', '.githooks/pre-commit'], $repositoryPath);
+            $process = new Process(
+                ['bash', '.githooks/pre-commit'],
+                $repositoryPath,
+                [
+                    'SEASONVAR_TASK_ID' => false,
+                    'SEASONVAR_TASK_LEASE_TOKEN' => false,
+                ],
+            );
             $process->run();
 
             $this->assertFalse($process->isSuccessful());

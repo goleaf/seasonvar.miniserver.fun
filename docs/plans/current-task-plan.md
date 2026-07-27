@@ -1,124 +1,171 @@
-# Текущая задача — Task 110: категории во всех discovery modes
-
-## Цель
-
-Вернуть на каждой поддерживаемой странице `/discover/{type}` тот же полный
-двухуровневый список активных категорий и подкатегорий, который уже
-восстановлен на `/discover/popular#collections`, без дублирования запросов,
-изменения recommendation ranking или создания отдельного directory route.
+# Текущая задача — Task 111: homepage, discussions и query boundaries
 
 ## Реестр активных workstreams
 
 | Workstream | Status | Evidence |
 |---|---|---|
-| Requirements, versions и production diagnosis | `completed` | Laravel 13.22.0, Livewire 4.3.3, Tailwind CSS 4.3.2; production SSR по девяти modes |
-| Persistent rule, design, plan и compliance matrix | `completed` | [requirement](../requirements/system-wide-integration.md), [design](../superpowers/specs/2026-07-27-all-discovery-collection-hierarchy-design.md), [plan](../superpowers/plans/2026-07-27-all-discovery-collection-hierarchy.md), [matrix](task-110-all-discovery-collection-hierarchy-compliance.md) |
-| TDD implementation | `completed` | Regression RED на `personalized`, затем focused GREEN `22/22`, 278 assertions |
-| Focused, build и browser verification | `completed` | Broad `157/157`, 1089 assertions; Pint/PHPStan/Vite green; production 18/18 desktop/mobile |
-| Documentation/evidence | `completed` | Canonical owners, README, CHANGELOG и [evidence](archive/2026-07-27-all-discovery-collection-hierarchy-evidence.md) |
-| Shared delivery audit | `in_progress` | Inherited Task 107 implementation отдельно подтверждён `135/135`, 771 assertions; его stale docs и a11y reason-group исправлены |
-| Exact commit и push | `unresolved` | Требуются финальный exact staged snapshot, lease approval, commit и обычный push |
+| Requirements, versions и repository audit | `completed` | [Task 111 evidence](archive/2026-07-27-task-111-homepage-query-classes-performance.md) |
+| Discussion, homepage, query и validation implementation | `completed` | [Plan](../superpowers/plans/2026-07-27-homepage-query-classes-performance.md), [matrix](task-111-homepage-query-classes-performance-compliance.md) |
+| Skills, security и compatibility review | `completed` | [Task 111 evidence](archive/2026-07-27-task-111-homepage-query-classes-performance.md) |
+| Broad verification и regression repair | `completed` | Backend gate: 2286 tests / 208315 assertions; frontend audit/build, homepage 6/6 и player lifecycle 16 passed / 6 skipped |
+| Exact commit и push в `main` | `planned` | Ожидает green verification, exact staged snapshot и lease approval |
 
 ## Реестр blocked/unresolved
 
 | Workstream | Status | Evidence |
 |---|---|---|
-| Общий browser first-party guard | `unresolved` | Новые Task 107/109/110 assertions проходят; соседний `/pwa/posters/browser-smoke` возвращает прежний `404` |
-| Общий operational health | `unresolved` | Importer, database, Redis, workers и readiness исправны; Memcached/full cache warming остаются вне текущего scope |
-| Remote delivery | `unresolved` | Exact commit ещё не создан; configured remote дополнительно требует успешной credential/write проверки |
+| Production migration rehearsal | `unresolved` | Backup/restore и timing создания индекса требуют целевого production evidence |
 
 ## Task-specific compliance matrix
 
 | Requirement | Status | Evidence |
 |---|---|---|
-| Requirements, versions, plans и implementation review | `completed` | Task 107–110 matrices и архивные evidence содержат проверенные owners, stack, risks и protected contracts |
-| Importer recovery/completion | `completed` | Fresh Seasonvar slice `376/376`, 2344 assertions; production canaries и rollback evidence сохранены |
-| Compact similar recommendations | `completed` | Related matrix `135/135`, 771 assertions; native `6 + 6`, bounded reasons и server-side feedback сохранены |
-| Discovery category hierarchy | `completed` | Fresh collection/discovery matrix `158/158`, 1075 assertions; production 18/18 desktop/mobile сохранено |
-| Routes, authorization, privacy, SEO и cache compatibility | `already_compliant` | Existing public/API/Livewire contracts не расширены; task-specific cross-feature matrices проверены |
-| Dependency update | `not_applicable` | Посторонний `composer.lock` не требуется для task behavior и исключён из delivery |
-| Exact main delivery | `in_progress` | Ожидает staged-path equality, reviewed index approval, commit, clean-tree pre-push и обычный push |
+| Постоянные requirements и protected contracts | `completed` | [Compliance matrix](task-111-homepage-query-classes-performance-compliance.md) |
+| Guest discussion и homepage facets | `completed` | [Task 111 evidence](archive/2026-07-27-task-111-homepage-query-classes-performance.md) |
+| Query/SQL performance и reversible migration | `completed` | [Design](../superpowers/specs/2026-07-27-homepage-query-classes-performance-design.md) |
+| Security, authorization и privacy boundaries | `already_compliant` | Public read contracts сохранены; write validation проходит до service layer |
+| Production activation | `unresolved` | Требуется production backup/restore и migration timing rehearsal |
+| Commit и remote delivery | `in_progress` | Green verification получена; выполняются exact staged review, lease approval, commit и push |
 
 ## Последнее подтверждённое evidence
 
-- [Task 107: compact similar recommendations](archive/2026-07-27-title-similar-recommendations-compact-evidence.md)
-- [Task 108: complete Seasonvar importer](archive/2026-07-26-complete-seasonvar-importer-evidence.md)
-- [Task 109: discovery hierarchy restoration](archive/2026-07-27-discovery-collection-hierarchy-restoration-evidence.md)
-- [Task 110: hierarchy on all discovery modes](archive/2026-07-27-all-discovery-collection-hierarchy-evidence.md)
+- [Task 111: homepage, discussions и query boundaries](archive/2026-07-27-task-111-homepage-query-classes-performance.md)
 
-## Подтверждённая причина
+## Цель
 
-- Все девять routes отвечают `200`, а `CatalogCollectionExplorer` уже умеет
-  рендерить 5 root и 31 child.
-- `CatalogDiscoveryPage::render()` передаёт section navigation только для
-  `CatalogRecommendationType::Popular`.
-- Blade монтирует explorer только внутри проверки непустой navigation.
-- Поэтому `popular` содержит дерево, а остальные восемь modes не монтируют
-  исправный компонент вообще.
+Исправить гостевую загрузку обсуждений, вывести на главной все жанры, страны
+и допустимые годы, сократить и ускорить связанные SQL-запросы, внедрить
+проверяемый Query Class pattern без изменения публичных маршрутов/API и
+закрыть связанные замечания по Laravel Collections, request-scoped
+memoization, nested validation и project skills.
+
+## Активный checklist
+
+| Priority | Workstream | Status | Evidence |
+|---|---|---|---|
+| critical | Requirements, versions, repository/production audit | `completed` | PHP 8.5, Laravel 13.22.0, Livewire 4.3.3, SQLite; применимые owners и внешние материалы проверены |
+| critical | Workspace lease и exact manifest | `completed` | `task-111-homepage-query-classes-performance`, NUL-delimited paths declared |
+| critical | Guest discussion regression | `completed` | RED воспроизвёл `MissingAttributeException`; GREEN service test проверяет roots/replies |
+| high | Homepage all-facets projection | `completed` | Один grouped query, все web facets, прежние API limits; 33 focused tests зелёные |
+| high | Query Class pattern | `completed` | Три `final readonly` класса, один public `handle()`, cache API сохранён |
+| high | Personal homepage release index | `completed` | Additive reversible migration, schema/SQLite EXPLAIN test |
+| high | Collection callback safety | `completed` | 19 callbacks исправлены, AST regression охватывает `app` и `tests` |
+| high | Request-scoped schema memoization | `completed` | `scopedIf` и lifecycle test после `forgetScopedInstances()` |
+| high | Composite nested identifier validation | `completed` | Strict row keys, backed enum и normalized pair rejection |
+| medium | Project skills optimization | `completed` | Правила исправлены; все 23 project skills прошли `quick_validate.py` |
+| high | Security, performance и compatibility review | `completed` | Player/query, prepared view data, Top‑100 и framework compatibility contracts проверены полным suite |
+| high | Documentation и verification | `completed` | Backend 2286/208315, frontend build/audit, 23 skills, homepage 6/6 и player lifecycle 16 passed / 6 skipped |
+| critical | Exact commit и push в `main` | `pending` | approved staged snapshot, commit hash, clean pre-push |
+
+## Подтверждённые причины
+
+- Гостевой `CommentDiscussionQuery` не выбирает
+  `viewer_private_replies_count`, но `CommentPresenter` читает атрибут всегда;
+  strict Eloquent выбрасывает `MissingAttributeException`.
+- Web projection загружает genre и country двумя запросами, затем ограничивает
+  жанры в builder/Blade, страны в Blade, а годы — двенадцатью строками snapshot.
+- Authenticated homepage выполняет запрос featured collections, хотя
+  соответствующая секция для него не рендерится.
+- Коррелированный personal-update subquery фильтрует
+  `release_schedule_entries` по `(catalog_title_id, status, released_at, id)`,
+  но существующий индекс использует `starts_at`.
+- `CatalogTasteOnboardingSchema` memoizes результат внутри объекта, однако
+  несколько consumers получают разные transient instances.
+- В repository есть arrow callbacks у `Collection::each()`; возвращённый
+  `false` является управляющим сигналом досрочного завершения.
+- Nested external identifiers имеют составную identity
+  `(provider, normalized_identifier)`; одиночный `distinct` некорректен,
+  а текущий сервис молча удаляет повторы.
+- Laravel 13.22.0 вызывает `Arr::last(null)` из
+  `CookieJar::hasQueued()` при logout других browser sessions после password
+  rehash и до события `OtherDeviceLogout`.
+- Full-page player owner не передавал валидированное начальное состояние
+  вложенному component; при наивном исправлении direct `#[Url]` hydration
+  перезаписывалась пустыми аргументами.
+- Builder подготавливал directory suggestions и related tags, но Blade их не
+  отображал; Top‑100 ранжировался по выбранному provider, а карточка могла
+  предпочесть другой рейтинг.
+- Subprocess-тест отсутствующего owner наследовал lease-переменные активного
+  PHPUnit process и потому не моделировал изолированную среду.
+- `CatalogTitleDetail` участвовал в начальной player selection, но отсутствовал
+  в явном `resources/player-release.json`, поэтому mixed PHP/assets rollout
+  не включал этот source в release fingerprint.
+- Player lifecycle acceptance смешивал ожидаемый optional PWA poster miss и
+  Firefox navigation cancellation с media failures; expired state также
+  показывал две одинаковые retry-кнопки.
+- После client hot-swap Livewire morph мог вернуть root session identity к
+  server `title:episode:media`, оставив новый UUID внутри `wire:ignore` video;
+  корректные progress/navigation events затем fail-closed отклонялись.
+- Firefox acceptance выявил test-environment drift: playback fixture host не
+  входил в test-only CSP, font requests отменялись слишком быстрым login
+  navigation, а `<details>` option имел actionability race между двумя tasks.
+- Firefox дополнительно сообщает навигационный `NS_BINDING_ABORTED` как
+  console font code `0x804b0002` и ограничение частоты report-only CSP; общий
+  console-error фильтр ошибочно смешивал точные diagnostics с failures.
 
 ## Выбранное решение
 
-- Один существующий nested `CatalogCollectionExplorer` монтируется ровно один
-  раз на каждом mode перед serial results.
-- `#collections` остаётся общим; `popular` сохраняет `#popular-titles`,
-  остальные modes получают `#discovery-titles`.
-- Child key включает mode и locale, чтобы Livewire identity оставалась
-  стабильной и не смешивала соседние route contexts.
-- Collection URL state/paginator независимы от recommendation filters,
-  paginator, refresh и ranking.
+- Для guest projection всегда выбирать нулевой private-reply count.
+- Ввести узкие `app/Services/Catalog/Queries/*Query` с одним `handle()`;
+  snapshot/metrics cache оставлять только cache boundary.
+- Получать public genre/country одной union-группой, web отдавать все строки,
+  API оставить с прежними limits.
+- Добавить доказанный составной индекс, не заменяя существующие calendar
+  indexes, и проверить его через schema introspection и `EXPLAIN`.
+- Использовать request/worker-scoped binding, а не process-wide singleton.
+- Сделать side-effect callbacks явными `void` closures и закрепить AST-тестом.
+- Валидировать nested rows, enum provider и составные normalized duplicates до
+  action layer.
+- Обновить только полезные project skills; внешние наборы с устаревшими или
+  конфликтующими правилами не устанавливать.
+- Применить large-project blueprint только к доказанным границам; не добавлять
+  interfaces/repositories/view composers или domain rewrite без реального
+  второго implementation и измеримой пользы.
+- Для Laravel 13.22.0 ограничить compatibility path exact
+  version/message/stack, восстановить только пропущенное событие и сохранить
+  fail-closed поведение остальных исключений.
+- Передавать initial player state только через validated full-page owner и
+  применять nullable mount arguments только при явном значении.
+- Рендерить уже подготовленные directory/tag данные и передавать карточке
+  выбранный Top‑100 rating provider без новых запросов.
+- Явно удалять task lease variables из env изолированного hook subprocess.
+- Добавить full-page player owner в release descriptor и повторить
+  readiness/browser decode matrix после нового fingerprint.
+- Сохранить строгий browser guard, исключив только точные optional
+  poster/navigation outcomes, и оставить одну recovery retry action.
+- Защитить только client-owned root attributes через `wire:ignore.self`, не
+  отключая обновление дочернего Livewire workspace.
+- Согласовать только Playwright CSP с fixture host, дождаться fonts и
+  объединить visibility/click в один проверяемый browser task.
+- Классифицировать только exact Firefox diagnostics и оставлять все остальные
+  font/asset/CSP errors блокирующими.
 
-## Ожидаемые изменяемые файлы
+## Совместимые contracts
 
-- `app/Livewire/CatalogDiscoveryPage.php`
-- `resources/views/livewire/catalog-discovery-page.blade.php`
-- `tests/Feature/UnifiedDiscoveryCollectionsTest.php`
-- `tests/Feature/CatalogDiscoveryLayoutTest.php`
-- `tests/Feature/CatalogDiscoveryQueryBudgetTest.php`
-- `tests/browser/discovery-collections.spec.js`
-- `docs/requirements/system-wide-integration.md`, `docs/architecture.md`,
-  `docs/frontend.md`, `docs/views.md`, `docs/UI_STANDARDS.md`,
-  `docs/caching.md`, `docs/performance.md`, `docs/README.md`
-- `README.md`, `CHANGELOG.md`, Task 110 plan/spec/compliance/evidence
+- `GET /`, localized home, `GET /api/v1/home`, discussion routes и Livewire
+  component public methods;
+- API limits: 18 genres, 12 years и прежняя JSON shape;
+- taxonomy/year URLs, catalog visibility, localized Russian UI;
+- personal library ownership, release visibility и existing calendar indexes;
+- content request provider combinations и database unique constraint;
+- PHP compatibility `^8.3`; PHP 8.5-only syntax не вводится.
 
-## Совместимые публичные contracts
+## Риски и rollback
 
-- `GET /discover/{type}` и localized routes для девяти существующих modes;
-- `/discover/popular#collections` и `#popular-titles`;
-- collection query keys и `collectionsPage`;
-- recommendation filters, ranking, refresh и main paginator;
-- public collection eligibility, taxonomy, moderation/quality, API/sitemap;
-- RU/EN translations и text-only nested hierarchy.
+| Domain | Risk | Mitigation / rollback |
+|---|---|---|
+| Database | Длительное создание индекса на production SQLite | Проверенный backup, остановка writers, additive migration; rollback только нового index |
+| Cache | Старый homepage snapshot скрывает полный годовой список | Versioned cache key; rollback к предыдущей версии key |
+| API | Случайное расширение старой JSON projection | Отдельные assertions web/all и API/bounded |
+| UI | Очень длинные country/year lists | Все элементы остаются в DOM; bounded keyboard-focusable scroll regions |
+| Auth/privacy | Facets или updates раскрывают чужое состояние | Public facets не принимают viewer; existing owner-scoped update query сохраняется |
+| Long-lived workers | Process-wide singleton сохраняет stale schema state | `scopedIf`, lifecycle test после `forgetScopedInstances()` |
+| Validation | `distinct` запрещает одинаковые ID разных providers | Составной provider-aware normalized key |
+| Skills | Supply-chain/устаревшие Laravel правила | Read-only source review, no blind install, local validator |
+| Framework | Временный exact shim переживёт upstream fix | Version gate автоматически отключает его; удалить после controlled patch и green regression |
 
-## Risks и cross-feature impact
+## Детальные документы
 
-| Domain | Решение |
-|---|---|
-| Database/migrations | Не меняются; production data не записывается |
-| Routes/API | Не меняются; aliases/default route не добавляются |
-| SEO | Collection state canonical к текущему mode и `noindex`; clean policy сохраняется |
-| Cache | Новых keys нет; route/type уже входит в identity, stateful collection variants обходят shared HTML |
-| Authorization/privacy | Только существующий public scope; private/personal state не раскрывается |
-| Mobile/a11y | Один существующий nested list, wrapping и 44px real actions |
-| Performance | Один фиксированный bounded explorer на mode; без N+1 и duplication |
-| Rollback | Вернуть popular-only parent condition; schema/data/cache rollback не нужен |
-
-## Verification notes
-
-- После точечного bump `CatalogPages` до версии `257` все девять production
-  URLs отвечают `200` и содержат один explorer, 5 root и 31 child.
-- Изолированный production Chromium: 9 modes × desktop/mobile, overflow `0`,
-  browser errors `0`; `/en/discover/random` проверен отдельно.
-- Полный project browser scenario проходит новые discovery assertions, но его
-  финальный общий guard по-прежнему видит два соседних
-  `404 /pwa/posters/browser-smoke` на каждом viewport.
-
-## Previous workstreams
-
-Task 109 восстановил сам полный root/child tree и сохранён в
-[evidence](archive/2026-07-27-discovery-collection-hierarchy-restoration-evidence.md).
-Task 108 importer проверен отдельно. Inherited Task 107 больше не считается
-непроверенным foreign scope: реализация `6 + 6`, compact feedback и
-screen-reader semantics подтверждены отдельной recommendation matrix и
-[evidence](archive/2026-07-27-title-similar-recommendations-compact-evidence.md).
-Все четыре workstream включаются только после одного exact staged review;
-посторонний `composer.lock` остаётся вне delivery.
+- [Design](../superpowers/specs/2026-07-27-homepage-query-classes-performance-design.md)
+- [Implementation plan](../superpowers/plans/2026-07-27-homepage-query-classes-performance.md)
+- [Compliance matrix](task-111-homepage-query-classes-performance-compliance.md)

@@ -197,6 +197,7 @@
                                 :show-description="false"
                                 :rank="$item->rank"
                                 :reason-labels="$item->reasonLabels"
+                                :preferred-rating-provider="$item->ratingProvider"
                             />
                         </li>
                     @endforeach
@@ -215,6 +216,7 @@
                                     :show-description="false"
                                     :rank="$item->rank"
                                     :reason-labels="$item->reasonLabels"
+                                    :preferred-rating-provider="$item->ratingProvider"
                                 />
                             </li>
                         @endforeach

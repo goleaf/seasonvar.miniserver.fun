@@ -17,6 +17,7 @@ use App\Models\Episode;
 use App\Models\Season;
 use App\Models\User;
 use App\Services\ContentRequests\CatalogCorrectionTargetResolver;
+use App\Services\ContentRequests\ContentRequestExternalIdentifierService;
 use App\Services\ContentRequests\ContentRequestInputFactory;
 use App\Services\ContentRequests\ContentRequestQuery;
 use App\Services\ContentRequests\ContentRequestSchema;
@@ -24,6 +25,8 @@ use App\Services\HelpCenter\HelpContextualLinkService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -111,9 +114,23 @@ final class ContentRequestFormPage extends Component
 
     private CatalogCorrectionTargetResolver $correctionTargets;
 
-    public function boot(CatalogCorrectionTargetResolver $correctionTargets): void
-    {
+    public function boot(
+        CatalogCorrectionTargetResolver $correctionTargets,
+        ContentRequestExternalIdentifierService $externalIdentifiers,
+    ): void {
         $this->correctionTargets = $correctionTargets;
+        $this->withValidator(function (Validator $validator) use ($externalIdentifiers): void {
+            $validator->after(function (Validator $validator) use ($externalIdentifiers): void {
+                $duplicateIndex = $externalIdentifiers->firstDuplicateIndex($this->externalIdentifiers);
+
+                if ($duplicateIndex !== null) {
+                    $validator->errors()->add(
+                        "externalIdentifiers.{$duplicateIndex}.identifier",
+                        __('requests.errors.duplicate_external_id'),
+                    );
+                }
+            });
+        });
     }
 
     public function mount(?string $locale = null): void
@@ -365,7 +382,9 @@ final class ContentRequestFormPage extends Component
             'currentValue' => ['nullable', 'string', 'max:2000'], 'proposedValue' => ['nullable', 'string', 'max:4000'],
             'explanation' => ['nullable', 'string', 'max:4000'], 'differentExplanation' => ['nullable', 'string', 'max:1000'],
             'sourceLinks' => ['array', 'max:3'], 'sourceLinks.*' => ['nullable', 'string', 'max:2048'],
-            'externalIdentifiers' => ['array', 'max:5'], 'externalIdentifiers.*.provider' => ['required', 'string'],
+            'externalIdentifiers' => ['array', 'max:'.max(1, (int) config('content-requests.max_external_ids', 5))],
+            'externalIdentifiers.*' => ['array:provider,identifier'],
+            'externalIdentifiers.*.provider' => ['required', Rule::enum(ContentRequestExternalProvider::class)],
             'externalIdentifiers.*.identifier' => ['nullable', 'string', 'max:120'],
         ];
     }

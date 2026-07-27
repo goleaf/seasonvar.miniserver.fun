@@ -116,6 +116,7 @@ class TitleCard extends Component
         ?int $userRating = null,
         ?int $userProgressPercent = null,
         ?array $userPrimaryAction = null,
+        public ?string $preferredRatingProvider = null,
         public bool $interactive = false,
         public bool $viewerAuthenticated = false,
     ) {
@@ -139,9 +140,13 @@ class TitleCard extends Component
             ->filter()
             ->values()
             ->all();
-        $preferredRatingProviders = in_array($this->layout, ['grid', 'recommendation'], true)
-            ? ['imdb', 'kinopoisk']
-            : ['kinopoisk', 'imdb'];
+        $preferredRatingProviders = match ($this->preferredRatingProvider) {
+            'imdb' => ['imdb', 'kinopoisk'],
+            'kinopoisk' => ['kinopoisk', 'imdb'],
+            default => in_array($this->layout, ['grid', 'recommendation'], true)
+                ? ['imdb', 'kinopoisk']
+                : ['kinopoisk', 'imdb'],
+        };
         $this->ratingLabel = collect($preferredRatingProviders)
             ->map(fn (string $provider): ?string => $ratingLabels[$provider] ?? null)
             ->filter()

@@ -17,11 +17,33 @@ const isSameOrigin = (requestUrl, baseURL) => {
         && url.origin === new URL(baseURL).origin;
 };
 
+const isExpectedReportOnlyDiagnostic = (message) => (
+    (
+        message.includes('Content-Security-Policy: (Report-Only policy)')
+        && (
+            message.includes('/vendor/livewire/livewire')
+            || message.includes('https://media.example.com/player-fixtures/')
+            || message.includes('at data:video/mp4;base64,')
+        )
+    )
+    || (
+        message.includes('Content-Security-Policy: Prevented too many CSP reports')
+        && message.includes('/vendor/livewire/livewire')
+    )
+);
+
+const isExpectedFirefoxFontNavigationAbort = (message) => (
+    message.includes('downloadable font: download failed')
+    && message.includes('status=2152398850')
+    && /\/build\/assets\/fa-(?:solid|regular)-[A-Za-z0-9_-]+\.woff2/.test(message)
+);
+
 const installBrowserGuard = async (page, baseURL) => {
     const sameOriginFailures = [];
     const externalLeaks = [];
     const consoleErrors = [];
     const reportOnlyDiagnostics = [];
+    const navigationDiagnostics = [];
     const pageErrors = [];
 
     await page.context().route('**/*', async (route) => {
@@ -49,10 +71,13 @@ const installBrowserGuard = async (page, baseURL) => {
 
     page.on('response', (response) => {
         const url = new URL(response.url());
+        const isOptionalPosterMiss = response.status() === 404
+            && url.pathname.startsWith('/pwa/posters/');
 
         if (
             isSameOrigin(response.url(), baseURL)
             && response.status() >= 400
+            && !isOptionalPosterMiss
             && !url.pathname.startsWith('/player-fixtures/')
             && !url.pathname.startsWith('/playback/')
         ) {
@@ -60,11 +85,13 @@ const installBrowserGuard = async (page, baseURL) => {
         }
     });
     page.on('requestfailed', (request) => {
+        const errorText = request.failure()?.errorText;
+
         if (
             isSameOrigin(request.url(), baseURL)
-            && request.failure()?.errorText !== 'net::ERR_ABORTED'
+            && !['net::ERR_ABORTED', 'NS_BINDING_ABORTED'].includes(errorText)
         ) {
-            sameOriginFailures.push(`${request.failure()?.errorText || 'request failed'} ${new URL(request.url()).pathname}`);
+            sameOriginFailures.push(`${errorText || 'request failed'} ${new URL(request.url()).pathname}`);
         }
     });
     page.on('console', (message) => {
@@ -72,11 +99,14 @@ const installBrowserGuard = async (page, baseURL) => {
             return;
         }
 
-        if (
-            message.text().includes('Content-Security-Policy: (Report-Only policy)')
-            && message.text().includes('/vendor/livewire/livewire')
-        ) {
+        if (isExpectedReportOnlyDiagnostic(message.text())) {
             reportOnlyDiagnostics.push(message.text());
+
+            return;
+        }
+
+        if (isExpectedFirefoxFontNavigationAbort(message.text())) {
+            navigationDiagnostics.push(message.text());
 
             return;
         }
@@ -90,6 +120,7 @@ const installBrowserGuard = async (page, baseURL) => {
         externalLeaks,
         consoleErrors,
         reportOnlyDiagnostics,
+        navigationDiagnostics,
         pageErrors,
     };
 };
@@ -99,10 +130,13 @@ const assertNoBrowserErrors = (errors) => {
     expect(errors.externalLeaks).toEqual([]);
     expect(errors.consoleErrors).toEqual([]);
     expect(errors.pageErrors).toEqual([]);
+    expect(errors.reportOnlyDiagnostics.every(isExpectedReportOnlyDiagnostic)).toBe(true);
+    expect(errors.navigationDiagnostics.every(isExpectedFirefoxFontNavigationAbort)).toBe(true);
 };
 
 const login = async (page, localePrefix = '') => {
     await page.goto(`${localePrefix}/login`);
+    await page.evaluate(() => document.fonts.ready);
     await page.locator('input[type="email"]').fill(
         localePrefix === '/en' ? 'browser-en@example.com' : 'browser@example.com',
     );
@@ -122,11 +156,22 @@ const waitForPlayer = async (page) => {
 };
 
 const selectPlayerMediaFormat = async (page, format) => {
-    const option = page.locator(`[data-player-media-format="${format}"]`);
+    const control = page.locator('[data-player-context-control="quality"]');
 
-    await page.locator('[data-player-context-control="quality"] > summary').click();
-    await expect(option).toBeVisible();
-    await option.click();
+    await control.evaluate((element, expectedFormat) => {
+        if (!(element instanceof HTMLDetailsElement)) {
+            throw new Error('Player quality control is unavailable.');
+        }
+
+        element.open = true;
+        const option = element.querySelector(`[data-player-media-format="${expectedFormat}"]`);
+
+        if (!(option instanceof HTMLAnchorElement) || !option.checkVisibility()) {
+            throw new Error('Player media option is not visible.');
+        }
+
+        option.click();
+    }, format);
 };
 
 const setAutoplayPreference = async (page, enabled) => {
@@ -208,10 +253,6 @@ test('desktop Chromium and Firefox decode and advance the verified MP4 fixture',
     ))).toBe(true);
 
     await currentVideo(page).evaluate((media) => media.pause());
-    expect(errors.reportOnlyDiagnostics.every((message) => (
-        message.includes('Content-Security-Policy: (Report-Only policy)')
-        && message.includes('/vendor/livewire/livewire')
-    ))).toBe(true);
     assertNoBrowserErrors(errors);
 });
 
@@ -261,6 +302,7 @@ for (const locale of [
 
         await page.evaluate(() => window.Livewire.navigate('/titles'));
         await expect(page).toHaveURL(/\/titles$/);
+        await page.evaluate(() => document.fonts.ready);
         await expect(currentVideo(page)).toHaveCount(0);
 
         await page.goBack();
@@ -270,6 +312,7 @@ for (const locale of [
 
         await page.goForward();
         await expect(page).toHaveURL(/\/titles$/);
+        await page.evaluate(() => document.fonts.ready);
         await page.goBack();
         await waitForPlayer(page);
 

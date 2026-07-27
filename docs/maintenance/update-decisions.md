@@ -1,6 +1,6 @@
 # Реестр решений об обновлениях
 
-Аудит: 18.07.2026. Решение относится к точным lock-файлам Task 29. `retain` не означает бессрочную заморозку: оно означает отсутствие достаточной причины менять dependency в этом change set. Отдельная запись `UD-C-017` от 19.07.2026 фиксирует последующую ограниченную установку Laravel Debugbar и не изменяет исторические выводы Task 29.
+Аудит: 18.07.2026. Решение относится к точным lock-файлам Task 29. `retain` не означает бессрочную заморозку: оно означает отсутствие достаточной причины менять dependency в этом change set. Запись `UD-C-017` от 19.07.2026 фиксирует ограниченную установку Laravel Debugbar, `UD-C-018` от 27.07.2026 — точный dev-only compatibility pin PHPStan для обязательного Rector gate, а `UD-C-019` — ограниченный application shim подтверждённой регрессии Laravel 13.22.0 без изменения lock; исторические выводы Task 29 не переписываются.
 
 ## Общий contract записей
 
@@ -35,6 +35,63 @@
 | UD-C-015 | `phpunit/phpunit` | `12.5.31` / `13.2.4` | retain; defer major | New major alone is not benefit; tests may not be run in Task 29 | Complete test suite/config/CI and Pao/Collision compatibility | PHPUnit 13 compatibility is unknown until a dedicated verified migration |
 | UD-C-016 | `rector/rector` | `2.5.7` / current metadata | retain | Owns required and maximum modernization inventory | Development/static analysis | Suggested refactors are not proof of deprecation or correctness |
 | UD-C-017 | `fruitcake/laravel-debugbar` | absent / `^4.4` (locked `4.4.0`) | add; package gates verified | Requested Laravel-native local request/SQL/Livewire diagnostics without a custom profiler | Development only; auto-discovery/config boot and local HTML responses; production uses `--no-dev` and remains fail-closed | Debugbar gates pass; historical unrelated baseline failures remain documented, and the complete `main` history was published through `eb4e7f9e` |
+| UD-C-018 | `phpstan/phpstan` | transitive `2.2.5` / exact direct `2.2.4` | pin compatible patch | PHPStan 2.2.5 removes the private `RichParser::$container` contract still read by Rector 2.5.7 and crashes before analysis | Development/static analysis only; Larastan and Rector share the parser engine; production `--no-dev` is unchanged | Remove the pin only after isolated and repository gates prove a newer pair |
+| UD-C-019 | `laravel/framework` | installed/locked `13.22.0` | retain lock; add exact application compatibility shim | PR #60881 makes `Arr::last(null)` throw from `CookieJar::hasQueued()` after password rehash during other-device logout | Browser account security only; no schema, package, cookie format or public route change | Remove the version-gated shim after an upstream-fixed framework patch passes the regression |
+
+### UD-C-019 — ограничить регрессию Laravel 13.22.0 в browser sessions
+
+1. Dependency/runtime: `laravel/framework 13.22.0` остаётся в существующем
+   lock; package update, downgrade и правка `vendor` не выполняются.
+2. Причина: официальный
+   [PR #60881](https://github.com/laravel/framework/pull/60881) нормализовал
+   вход `Arr::last()` через `Arr::from()`. При отсутствии queued
+   remember-cookie `SessionGuard::logoutOtherDevices()` передаёт `null` и
+   получает `InvalidArgumentException` уже после forced password rehash, но
+   до `OtherDeviceLogout`.
+3. Решение: `BrowserSessionService` перехватывает только exact
+   `13.22.0` + exact message + framework frames `Arr::last`,
+   `CookieJar::queued`, `SessionGuard::logoutOtherDevices`; остальные
+   исключения пробрасываются. Пропущенное framework event отправляется один
+   раз, затем прежний current-session hash синхронизируется и owner-scoped
+   остальные database sessions удаляются.
+4. Compatibility/security: remember-cookie не создаётся и не удаляется
+   вручную; пароль, ID сессий и exception trace не раскрываются. Existing
+   rate limit, password validation, authentication audit и текущая сессия
+   сохранены.
+5. Affected modules: только browser account service и его feature regression;
+   routes, API, schema, cache keys, queue payloads, assets и production
+   dependency graph не меняются.
+6. Rollout/rollback: code deployment не требует migration/cache flush. Откат
+   на текущем framework возвращает известную ошибку; безопасное удаление shim
+   выполняется после controlled Laravel patch и green focused/full gates.
+7. Verification: regression проверяет удаление другой сессии, сохранение
+   текущей, authenticated state, synchronized password hash и dispatch
+   `OtherDeviceLogout`.
+
+### UD-C-018 — закрепить совместимую пару Rector/PHPStan
+
+1. Dependency/runtime: `phpstan/phpstan` становится прямой
+   `require-dev`-зависимостью с точным ограничением `2.2.4`; production package
+   graph не меняется.
+2. Причина: обязательный `composer rector:check` на транзитивном `2.2.5`
+   завершался до анализа с `MissingPrivatePropertyException` для
+   `RichParser::$container`. Это подтверждённый compatibility defect, а не
+   желание использовать другую версию.
+3. Compatibility evidence: отдельный минимальный Composer-проект с
+   `rector/rector 2.5.7` и `phpstan/phpstan 2.2.4` выполнил dry-run; тот же
+   Rector в repository после pin запустил полный required profile.
+4. Affected modules: только development static gates (`composer analyse`,
+   `composer rector:check`, CI/pre-push); routes, database, cache, sessions,
+   queues, UI, API и production install не затронуты.
+5. Security/license: MIT, `composer audit --locked` не нашёл известных
+   advisories; pin не является обещанием отсутствия будущих advisories.
+6. Migration/deployment: database/data migration отсутствует; deployment
+   продолжает использовать locked install и `--no-dev` для production.
+7. Rollback: удалить прямое ограничение и обновить только PHPStan lock entry
+   после того, как новая совместимая пара проходит изолированный probe,
+   Larastan, оба Rector-профиля и полный CI.
+8. Limitation: `2.2.5+` временно недоступен этому repository gate; состояние
+   пересматривается при новом Rector/PHPStan patch, без broad Composer update.
 
 ### UD-C-017 — добавить Laravel Debugbar только для разработки
 

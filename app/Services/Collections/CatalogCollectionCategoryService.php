@@ -590,22 +590,19 @@ final class CatalogCollectionCategoryService
         ], JSON_THROW_ON_ERROR));
     }
 
-    /** @return never */
-    private function validation(string $field, string $message): void
+    private function validation(string $field, string $message): never
     {
         throw ValidationException::withMessages([$field => [$message]]);
     }
 
-    /** @return never */
-    private function invalid(): void
+    private function invalid(): never
     {
         throw ValidationException::withMessages([
             'categoryPublicId' => [__('collections.validation.category')],
         ]);
     }
 
-    /** @return never */
-    private function invalidAssignments(): void
+    private function invalidAssignments(): never
     {
         throw ValidationException::withMessages([
             'assignments' => [__('collections.classification.validation_batch')],

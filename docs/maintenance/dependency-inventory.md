@@ -1,6 +1,13 @@
 # Канонический реестр прямых зависимостей
 
-Аудит: 18.07.2026; повторно сверен 19.07.2026 после установки Laravel Debugbar и последующих repository changes. Источники: `composer.json`, `composer.lock`, `composer show --direct --format=json`, `composer licenses --format=json`, `package.json`, `package-lock.json`, `npm ls --depth=0`, package manifest и полный repository usage search. Основные таблицы содержат только 27 direct dependencies; transitive packages упоминаются лишь там, где они образуют production boundary. Версия означает состояние lock-файла, а не рекомендацию обновиться.
+Аудит: 18.07.2026; повторно сверен 27.07.2026 после фиксации совместимой
+инструментальной пары Rector/PHPStan. Источники: `composer.json`,
+`composer.lock`, `composer show --direct --format=json`,
+`composer licenses --format=json`, `package.json`, `package-lock.json`,
+`npm ls --depth=0`, package manifest и полный repository usage search.
+Основные таблицы содержат только 28 direct dependencies; transitive packages
+упоминаются лишь там, где они образуют production boundary. Версия означает
+состояние lock-файла, а не рекомендацию обновиться.
 
 ## Composer: назначение и решение
 
@@ -21,6 +28,7 @@
 | `laravel/pint` | `1.29.3` / `^1.27` | development | Canonical PHP formatter | `./vendor/bin/pint`, development workflow | retain |
 | `mockery/mockery` | `1.6.12` / `^1.6` | development | Existing test doubles | existing tests | retain; tests were not run in Task 29 |
 | `nunomaduro/collision` | `8.9.5` / `^8.6` | development | Development CLI exception rendering | auto-discovered development provider | retain |
+| `phpstan/phpstan` | `2.2.4` / `2.2.4` | development | Shared static-analysis engine for Larastan and Rector | `phpstan.neon.dist`, `composer analyse`, `composer rector:check` | retain exact compatibility pin; review after upstream Rector supports PHPStan 2.2.5+ |
 | `phpunit/phpunit` | `12.5.31` / `^12.5.12` | development | Existing PHPUnit 12 test infrastructure | `phpunit.xml`, tests | retain; major 13 deferred |
 | `rector/rector` | `2.5.7` / `^2.4` | development | Required and maximum read-only modernization profiles | `rector.php`, `rector-max.php` | retain |
 
@@ -60,6 +68,7 @@
 | `laravel/pint` | formatter binary | development only | required workflow / low | adopt documented equivalent formatter with zero style drift | audit clean; MIT; development |
 | `mockery/mockery` | none | development only | existing test dependency / medium | migrate every existing mock without changing test semantics | audit clean; BSD-3-Clause; testing |
 | `nunomaduro/collision` | CLI rendering provider | development CLI only | optional / low | verify console/debug output remains usable | audit clean; MIT; development |
+| `phpstan/phpstan` | `phpstan` binary and shared parser/type engine | development analysis only | required by Larastan and Rector / medium | remove the exact pin only after both zero-error gates pass against the proposed patch | audit clean; MIT; development |
 | `phpunit/phpunit` | `phpunit` binary | development only | protected test infrastructure / high | separately migrate suite/config/extensions; Task 29 cannot prove PHPUnit 13 | audit clean; BSD-3-Clause; testing |
 | `rector/rector` | `rector` binary | development analysis only | required static gate / medium | preserve both required and maximum rule inventories | audit clean; MIT; development |
 | `@fortawesome/fontawesome-free` | no routes/commands/migrations | global local CSS/font assets; public bundle impact | mandatory current icons / medium | replace every icon name/import and confirm licensing/visual/accessibility parity | audit clean; CC-BY-4.0 + OFL-1.1 + MIT; UI |
@@ -96,7 +105,14 @@ Seven scheduler entries remain bounded and named; no cron, queue, provider call 
 
 ## Lock and licensing policy
 
-- The four dependency files were rehashed on 19.07.2026 and are protected from unrelated rewrite. The repeat audit changes no package version or lock entry; the earlier Debugbar decision added exactly three Composer lock entries with no update or removal.
-- Fresh 19.07.2026 `composer audit --locked` reports no advisory, malware-policy or abandoned-package record. Fresh `npm audit` reports zero known vulnerabilities across the 113 locked npm dependencies. These are dated tooling results, not a permanent safety claim.
+- Task 111 adds one exact direct development constraint and changes only the
+  existing `phpstan/phpstan` lock entry from `2.2.5` to `2.2.4`. Production
+  `composer install --no-dev` remains unchanged. Rollback removes the direct
+  pin and resolves the previously reviewed lock only after Rector compatibility
+  is restored.
+- Fresh 27.07.2026 `composer audit --locked` reports no advisory,
+  malware-policy or abandoned-package record. Fresh `npm audit` reports zero
+  known vulnerabilities. These are dated tooling results, not a permanent
+  safety claim.
 - Direct Composer licenses are MIT except Mockery/PHPUnit (BSD-3-Clause). Direct npm licenses are documented above; FontAwesome attribution/license obligations and axe-core MPL-2.0 must remain in any distribution/legal review.
 - A successful install or clean advisory command never replaces feature, production, privacy, accessibility or rollback verification.

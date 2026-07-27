@@ -183,10 +183,12 @@ final class CatalogCollectionQuery
 
         if ($withTrashed) {
             $cutoff = now()->subDays(max(1, (int) config('catalog-collections.restoration_days', 30)));
-            $paginator->getCollection()->each(fn (CatalogCollection $collection) => $collection->setAttribute(
-                'is_restorable',
-                $collection->deleted_at !== null && $collection->deleted_at->gt($cutoff),
-            ));
+            $paginator->getCollection()->each(function (CatalogCollection $collection) use ($cutoff): void {
+                $collection->setAttribute(
+                    'is_restorable',
+                    $collection->deleted_at !== null && $collection->deleted_at->gt($cutoff),
+                );
+            });
         }
 
         return $paginator;
@@ -653,10 +655,9 @@ final class CatalogCollectionQuery
         $paginator = $query->paginate($perPage, pageName: 'collectionAdminPage');
 
         if (! $qualityAvailable) {
-            $paginator->getCollection()->each(
-                fn (CatalogCollection $collection): CatalogCollection => $collection
-                    ->setRelation('qualityIssues', new EloquentCollection),
-            );
+            $paginator->getCollection()->each(function (CatalogCollection $collection): void {
+                $collection->setRelation('qualityIssues', new EloquentCollection);
+            });
         }
 
         return $paginator;

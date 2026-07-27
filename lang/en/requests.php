@@ -317,6 +317,7 @@ return [
         'invalid_language' => 'Unsupported language code.',
         'invalid_translation_type' => 'Unsupported translation type.',
         'invalid_external_id' => 'The external identifier has an invalid format.',
+        'duplicate_external_id' => 'This external identifier has already been added.',
         'too_many_external_ids' => 'Too many external identifiers.',
         'invalid_source_url' => 'The link is invalid or points to a prohibited address.',
         'too_many_links' => 'Too many source links.',

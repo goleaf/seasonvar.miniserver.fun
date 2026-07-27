@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<html lang="{{ $htmlLocale }}">
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -14,7 +14,7 @@
         <title>{{ $title }}</title>
         @vite('resources/js/app.js')
     </head>
-    <body class="min-h-screen bg-slate-50 text-slate-800 antialiased" data-pwa-enabled="1" data-pwa-service-worker-url="/service-worker.js" data-pwa-session-url="/pwa/session" data-pwa-help-snapshot-url="/pwa/help-snapshot?locale={{ app()->getLocale() }}">
+    <body class="min-h-screen bg-slate-50 text-slate-800 antialiased" data-pwa-enabled="1" data-pwa-service-worker-url="/service-worker.js" data-pwa-session-url="/pwa/session" data-pwa-help-snapshot-url="{{ $pwaHelpSnapshotUrl }}">
         @yield('content')
     </body>
 </html>

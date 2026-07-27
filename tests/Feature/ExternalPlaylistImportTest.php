@@ -81,13 +81,19 @@ class ExternalPlaylistImportTest extends TestCase
         $this->get(route('titles.show', $catalogTitle))
             ->assertOk()
             ->assertSeeText('Начать с 2 серии')
-            ->assertSeeText('Выбрана 2 серия')
+            ->assertSee('data-player-context-episode', false)
+            ->assertSeeText('2 серия')
+            ->assertSee(
+                'data-active-player-session="'.$catalogTitle->id.':'.$episode->id.':'.$media->id.'"',
+                false,
+            )
             ->assertSee('/playback/'.$media->id.'?', false)
             ->assertDontSee('https://media.example.com/files/6_kadrov_s01e02.mp4', false);
 
         $this->get(route('titles.show', ['catalogTitle' => $catalogTitle, 'episode' => $episode->id]))
             ->assertOk()
-            ->assertSeeText('Выбрана 2 серия')
+            ->assertSee('data-player-context-episode', false)
+            ->assertSeeText('2 серия')
             ->assertDontSeeText('видео найдено')
             ->assertSee('/playback/'.$media->id.'?', false)
             ->assertDontSee('https://media.example.com/files/6_kadrov_s01e02.mp4', false);

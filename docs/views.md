@@ -203,7 +203,7 @@ Parent `catalog-title-detail.blade.php` назначает единственн�
 
 Native buttons/links/dialog имеют семантику, visible focus, минимум 44 px, translated ARIA/live regions, mobile wrapping и working href fallback. Plyr остаётся владельцем core controls; portal controls не имитируют unsupported browser features. Полный presentation checklist: [`audits/video-playback-report.md`](audits/video-playback-report.md).
 
-Только keyed `data-player-shell` имеет полный `wire:ignore`, потому что Plyr/HLS изменяют всё его поддерево. `wire:ignore.self` недостаточен, а расширение boundary на loading overlay, media options, ошибки или portal controls запрещено: эти sibling-элементы обязаны получать server-owned Livewire morphs.
+Только keyed `data-player-shell` имеет полный `wire:ignore`, потому что Plyr/HLS изменяют всё его поддерево. Для самого shell `wire:ignore.self` недостаточен; этот modifier отдельно стоит на корне workspace и защищает только client-owned session attributes, оставляя дочерние loading overlay, media options, ошибки и portal controls под server-owned Livewire morph.
 
 `wire:replace.self` используется ровно в четырёх template pattern `title-filters.blade.php` и только на leaf-checkbox с `wire:model.live`: заменяется сам input после grouped island response, окружающие label/counter/group остаются morph-owned. Bare subtree replacement, replacement на player, forms/dialogs/editors и text/search inputs запрещены без воспроизводящего дефект теста и доказательства, что узкий key/component/lifecycle boundary недостаточен.
 
@@ -291,3 +291,20 @@ Raw source URL не попадает в option markup; обычный fallback �
 канонический публичный query, а бесшовный переход — opaque media ID.
 Короткоживущий signed playback grant по-прежнему получает только существующий
 player lifecycle после server resolution.
+
+## Главная страница Task 111
+
+`resources/views/livewire/catalog-home-page.blade.php` пассивно получает
+полные web facets от `CatalogHomePageBuilder`. Стабильные
+`data-home-facet-list="genres|countries|years"` используются для browser
+regression, а не для business state. URL стран подготовлен query boundary;
+Blade не вызывает модели, сервисы, container или database.
+
+`resources/views/catalog/titles.blade.php` также остаётся пассивным:
+`directorySuggestions` и `TagPageData::related` полностью подготовлены
+builder/query boundaries. Ссылки каталогов и тегов строятся по существующим
+named routes, а Blade не выполняет поиск, счётчики или запросы к моделям.
+
+Top‑100 передаёт `CatalogTopListItem::ratingProvider` в
+`x-catalog.title-card`; карточка выбирает этот проверенный источник первым и
+не меняет исходный порядок списка.

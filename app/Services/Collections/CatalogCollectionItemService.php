@@ -132,7 +132,9 @@ final class CatalogCollectionItemService
                 ->orderBy('id')
                 ->lockForUpdate()
                 ->get();
-            $manageable->each(fn (CatalogCollection $collection) => Gate::forUser($actor)->authorize('manageItems', $collection));
+            $manageable->each(function (CatalogCollection $collection) use ($actor): void {
+                Gate::forUser($actor)->authorize('manageItems', $collection);
+            });
             $currentTitle = CatalogTitle::query()->lockForUpdate()->findOrFail($title->id);
             Gate::forUser($actor)->authorize('interact', $currentTitle);
             $manageablePublicIds = $manageable->pluck('public_id')->all();
@@ -454,7 +456,9 @@ final class CatalogCollectionItemService
             ->orderBy('position')
             ->orderBy('id')
             ->pluck('id')
-            ->each(fn (mixed $id, int $index) => CatalogCollectionItem::query()->whereKey($id)->update(['position' => $index + 1]));
+            ->each(function (mixed $id, int $index): void {
+                CatalogCollectionItem::query()->whereKey($id)->update(['position' => $index + 1]);
+            });
     }
 
     private function assertManual(CatalogCollection $collection): void

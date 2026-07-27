@@ -869,6 +869,10 @@ return [
     ],
     'player' => [
         'validation' => [
+            'review_integer' => 'The selected review number must be an integer.',
+            'review_minimum' => 'The selected review number must be greater than zero.',
+            'comment_integer' => 'The selected comment number must be an integer.',
+            'comment_minimum' => 'The selected comment number must be greater than zero.',
             'season_integer' => 'The selected season number must be an integer.',
             'season_minimum' => 'The selected season number must be greater than zero.',
             'episode_integer' => 'The selected episode number must be an integer.',
@@ -886,6 +890,8 @@ return [
             'format_supported' => 'The selected format is not supported.',
         ],
         'attributes' => [
+            'review' => 'review',
+            'comment' => 'comment',
             'season' => 'season',
             'episode' => 'episode',
             'media' => 'video',

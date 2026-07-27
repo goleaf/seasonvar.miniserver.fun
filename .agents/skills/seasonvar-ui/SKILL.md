@@ -25,6 +25,10 @@ Build a quiet, usable Russian catalog interface that exposes real catalog data a
 - Keep fixed-format UI stable with explicit dimensions, grids, aspect ratios, or min/max constraints.
 - For playback variants, make quality, format, translation/voice, subtitle state, and availability scannable without hiding alternatives.
 - Use local assets/icons already installed through npm. Avoid CDN dependencies.
+- Keep the homepage genre/country/year discovery block available to guests and
+  authenticated users. Render every available option; when density is high,
+  use a labelled, keyboard-focusable bounded scroll region instead of slicing
+  the collection in Blade.
 
 ## Responsive Checks
 

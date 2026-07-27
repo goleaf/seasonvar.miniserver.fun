@@ -8,6 +8,7 @@ use App\Models\CatalogTitle;
 use App\Models\Country;
 use App\Models\Genre;
 use App\Models\User;
+use App\Services\Catalog\CatalogTasteOnboardingSchema;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -16,6 +17,21 @@ use Tests\TestCase;
 final class CatalogTasteOnboardingSchemaTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_onboarding_schema_is_reused_only_within_the_current_container_scope(): void
+    {
+        $first = app(CatalogTasteOnboardingSchema::class);
+        $sameScope = app(CatalogTasteOnboardingSchema::class);
+
+        $this->assertSame($first, $sameScope);
+
+        app()->forgetScopedInstances();
+
+        $nextScope = app(CatalogTasteOnboardingSchema::class);
+
+        $this->assertNotSame($first, $nextScope);
+        $this->assertSame($nextScope, app(CatalogTasteOnboardingSchema::class));
+    }
 
     public function test_onboarding_schema_is_owner_scoped_and_indexed_for_recommendation_reads(): void
     {

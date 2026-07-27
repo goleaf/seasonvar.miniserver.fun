@@ -425,9 +425,9 @@ final class CatalogTitlePlaybackQuery
         $episodes = $this->episodesForSeasonQuery($catalogTitle, $season, $user, false)
             ->paginate(perPage: $perPage, pageName: 'playerEpisodePage', page: $page);
 
-        $episodes->getCollection()->each(
-            fn (Episode $episode): Episode => $episode->setRelation('season', $season),
-        );
+        $episodes->getCollection()->each(function (Episode $episode) use ($season): void {
+            $episode->setRelation('season', $season);
+        });
 
         return $episodes;
     }

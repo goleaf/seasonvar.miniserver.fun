@@ -22,6 +22,10 @@ final class ContentRequestExternalIdentifierService
             throw new ContentRequestActionException('requests.errors.too_many_external_ids');
         }
 
+        if ($this->firstDuplicateIndex($identifiers) !== null) {
+            throw new ContentRequestActionException('requests.errors.duplicate_external_id');
+        }
+
         return collect($identifiers)
             ->map(function (array $item): array {
                 $provider = ContentRequestExternalProvider::tryFrom(Str::lower(trim($item['provider'] ?? '')));
@@ -37,9 +41,38 @@ final class ContentRequestExternalIdentifierService
 
                 return ['provider' => $provider->value, 'identifier' => $identifier, 'normalized_identifier' => $normalized];
             })
-            ->unique(fn (array $item): string => $item['provider'].':'.$item['normalized_identifier'])
             ->values()
             ->all();
+    }
+
+    /** @param list<array<string, mixed>> $identifiers */
+    public function firstDuplicateIndex(array $identifiers): ?int
+    {
+        $seen = [];
+
+        foreach ($identifiers as $index => $item) {
+            $provider = ContentRequestExternalProvider::tryFrom(
+                Str::lower(trim((string) ($item['provider'] ?? ''))),
+            );
+            $identifier = trim((string) ($item['identifier'] ?? ''));
+
+            if ($provider === null || ! $this->valid($provider, $identifier)) {
+                continue;
+            }
+
+            $normalized = $provider === ContentRequestExternalProvider::Imdb
+                ? Str::lower($identifier)
+                : (ltrim($identifier, '0') ?: '0');
+            $key = $provider->value.':'.$normalized;
+
+            if (isset($seen[$key])) {
+                return (int) $index;
+            }
+
+            $seen[$key] = true;
+        }
+
+        return null;
     }
 
     private function valid(ContentRequestExternalProvider $provider, string $identifier): bool

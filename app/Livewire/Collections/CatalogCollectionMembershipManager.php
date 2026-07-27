@@ -129,10 +129,12 @@ final class CatalogCollectionMembershipManager extends Component
         $manageableCollections = $this->open && $user instanceof User
             ? $collections->manageableForTitle($user, $this->catalogTitleId)
             : collect();
-        $manageableCollections->each(fn (CatalogCollection $collection) => $collection->setAttribute(
-            'visibility_label',
-            $collection->visibility->label(),
-        ));
+        $manageableCollections->each(function (CatalogCollection $collection): void {
+            $collection->setAttribute(
+                'visibility_label',
+                $collection->visibility->label(),
+            );
+        });
         $categoryViewData = $this->open && $user instanceof User
             ? $this->categorySelectionViewData($categories)
             : [

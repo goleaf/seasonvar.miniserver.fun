@@ -306,7 +306,11 @@ final class CommentDiscussionQuery
                     ->where('status', '!=', CommentStatus::Removed->value)
                     ->whereNull('deleted_at'),
             ]);
+
+            return;
         }
+
+        $query->selectRaw('0 as viewer_private_replies_count');
     }
 
     /** @param Builder<Comment> $query */

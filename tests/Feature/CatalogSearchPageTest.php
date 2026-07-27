@@ -379,7 +379,7 @@ class CatalogSearchPageTest extends TestCase
 
         $this->get(route('titles.index', ['q' => 'шерлокк']))
             ->assertOk()
-            ->assertSeeText('Найдено сейчас: 0')
+            ->assertSee('data-catalog-current-result-label="0 сериалов"', false)
             ->assertSeeText('Возможно, подойдёт')
             ->assertSee(route('titles.index', ['sort' => 'relevance', 'q' => 'Шерлок']))
             ->assertDontSee('href="'.route('titles.show', $title).'"', false);
@@ -399,7 +399,7 @@ class CatalogSearchPageTest extends TestCase
 
         $this->get(route('titles.index', ['q' => 'Шерлок', 'year' => 2020]))
             ->assertOk()
-            ->assertSeeText('Найдено сейчас: 0')
+            ->assertSee('data-catalog-current-result-label="0 сериалов"', false)
             ->assertDontSeeText('Возможно, подойдёт');
     }
 }

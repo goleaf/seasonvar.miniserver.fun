@@ -424,3 +424,27 @@ Task 102 не меняет CSP enforcement, signed grant TTL, SSRF/DNS/host vali
 CSRF, policies, rate limits или private/no-store contracts. PWA по-прежнему не
 кеширует video/HLS/signed playback. Secret/debug scan выполняется по exact
 staged diff перед commit.
+
+## Исправления чтения и nested validation Task 111
+
+`CommentDiscussionQuery` теперь всегда выбирает
+`viewer_private_replies_count`: реальный bound aggregate для вошедшего
+пользователя и SQL literal `0` для гостя. Presenter больше не обращается к
+отсутствующему атрибуту, а private replies по-прежнему не раскрываются гостю.
+
+Строка внешнего идентификатора заявки принимает только ключи `provider` и
+`identifier`; provider проверяется backed enum. Уникальность определяется
+нормализованной парой provider+identifier, поэтому регистр IMDb не обходит
+проверку, а одинаковый numeric ID у TMDB и TVDB не считается дубликатом.
+Livewire возвращает field-level ошибку, domain service повторно отвергает
+дубликат и не выполняет silent deduplication. Новые raw SQL/user-controlled
+identifiers, public endpoint или permission не добавлены.
+
+Laravel 13.22.0 имеет подтверждённый framework regression при завершении
+других браузерных сессий без remember-cookie. Совместимый путь в
+`BrowserSessionService` допускает только точное сочетание версии, сообщения и
+стека `Arr::last()` → `CookieJar::queued()` →
+`SessionGuard::logoutOtherDevices()`. Он не проглатывает другие ошибки,
+вручную восстанавливает только пропущенное событие `OtherDeviceLogout`, затем
+сохраняет текущую owner-сессию и удаляет только остальные database sessions.
+Пароль, cookie, session ID и trace пользователю или в аудит не выводятся.

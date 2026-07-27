@@ -19,9 +19,9 @@ class CatalogRouteFilterCompositionTest extends TestCase
     {
         $turkey = Country::query()->create(['name' => 'Турция', 'slug' => 'turciia']);
 
-        CatalogTitle::factory()->count(30)->create()->each(
-            fn (CatalogTitle $title) => $title->countries()->attach($turkey),
-        );
+        CatalogTitle::factory()->count(30)->create()->each(function (CatalogTitle $title) use ($turkey): void {
+            $title->countries()->attach($turkey);
+        });
 
         $content = $this->get(route('titles.taxonomy', [
             'type' => 'country',

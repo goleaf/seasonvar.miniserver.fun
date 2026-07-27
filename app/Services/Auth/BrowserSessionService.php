@@ -8,14 +8,20 @@ use App\DTOs\BrowserSessionSummaryData;
 use App\Enums\AuthenticationEvent;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Auth\Events\OtherDeviceLogout;
 use Illuminate\Auth\SessionGuard;
+use Illuminate\Cookie\CookieJar;
+use Illuminate\Foundation\Application;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 use LogicException;
 
 final class BrowserSessionService
@@ -56,7 +62,7 @@ final class BrowserSessionService
             ]);
         }
 
-        $guard->logoutOtherDevices($password);
+        $this->logoutOtherFrameworkSessions($guard, $user, $password);
         $user->refresh();
         $this->synchronizeCurrentPasswordHash($user);
         $this->deleteOtherDatabaseSessions($user, $currentSessionId);
@@ -189,6 +195,45 @@ final class BrowserSessionService
             ->where('user_id', $user->getKey())
             ->where('id', '!=', $currentSessionId)
             ->delete();
+    }
+
+    private function logoutOtherFrameworkSessions(SessionGuard $guard, User $user, string $password): void
+    {
+        try {
+            $guard->logoutOtherDevices($password);
+        } catch (InvalidArgumentException $exception) {
+            if (! $this->isLaravelMissingQueuedRecallerRegression($exception)) {
+                throw $exception;
+            }
+
+            Event::dispatch(new OtherDeviceLogout('web', $user));
+        }
+    }
+
+    private function isLaravelMissingQueuedRecallerRegression(InvalidArgumentException $exception): bool
+    {
+        if (
+            Application::VERSION !== '13.22.0'
+            || $exception->getMessage() !== 'Items cannot be represented by a scalar value.'
+        ) {
+            return false;
+        }
+
+        $expectedFrames = [
+            Arr::class.'::last' => false,
+            CookieJar::class.'::queued' => false,
+            SessionGuard::class.'::logoutOtherDevices' => false,
+        ];
+
+        foreach ($exception->getTrace() as $frame) {
+            $key = ($frame['class'] ?? '').'::'.($frame['function'] ?? '');
+
+            if (array_key_exists($key, $expectedFrames)) {
+                $expectedFrames[$key] = true;
+            }
+        }
+
+        return ! in_array(false, $expectedFrames, true);
     }
 
     private function opaqueToken(User $user, string $sessionId): string

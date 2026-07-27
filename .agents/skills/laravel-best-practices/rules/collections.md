@@ -1,17 +1,27 @@
 # Collection Best Practices
 
-## Use Higher-Order Messages for Simple Operations
+## Keep `each()` Side Effects Explicit
+
+`Collection::each()` stops as soon as a callback returns strict `false`.
+Arrow functions implicitly return their expression, and higher-order
+`each->method()` forwards the method result. Either form can therefore truncate
+side effects when the called expression may return `false`.
 
 Incorrect:
 ```php
-$users->each(function (User $user) {
+$users->each(fn (User $user) => $user->markAsVip());
+```
+
+Correct:
+```php
+$users->each(function (User $user): void {
     $user->markAsVip();
 });
 ```
 
-Correct: `$users->each->markAsVip();`
-
-Works with `each`, `map`, `sum`, `filter`, `reject`, `contains`, etc.
+Use `map()` when callback return values are the intended output. Higher-order
+messages remain appropriate only when their return contract is known and
+cannot trigger collection control-flow semantics.
 
 ## Choose `cursor()` vs. `lazy()` Correctly
 

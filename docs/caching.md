@@ -176,11 +176,14 @@ Cold rebuild десятилетий не группирует вычисляем
 ## Годовые подборки главной страницы
 
 `CatalogHomeSnapshotCache` хранит `year_buckets` отдельным компактным
-ресурсом `homepage-year-buckets-v1` внутри существующего
-`CatalogFacetSnapshotCache`. Dimensions фиксируют публичную аудиторию, лимит
-12 и текущий календарный год; payload содержит только целые `year` и
-`titles_count`, отсортированные по году в обратном порядке. Внешний Homepage
-snapshot, его ключи, сроки и response shape не меняются.
+ресурсом `homepage-year-buckets-v2` внутри существующего
+`CatalogFacetSnapshotCache`. Dimensions фиксируют публичную аудиторию и
+текущий календарный год; payload содержит все допустимые целые `year` и
+`titles_count`, отсортированные по году в обратном порядке. Web-проекция
+показывает весь payload, а прежний API contract ограничивает его первыми 12
+строками вне cache boundary. Внешний Homepage snapshot использует
+`content-index-v3`; прежний shape и сроки сохранены, а смена версии исключает
+выдачу старого ограниченного payload.
 
 `CatalogCacheInvalidator::catalogChanged()` уже повышает версии Homepage и
 `CatalogFacets` после успешного commit. Поэтому изменение видимости или года
@@ -567,3 +570,17 @@ asset graph. Поэтому PHP/player sources и JS/CSS chunks нельзя н�
 полный flush или user dimension не добавлены. Signed playback, HLS/video,
 provider URL, progress, preferences и authenticated HTML по-прежнему запрещены
 в shared cache и Cache Storage.
+
+## Cache lifecycle главной страницы Task 111
+
+Public snapshot использует `content-index-v3`; годовые группы используют
+`homepage-year-buckets-v2` без прежней размерности `limit=12`. Cache miss
+делегируется `CatalogHomeSnapshotQuery`, а API-лимит применяется только в
+projection, поэтому guest/auth web и API не создают разные копии одной
+публичной истины. Facet cache signature учитывает список групп и nullable
+limits; personal state, user ID и URL не входят в shared key.
+
+`CatalogTasteOnboardingSchema` зарегистрирован через `scopedIf()`: его
+schema memoization разделяется потребителями одного request/job scope, но не
+переживает сброс scoped instances в Octane/queue lifecycle. Process-wide
+singleton для этого mutable memoized read запрещён.

@@ -33,6 +33,7 @@ use App\Services\Auth\AccountAccessResolver;
 use App\Services\Auth\AccountSettingsSchema;
 use App\Services\Catalog\CatalogRecommendationPreferenceQuery;
 use App\Services\Catalog\CatalogRecommendationPreferenceSchema;
+use App\Services\Catalog\CatalogTasteOnboardingSchema;
 use App\Services\Catalog\PersonalLibrarySchema;
 use App\Services\Catalog\PlaybackQualitySchema;
 use App\Services\Collections\CatalogCollectionSchema;
@@ -95,6 +96,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->scopedIf(PersonalLibrarySchema::class);
         $this->app->scopedIf(CatalogRecommendationPreferenceSchema::class);
         $this->app->scopedIf(CatalogRecommendationPreferenceQuery::class);
+        $this->app->scopedIf(CatalogTasteOnboardingSchema::class);
         $this->app->scopedIf(PlaybackQualitySchema::class);
         $this->app->scopedIf(PremiumAccessResolver::class);
         $this->app->singleton(PremiumPaymentGatewayRegistry::class, static fn (): PremiumPaymentGatewayRegistry => new PremiumPaymentGatewayRegistry);

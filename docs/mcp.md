@@ -99,3 +99,13 @@ php artisan integrations:doctor --strict --json
 - `seasonvar-skill-authoring`
 
 Новые Seasonvar skills лежат в `.agents/skills` и не содержат секретов или исполняемых интеграций. Они задают правила для импорта, интерфейса, SEO и MCP-операций.
+
+## Аудит skills Task 111
+
+Все project skill directories проверяются `quick_validate.py` после
+изменений, а не только затронутые. Сторонние skills из публичных каталогов
+сначала проверяются по exact repository/ref, поддержке, scripts/assets,
+пересечению и конфликтам с `AGENTS.md`; популярность не является основанием
+установки. В Task 111 дополнительные packages не установлены: найденные
+Laravel/security/performance наборы дублировали более строгие локальные
+правила или содержали устаревшие архитектурные советы.

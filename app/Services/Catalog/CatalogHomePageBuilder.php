@@ -15,11 +15,11 @@ use App\Models\User;
 use App\Services\Auth\AccountDateTimeFormatter;
 use App\Services\Auth\AccountSettingsService;
 use App\Services\Auth\AuthenticationRedirectService;
+use App\Services\Catalog\Queries\CatalogHomeFacetGroupsQuery;
 use App\Services\Collections\CatalogCollectionQuery;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 
 class CatalogHomePageBuilder
@@ -30,9 +30,13 @@ class CatalogHomePageBuilder
 
     private const WEB_TRENDING_TITLE_LIMIT = 5;
 
+    private const API_GENRE_LIMIT = 18;
+
+    private const API_YEAR_LIMIT = 12;
+
     public function __construct(
         private readonly CatalogSeoBuilder $seo,
-        private readonly CatalogFacetQuery $facets,
+        private readonly CatalogHomeFacetGroupsQuery $homeFacets,
         private readonly CatalogTaxonomyRegistry $taxonomies,
         private readonly CatalogTitleQuery $titles,
         private readonly CatalogHomeContentAdditionQuery $contentAdditions,
@@ -82,14 +86,9 @@ class CatalogHomePageBuilder
     ): array {
         $accountSettings = $this->accountSettings->resolve($user);
         $locale = app()->currentLocale();
-        $genres = $this->facets->taxonomies('genre');
-        $countries = $this->facets->taxonomies('country');
-        $countries->each(function (Model $country): void {
-            $country->setAttribute('detail_url', route('titles.taxonomy', [
-                'type' => 'country',
-                'taxonomy' => $country->getAttribute('slug'),
-            ]));
-        });
+        $facetGroups = $this->homeFacets->handle();
+        $genres = $facetGroups->get('genre', collect());
+        $countries = $facetGroups->get('country', collect());
         $snapshot = $this->snapshot->snapshot();
         $allLatestTitleIds = $snapshot['latest_title_ids'];
         $latestTitleIds = $latestTitleLimit === null
@@ -219,7 +218,13 @@ class CatalogHomePageBuilder
             $latestTitles->concat($featuredTitles)->concat($videoTitles),
             $user,
         );
-        $yearBuckets = collect($snapshot['year_buckets'])->map(fn (array $attributes): object => (object) $attributes);
+        $yearBuckets = collect($snapshot['year_buckets'])
+            ->when(
+                ! $includeWebOnlySections,
+                fn (Collection $buckets): Collection => $buckets->take(self::API_YEAR_LIMIT),
+            )
+            ->map(fn (array $attributes): object => (object) $attributes)
+            ->values();
         $subtitleTag = null;
 
         if (is_array($snapshot['subtitle_tag'] ?? null)) {
@@ -240,13 +245,17 @@ class CatalogHomePageBuilder
             'latestMedia' => $latestMedia,
             'latestReleaseGroups' => $latestReleaseGroups,
             'yearBuckets' => $yearBuckets,
-            'genres' => $genres->take(18)->values(),
+            'genres' => $includeWebOnlySections
+                ? $genres->values()
+                : $genres->take(self::API_GENRE_LIMIT)->values(),
             'countries' => $countries,
             'subtitleTag' => $subtitleTag,
             'subtitleTagUrl' => $subtitleTag instanceof Tag
                 ? route('titles.taxonomy', ['type' => 'tag', 'taxonomy' => $subtitleTag->slug])
                 : null,
-            'featuredCollections' => $this->collections->featured(),
+            'featuredCollections' => $includeWebOnlySections && $user !== null
+                ? collect()
+                : $this->collections->featured(),
             'homeRecommendationItems' => $homeRecommendationItems,
             'homeRecommendationPresentation' => $homeRecommendationPresentation,
             'trendingSpotlight' => $trendingItems->first(),

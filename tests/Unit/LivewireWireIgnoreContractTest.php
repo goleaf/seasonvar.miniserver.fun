@@ -9,16 +9,20 @@ use Tests\TestCase;
 
 final class LivewireWireIgnoreContractTest extends TestCase
 {
-    public function test_only_the_keyed_player_shell_is_ignored(): void
+    public function test_player_workspace_preserves_its_identity_while_only_the_keyed_media_shell_is_fully_ignored(): void
     {
         $markup = collect(File::allFiles(resource_path('views')))
             ->map(fn ($file): string => File::get($file->getPathname()))
             ->implode("\n");
         $player = File::get(resource_path('views/livewire/catalog-title-player.blade.php'));
 
-        $this->assertSame(1, substr_count($markup, 'wire:ignore'));
+        $this->assertSame(2, substr_count($markup, 'wire:ignore'));
+        $this->assertSame(1, substr_count($markup, 'wire:ignore.self'));
         $this->assertSame(1, substr_count($player, '<video'));
-        $this->assertStringNotContainsString('wire:ignore.self', $markup);
+        $this->assertMatchesRegularExpression(
+            '/id="player"\s+wire:ignore\.self\s+class=.*?data-active-player-session=/s',
+            $player,
+        );
         $this->assertStringContainsString('data-player-menu-bootstrap=', $player);
         $this->assertMatchesRegularExpression(
             '/wire:key="catalog-player-media-shell-\{\{ \$selectedMedia->id \}\}-\{\{ \$authorizationVersion \}\}"\s+wire:ignore\s+data-player-shell/s',
@@ -30,7 +34,7 @@ final class LivewireWireIgnoreContractTest extends TestCase
     {
         $player = File::get(resource_path('views/livewire/catalog-title-player.blade.php'));
         $runtime = File::get(resource_path('js/player.js'));
-        $ignore = strpos($player, 'wire:ignore');
+        $ignore = strpos($player, "\n                            wire:ignore\n");
 
         $this->assertIsInt($ignore);
         $this->assertLessThan($ignore, strpos($player, 'wire:target="selectMedia"'));
@@ -65,6 +69,7 @@ final class LivewireWireIgnoreContractTest extends TestCase
         $component = File::get(app_path('Livewire/CatalogTitlePlayer.php'));
         $player = File::get(resource_path('views/livewire/catalog-title-player.blade.php'));
         $navigationRuntime = File::get(resource_path('js/player-navigation.js'));
+        $mediaIgnore = strpos($player, "\n                            wire:ignore\n");
 
         $this->assertStringContainsString(
             "@island(name: 'catalog-player-navigation', always: true, with: \$this->playerNavigationIslandPage)",
@@ -82,9 +87,10 @@ final class LivewireWireIgnoreContractTest extends TestCase
             "#[Renderless]\n    public function commitPlayerTransition",
             $component,
         );
+        $this->assertIsInt($mediaIgnore);
         $this->assertLessThan(
             strpos($player, "@island(name: 'catalog-player-navigation'"),
-            strpos($player, 'wire:ignore'),
+            $mediaIgnore,
         );
     }
 

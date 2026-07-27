@@ -40,6 +40,11 @@ Always include the routes relevant to the change:
 - `/feed.xml`, `/sitemap.xml`, or sitemap child routes for feed/SEO changes.
 - API routes only when JSON behavior changed.
 
+For homepage facet work, test both guest and authenticated sessions. Assert
+that every database-backed genre, country and valid year is present in the DOM,
+including entries beyond former display caps; verify focusable overflow regions
+on desktop and mobile rather than accepting hidden/truncated links.
+
 ## Recommendation QA
 
 - On title pages, verify `Советуем посмотреть` is not an empty dead block.

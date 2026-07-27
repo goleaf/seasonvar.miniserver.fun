@@ -26,6 +26,9 @@ python3 /root/.codex/skills/.system/skill-creator/scripts/init_skill.py <skill-n
 python3 /root/.codex/skills/.system/skill-creator/scripts/quick_validate.py .agents/skills/<skill-name>
 ```
 
+- After a repository-wide skill audit, validate every project skill directory,
+  not only the edited one. Unsupported frontmatter fields are failures.
+
 ## Skill Content Rules
 
 - Put trigger conditions in frontmatter `description`; do not rely on a body "when to use" section for discovery.
@@ -33,6 +36,11 @@ python3 /root/.codex/skills/.system/skill-creator/scripts/quick_validate.py .age
 - Create `references/`, `scripts/`, or `assets/` only when they directly reduce repeated work.
 - Do not add README, changelog, installation guide, or broad documentation inside a skill folder.
 - Do not duplicate AGENTS.md; reference project docs instead.
+- Treat third-party skill catalogs as discovery, not trust. Before installation
+  inspect the exact repository/ref, maintenance activity, instructions, scripts,
+  transitive assets and overlap with project rules.
+- Do not install a skill merely because it is popular or newer. Record the
+  concrete project gap and reject generic, outdated or conflicting candidates.
 
 ## MCP Rules
 

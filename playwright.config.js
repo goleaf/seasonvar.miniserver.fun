@@ -127,6 +127,8 @@ export default defineConfig({
             PLAYBACK_ALLOWED_HOSTS: 'media.example.com',
             PLAYBACK_ENFORCE_PUBLIC_DNS: 'false',
             QUEUE_CONNECTION: 'sync',
+            SECURITY_CSP_CONNECT_SOURCES: 'https://media.example.com',
+            SECURITY_CSP_MEDIA_SOURCES: 'https://media.example.com,data:',
             SESSION_DRIVER: 'database',
         },
     },

@@ -32,7 +32,7 @@ final class PwaFrontendSourceContractTest extends TestCase
             'event.stopImmediatePropagation()',
             'pwaLogoutCleanupComplete',
             'clearPreviousAccountScope',
-            "error.status === 401 || error.status === 403",
+            'error.status === 401 || error.status === 403',
             'MAX_POSTER_PREFETCH = 12',
             'POSTER_PREFETCH_CONCURRENCY = 3',
             "'rating.set'",

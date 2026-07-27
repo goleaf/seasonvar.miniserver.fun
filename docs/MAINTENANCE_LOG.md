@@ -488,6 +488,7 @@
 - `2026_07_26_235500_add_field_corrections_to_content_requests.php`
 - `2026_07_26_235600_restrict_catalog_corrections_to_administrators.php`
 - `2026_07_26_235900_create_web_push_subscriptions.php`
+- `2026_07_27_031500_add_release_lookup_index_to_release_schedule_entries.php`
 <!-- project-docs:end -->
 
 ## 2026-07-16 — recommendation/discovery task 18

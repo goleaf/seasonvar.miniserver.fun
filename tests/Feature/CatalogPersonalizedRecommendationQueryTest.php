@@ -96,7 +96,9 @@ final class CatalogPersonalizedRecommendationQueryTest extends TestCase
     public function test_service_blends_public_rows_by_confidence_and_reports_actual_fallback(): void
     {
         $personalCandidates = collect(range(1, 8))->map(fn (): CatalogTitle => $this->watchableTitle());
-        collect(range(1, 12))->each(fn (): CatalogTitle => $this->watchableTitle());
+        collect(range(1, 12))->each(function (): void {
+            $this->watchableTitle();
+        });
         $low = User::factory()->create();
         $medium = User::factory()->create();
         $high = User::factory()->create();

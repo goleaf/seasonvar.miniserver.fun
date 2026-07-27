@@ -1399,3 +1399,21 @@ SQLite `EXPLAIN QUERY PLAN` для resolver query использовал
 index не выбран планировщиком для title-scoped bounded набора и не добавлен,
 чтобы не повышать стоимость importer INSERT/UPDATE без измеренной пользы.
 Migration, N+1 и новый cache отсутствуют.
+
+## Главная страница и personal release lookup Task 111
+
+Жанры и страны главной теперь загружаются одним `UNION ALL` запросом
+`CatalogHomeFacetGroupsQuery`, а не двумя независимыми taxonomy queries.
+Полный список годов строится одним grouped запросом внутри versioned public
+snapshot; web рендерит его целиком, API делает совместимый slice в памяти.
+Authenticated web не выполняет запрос `featured()` для скрытой секции.
+
+Для коррелированного предиката личных обновлений добавлен подтверждённый
+`release_schedule_title_released_idx` по
+`(catalog_title_id, status, released_at, id)`. На репрезентативной локальной
+SQLite-копии прежний cold lookup занимал около `12,96 s`, с индексом —
+около `1,8 s`, а повторный warm lookup — около `60,7 ms`. Вариант с
+`is_public` был больше и не дал улучшения, поэтому отклонён. Перед production
+миграцией требуется актуальная закрытая резервная копия, остановка writers,
+`EXPLAIN QUERY PLAN`, canary-запрос и готовность выполнить обратимый `down`;
+текущая задача production migration не выполняет.

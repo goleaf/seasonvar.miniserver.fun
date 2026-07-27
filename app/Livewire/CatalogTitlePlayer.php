@@ -164,9 +164,41 @@ class CatalogTitlePlayer extends Component
         $this->playbackQualitySchema = $playbackQualitySchema;
     }
 
-    public function mount(int $catalogTitleId): void
-    {
+    public function mount(
+        int $catalogTitleId,
+        string|int|null $initialSeason = null,
+        string|int|null $initialEpisode = null,
+        string|int|null $initialMedia = null,
+        ?string $initialVariant = null,
+        ?string $initialQuality = null,
+        ?string $initialFormat = null,
+    ): void {
         $this->catalogTitleId = $catalogTitleId;
+
+        if ($initialSeason !== null) {
+            $this->season = $initialSeason;
+        }
+
+        if ($initialEpisode !== null) {
+            $this->episode = $initialEpisode;
+        }
+
+        if ($initialMedia !== null) {
+            $this->media = $initialMedia;
+        }
+
+        if ($initialVariant !== null) {
+            $this->variant = $initialVariant;
+        }
+
+        if ($initialQuality !== null) {
+            $this->quality = $initialQuality;
+        }
+
+        if ($initialFormat !== null) {
+            $this->format = $initialFormat;
+        }
+
         $this->normalizeInitialSelection();
     }
 

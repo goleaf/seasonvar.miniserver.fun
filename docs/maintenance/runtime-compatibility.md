@@ -1,6 +1,28 @@
 # Матрица runtime-совместимости
 
-Аудит: 18.07.2026; повторные maintenance/operational-сверки 20.07.2026 и 24.07.2026. Матрица разделяет локально установленное, проверенное инструментами, требуемое проектом и внешнее production-состояние. Статус `verified` относится только к перечисленной проверке и не означает поддержку любого будущего patch release.
+Аудит: 18.07.2026; повторные maintenance/operational-сверки 20.07.2026,
+24.07.2026 и 27.07.2026. Матрица разделяет локально установленное, проверенное
+инструментами, требуемое проектом и внешнее production-состояние. Статус
+`verified` относится только к перечисленной проверке и не означает поддержку
+любого будущего patch release.
+
+## Development-tool compatibility delta 27.07.2026
+
+- Фактически установлены PHP `8.5.8`, Laravel `13.22.0`, Livewire `4.3.3`,
+  Rector `2.5.7` и Larastan `3.10.0`.
+- Транзитивный PHPStan `2.2.5` несовместим с внутренней parser-интеграцией
+  Rector `2.5.7` и падает до анализа. Прямой dev-only pin `2.2.4` подтверждён
+  изолированным probe, `composer analyse` и полным required Rector dry-run.
+- Production dependency graph, PHP requirement `^8.3`, маршруты, схема,
+  данные, cache/session/queue contracts и frontend assets этим pin не меняются.
+- У Laravel `13.22.0` подтверждена регрессия
+  `SessionGuard::logoutOtherDevices()` без remember-cookie: изменение
+  `Arr::last()` из [PR #60881](https://github.com/laravel/framework/pull/60881)
+  передаёт отсутствующий queued cookie в `Arr::from(null)`. Проект не меняет
+  `vendor`: `BrowserSessionService` ограниченно завершает уже выполненную
+  framework-операцию только для exact version/message/stack и восстанавливает
+  событие `OtherDeviceLogout`. На следующем framework patch этот путь
+  неактивен и удаляется после green compatibility regression.
 
 ## Operational compatibility delta 24.07.2026
 

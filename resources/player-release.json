@@ -6,6 +6,7 @@
         "app/DTOs/PlaybackSourceData.php",
         "app/DTOs/PlaybackTransitionData.php",
         "app/Enums/PlaybackAvailability.php",
+        "app/Livewire/CatalogTitleDetail.php",
         "app/Livewire/CatalogTitlePlayer.php",
         "app/Models/LicensedMedia.php",
         "app/Services/Catalog/CatalogEntitlementService.php",

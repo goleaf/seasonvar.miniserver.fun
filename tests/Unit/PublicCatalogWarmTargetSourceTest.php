@@ -170,9 +170,9 @@ final class PublicCatalogWarmTargetSourceTest extends TestCase
             Genre::query()->insert($chunk);
         }
 
-        Genre::query()->orderBy('id')->pluck('id')->chunk(250)->each(
-            fn ($ids) => $title->genres()->attach($ids),
-        );
+        Genre::query()->orderBy('id')->pluck('id')->chunk(250)->each(function ($ids) use ($title): void {
+            $title->genres()->attach($ids);
+        });
 
         DB::flushQueryLog();
         DB::enableQueryLog();

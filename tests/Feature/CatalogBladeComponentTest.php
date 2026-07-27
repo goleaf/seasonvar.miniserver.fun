@@ -281,44 +281,7 @@ class CatalogBladeComponentTest extends TestCase
 
     public function test_title_page_places_season_anchor_on_season_block_with_scroll_offset(): void
     {
-        $catalogTitle = CatalogTitle::factory()->create([
-            'title' => 'Якорный сериал',
-            'slug' => 'iakornyi-serial',
-        ]);
-        $firstSeason = Season::factory()->create([
-            'catalog_title_id' => $catalogTitle->id,
-            'number' => 1,
-            'title' => 'Сезон 1',
-        ]);
-        $secondSeason = Season::factory()->create([
-            'catalog_title_id' => $catalogTitle->id,
-            'number' => 2,
-            'title' => 'Сезон 2',
-        ]);
-        $firstEpisode = Episode::factory()->create([
-            'season_id' => $firstSeason->id,
-            'number' => 1,
-            'title' => 'Первая серия',
-        ]);
-        $secondEpisode = Episode::factory()->create([
-            'season_id' => $secondSeason->id,
-            'number' => 1,
-            'title' => 'Вторая серия',
-        ]);
-        LicensedMedia::factory()->create([
-            'catalog_title_id' => $catalogTitle->id,
-            'season_id' => $firstSeason->id,
-            'episode_id' => $firstEpisode->id,
-            'status' => 'published',
-            'published_at' => now(),
-        ]);
-        LicensedMedia::factory()->create([
-            'catalog_title_id' => $catalogTitle->id,
-            'season_id' => $secondSeason->id,
-            'episode_id' => $secondEpisode->id,
-            'status' => 'published',
-            'published_at' => now(),
-        ]);
+        [$catalogTitle, $firstSeason, $secondSeason] = $this->createSeasonAnchorFixture();
 
         $response = $this->get(route('titles.show', $catalogTitle));
 
@@ -332,17 +295,38 @@ class CatalogBladeComponentTest extends TestCase
             ->assertDontSeeText('Быстрый выбор сезона')
             ->assertSee('id="season-'.$firstSeason->id.'"', false)
             ->assertSee('class="scroll-mt-40 p-4 sm:scroll-mt-44 lg:scroll-mt-48"', false)
-            ->assertDontSeeText('Вторая серия');
+            ->assertDontSee('id="season-'.$secondSeason->id.'"', false);
+    }
 
-        $this->get(route('titles.show', [
+    public function test_title_page_honours_selected_season_query_on_the_initial_request(): void
+    {
+        [$catalogTitle, $firstSeason, $secondSeason] = $this->createSeasonAnchorFixture();
+        $selectedSeasonResponse = $this->get(route('titles.show', [
             'catalogTitle' => $catalogTitle,
             'season' => $secondSeason->id,
-        ]))
+        ]));
+
+        $selectedSeasonResponse
+            ->assertHeader('X-Seasonvar-Page-Cache', 'MISS')
             ->assertOk()
             ->assertSee('id="season-'.$secondSeason->id.'"', false)
             ->assertSee('class="scroll-mt-40 p-4 sm:scroll-mt-44 lg:scroll-mt-48"', false)
             ->assertSeeText('Вторая серия')
-            ->assertDontSeeText('Первая серия');
+            ->assertDontSee('id="season-'.$firstSeason->id.'"', false);
+    }
+
+    public function test_title_page_rejects_invalid_review_and_comment_query_identifiers(): void
+    {
+        $catalogTitle = CatalogTitle::factory()->create();
+        $returnUrl = route('titles.show', $catalogTitle);
+
+        $this->from($returnUrl)
+            ->get($returnUrl.'?review=0&comment=not-an-integer')
+            ->assertRedirect($returnUrl)
+            ->assertSessionHasErrors([
+                'review' => 'Номер выбранного отзыва должен быть больше нуля.',
+                'comment' => 'Номер выбранного комментария должен быть числом.',
+            ]);
     }
 
     public function test_title_page_groups_playback_options_and_preserves_selected_variant_between_episodes(): void
@@ -420,8 +404,9 @@ class CatalogBladeComponentTest extends TestCase
 
         $response
             ->assertOk()
-            ->assertSeeText('Настройки просмотра')
-            ->assertSeeText('Вариант')
+            ->assertSee('data-player-context-bar', false)
+            ->assertSee('data-player-context-control="translation"', false)
+            ->assertSeeText('Перевод')
             ->assertSeeText('Субтитры')
             ->assertSeeText('Кураж-Бамбей')
             ->assertSee(e(route('titles.show', [
@@ -562,5 +547,52 @@ class CatalogBladeComponentTest extends TestCase
         ]))
             ->assertOk()
             ->assertSee('/playback/'.$secondEpisodePreferredMedia->id.'?', false);
+    }
+
+    /**
+     * @return array{CatalogTitle, Season, Season}
+     */
+    private function createSeasonAnchorFixture(): array
+    {
+        $catalogTitle = CatalogTitle::factory()->create([
+            'title' => 'Якорный сериал',
+            'slug' => 'iakornyi-serial',
+        ]);
+        $firstSeason = Season::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'number' => 1,
+            'title' => 'Сезон 1',
+        ]);
+        $secondSeason = Season::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'number' => 2,
+            'title' => 'Сезон 2',
+        ]);
+        $firstEpisode = Episode::factory()->create([
+            'season_id' => $firstSeason->id,
+            'number' => 1,
+            'title' => 'Первая серия',
+        ]);
+        $secondEpisode = Episode::factory()->create([
+            'season_id' => $secondSeason->id,
+            'number' => 1,
+            'title' => 'Вторая серия',
+        ]);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'season_id' => $firstSeason->id,
+            'episode_id' => $firstEpisode->id,
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'season_id' => $secondSeason->id,
+            'episode_id' => $secondEpisode->id,
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+
+        return [$catalogTitle, $firstSeason, $secondSeason];
     }
 }

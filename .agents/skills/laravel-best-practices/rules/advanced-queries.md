@@ -58,17 +58,21 @@ $feature->load('comments.user');
 $feature->comments->each->setRelation('feature', $feature);
 ```
 
-## Prefer `whereIn` + Subquery Over `whereHas`
+## Compare `whereHas` and Subquery Shapes with the Real Planner
 
-`whereHas()` emits a correlated `EXISTS` subquery that re-executes per row. Using `whereIn()` with a `select('id')` subquery lets the database use an index lookup instead, without loading data into PHP memory.
+Neither `whereHas()` nor `whereIn()` is universally faster. Modern database
+planners may rewrite either form, and selectivity, null semantics, composite
+indexes and database engine all matter. Preserve the relationship expression
+that communicates the domain unless `EXPLAIN` and representative data prove a
+different shape is better.
 
-Incorrect (correlated EXISTS re-executes per row):
+Relationship form:
 
 ```php
 $query->whereHas('company', fn ($q) => $q->where('name', 'like', $term));
 ```
 
-Correct (index-friendly subquery, no PHP memory overhead):
+Equivalent foreign-key subquery to benchmark:
 
 ```php
 $query->whereIn('company_id', Company::where('name', 'like', $term)->select('id'));
@@ -78,9 +82,13 @@ $query->whereIn('company_id', Company::where('name', 'like', $term)->select('id'
 
 Running a small, targeted secondary query and passing its results via `whereIn` is often faster than a single complex correlated subquery or join. The additional round-trip is worthwhile when the secondary query is highly selective and uses its own index.
 
-## Use Compound Indexes Matching `orderBy` Column Order
+## Design Compound Indexes for the Full Predicate and Ordering
 
-When ordering by multiple columns, create a single compound index in the same column order as the `ORDER BY` clause. Individual single-column indexes cannot combine for multi-column sorts — the database will filesort without a compound index.
+Start with equality filters and join columns, then range and ordering columns as
+the target engine can use them. Do not copy only the `ORDER BY` column order or
+add every filtered column blindly. Record the concrete query, inspect existing
+indexes, compare `EXPLAIN`, and account for write/storage cost before adding a
+new index.
 
 ```php
 // Migration

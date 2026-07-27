@@ -10,9 +10,11 @@ use App\Models\CatalogTitle;
 use App\Models\CatalogTitleUserState;
 use App\Models\User;
 use App\Notifications\VerifyAccountEmail;
+use Illuminate\Auth\Events\OtherDeviceLogout;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Route;
@@ -179,6 +181,7 @@ final class WebAccountManagementTest extends TestCase
 
     public function test_logout_other_browser_sessions_preserves_current_session(): void
     {
+        Event::fake([OtherDeviceLogout::class]);
         config(['session.driver' => 'database']);
         $user = User::factory()->create();
         $currentSessionId = session()->getId();
@@ -206,6 +209,7 @@ final class WebAccountManagementTest extends TestCase
         $this->assertDatabaseMissing('sessions', ['id' => 'other-browser-session']);
         $this->assertSame($user->fresh()->password, session('password_hash_web'));
         $this->assertAuthenticatedAs($user);
+        Event::assertDispatched(OtherDeviceLogout::class, fn (OtherDeviceLogout $event): bool => $event->user->is($user));
     }
 
     public function test_account_deletion_requires_password_and_removes_private_state(): void

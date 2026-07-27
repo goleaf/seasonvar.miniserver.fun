@@ -1,6 +1,6 @@
 # Карта документации проекта
 
-Обновлено: 26.07.2026
+Обновлено: 27.07.2026
 
 Этот файл — единый индекс проектной документации. У каждого контракта есть один основной файл-владелец; остальные документы должны ссылаться на него, а не копировать длинные правила. `README.md` остаётся точкой входа и содержит простую историю обновлений для посетителей, `AGENTS.md` — только обязательные инструкции для агентов, а подробный технический журнал ведётся в `CHANGELOG.md`.
 
@@ -17,7 +17,7 @@
 | Production operations | [`requirements/production-operations.md`](requirements/production-operations.md), [`deployment.md`](deployment.md), [`environment.md`](environment.md), [`operations/README.md`](operations/README.md) | Permanent production rules, verified environment, in-place deployment, rollback, backup/restore, disaster recovery, incidents, logging/health, providers, service-worker state и ручной acceptance без fake infrastructure. |
 | PWA, offline-копии и Web Push | [`requirements/pwa-and-push.md`](requirements/pwa-and-push.md), [`operations/service-worker-deployment.md`](operations/service-worker-deployment.md) | Installability, strict cache/media denylist, opaque account-scoped IndexedDB, bounded offline library/help/posters, safe mutation queue, payloadless VAPID Web Push, deployment и rollback. |
 | Multilingual maintenance | [`requirements/multilingual-requirements.md`](requirements/multilingual-requirements.md) | Locale preservation, translation loaders, placeholders/pluralization, notifications/mail/admin и frontend upgrade checks. |
-| Границы Laravel/Livewire | [`architecture.md`](architecture.md) | Тонкие контроллеры, page builders, query/services/actions, locked Livewire state и server-rendered оболочки. |
+| Границы Laravel/Livewire | [`architecture.md`](architecture.md) | Тонкие контроллеры, page builders, query/services/actions, locked Livewire state и server-rendered оболочки. Query Classes и оптимизация главной Task 111 описаны в [`design`](superpowers/specs/2026-07-27-homepage-query-classes-performance-design.md) и [`plan`](superpowers/plans/2026-07-27-homepage-query-classes-performance.md). |
 | JSON и mobile API | [`api.md`](api.md) | Legacy compatibility, `/api` discovery, версионирование `/api/v1`, OpenAPI, error envelope, pagination и публичные поля. |
 | Каталог, multilingual portal search, autocomplete, actor/tag pages, directory hubs и URL state | [`catalog-search.md`](catalog-search.md) | Формат query-параметров, нормализация/ranking/fallback, два header API scope, public-only источники, rich title cards, `/search`/`/{locale}/search`, actor/tag identity, OR/AND filters, sorting, pagination, cache/SEO и browser history. |
 | Качество карточек каталога | [`catalog-quality.md`](catalog-quality.md) | Версионированный `quality_score`, безопасные объяснимые проблемы, batch-пересчёт, dirty lifecycle, административные очереди, ограничения ложных срабатываний, rollout и rollback. |

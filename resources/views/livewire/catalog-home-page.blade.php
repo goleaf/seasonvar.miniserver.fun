@@ -110,49 +110,6 @@
             </div>
         </section>
 
-        <section data-home-section="catalog-facets" aria-labelledby="home-catalog-facets">
-            <div class="mb-4 border-b border-slate-200 pb-3">
-                <h2 id="home-catalog-facets" class="text-2xl font-semibold text-slate-900">{{ __('home.sections.catalog_facets') }}</h2>
-            </div>
-            <div class="grid gap-6 lg:grid-cols-3">
-                <div>
-                    <h3 class="text-lg font-semibold text-slate-900">{{ __('home.sections.genres') }}</h3>
-                    <div class="mt-3 flex flex-wrap gap-2">
-                        @if ($subtitleTag && $subtitleTagUrl)
-                            <a href="{{ $subtitleTagUrl }}" class="inline-flex min-h-8 items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800">
-                                <span>{{ __('home.navigation.subtitles') }}</span>
-                                <x-localized-number :value="$subtitleTag->catalog_titles_count" class="text-xs text-slate-600" />
-                            </a>
-                        @endif
-                        @foreach ($genres->take(14) as $genre)
-                            <x-ui.taxonomy-chip :taxonomy="$genre" :count="$genre->catalog_titles_count" />
-                        @endforeach
-                    </div>
-                </div>
-                <div class="border-t border-slate-200 pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
-                    <h3 class="text-lg font-semibold text-slate-900">{{ __('home.sections.countries') }}</h3>
-                    <div class="mt-3 flex flex-wrap gap-2">
-                        @foreach ($countries->take(12) as $country)
-                            <a href="{{ $country->detail_url }}" class="inline-flex min-h-8 items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800">
-                                <span>{{ $country->name }}</span>
-                                <x-localized-number :value="$country->catalog_titles_count" class="text-xs text-slate-600" />
-                            </a>
-                        @endforeach
-                    </div>
-                </div>
-                <div class="border-t border-slate-200 pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
-                    <h3 class="text-lg font-semibold text-slate-900">{{ __('home.sections.years') }}</h3>
-                    <div class="mt-3 flex flex-wrap gap-2">
-                        @foreach ($yearBuckets as $bucket)
-                            <a href="{{ route('titles.year', ['year' => $bucket->year]) }}" class="inline-flex min-h-8 items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800">
-                                <span>{{ $bucket->year }}</span>
-                                <x-localized-number :value="$bucket->titles_count" class="text-xs text-slate-600" />
-                            </a>
-                        @endforeach
-                    </div>
-                </div>
-            </div>
-        </section>
     @else
         <section data-home-section="continue-watching" aria-labelledby="home-continue-watching">
             <div class="mb-4 flex items-end justify-between gap-3 border-b border-slate-200 pb-3">
@@ -276,4 +233,63 @@
             </div>
         </section>
     @endif
+
+    <section data-home-section="catalog-facets" aria-labelledby="home-catalog-facets">
+        <div class="mb-4 border-b border-slate-200 pb-3">
+            <h2 id="home-catalog-facets" class="text-2xl font-semibold text-slate-900">{{ __('home.sections.catalog_facets') }}</h2>
+        </div>
+        <div class="grid gap-6 lg:grid-cols-3">
+            <div>
+                <h3 class="text-lg font-semibold text-slate-900">{{ __('home.sections.genres') }}</h3>
+                <div
+                    data-home-facet-list="genres"
+                    class="mt-3 flex max-h-72 flex-wrap content-start gap-2 overflow-y-auto overscroll-contain pr-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+                    tabindex="0"
+                    aria-label="{{ __('home.sections.genres') }}"
+                >
+                    @if ($subtitleTag && $subtitleTagUrl)
+                        <a href="{{ $subtitleTagUrl }}" class="inline-flex min-h-8 items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800">
+                            <span>{{ __('home.navigation.subtitles') }}</span>
+                            <x-localized-number :value="$subtitleTag->catalog_titles_count" class="text-xs text-slate-600" />
+                        </a>
+                    @endif
+                    @foreach ($genres as $genre)
+                        <x-ui.taxonomy-chip :taxonomy="$genre" :count="$genre->catalog_titles_count" />
+                    @endforeach
+                </div>
+            </div>
+            <div class="border-t border-slate-200 pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+                <h3 class="text-lg font-semibold text-slate-900">{{ __('home.sections.countries') }}</h3>
+                <div
+                    data-home-facet-list="countries"
+                    class="mt-3 flex max-h-72 flex-wrap content-start gap-2 overflow-y-auto overscroll-contain pr-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+                    tabindex="0"
+                    aria-label="{{ __('home.sections.countries') }}"
+                >
+                    @foreach ($countries as $country)
+                        <a href="{{ $country->detail_url }}" class="inline-flex min-h-8 items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800">
+                            <span>{{ $country->name }}</span>
+                            <x-localized-number :value="$country->catalog_titles_count" class="text-xs text-slate-600" />
+                        </a>
+                    @endforeach
+                </div>
+            </div>
+            <div class="border-t border-slate-200 pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+                <h3 class="text-lg font-semibold text-slate-900">{{ __('home.sections.years') }}</h3>
+                <div
+                    data-home-facet-list="years"
+                    class="mt-3 flex max-h-72 flex-wrap content-start gap-2 overflow-y-auto overscroll-contain pr-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+                    tabindex="0"
+                    aria-label="{{ __('home.sections.years') }}"
+                >
+                    @foreach ($yearBuckets as $bucket)
+                        <a href="{{ route('titles.year', ['year' => $bucket->year]) }}" class="inline-flex min-h-8 items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800">
+                            <span>{{ $bucket->year }}</span>
+                            <x-localized-number :value="$bucket->titles_count" class="text-xs text-slate-600" />
+                        </a>
+                    @endforeach
+                </div>
+            </div>
+        </div>
+    </section>
 </div>
