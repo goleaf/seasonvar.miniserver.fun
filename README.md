@@ -462,6 +462,7 @@ php artisan autocache:flush "App\Models\Country"
 php artisan api:sync-prune
 php artisan catalog-collections:prune
 php artisan catalog-collections:sync-hdrezka --dry-run
+php artisan catalog-collections:restore-public-editorial --dry-run --json
 php artisan catalog-collections:repair-public-quality --dry-run --json
 php artisan catalog-collections:quality-refresh --dry-run --limit=50
 php artisan catalog:quality-refresh --limit=250
@@ -591,6 +592,12 @@ Eloquent AutoCache включён только для явно отмеченн�
 
 ### 27 июля 2026 года
 
+- На `/discover/popular` снова доступны 10 настоящих редакционных подборок:
+  «Сериалы 2026», «Аниме 2026», коллекции Netflix, Amazon, Apple TV+,
+  Disney+, HBO и HULU, «Про месть» и «Мультфильмы про друзей». Они
+  распределены по существующим категориям и подкатегориям, открываются
+  целиком с телефона и компьютера, а прежний демонстрационный шум и пустые
+  записи в публичный раздел не возвращены.
 - Адрес `/discover/` снова открывает популярные подборки прямо у полного
   списка категорий и подкатегорий. Русский и английский локализованные адреса
   сохраняют язык, а телефон и компьютер приходят к той же канонической

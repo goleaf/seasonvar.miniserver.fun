@@ -304,6 +304,14 @@ auth middleware сохраняет intended URL, а расписание исп�
 
 `CatalogDiscoveryPage` остаётся единственным full-page owner `/discover/{type}`. Совместимый `/discover` и localized aliases только временно перенаправляют к соответствующему `popular#collections` и не рендерят отдельный landing. Девять реальных режимов имеют один H1 с mode-specific summary, переносящуюся mode navigation без вложенной прокрутки и fake landing, сворачиваемые общие filters и secondary refresh рядом с результатами. Каждый mode показывает компактную навигацию секций и один `CatalogCollectionExplorer` перед serial results: `#collections` стабилен во всех modes, `popular` сохраняет совместимый `#popular-titles`, остальные используют `#discovery-titles`; глобальная RU/EN ссылка «Подборки» по-прежнему открывает popular `#collections`. Explorer имеет стабильный Livewire key по mode и locale и хранит независимые `collections_q`, `collections_sort`, `collections_category`, `collections_subcategory` и `collectionsPage`, не меняя recommendation filters или ranking. На телефоне, планшете и desktop весь активный двухуровневый справочник выводится одним переносимым nested list: положительные root/child являются Livewire-фильтрами, а zero-count узлы остаются видимыми текстовыми пунктами со счётчиком `0`, но не становятся dead controls. Выбранный bookmarked zero-count state сохраняется, а forged/stale child state нормализуется server-side. `CatalogAdministrationPage` аналогично является единственным full-page owner `/admin/catalog` и переключает catalog/collection manager fragments без второго layout или `<h1>`. Dashboard, editor, public/private/unlisted detail, owner profile и title membership используют Livewire 4 без Volt. Public properties — normalized scalar URL state, bounded draft UUIDs и locked identities/version; Eloquent graphs существуют только внутри render. Search/filter/sort/pagination используют browser history. Collection cards и detail hero text-only; image upload/control/placeholder отсутствуют.
 
+Рабочий public directory получает только прошедшие canonical quality scope
+записи. Проверенное восстановление source-managed редакционных подборок
+возвращает десять text-only карточек в девять существующих подкатегорий и
+тем самым делает соответствующие root/child counters интерактивными;
+остальные zero-count узлы продолжают показываться тем же неактивным текстом.
+Отдельного recovery UI, auto-classification по имени, новых routes или
+клиентского обхода server-side eligibility нет.
+
 На `/discover/personalized` serial results принадлежат одному
 светло-зелёному shell с белыми result cards; feedback остаётся внутри той же
 карточки. Общий recommendation layout всегда показывает отдельную primary

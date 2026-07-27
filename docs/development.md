@@ -256,6 +256,7 @@ scripts/check-changelog-policy.sh CHANGELOG.md
 - `php artisan seasonvar:import --forever --sleep=60` — непрерывный локальный цикл импорта.
 - `php artisan seasonvar:import "https://seasonvar.ru/..." --force` — принудительное обновление одной страницы.
 - `php artisan catalog-collections:sync-hdrezka --dry-run` — bounded read-only обход внешних редакционных подборок и проверка сопоставления с локальными тайтлами; требует включённый `HDREZKA_COLLECTION_SYNC_ENABLED` и не относится к Seasonvar import.
+- `php artisan catalog-collections:restore-public-editorial --dry-run --json` — read-only проверка exact allowlist ранее опубликованных HDRezka-подборок и их назначения в стабильные подкатегории. Запись требует `--force`, а в production также проверенный backup, остановленных writers и флаги `--backup-confirmed --writers-paused`.
 - `php artisan catalog-collections:repair-public-quality --dry-run --json` — read-only census exact legacy demo/source collection footprint, public eligibility и зависимых recommendation signals. Без `--force` команда всегда остаётся dry-run.
 - `php artisan integrations:doctor` — read-only диагностика MCP, Google, CLI tools и проектных skills без вывода секретов.
 - `php artisan app:health` — operational health по DB, Redis workloads, Memcached, workers и прогреву; `degraded`/`failed` возвращают ненулевой exit, даже если HTTP traffic readiness ещё true.

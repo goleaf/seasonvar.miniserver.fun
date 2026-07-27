@@ -1,4 +1,4 @@
-# Текущая задача — Task 113–116
+# Текущая задача — Task 113–117
 
 ## Реестр активных workstreams
 
@@ -8,12 +8,14 @@
 | Task 114: video-first режим «Театр» | `completed: commit cc77728a; push unresolved authentication` | [Task 114 evidence](archive/2026-07-27-player-theatre-video-first-evidence.md) |
 | Task 115: заметные карточки персональных рекомендаций | `completed: commit cc77728a; push unresolved authentication` | [Task 115 evidence](archive/2026-07-27-personalized-series-cards-evidence.md) |
 | Task 116: восстановление default-входа discovery | `completed: commit cc77728a; push unresolved authentication` | [Task 116 evidence](archive/2026-07-27-discovery-default-route-restoration-evidence.md) |
+| Task 117: восстановление публичных редакционных подборок | `in_progress: implementation/production complete; delivery pending` | [Evidence](archive/2026-07-27-public-editorial-collection-restoration-evidence.md) |
 
 ## Реестр blocked/unresolved
 
 | Workstream | Status | Evidence |
 | --- | --- | --- |
 | Task 115 inherited browser gate | `unresolved` | Старый PWA poster fixture даёт `404`; focused Task 115 gates прошли |
+| Task 117 inherited PWA browser signal | `unresolved` | Existing `/service-worker.js` возвращает `404`; collection page/local requests проходят |
 | Remote delivery Tasks 113–116 | `unresolved` | `composer.lock` был адресно сохранён и восстановлен без изменения; push дошёл до GitHub HTTPS username prompt, credential helper отсутствует, данные не отправлены |
 
 ## Task-specific compliance matrix
@@ -29,6 +31,8 @@
 | Task 115 approved green direction | `completed` | [Task 115 design](../superpowers/specs/2026-07-27-personalized-series-cards-design.md) |
 | Task 115 implementation и verification | `completed` | [Evidence](archive/2026-07-27-personalized-series-cards-evidence.md): RED/GREEN, `44` PHPUnit tests, build, focused Playwright `3/3` |
 | Task 116 route contract | `completed` | Default/trailing-slash/RU/EN ведут к существующему `popular#collections` |
+| Task 117 root cause и canonical recovery contract | `completed` | 501 строка сохранена; exact allowlist ограничен 10 проверенными source collections |
+| Task 117 implementation и production apply | `completed` | 10 restored/listed; verified backup, quarantine и live integrity checks |
 
 ## Последнее подтверждённое evidence
 
@@ -37,6 +41,27 @@
 - [Task 114: video-first theatre evidence](archive/2026-07-27-player-theatre-video-first-evidence.md)
 - [Task 115: compliance заметных карточек](task-115-personalized-series-cards-compliance.md)
 - [Task 116: compliance default discovery](task-116-discovery-default-route-restoration-compliance.md)
+- [Task 117: compliance восстановления редакционных подборок](task-117-public-editorial-restoration-compliance.md)
+
+## Task 117 — цель и checklist
+
+Вернуть в `/discover/***#collections` десять сохранённых и вручную
+проверенных source-managed подборок, назначив им существующие подкатегории и
+не возвращая demo, пустые или ошибочно сопоставленные записи.
+
+| Priority | Workstream | Status | Evidence |
+|---|---|---|---|
+| critical | Requirements, versions и root-cause census | `completed` | 501 public/approved, 0 listed; 447 demo и 54 source |
+| critical | Canonical contract и exact reviewed manifest | `completed` | [Design](../superpowers/specs/2026-07-27-public-editorial-collection-restoration-design.md) |
+| high | TDD recovery service/command | `completed` | 176 тестов / 1 258 утверждений; Pint, focused PHPStan, Rector |
+| critical | Production backup/writer-safe apply | `completed` | Backup 31 423 373 312 bytes; restore 10; quarantine 897+44; quick/FK green |
+| high | Directory/category/browser verification | `completed` | HTTP 200; 10 cards; 5 roots/31 children; desktop/mobile no overflow |
+| critical | Commit и push в `main` | `pending` | После полного review exact scope |
+
+Task 117 не меняет migrations, routes, API shape, sitemap format,
+translations, packages, permissions или cache keys. Data scope ограничен
+exact десятью source keys; rollback — verified backup либо авторизованный
+roll-forward в private/archived.
 
 ## Task 116 — цель и checklist
 

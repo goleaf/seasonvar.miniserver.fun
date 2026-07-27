@@ -1,5 +1,24 @@
 # Журнал обслуживания
 
+- 27.07.2026: восстановлены 10 вручную проверенных редакционных HDRezka-
+  подборок в девяти существующих подкатегориях без broad
+  auto-classification. До DML точные cron/scheduler boundaries и 16
+  queue-writers остановлены, активный `seasonvar:import` завершён штатным
+  `SIGTERM` со статусом `cancelled`, а пустая orphaned recommendation build
+  закрыта существующим stale-pruner после канонического тайм-аута. Финальный
+  согласованный SQLite backup размером 31 423 373 312 байт и live DB прошли
+  `PRAGMA quick_check=ok` и нулевой `PRAGMA foreign_key_check`. Recovery
+  пересчитала quality всех 10 строк; следующая штатная quarantine изолировала
+  897 demo и 44 неподтверждённые source collections, удалила 5
+  недействительных signals и инвалидировала 160 производных рекомендаций.
+  Повторные dry-run показывают 10 publicly listed, нулевые recovery и
+  quarantine candidates. Сайт, обе временно снятые cron-строки и все 16
+  workers восстановлены; readiness остаётся `true` при прежнем `degraded`
+  из-за недоступного Memcached и устаревшего full-warm evidence. Rollback —
+  проверенный private backup при остановленных writers либо авторизованный
+  roll-forward exact rows в private/archived; broad SQL и global cache flush
+  не применялись.
+
 - 26.07.2026: выполнено обратимо совместимое обновление светлой визуальной
   системы без изменения runtime, зависимостей, маршрутов, Livewire state,
   SQL, схемы, индексов, кеша, прав доступа, переводов и production data.

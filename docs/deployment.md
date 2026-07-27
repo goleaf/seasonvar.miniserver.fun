@@ -564,12 +564,52 @@ Existing per-minute `schedule:run` обслуживает `catalog-collections:p
 
 Operational rollback начинается с `HDREZKA_COLLECTION_SYNC_ENABLED=false`, config-cache rebuild и graceful worker reload: существующие локальные подборки продолжают открываться, а новые runs не стартуют. После production writes сохраняйте source audit и collections в verified database backup; migration rollback удалит audit и exact-match индексы, поэтому выполняется только вместе с совместимым code rollback. Collection images не восстанавливаются. Не используйте `cache:clear`, `queue:clear`, `migrate:fresh` или `db:wipe`.
 
+### Восстановление проверенных редакционных подборок
+
+1. До остановки writers выполните
+   `php artisan catalog-collections:restore-public-editorial --dry-run --json`.
+   Допустима запись только при точном ожидаемом числе `restorable_records`,
+   нулевых `missing_records`, `category_conflicts` и `ineligible_records`.
+   Отчёт содержит только агрегаты; source keys, provider URL и private paths
+   не копируются в deployment evidence.
+2. Штатно дождитесь завершения активного `seasonvar:import`, остановите
+   collection sync, import/title-refresh/cache-warm workers и остальные
+   database writers. Убедитесь, что активные import/sync/build counters
+   равны нулю, создайте отдельный SQLite backup, проверьте размер,
+   контрольную сумму, `PRAGMA quick_check` и `PRAGMA foreign_key_check`.
+3. В коротком maintenance window выполните
+   `php artisan catalog-collections:restore-public-editorial --force --backup-confirmed --writers-paused --json`.
+   Команда повторно проверяет exact provider/source identity, ownerless
+   editorial/manual state, active category tree, доступность source и
+   bounded membership, назначает только встроенный reviewed category slug и
+   пересчитывает version-aware quality.
+4. Только после успешного восстановления выполните штатную quarantine
+   прежнего шума из следующего раздела. Обратный порядок запрещён: он удалил
+   бы recommendation signals ещё не классифицированных проверенных
+   подборок.
+5. Повторный recovery dry-run должен показать нулевой
+   `restorable_records`, ожидаемый `already_restored_records` и такое же
+   число `publicly_listed_records`. Проверьте category/subcategory counts,
+   `/discover/popular#collections`, detail, search, API и sitemap, затем
+   возобновите прежние workers и readiness checks. Global cache flush не
+   требуется.
+
+При ошибочном exact match оставьте writers остановленными и восстановите
+проверенный backup. После частичного прерывания идемпотентную recovery-команду
+можно повторить только после устранения причины; broad `UPDATE`, hard delete
+и migration rollback не являются допустимым откатом.
+
 ### Quarantine прежнего шума публичных подборок
 
-1. До остановки writers выполните только `php artisan catalog-collections:repair-public-quality --dry-run --json` и сохраните агрегатный отчёт без идентификаторов пользователей или source URL. Нулевой `publicly_listed_records` при ненулевом legacy public count является ожидаемым fail-closed состоянием до cleanup, а не разрешением на запись.
+1. До остановки writers выполните только `php artisan catalog-collections:repair-public-quality --dry-run --json` и сохраните агрегатный отчёт без идентификаторов пользователей или source URL. Если reviewed recovery применима, она должна завершиться первой. Нулевой `publicly_listed_records` при ненулевом legacy public count является ожидаемым fail-closed состоянием до recovery/cleanup, а не разрешением на запись.
 2. Штатно остановите единственный Seasonvar importer, collection sync, queue workers/scheduler и другие database writers; убедитесь, что active run/build counters равны нулю. Создайте отдельный verified SQLite backup, выполните quick/FK checks и подтвердите место для rollback.
 3. Выполните `php artisan catalog-collections:repair-public-quality --force --backup-confirmed --writers-paused --json`. Команда повторно проверяет exact demo UUID/owner footprint, ownerless uncategorized HDRezka provenance и active writers. Она переводит найденные collections в private review, удаляет только недействительные `editorial_collection` signals/materialized recommendations и не удаляет membership/source/comments/reports/users.
-4. Повторите dry-run: quarantine candidates и source signals должны стать нулевыми. Затем возобновите workers, проверьте `/discover/popular`, collection search/API/sitemap и одну вручную одобренную categorized collection. Глобальный cache flush не требуется: repair использует существующие targeted generation boundaries.
+4. Повторите dry-run: quarantine candidates должны стать нулевыми, а source
+   signals могут остаться только у восстановленных categorized collections.
+   Затем возобновите workers, проверьте `/discover/popular`, collection
+   search/API/sitemap и одну вручную одобренную categorized collection.
+   Глобальный cache flush не требуется: repair использует существующие
+   targeted generation boundaries.
 
 Rollback не выполняется массовым обратным `UPDATE`: прежняя автоматическая
 публикация не является допустимым состоянием. При ошибочном exact match

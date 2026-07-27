@@ -302,6 +302,20 @@ Target boundaries:
 - Синхронизация сопоставляет только уже существующие `CatalogTitle`: exact normalized primary/original/approved-alias title является обязательной основой, несовпадение года или типа блокирует связь, а country/detail metadata помогают разрешить конкурирующие exact candidates. Неоднозначные и отсутствующие карточки остаются диагностическими source items; команда не создаёт фиктивные фильмы, жанры, сезоны, серии, media или публичный текст.
 - `HdRezkaCollectionTypeCompatibility` является общей границей нормализации типа для matcher и диагностики. `series|show|anime|documentary` относятся к поддерживаемой области текущего каталога, `film|cartoon` — к неподдерживаемой, а отсутствующий или новый неизвестный код остаётся `unknown` и не маскируется под несовместимость. Эта классификация не ослабляет matching: известное несовпадение типов по-прежнему fail closed, неизвестный тип не даёт type-score, а scope никогда не создаёт membership самостоятельно.
 - Каждая новая remote-подборка получает ownerless `editorial`, `private`, `archived`, unpublished collection с русской translation row. Синхронизация обновляет только source-owned название, items и provenance; локальные category/moderation/visibility/description/featured/publication decisions сохраняются. Редактор назначает категорию и явно проводит запись через moderation перед публикацией. Complete snapshot удаляет только устаревшие source-owned memberships/signals, а partial snapshot никогда не выполняет destructive stale reconciliation.
+- Восстановление ранее опубликованных source-managed подборок отделено от
+  обычной синхронизации. Ручная dry-run-first recovery-команда может
+  классифицировать и повторно опубликовать только заранее проверенный exact
+  allowlist `provider + source_key → stable category slug`: источник должен
+  оставаться доступным, состав — непустым и не превышать public cap, а
+  назначенная категория и её родитель — активными. Команда не принимает
+  произвольные ID, URL, названия или category values, не публикует
+  демонстрационные, пустые, конфликтно классифицированные или не
+  включённые в allowlist записи и после изменения обязана пересчитать
+  version-aware quality. Production write требует проверенного backup,
+  остановленных writers и отсутствия активного импорта, source sync и
+  незавершённой recommendation build. Это явное редакционное восстановление
+  не ослабляет правило `private/archived` для новых sync rows и не превращает
+  category suggestions в автоматическую публикацию.
 - Изображения remote-подборок не запрашиваются, не скачиваются и не сохраняются. Полные видео, постеры тайтлов, HTML snapshots и произвольные remote assets также не сохраняются.
 - Audit состоит из агрегированного run, source record и source-item match rows. Public/admin presentation показывает только allowlisted counters/status и не раскрывает source URL, raw error, filesystem path или raw match evidence. Приватная admin-сводка дополнительно считает source-managed коллекции без membership, отделяет пустые коллекции с поддерживаемым или неизвестным типом от коллекций только с неподдерживаемыми типами, показывает `supported|unsupported|unknown` item counts, долю `matched/items` и только известные пары `match_status:match_method` последнего run; неизвестный type/method code не передаётся в представление как raw value. Public card является text-only и может показывать отметку «Обновляется автоматически» без runtime-запроса к источнику.
 - Успешное material reconciliation обновляет `editorial_collection:*` recommendation signals только для source collection, уже прошедших канонический public-quality scope. Добавленные и удалённые связи таких подборок помечают affected IDs dirty и ставят единственную deduplicated Redis job пересборки; private review rows не инициируют бессмысленный rebuild. Recommendation scorer учитывает не более трёх общих подборок и ограничивает вклад; после активации поколения запускается существующий bounded warm критических Redis/Memcached-backed страниц.
