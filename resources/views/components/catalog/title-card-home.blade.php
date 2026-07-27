@@ -7,7 +7,11 @@
 >
     <div class="min-w-0">
         <h3 class="{{ $layout === 'spotlight' ? 'text-xl lg:text-2xl' : 'text-lg' }} font-semibold leading-tight text-slate-900">
-            <a href="{{ route('titles.show', $title) }}" class="break-words hover:text-emerald-800">
+            <a
+                href="{{ route('titles.show', $title) }}"
+                data-home-title-link
+                class="cursor-pointer break-words after:absolute after:inset-0 after:rounded-panel hover:text-emerald-800 focus-visible:outline-none focus-visible:after:ring-4 focus-visible:after:ring-emerald-200 focus-visible:after:ring-inset"
+            >
                 {{ $displayTitle }}
             </a>
         </h3>

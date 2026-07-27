@@ -5,7 +5,11 @@
     data-home-latest-media-group="{{ $title->id }}"
 >
     <h3 class="text-lg font-semibold leading-6 text-slate-900">
-        <a href="{{ $titleUrl }}" class="break-words hover:text-emerald-800">
+        <a
+            href="{{ $titleUrl }}"
+            data-home-title-link
+            class="cursor-pointer break-words after:absolute after:inset-0 after:rounded-panel hover:text-emerald-800 focus-visible:outline-none focus-visible:after:ring-4 focus-visible:after:ring-emerald-200 focus-visible:after:ring-inset"
+        >
             {{ $displayTitle }}
         </a>
     </h3>

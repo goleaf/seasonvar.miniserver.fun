@@ -130,6 +130,30 @@ class CatalogBladeComponentTest extends TestCase
         $this->assertSame([], $queries);
     }
 
+    public function test_home_title_cards_expose_a_keyboard_visible_whole_card_link(): void
+    {
+        $catalogTitle = CatalogTitle::factory()->make([
+            'title' => 'Кликабельный домашний сериал',
+            'slug' => 'clickable-home-title',
+            'poster_url' => 'https://media.example.com/clickable-home-title.jpg',
+        ]);
+
+        foreach (['home', 'trend'] as $layout) {
+            $html = Blade::render(
+                '<x-catalog.title-card :title="$title" :layout="$layout" :show-description="false" />',
+                ['title' => $catalogTitle, 'layout' => $layout],
+            );
+
+            $this->assertStringContainsString('data-home-title-link', $html);
+            $this->assertStringContainsString('cursor-pointer', $html);
+            $this->assertStringContainsString('after:absolute', $html);
+            $this->assertStringContainsString('after:inset-0', $html);
+            $this->assertStringContainsString('focus-visible:after:ring-4', $html);
+            $this->assertStringContainsString('focus-visible:after:ring-emerald-200', $html);
+            $this->assertStringContainsString('href="'.route('titles.show', $catalogTitle).'"', $html);
+        }
+    }
+
     public function test_latest_media_card_prepares_episode_metadata_outside_blade(): void
     {
         $catalogTitle = CatalogTitle::factory()->create([
@@ -166,6 +190,10 @@ class CatalogBladeComponentTest extends TestCase
 
         $this->assertStringContainsString('data-ui-poster-card', $html);
         $this->assertStringContainsString('data-home-latest-media-group="'.$catalogTitle->id.'"', $html);
+        $this->assertStringContainsString('data-home-title-link', $html);
+        $this->assertStringContainsString('after:absolute', $html);
+        $this->assertStringContainsString('focus-visible:after:ring-4', $html);
+        $this->assertStringContainsString('relative z-10', $html);
         $this->assertStringContainsString('Новая серия', $html);
         $this->assertStringContainsString('Добавлена серия 7', $html);
         $this->assertStringContainsString('1 сезон', $html);

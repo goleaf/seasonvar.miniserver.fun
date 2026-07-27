@@ -10,7 +10,7 @@
 | Task 116: восстановление default-входа discovery | `completed: commit cc77728a; push unresolved authentication` | [Task 116 evidence](archive/2026-07-27-discovery-default-route-restoration-evidence.md) |
 | Task 117: восстановление публичных редакционных подборок | `completed: commit b2e97d80; push unresolved authentication` | [Evidence](archive/2026-07-27-public-editorial-collection-restoration-evidence.md) |
 | Task 118: адаптивная панель действий фильтров каталога | `completed: commit d6286c7c; push unresolved authentication` | [Evidence](archive/2026-07-27-catalog-filter-actions-evidence.md) |
-| Task 119: полный редизайн главной страницы | `in_progress: option 1 approved; implementation authorized in main` | [Compliance matrix](task-119-homepage-redesign-compliance.md) |
+| Task 119: полный редизайн главной страницы | `in_progress: verification complete; commit and push pending` | [Evidence](archive/2026-07-27-task-119-homepage-redesign-evidence.md) |
 
 ## Реестр blocked/unresolved
 
@@ -41,7 +41,8 @@
 | Task 119 requirements, versions и existing implementation | `completed` | Laravel Boost: PHP `8.5`, Laravel `13.22.0`, Livewire `4.3.3`, Tailwind `4.3.2`; routes, builder, cards, cache и tests inspected |
 | Task 119 desktop/mobile MCP audit | `completed` | Live `/` проверен на `1440×1200` и `390×844`; постеры homepage-карточек не являются ссылками, страница визуально плоская и чрезмерно длинная |
 | Task 119 design direction и approved specification | `completed: option 1 approved` | [Design](../superpowers/specs/2026-07-27-homepage-visual-redesign-design.md) |
-| Task 119 implementation, verification и delivery | `in_progress` | Design approved; TDD начинается с кликабельных poster overlays, затем section composition, cache rotation и browser matrix |
+| Task 119 implementation и verification | `completed` | Whole-card overlays/surfaces/cache `3`; full gate `2 305` tests / `208 535` assertions; Playwright `21/21` |
+| Task 119 delivery | `in_progress` | Полный pre-push gate GREEN; exact task commit и push attempt остаются |
 
 ## Последнее подтверждённое evidence
 
@@ -54,6 +55,7 @@
 - [Task 118: compliance панели действий фильтров](task-118-catalog-filter-actions-compliance.md)
 - [Task 118: evidence панели действий фильтров](archive/2026-07-27-catalog-filter-actions-evidence.md)
 - [Task 119: compliance полного редизайна главной](task-119-homepage-redesign-compliance.md)
+- [Task 119: evidence полного редизайна главной](archive/2026-07-27-task-119-homepage-redesign-evidence.md)
 
 ## Task 119 — цель и checklist
 
@@ -67,15 +69,15 @@
 |---|---|---|---|
 | critical | Requirements, versions и repository audit | `completed` | Обязательные owners, прежние Task 94/103/111 specs, Laravel Boost docs и установленный stack проверены |
 | critical | Desktop/mobile MCP audit | `completed` | Live `/`: `1440×1200`, `390×844`, accessibility snapshots, screenshots и console log |
-| high | Полный census домашних ссылок и interaction boundaries | `in_progress` | Проверены `home`, `spotlight`, `trend`, latest-media и continue-watching; collection/account/facet actions сохраняются отдельными controls |
+| high | Полный census домашних ссылок и interaction boundaries | `completed` | `home`, `spotlight`, `trend`, latest-media и continue-watching используют один overlay; collection/account/facet actions остаются отдельными controls |
 | high | Визуальное направление и design specification | `completed: option 1 approved` | [Design](../superpowers/specs/2026-07-27-homepage-visual-redesign-design.md) |
 | high | Detailed TDD implementation plan | `completed` | [Implementation plan](../superpowers/plans/2026-07-27-homepage-visual-redesign.md) |
-| critical | Кликабельные изображения и карточки | `pending` | Использовать существующий whole-card overlay pattern с сохранением отдельных CTA, taxonomy links, focus order и без nested anchors |
-| high | Новая композиция и системный цвет | `pending` | Секции получают различимый ритм, ограниченные semantic tints и более короткую mobile presentation без скрытия обязательного content contract |
-| critical | Cache/release compatibility | `pending` | Оценить bump homepage `response_contract=2`, Vite build, stale response recovery и ordinary rollback без data restore |
-| high | TDD, focused/full PHPUnit и Playwright matrix | `pending` | `/`, `/ru`, `/en`; guest/auth; `320×720`, `390×844`, landscape, tablet, desktop, zoom/keyboard/reduced motion |
-| medium | Canonical docs, README, CHANGELOG и archive evidence | `pending implementation` | Visitor-visible change потребует owner docs, README history и русский CHANGELOG |
-| critical | Exact commit и push in `main` | `pending implementation` | Только declared task scope; посторонние `composer.lock` и `storage/debugbar/.gitignore` не трогать |
+| critical | Кликабельные изображения и карточки | `completed` | Whole-card overlay покрывает постер; CTA/taxonomy foreground, visible focus и exact Continue Watching URL проверены |
+| high | Новая композиция и системный цвет | `completed` | Amber/sky/emerald/slate surfaces и white card shells проверены на guest/auth и RU/EN без удаления секций/facets |
+| critical | Cache/release compatibility | `completed` | Homepage `response_contract=3`, Vite build и rollback без data restore задокументированы |
+| high | TDD, full PHPUnit и Playwright matrix | `completed` | Full gate `2 305` tests / `208 535` assertions, `11` skipped; Playwright `21/21` на семи viewport-профилях |
+| medium | Canonical docs, README, CHANGELOG и archive evidence | `completed` | UI/frontend/views/caching owners, README history, русский CHANGELOG и evidence обновлены |
+| critical | Exact commit и push in `main` | `in_progress` | Только declared task scope; посторонние `composer.lock` и `storage/debugbar/.gitignore` исключены |
 
 Защищённые contracts: full-page `CatalogHomePage`, route names `home` и
 `localized.home`, гостевой/authenticated порядок Task 94, полные
@@ -90,13 +92,12 @@ JavaScript business logic не входят в scope.
 `resources/views/components/catalog/title-card-home.blade.php`,
 `resources/views/components/catalog/title-card-trend.blade.php`,
 `resources/views/components/catalog/latest-media-card.blade.php`,
-`resources/views/components/catalog/home-trending-grid.blade.php`,
-опционально additive contract
-`resources/views/components/ui/poster-card.blade.php` /
+`resources/views/components/catalog/home-section-heading.blade.php`,
 `app/View/Components/Ui/PosterCard.php`, homepage tests и browser specs,
 `app/Support/Cache/PublicPageCachePolicy.php` при подтверждённой
-необходимости ротации response cache, переводы только для фактически новой
-копии, owner docs, `README.md` и `CHANGELOG.md`.
+необходимости ротации response cache, owner docs, `README.md` и
+`CHANGELOG.md`. Новые translations, business JavaScript и изменение
+`home-trending-grid` не потребовались.
 
 Rollback: согласованный revert homepage presentation/tests/docs, Vite rebuild
 и возврат предыдущего cache response contract при отсутствии нового stale

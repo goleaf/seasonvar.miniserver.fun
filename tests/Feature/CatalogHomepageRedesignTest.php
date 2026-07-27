@@ -36,8 +36,14 @@ final class CatalogHomepageRedesignTest extends TestCase
             'catalog-facets',
         ]);
         $response
+            ->assertSee('data-home-page', false)
             ->assertSee('data-home-metrics-compact', false)
             ->assertSee('data-home-metrics-mobile-last', false)
+            ->assertSee('data-home-surface="amber"', false)
+            ->assertSee('data-home-surface="sky"', false)
+            ->assertSee('data-home-surface="emerald"', false)
+            ->assertSee('data-home-surface="slate"', false)
+            ->assertSee('data-home-section-action', false)
             ->assertDontSee('data-home-section="continue-watching"', false)
             ->assertDontSee('data-home-section="library-updates"', false)
             ->assertDontSee('data-home-section="personal-recommendations"', false)
@@ -60,6 +66,12 @@ final class CatalogHomepageRedesignTest extends TestCase
             'catalog-facets',
         ]);
         $response
+            ->assertSee('data-home-page', false)
+            ->assertSee('data-home-surface="amber"', false)
+            ->assertSee('data-home-surface="sky"', false)
+            ->assertSee('data-home-surface="emerald"', false)
+            ->assertSee('data-home-surface="slate"', false)
+            ->assertSee('data-home-section-action', false)
             ->assertDontSee('data-home-section="statistics"', false)
             ->assertDontSee('data-home-section="new-titles"', false)
             ->assertDontSee('data-home-section="watch-now"', false)
@@ -87,6 +99,36 @@ final class CatalogHomepageRedesignTest extends TestCase
             ->assertDontSee('data-home-library-update="'.$foreignUpdateTitle->id.'"', false)
             ->assertSeeText('Продолжение владельца')
             ->assertSeeText('Обновление библиотеки владельца');
+    }
+
+    public function test_continue_watching_poster_opens_the_exact_episode_without_hijacking_its_action(): void
+    {
+        $owner = User::factory()->create();
+        [$title, $episode] = $this->watchableTitle('home-clickable-progress', 'Кликабельное продолжение');
+        $this->progress($owner, $title, $episode);
+
+        $html = $this->actingAs($owner)->get(route('home'))->assertOk()->getContent();
+        $sectionStart = strpos($html, 'data-home-section="continue-watching"');
+        $sectionEnd = strpos($html, 'data-home-section="library-updates"', $sectionStart ?: 0);
+
+        $this->assertIsInt($sectionStart);
+        $this->assertIsInt($sectionEnd);
+
+        $section = substr($html, $sectionStart, $sectionEnd - $sectionStart);
+        $expectedUrl = route('titles.show', [
+            'catalogTitle' => $title,
+            'episode' => $episode->id,
+        ]).'#player';
+
+        $this->assertStringContainsString('data-home-title-link', $section);
+        $this->assertStringContainsString('href="'.$expectedUrl.'"', $section);
+        $this->assertStringContainsString('cursor-pointer', $section);
+        $this->assertStringContainsString('after:absolute', $section);
+        $this->assertStringContainsString('focus-visible:after:ring-4', $section);
+        $this->assertMatchesRegularExpression(
+            '/<a[^>]*class="[^"]*relative z-10[^"]*"[^>]*>.*'.preg_quote('Продолжить', '/').'/s',
+            $section,
+        );
     }
 
     /** @param list<string> $sections */

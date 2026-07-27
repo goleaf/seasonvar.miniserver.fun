@@ -245,7 +245,7 @@ class BladeTemplateTest extends TestCase
 
     public function test_poster_card_exposes_supported_public_layouts_and_rejects_unknown_layouts(): void
     {
-        foreach (['grid', 'list', 'compact', 'recommendation', 'stats'] as $layout) {
+        foreach (['grid', 'list', 'compact', 'recommendation', 'stats', 'home', 'spotlight', 'trend'] as $layout) {
             $this->blade(
                 '<x-ui.poster-card :layout="$layout" alt="Постер"><p>Описание</p></x-ui.poster-card>',
                 ['layout' => $layout],
@@ -262,6 +262,19 @@ class BladeTemplateTest extends TestCase
 
         $this->assertFileExists(resource_path('views/components/catalog/title-card-list.blade.php'));
         $this->assertFileExists(resource_path('views/components/catalog/title-card-grid.blade.php'));
+    }
+
+    public function test_home_poster_card_layouts_use_a_white_bordered_interactive_surface(): void
+    {
+        foreach (['home', 'spotlight', 'trend'] as $layout) {
+            $this->blade(
+                '<x-ui.poster-card :layout="$layout" alt="Постер">Описание</x-ui.poster-card>',
+                ['layout' => $layout],
+            )
+                ->assertSee('rounded-panel border border-slate-200 bg-white', false)
+                ->assertSee('hover:border-emerald-300', false)
+                ->assertSee('focus-within:border-emerald-500', false);
+        }
     }
 
     public function test_catalog_count_translations_follow_russian_and_english_plural_rules(): void

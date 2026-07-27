@@ -105,6 +105,23 @@ labels и named-route URLs; Blade не выполняет query, ranking, timezo
 range или ownership calculation.
 - «Последние обновления» показывает не более шести тайтлов. Для каждого тайтла query гидратирует максимум восемь новых series/media rows, но оконные `COUNT/MIN/MAX` сохраняют точный общий диапазон массового пополнения; компонент выводит одну summary-строку, metadata и действия вместо списка эпизодов. На phone видимы первые четыре обновления с переходом к полному разделу. Полные сезоны и источники в БД, detail page и API не сокращаются. Гостевая подборка новых сериалов использует индексируемый тип `RecentlyAdded`, а авторизованный пользователь сохраняет `Personalized` lifecycle и private remember-shown state.
 
+### Homepage presentation lifecycle Task 119
+
+Task 119 меняет только SSR presentation. `CatalogHomePageBuilder::webData()`,
+guest/auth projection, ranking, eager loading, query budget, stable section
+order и `/api/v1/home` остаются прежними. Blade добавляет одну
+`data-home-page` boundary, светлые семантические section surfaces и
+query-free `x-catalog.home-section-heading`; JavaScript carousel, client
+reordering, API fetch или новый Livewire island не создаются.
+
+Название каждой домашней карточки остаётся единственной канонической ссылкой
+на тайтл, но её `after`-overlay покрывает постер и основную площадь карточки.
+Taxonomy и explicit action links сохраняют `z-index` выше overlay, поэтому
+вложенных anchors и подмены вторичных действий нет. Continue Watching
+использует прежний exact episode URL и `#player`. Browser contract проверяет
+реальный hit target по координате видимой части постера, отсутствие
+горизонтального overflow, RU/EN и guest/auth на семи viewport-профилях.
+
 Датированные доказательства и незакрытые gaps находятся в [`audits/frontend-report.md`](audits/frontend-report.md), [`audits/livewire-report.md`](audits/livewire-report.md) и [`audits/video-playback-report.md`](audits/video-playback-report.md). Текущий переходный gap: Blade не содержит PHP/query/service calls, но header/footer/layout всё ещё используют route-aware `request()` и один template читает `config()`; living plan переносит эти решения в prepared view state.
 
 ## Глобальный поиск в шапке

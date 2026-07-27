@@ -2,9 +2,9 @@
 
 Обновлено: 27.07.2026.
 
-Статус: `implementation_authorized`. MCP-аудит и repository census
-выполнены; пользователь утвердил рекомендованный вариант 1 и разрешил
-реализацию только в существующей `main`.
+Статус: `in_progress`. Пользователь утвердил
+рекомендованный вариант 1; implementation и verification завершены только в
+существующей `main`, exact commit и push attempt ещё не выполнены.
 
 ## Цель
 
@@ -21,12 +21,14 @@
   `App\Livewire\CatalogHomePage`; новые routes или контроллер не нужны.
 - `CatalogHomePageBuilder::webData()` остаётся владельцем guest/auth
   projection, visibility, personal ownership и bounded section data.
-- Обычные `home`, `spotlight`, `trend`, latest-media и continue-watching
-  карточки выводят постер вне ссылки; к тайтлу ведёт только текстовая ссылка
-  или отдельная CTA. В существующих grid/list/compact карточках уже есть
-  проверенный whole-card overlay pattern через `after:absolute after:inset-0`.
-- Live MCP-аудит на `1440×1200` и `390×844` подтвердил длинное однообразное
-  полотно, слабое визуальное разделение секций и отсутствие клика по постеру.
+- `home`, `spotlight`, `trend`, latest-media и continue-watching теперь
+  используют проверенный whole-card overlay pattern через
+  `after:absolute after:inset-0`; отдельные CTA/taxonomy controls остаются
+  foreground links.
+- Исходный live MCP-аудит на `1440×1200` и `390×844` подтвердил длинное
+  однообразное полотно, слабое визуальное разделение секций и отсутствие
+  клика по постеру; локальный Playwright после реализации подтвердил новый
+  contract на семи viewport-профилях.
 - Production console содержит существующий `404` одного script request и
   report-only CSP diagnostics. Это отдельный сигнал: редизайн не должен
   выдавать его за собственную регрессию или молча скрывать.
@@ -40,20 +42,20 @@
 | Laravel 13 / Livewire 4 / Tailwind 4 | `already_compliant` | Версии подтверждены Laravel Boost; package update не требуется |
 | Full-page Livewire route boundary | `already_compliant` | `home` и `localized.home` сохраняются |
 | Светлая тема и системная палитра | `completed: design approved` | Amber отделяет trend, sky — updates, emerald — watch/personal return, slate — neutral; red остаётся error-only |
-| Кликабельность постеров | `pending` | Планируется additive whole-card overlay без nested anchors и перехвата вторичных controls |
-| Mobile-first, touch, keyboard и focus | `pending` | Обязательны 44px essential controls, visible `focus-visible`, no page overflow, keyboard path и zoom |
+| Кликабельность постеров | `completed` | Реальный browser hit-test координаты постера попадает в единственную title link; nested anchors отсутствуют |
+| Mobile-first, touch, keyboard и focus | `completed` | Section actions ≥44px, visible `focus-visible`, wrapping и отсутствие page overflow проверены unit/browser contracts |
 | Guest/auth section order Task 94 | `already_compliant` | Порядок остаётся server-rendered и не переставляется CSS/JS |
 | Полные facets Task 111 | `already_compliant` | Все genres/countries/years и стабильные `data-home-facet-list` сохраняются |
 | Passive Blade | `already_compliant` | Query/ranking/URLs/ownership не переносятся в Blade; `@php`, inline CSS и business JS запрещены |
 | RU/EN и localized routes | `already_compliant` | Existing keys и locale aliases сохраняются; новые keys возможны только синхронно для всех locale |
-| Query и payload budgets | `pending verification` | Builder selection/hydration не расширяется; запросы и DOM/image counts должны не ухудшиться |
-| Homepage cache compatibility | `pending decision` | Проверить ротацию `PublicPageCachePolicy` `response_contract=2` для недостижимости stale HTML |
+| Query и payload budgets | `completed` | Builder/data selection не изменены; performance/projection suites прошли `59` tests / `485` assertions |
+| Homepage cache compatibility | `completed` | `PublicPageCachePolicy` использует homepage `response_contract=3`; unit contract GREEN |
 | SEO, canonical и `hreflang` | `already_compliant` | Content/order change не меняет существующий SEO shell |
 | PWA/private/media boundaries | `already_compliant` | Offline/private exclusions и same-origin poster proxy не меняются |
 | Routes/API/schema/permissions | `not_applicable` | Изменения не требуются; `/api/v1/home` shape должен остаться прежним |
 | Dependencies/migrations/data writes | `not_applicable` | Новые packages, migration, backfill и production DML не планируются |
-| README/owner docs/CHANGELOG | `pending implementation` | Обновляются только после реального visitor-visible изменения |
-| Commit/push | `pending implementation` | Только existing `main`; remote authentication ранее unresolved |
+| README/owner docs/CHANGELOG | `completed` | UI/frontend/views/caching owners, visitor history и русский changelog обновлены |
+| Commit/push | `in_progress` | Exact commit/push ещё не выполнены; работа остаётся только в `main`, remote authentication ранее отсутствовала |
 
 ## Cross-feature impact
 
@@ -73,21 +75,21 @@
 | Premium/region/legal | `unaffected` | Visibility и entitlement остаются server-owned в текущих query boundaries |
 | Administration/audit | `not_applicable` | Write/admin workflow отсутствует |
 
-## Ожидаемые изменяемые файлы после утверждения дизайна
+## Фактический implementation scope
 
 - `resources/views/livewire/catalog-home-page.blade.php`;
 - `resources/views/components/catalog/title-card-home.blade.php`;
 - `resources/views/components/catalog/title-card-trend.blade.php`;
 - `resources/views/components/catalog/latest-media-card.blade.php`;
-- `resources/views/components/catalog/home-trending-grid.blade.php`;
-- при доказанной необходимости — additive API
-  `resources/views/components/ui/poster-card.blade.php` и
-  `app/View/Components/Ui/PosterCard.php`;
+- `resources/views/components/catalog/home-section-heading.blade.php` как
+  единый passive owner responsive section title/action markup;
+- `app/View/Components/Ui/PosterCard.php` для белых interactive surfaces
+  только layouts `home|spotlight|trend`;
 - homepage feature/unit/browser tests;
 - при ротации cache markup —
   `app/Support/Cache/PublicPageCachePolicy.php` и его unit test;
-- только фактически затронутые translations, canonical UI/frontend/views/
-  caching docs, `README.md` и `CHANGELOG.md`;
+- translations не изменялись; canonical UI/frontend/views/caching docs,
+  `README.md` и `CHANGELOG.md` обновлены;
 - design spec, detailed implementation plan и archive evidence.
 
 ## Файлы и contracts, которые должны остаться совместимыми
@@ -118,18 +120,21 @@
 - Посторонние рабочие изменения `composer.lock` и
   `storage/debugbar/.gitignore` не входят в task scope.
 
-## Planned verification
+## Verification
 
-1. TDD RED/GREEN для кликабельного постера/карточки, сохранения отдельных CTA
-   и отсутствия nested anchors.
-2. Existing homepage, projection, performance, cache, translation и Blade
-   contract suites.
-3. `./vendor/bin/pint --dirty --format agent` только при PHP-правках,
-   focused Larastan/Rector по фактическому scope и `npm run build`.
-4. Playwright для `/`, `/ru`, `/en`, guest/auth на `320×720`, `390×844`,
-   `844×390`, `768×1024`, `1024×768`, `1440×1200`, `1920×1080`, с
-   keyboard/focus, zoom, reduced motion, console/network и horizontal
-   overflow checks.
-5. Финальное перечитывание requirements, repository-wide legacy/dead-control
-   search, README check, staged diff review, exact lease approval, commit в
-   `main` и push attempt.
+1. TDD RED подтвердил отсутствие overlay/surfaces/cache contract; GREEN —
+   `43` tests / `339` assertions.
+2. Projection/performance/facet/visual suites — `59` tests / `485`
+   assertions; `CatalogPageTest` — `85` / `865`; `--filter=CatalogHome` —
+   `31` / `242`.
+3. Focused PHPStan: `0` errors; Rector: `0` changes; Pint и Vite build
+   завершились успешно.
+4. Playwright: основной набор `9/9`, расширенная матрица `21/21` на desktop,
+   mobile, tablet, narrow phone, phone landscape, tablet landscape и TV-like
+   Chromium; `/`, `/en`, guest/auth, exact poster hit target и отсутствие
+   horizontal overflow проверены.
+5. Полный pre-push gate GREEN: `2 305` tests, `2 294` passed, `11` skipped,
+   `208 535` assertions; Composer/npm audit, Pint, Rector, PHP syntax,
+   PHPStan, docs/config/routes/views cache и Vite/player release прошли.
+6. Staged diff approval, commit в `main` и push attempt остаются последними
+   delivery-шагами.

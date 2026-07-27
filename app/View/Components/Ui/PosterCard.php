@@ -16,9 +16,9 @@ class PosterCard extends Component
         'compact' => 'grid grid-cols-[3.5rem_minmax(0,1fr)] gap-3 p-3 hover:bg-emerald-50/60 sm:grid-cols-[4rem_minmax(0,1fr)]',
         'recommendation' => 'grid grid-cols-[4rem_minmax(0,1fr)] gap-3 p-3 hover:bg-emerald-50/60 sm:grid-cols-[5rem_minmax(0,1fr)] sm:gap-4 sm:p-4 md:grid-cols-[6rem_minmax(0,1fr)]',
         'stats' => 'grid grid-cols-[5.5rem_minmax(0,1fr)] sm:flex sm:h-full sm:flex-col',
-        'home' => 'flex h-full flex-col',
-        'spotlight' => 'flex flex-col lg:grid lg:grid-cols-[minmax(11rem,0.85fr)_minmax(0,1fr)] lg:gap-5 lg:rounded-panel lg:border lg:border-slate-200 lg:bg-white lg:p-5',
-        'trend' => 'flex flex-col lg:grid lg:grid-cols-[4rem_minmax(0,1fr)] lg:gap-3 lg:p-3',
+        'home' => 'flex h-full flex-col rounded-panel border border-slate-200 bg-white p-2.5 hover:border-emerald-300 focus-within:border-emerald-500',
+        'spotlight' => 'flex h-full flex-col rounded-panel border border-slate-200 bg-white p-3 hover:border-emerald-300 focus-within:border-emerald-500 lg:grid lg:grid-cols-[minmax(11rem,0.85fr)_minmax(0,1fr)] lg:gap-5 lg:p-5',
+        'trend' => 'flex h-full flex-col rounded-panel border border-slate-200 bg-white p-2.5 hover:border-emerald-300 focus-within:border-emerald-500 lg:grid lg:grid-cols-[4rem_minmax(0,1fr)] lg:gap-3',
     ];
 
     /**

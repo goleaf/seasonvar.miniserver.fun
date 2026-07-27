@@ -1,6 +1,6 @@
 # Blade-шаблоны
 
-Обновлено: 25.07.2026
+Обновлено: 27.07.2026
 
 ## Правило без inline PHP
 
@@ -156,6 +156,17 @@ responsive grid с одним desktop spotlight; обычные title grids ис
 ведут к реальному каталогу/библиотеке. Нет `@php`, inline CSS/business
 JavaScript, raw HTML, nested scrolling, fake trend/recommendation labels или
 дублирования Eloquent graph в public Livewire state.
+
+Task 119 добавляет passive
+`resources/views/components/catalog/home-section-heading.blade.php` как
+единственного owner heading/action markup и семантических divider tones.
+`x-ui.poster-card` в layouts `home`, `spotlight` и `trend` создаёт только
+белую bordered surface; wrapping anchor по-прежнему не создаётся shell.
+Единственная title link находится в `title-card-home`,
+`title-card-trend`, `latest-media-card` или continue-watching body и расширяет
+свою область через `after:absolute after:inset-0`. Вторичные ссылки/кнопки
+получают существующий foreground layer, поэтому nested anchors отсутствуют,
+а каждый control сохраняет собственный URL и focus.
 
 ## Представление рейтингов Top 100
 
