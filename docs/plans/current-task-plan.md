@@ -1,4 +1,4 @@
-# Текущая задача — Task 113–118
+# Текущая задача — Task 113–119
 
 ## Реестр активных workstreams
 
@@ -10,6 +10,7 @@
 | Task 116: восстановление default-входа discovery | `completed: commit cc77728a; push unresolved authentication` | [Task 116 evidence](archive/2026-07-27-discovery-default-route-restoration-evidence.md) |
 | Task 117: восстановление публичных редакционных подборок | `completed: commit b2e97d80; push unresolved authentication` | [Evidence](archive/2026-07-27-public-editorial-collection-restoration-evidence.md) |
 | Task 118: адаптивная панель действий фильтров каталога | `completed: commit d6286c7c; push unresolved authentication` | [Evidence](archive/2026-07-27-catalog-filter-actions-evidence.md) |
+| Task 119: полный редизайн главной страницы | `in_progress: MCP audit completed; visual direction pending approval` | [Compliance matrix](task-119-homepage-redesign-compliance.md) |
 
 ## Реестр blocked/unresolved
 
@@ -18,6 +19,7 @@
 | Task 115 inherited browser gate | `unresolved` | Старый PWA poster fixture даёт `404`; focused Task 115 gates прошли |
 | Task 117 inherited PWA browser signal | `unresolved` | Existing `/service-worker.js` возвращает `404`; collection page/local requests проходят |
 | Remote delivery Tasks 113–118 | `unresolved` | Посторонние изменения были адресно сохранены и точно восстановлены; HTTPS remote не имеет credential helper, фактический push завершился ошибкой чтения GitHub username |
+| Task 119 production browser signal | `unresolved` | MCP-аудит главной зафиксировал существующий `404` одного script request и report-only CSP diagnostics; источник должен быть отделён от редизайна до release |
 
 ## Task-specific compliance matrix
 
@@ -36,6 +38,10 @@
 | Task 117 implementation и production apply | `completed` | 10 restored/listed; verified backup, quarantine и live integrity checks |
 | Task 118 root cause и утверждённая компоновка | `completed` | `18rem` sidebar конфликтует с `sm:flex-row`; пользователь выбрал три полноширинных действия |
 | Task 118 implementation и verification | `completed` | [Evidence](archive/2026-07-27-catalog-filter-actions-evidence.md): RED/GREEN; focused `131` tests / `1 268` assertions; full pre-push `2 302` / `208 472`; Playwright `3/3` |
+| Task 119 requirements, versions и existing implementation | `completed` | Laravel Boost: PHP `8.5`, Laravel `13.22.0`, Livewire `4.3.3`, Tailwind `4.3.2`; routes, builder, cards, cache и tests inspected |
+| Task 119 desktop/mobile MCP audit | `completed` | Live `/` проверен на `1440×1200` и `390×844`; постеры homepage-карточек не являются ссылками, страница визуально плоская и чрезмерно длинная |
+| Task 119 design direction и approved specification | `in_progress` | Требуется один выбор интенсивности системных цветных поверхностей; после него оформляются design spec и implementation plan |
+| Task 119 implementation, verification и delivery | `unresolved` | Код не меняется до утверждения design spec; TDD, browser matrix, docs, commit и push запланированы |
 
 ## Последнее подтверждённое evidence
 
@@ -47,6 +53,54 @@
 - [Task 117: compliance восстановления редакционных подборок](task-117-public-editorial-restoration-compliance.md)
 - [Task 118: compliance панели действий фильтров](task-118-catalog-filter-actions-compliance.md)
 - [Task 118: evidence панели действий фильтров](archive/2026-07-27-catalog-filter-actions-evidence.md)
+- [Task 119: compliance полного редизайна главной](task-119-homepage-redesign-compliance.md)
+
+## Task 119 — цель и checklist
+
+Полностью переработать композицию `/`, `/ru` и `/en` внутри канонического
+светлого языка Seasonvar: сделать изображение каждого домашнего сериала
+понятной кликабельной областью, усилить визуальную иерархию системными
+цветными поверхностями и сократить ощущение бесконечного однообразного
+полотна на телефоне, не удаляя содержательные секции.
+
+| Priority | Workstream | Status | Evidence |
+|---|---|---|---|
+| critical | Requirements, versions и repository audit | `completed` | Обязательные owners, прежние Task 94/103/111 specs, Laravel Boost docs и установленный stack проверены |
+| critical | Desktop/mobile MCP audit | `completed` | Live `/`: `1440×1200`, `390×844`, accessibility snapshots, screenshots и console log |
+| high | Полный census домашних ссылок и interaction boundaries | `in_progress` | Проверены `home`, `spotlight`, `trend`, latest-media и continue-watching; collection/account/facet actions сохраняются отдельными controls |
+| high | Визуальное направление и design specification | `pending user approval` | Выбор касается интенсивности `emerald/sky/amber/red/slate` tint-поверхностей без dark theme, gradients или случайной палитры |
+| high | Detailed TDD implementation plan | `pending approved design` | Будет создан после письменного утверждения design spec |
+| critical | Кликабельные изображения и карточки | `pending` | Использовать существующий whole-card overlay pattern с сохранением отдельных CTA, taxonomy links, focus order и без nested anchors |
+| high | Новая композиция и системный цвет | `pending` | Секции получают различимый ритм, ограниченные semantic tints и более короткую mobile presentation без скрытия обязательного content contract |
+| critical | Cache/release compatibility | `pending` | Оценить bump homepage `response_contract=2`, Vite build, stale response recovery и ordinary rollback без data restore |
+| high | TDD, focused/full PHPUnit и Playwright matrix | `pending` | `/`, `/ru`, `/en`; guest/auth; `320×720`, `390×844`, landscape, tablet, desktop, zoom/keyboard/reduced motion |
+| medium | Canonical docs, README, CHANGELOG и archive evidence | `pending implementation` | Visitor-visible change потребует owner docs, README history и русский CHANGELOG |
+| critical | Exact commit и push in `main` | `pending implementation` | Только declared task scope; посторонние `composer.lock` и `storage/debugbar/.gitignore` не трогать |
+
+Защищённые contracts: full-page `CatalogHomePage`, route names `home` и
+`localized.home`, гостевой/authenticated порядок Task 94, полные
+genres/countries/years Task 111, `/api/v1/home`, recommendation/visibility
+rules, personalized ownership, public cache separation, SEO/`hreflang`,
+PWA private/media exclusions и локализованные RU/EN labels. Migrations,
+database writes, permissions, provider calls, package updates и новая
+JavaScript business logic не входят в scope.
+
+Ожидаемый implementation scope после утверждения дизайна:
+`resources/views/livewire/catalog-home-page.blade.php`,
+`resources/views/components/catalog/title-card-home.blade.php`,
+`resources/views/components/catalog/title-card-trend.blade.php`,
+`resources/views/components/catalog/latest-media-card.blade.php`,
+`resources/views/components/catalog/home-trending-grid.blade.php`,
+опционально additive contract
+`resources/views/components/ui/poster-card.blade.php` /
+`app/View/Components/Ui/PosterCard.php`, homepage tests и browser specs,
+`app/Support/Cache/PublicPageCachePolicy.php` при подтверждённой
+необходимости ротации response cache, переводы только для фактически новой
+копии, owner docs, `README.md` и `CHANGELOG.md`.
+
+Rollback: согласованный revert homepage presentation/tests/docs, Vite rebuild
+и возврат предыдущего cache response contract при отсутствии нового stale
+payload; migrations, restore базы и broad cache flush не требуются.
 
 ## Task 118 — цель и checklist
 
