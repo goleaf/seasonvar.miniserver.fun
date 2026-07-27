@@ -10,7 +10,7 @@
 | Task 116: восстановление default-входа discovery | `completed: commit cc77728a; push unresolved authentication` | [Task 116 evidence](archive/2026-07-27-discovery-default-route-restoration-evidence.md) |
 | Task 117: восстановление публичных редакционных подборок | `completed: commit b2e97d80; push unresolved authentication` | [Evidence](archive/2026-07-27-public-editorial-collection-restoration-evidence.md) |
 | Task 118: адаптивная панель действий фильтров каталога | `completed: commit d6286c7c; push unresolved authentication` | [Evidence](archive/2026-07-27-catalog-filter-actions-evidence.md) |
-| Task 119: полный редизайн главной страницы | `in_progress: verification complete; commit and push pending` | [Evidence](archive/2026-07-27-task-119-homepage-redesign-evidence.md) |
+| Task 119: полный редизайн главной страницы | `completed: commit 948be300; push unresolved authentication` | [Evidence](archive/2026-07-27-task-119-homepage-redesign-evidence.md) |
 
 ## Реестр blocked/unresolved
 
@@ -18,7 +18,7 @@
 | --- | --- | --- |
 | Task 115 inherited browser gate | `unresolved` | Старый PWA poster fixture даёт `404`; focused Task 115 gates прошли |
 | Task 117 inherited PWA browser signal | `unresolved` | Existing `/service-worker.js` возвращает `404`; collection page/local requests проходят |
-| Remote delivery Tasks 113–118 | `unresolved` | Посторонние изменения были адресно сохранены и точно восстановлены; HTTPS remote не имеет credential helper, фактический push завершился ошибкой чтения GitHub username |
+| Remote delivery Tasks 113–119 | `unresolved` | Посторонние изменения были адресно сохранены и точно восстановлены; HTTPS remote не имеет credential helper, фактический push завершился ошибкой чтения GitHub username |
 | Task 119 production browser signal | `unresolved` | MCP-аудит главной зафиксировал существующий `404` одного script request и report-only CSP diagnostics; источник должен быть отделён от редизайна до release |
 
 ## Task-specific compliance matrix
@@ -42,7 +42,7 @@
 | Task 119 desktop/mobile MCP audit | `completed` | Live `/` проверен на `1440×1200` и `390×844`; постеры homepage-карточек не являются ссылками, страница визуально плоская и чрезмерно длинная |
 | Task 119 design direction и approved specification | `completed: option 1 approved` | [Design](../superpowers/specs/2026-07-27-homepage-visual-redesign-design.md) |
 | Task 119 implementation и verification | `completed` | Whole-card overlays/surfaces/cache `3`; full gate `2 305` tests / `208 535` assertions; Playwright `21/21` |
-| Task 119 delivery | `in_progress` | Полный pre-push gate GREEN; exact task commit и push attempt остаются |
+| Task 119 delivery | `unresolved: commit 948be300; push authentication` | Full gate GREEN; push отклонён до hook из-за недоступного GitHub username |
 
 ## Последнее подтверждённое evidence
 
@@ -77,7 +77,7 @@
 | critical | Cache/release compatibility | `completed` | Homepage `response_contract=3`, Vite build и rollback без data restore задокументированы |
 | high | TDD, full PHPUnit и Playwright matrix | `completed` | Full gate `2 305` tests / `208 535` assertions, `11` skipped; Playwright `21/21` на семи viewport-профилях |
 | medium | Canonical docs, README, CHANGELOG и archive evidence | `completed` | UI/frontend/views/caching owners, README history, русский CHANGELOG и evidence обновлены |
-| critical | Exact commit и push in `main` | `in_progress` | Только declared task scope; посторонние `composer.lock` и `storage/debugbar/.gitignore` исключены |
+| critical | Exact commit и push in `main` | `unresolved: commit 948be300; push authentication` | User changes исключены, временно сохранены и восстановлены с совпавшей SHA-256 |
 
 Защищённые contracts: full-page `CatalogHomePage`, route names `home` и
 `localized.home`, гостевой/authenticated порядок Task 94, полные

@@ -2,9 +2,10 @@
 
 Обновлено: 27.07.2026.
 
-Статус: `in_progress`. Пользователь утвердил
+Статус: `completed`; remote delivery: `unresolved`. Пользователь утвердил
 рекомендованный вариант 1; implementation и verification завершены только в
-существующей `main`, exact commit и push attempt ещё не выполнены.
+существующей `main` и зафиксированы commit `948be300`. Push отклонён внешней
+HTTPS-аутентификацией.
 
 ## Цель
 
@@ -55,7 +56,7 @@
 | Routes/API/schema/permissions | `not_applicable` | Изменения не требуются; `/api/v1/home` shape должен остаться прежним |
 | Dependencies/migrations/data writes | `not_applicable` | Новые packages, migration, backfill и production DML не планируются |
 | README/owner docs/CHANGELOG | `completed` | UI/frontend/views/caching owners, visitor history и русский changelog обновлены |
-| Commit/push | `in_progress` | Exact commit/push ещё не выполнены; работа остаётся только в `main`, remote authentication ранее отсутствовала |
+| Commit/push | `unresolved` | Commit `948be300` в `main`; push не смог прочитать GitHub username, credential helper отсутствует |
 
 ## Cross-feature impact
 
@@ -136,5 +137,6 @@
 5. Полный pre-push gate GREEN: `2 305` tests, `2 294` passed, `11` skipped,
    `208 535` assertions; Composer/npm audit, Pint, Rector, PHP syntax,
    PHPStan, docs/config/routes/views cache и Vite/player release прошли.
-6. Staged diff approval, commit в `main` и push attempt остаются последними
-   delivery-шагами.
+6. Exact manifest/index approval прошёл; commit `948be300` создан в `main`.
+   Push attempt отклонён до hook: HTTPS remote не смог прочитать GitHub
+   username при отключённых terminal prompts.

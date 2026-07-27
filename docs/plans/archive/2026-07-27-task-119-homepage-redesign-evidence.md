@@ -84,7 +84,14 @@ TV-like Chromium прошла `21/21`. Desktop/mobile/auth screenshots прос�
 
 ## Delivery
 
-Полный pre-push gate завершён успешно. Exact staged diff approval, commit в
-`main` и push attempt фиксируются после завершения этих шагов. Ранее
-настроенный HTTPS remote не имел доступного credential helper; возможный
-внешний отказ должен быть отмечен как `unresolved`.
+Полный pre-push gate завершён успешно. Exact manifest из `21` task path,
+staged diff и SHA-256 index approval прошли; product commit `948be300`
+создан в `main`.
+
+Перед push два посторонних пользовательских изменения
+`composer.lock`/`storage/debugbar/.gitignore` были адресно помещены во
+временный stash. Push отклонён до hook, потому что HTTPS remote не смог
+прочитать GitHub username при отключённых terminal prompts и не имеет
+credential helper. Stash восстановлен; SHA-256 их binary diff до и после
+полностью совпала. Remote delivery остаётся честным `unresolved`, product
+commit локально завершён.
