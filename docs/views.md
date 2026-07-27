@@ -285,6 +285,17 @@ theatre: sidebar, primary column и player workspace. Theatre CSS скрывае
 secondary siblings, не дублирует markup и не превращает страницу в nested
 scroll.
 
+Внутри player view presentation-only markers
+`data-player-stage-panel`, `data-player-seasons-panel`,
+`data-player-season-content`, `data-player-season-options` и
+`data-player-episode-option` позволяют scoped theatre CSS согласованно
+оформить main/seasons surfaces без query или client-owned business state.
+`data-player-theatre-secondary` скрывает только дублирующие вторичные
+действия. Toggle связан с player через `aria-controls`, а
+`data-player-theatre-icon` отражает expand/compress без второго control.
+Scroll/focus lifecycle остаётся владельцем `player-navigation.js`; Blade не
+сохраняет координаты и не перемещает media shell.
+
 В Blade не строятся queries и не вычисляется availability. Все labels/options
 готовятся component/view-model boundaries и выводятся через escaped `{{ }}`.
 Raw source URL не попадает в option markup; обычный fallback использует

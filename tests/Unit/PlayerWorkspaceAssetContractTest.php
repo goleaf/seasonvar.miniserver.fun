@@ -19,7 +19,14 @@ final class PlayerWorkspaceAssetContractTest extends TestCase
         self::assertStringContainsString("event.key !== 'Escape'", $navigation);
         self::assertStringContainsString('document.fullscreenElement', $navigation);
         self::assertStringContainsString("root.querySelector('dialog[open]')", $navigation);
-        self::assertStringContainsString('theatreTriggerFor(root)?.focus()', $navigation);
+        self::assertStringContainsString('requestAnimationFrame', $navigation);
+        self::assertStringContainsString('cancelAnimationFrame', $navigation);
+        self::assertStringContainsString('window.scrollTo', $navigation);
+        self::assertStringContainsString("behavior: 'auto'", $navigation);
+        self::assertStringContainsString('preventScroll: true', $navigation);
+        self::assertStringContainsString('theatreReturnPosition', $navigation);
+        self::assertStringContainsString('data-player-theatre-icon', $navigation);
+        self::assertStringContainsString("'fa-compress'", $navigation);
         self::assertStringContainsString('cleanupTheatre', $navigation);
         self::assertStringContainsString("closest('[data-player-theatre-toggle]')", $navigation);
         self::assertStringContainsString('syncTheatreUi', $navigation);
@@ -28,6 +35,11 @@ final class PlayerWorkspaceAssetContractTest extends TestCase
         self::assertStringNotContainsString('sessionStorage', $navigation);
         self::assertStringContainsString('body.player-theatre-active', $styles);
         self::assertStringContainsString('[data-player-workspace-region]', $styles);
+        self::assertStringContainsString('[data-site-header]', $styles);
+        self::assertStringContainsString('[data-mobile-bottom-navigation]', $styles);
+        self::assertStringContainsString('[data-site-footer]', $styles);
+        self::assertStringContainsString('[data-player-seasons-panel]', $styles);
+        self::assertStringContainsString('[data-player-episode-option]', $styles);
     }
 
     public function test_runtime_mirrors_states_and_recovery_opens_existing_source_menu(): void

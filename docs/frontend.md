@@ -549,6 +549,16 @@ cleanup. Он не клонирует и не перемещает video DOM, н
 playback grant, не создаёт fixed overlay, не использует storage. `Escape`
 сначала уважает открытый dialog и fullscreen; затем закрывает theatre.
 
+До layout mutation controller сохраняет `scrollX`/`scrollY` только в памяти.
+В следующем cancellable `requestAnimationFrame` он привязывает viewport к
+`data-player-workspace-region`, чтобы toggle и video оставались видимы после
+скрытия больших секций страницы. Выход сначала восстанавливает document flow,
+затем в следующем frame возвращает точную прежнюю прокрутку и focus через
+`preventScroll`; navigation cleanup отменяет pending frame и не переносит
+позицию на другой тайтл. Site header, footer и mobile bottom navigation
+скрываются только при активном body marker, а main/seasons panels используют
+общую тёмную сцену и сохраняют один исходный `<video>`.
+
 Context-bar использует server-prepared labels и real source variants. In-place
 transition обновляет сезон, серию, перевод, качество, subtitle status и
 `aria-current` без пересоздания player. `has_subtitles` или
@@ -566,7 +576,10 @@ flow. Raw provider URL и grant в DOM/status/report не выводятся.
 Previous/next остаются обычными links с каноническим query fallback; JS лишь
 перехватывает их для бесшовного перехода. На mobile menu визуально становится
 bottom sheet, все targets не меньше 44 px, player остаётся 16:9 и корректно
-пересчитывается в landscape без orientation lock.
+пересчитывается в landscape без orientation lock. Геометрия theatre
+проверяется на desktop, phone, tablet, narrow phone, landscape и TV-like
+viewport; Chromium и Firefox lifecycle отдельно защищают dialog/fullscreen
+priority и неизменную identity media DOM.
 
 ## PWA frontend lifecycle Task 100
 

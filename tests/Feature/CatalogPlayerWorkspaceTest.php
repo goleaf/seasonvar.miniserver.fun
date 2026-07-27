@@ -83,6 +83,12 @@ final class CatalogPlayerWorkspaceTest extends TestCase
             ->assertSeeHtml('data-player-context-bar')
             ->assertSeeHtml('data-player-theatre-toggle')
             ->assertSeeHtml('aria-pressed="false"')
+            ->assertSeeHtml('aria-controls="player"')
+            ->assertSeeHtml('data-player-theatre-icon')
+            ->assertSeeHtml('data-player-stage-panel')
+            ->assertSeeHtml('data-player-seasons-panel')
+            ->assertSeeHtml('data-player-season-options')
+            ->assertSeeHtml('data-player-episode-option')
             ->assertSeeHtml('data-player-recovery')
             ->assertSeeHtml('data-player-choose-source')
             ->assertSeeHtml('data-player-context-translation')
@@ -96,6 +102,11 @@ final class CatalogPlayerWorkspaceTest extends TestCase
             ->assertSeeText('8 серия: Раскрытие →')
             ->assertSeeText('? Горячие клавиши')
             ->assertDontSee('11cdn.org', escape: false);
+
+        $html = $component->html();
+
+        self::assertSame(2, substr_count($html, 'wire:ignore'));
+        self::assertSame(1, substr_count($html, 'wire:ignore.self'));
     }
 
     public function test_title_page_exposes_scoped_theatre_layout_markers(): void

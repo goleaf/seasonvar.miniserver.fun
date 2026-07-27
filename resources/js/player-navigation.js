@@ -125,16 +125,20 @@ const restoreSelectionFromLocation = async (root) => {
 };
 
 const theatreTriggerFor = (root) => root.querySelector('[data-player-theatre-toggle]');
+const theatreRegionFor = (root) => root.closest('[data-player-workspace-region]') || root;
 
 const syncTheatreUi = (root, active) => {
     const theatreTrigger = theatreTriggerFor(root);
     const theatreLabel = theatreTrigger?.querySelector('[data-player-theatre-label]');
+    const theatreIcon = theatreTrigger?.querySelector('[data-player-theatre-icon]');
     const titleWorkspace = root.closest('[data-title-detail-workspace]');
 
     document.body.classList.toggle('player-theatre-active', active);
     root.toggleAttribute('data-player-theatre-active', active);
     titleWorkspace?.toggleAttribute('data-player-theatre-active', active);
     theatreTrigger?.setAttribute('aria-pressed', active ? 'true' : 'false');
+    theatreIcon?.classList.toggle('fa-expand', !active);
+    theatreIcon?.classList.toggle('fa-compress', active);
 
     if (theatreLabel instanceof HTMLElement && theatreTrigger instanceof HTMLElement) {
         theatreLabel.textContent = active
@@ -162,20 +166,111 @@ const bindRoot = (root) => {
     const { signal } = controller;
     let theatreActive = document.body.classList.contains('player-theatre-active')
         || root.hasAttribute('data-player-theatre-active');
+    let theatreFrame = null;
+    let theatreReturnPosition = null;
 
-    const setTheatre = (active) => {
-        theatreActive = active === true;
-        syncTheatreUi(root, theatreActive);
+    const cancelTheatreFrame = () => {
+        if (theatreFrame !== null) {
+            window.cancelAnimationFrame(theatreFrame);
+            theatreFrame = null;
+        }
     };
-    const cleanupTheatre = () => setTheatre(false);
+    const inNextTheatreFrame = (callback) => {
+        cancelTheatreFrame();
+        theatreFrame = window.requestAnimationFrame(() => {
+            theatreFrame = null;
+
+            if (root.isConnected) {
+                callback();
+            }
+        });
+    };
+    const focusTheatreTrigger = () => {
+        const theatreTrigger = theatreTriggerFor(root);
+
+        if (theatreTrigger instanceof HTMLElement) {
+            theatreTrigger.focus({ preventScroll: true });
+        }
+    };
+    const alignTheatreWorkspace = () => {
+        inNextTheatreFrame(() => {
+            const region = theatreRegionFor(root);
+            const targetTop = window.scrollY + region.getBoundingClientRect().top;
+
+            window.scrollTo({
+                left: window.scrollX,
+                top: Math.max(0, targetTop),
+                behavior: 'auto',
+            });
+        });
+    };
+    const restoreTheatrePosition = (focusTrigger) => {
+        const returnPosition = theatreReturnPosition;
+
+        theatreReturnPosition = null;
+
+        if (returnPosition === null) {
+            if (focusTrigger) {
+                focusTheatreTrigger();
+            }
+
+            return;
+        }
+
+        inNextTheatreFrame(() => {
+            window.scrollTo({
+                left: returnPosition.x,
+                top: returnPosition.y,
+                behavior: 'auto',
+            });
+
+            if (focusTrigger) {
+                focusTheatreTrigger();
+            }
+        });
+    };
+    const setTheatre = (active, { focusTrigger = false, restorePosition = true } = {}) => {
+        const nextActive = active === true;
+
+        if (nextActive === theatreActive) {
+            syncTheatreUi(root, theatreActive);
+
+            return;
+        }
+
+        if (nextActive) {
+            theatreReturnPosition = {
+                x: window.scrollX,
+                y: window.scrollY,
+            };
+        }
+
+        theatreActive = nextActive;
+        syncTheatreUi(root, theatreActive);
+
+        if (theatreActive) {
+            alignTheatreWorkspace();
+        } else if (restorePosition) {
+            restoreTheatrePosition(focusTrigger);
+        } else {
+            cancelTheatreFrame();
+            theatreReturnPosition = null;
+        }
+    };
+    const cleanupTheatre = () => {
+        cancelTheatreFrame();
+        theatreReturnPosition = null;
+        theatreActive = false;
+        syncTheatreUi(root, false);
+    };
 
     boundRoots.set(root, controller);
-    setTheatre(theatreActive);
+    syncTheatreUi(root, theatreActive);
     root.addEventListener('click', (event) => {
         const target = event.target instanceof Element ? event.target : null;
 
         if (target?.closest('[data-player-theatre-toggle]')) {
-            setTheatre(!theatreActive);
+            setTheatre(!theatreActive, { focusTrigger: theatreActive });
         }
     }, { signal });
     document.addEventListener('keydown', (event) => {
@@ -198,8 +293,7 @@ const bindRoot = (root) => {
         }
 
         event.preventDefault();
-        cleanupTheatre();
-        theatreTriggerFor(root)?.focus();
+        setTheatre(false, { focusTrigger: true });
     }, { signal });
     signal.addEventListener('abort', cleanupTheatre, { once: true });
     root.addEventListener('catalog-player-menu-page-request', (event) => {

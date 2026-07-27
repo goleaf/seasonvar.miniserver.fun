@@ -6,7 +6,7 @@
     data-player-workspace
     data-player-runtime-state="loading"
 >
-    <x-ui.panel :title="__('catalog.player.watch')" icon="fa-solid fa-circle-play">
+    <x-ui.panel data-player-stage-panel :title="__('catalog.player.watch')" icon="fa-solid fa-circle-play">
         <div data-player-context-bar class="-mx-4 -mt-4 mb-4 border-b border-slate-200 bg-slate-100 px-4 py-3 sm:-mx-5 sm:-mt-5 sm:px-5">
             <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                 <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold text-slate-700">
@@ -80,18 +80,19 @@
                         type="button"
                         data-player-theatre-toggle
                         aria-pressed="false"
+                        aria-controls="player"
                         data-label-expand="{{ __('catalog.player.theatre_expand') }}"
                         data-label-collapse="{{ __('catalog.player.theatre_collapse') }}"
                         class="inline-flex min-h-11 items-center gap-2 rounded-control border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-emerald-300 hover:text-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
                     >
-                        <x-ui.icon name="fa-solid fa-expand" />
+                        <x-ui.icon name="fa-solid fa-expand" data-player-theatre-icon />
                         <span data-player-theatre-label>{{ __('catalog.player.theatre_expand') }}</span>
                     </button>
                 </div>
             </div>
         </div>
 
-        <div class="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
+        <div data-player-theatre-secondary class="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
             <div class="min-w-0">
                 <div class="text-xs font-semibold text-emerald-700">{{ __('catalog.player.continue') }}</div>
                 <div class="mt-1 text-lg font-semibold text-slate-900">{{ $primaryAction->label }}</div>
@@ -337,7 +338,7 @@
                     </div>
 
                     @if ($showView->selectedMediaIsDirectFile)
-                        <div class="mt-3">
+                        <div data-player-theatre-secondary class="mt-3">
                             @if ($showView->selectedMediaDownloadUrl)
                                 <a
                                     href="{{ $showView->selectedMediaDownloadUrl }}"
@@ -372,7 +373,7 @@
                             @endif
                         </div>
                     @elseif ($showView->selectedMediaDownloadUnavailableReason)
-                        <div class="mt-3 inline-flex min-h-11 items-center gap-2 rounded-control bg-slate-100 px-4 py-3 text-sm font-bold text-slate-600">
+                        <div data-player-theatre-secondary class="mt-3 inline-flex min-h-11 items-center gap-2 rounded-control bg-slate-100 px-4 py-3 text-sm font-bold text-slate-600">
                             <x-ui.icon name="fa-solid fa-tower-broadcast" />
                             <span>{{ $showView->selectedMediaDownloadUnavailableReason }}</span>
                         </div>
@@ -567,11 +568,12 @@
 
     </x-ui.panel>
 
-    <x-ui.panel id="seasons" :title="__('catalog.player.seasons_and_episodes')" icon="fa-solid fa-layer-group" :pad="false" class="scroll-mt-40 sm:scroll-mt-44 lg:scroll-mt-48">
+    <x-ui.panel id="seasons" data-player-seasons-panel :title="__('catalog.player.seasons_and_episodes')" icon="fa-solid fa-layer-group" :pad="false" class="scroll-mt-40 sm:scroll-mt-44 lg:scroll-mt-48">
         <div class="relative">
             <div
                 wire:loading.delay.flex
                 wire:target="selectMedia"
+                data-player-seasons-loading
                 class="absolute inset-0 z-10 hidden items-start justify-center rounded-b-lg bg-white/80 p-4 text-center text-sm font-bold text-emerald-700 backdrop-blur-sm"
                 role="status"
             >
@@ -582,7 +584,7 @@
             </div>
 
             @if ($seasons->isNotEmpty())
-                <div class="border-b border-slate-200 p-3">
+                <div data-player-season-options class="border-b border-slate-200 p-3">
                     <nav class="flex flex-wrap gap-2 pb-1" aria-label="{{ __('catalog.player.available_seasons') }}">
                         @foreach ($seasons as $seasonOption)
                             <a
@@ -605,6 +607,7 @@
 
                 <div
                     @if ($activeSeason) id="season-{{ $activeSeason->id }}" @endif
+                    data-player-season-content
                     class="scroll-mt-40 p-4 sm:scroll-mt-44 lg:scroll-mt-48"
                 >
                     @if ($activeSeason)
@@ -623,6 +626,7 @@
                         @endif
                         <div
                             wire:key="season-episode-{{ $episodeOption->id }}"
+                            data-player-episode-option
                             @if ($selectedEpisode?->id === $episodeOption->id) aria-current="true" @endif
                             @class([
                                 'grid content-between gap-2 rounded-lg p-2 text-left text-sm leading-5 transition',

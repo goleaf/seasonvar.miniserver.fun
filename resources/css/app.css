@@ -963,6 +963,23 @@ body.player-theatre-active {
     background: var(--color-slate-950);
 }
 
+body.player-theatre-active :where(
+    [data-site-header],
+    [data-mobile-bottom-navigation],
+    [data-site-footer]
+) {
+    display: none;
+}
+
+body.player-theatre-active #main-content {
+    max-width: none;
+    padding-block: 0;
+}
+
+body.player-theatre-active [data-title-detail-workspace] {
+    min-block-size: var(--app-viewport-height);
+}
+
 body.player-theatre-active [data-title-detail-sidebar] {
     display: none;
 }
@@ -979,35 +996,105 @@ body.player-theatre-active [data-player-workspace-region] {
     width: 100vw;
     margin-inline: calc(50% - 50vw);
     background: var(--color-slate-950);
-    padding: clamp(0.75rem, 2vw, 2rem) max(0.75rem, calc((100vw - 96rem) / 2));
+    padding-block-start: max(clamp(0.75rem, 2vw, 2rem), var(--app-safe-top));
+    padding-inline-end: max(0.75rem, var(--app-safe-right), calc((100vw - 96rem) / 2));
+    padding-block-end: max(clamp(0.75rem, 2vw, 2rem), var(--app-safe-bottom));
+    padding-inline-start: max(0.75rem, var(--app-safe-left), calc((100vw - 96rem) / 2));
     color: var(--color-slate-100);
 }
 
-body.player-theatre-active [data-player-workspace] > [data-ui-panel]:first-child {
+body.player-theatre-active :where(
+    [data-player-stage-panel],
+    [data-player-seasons-panel]
+) {
     border-color: var(--color-slate-700);
     background: var(--color-slate-900);
 }
 
-body.player-theatre-active [data-player-workspace] > [data-ui-panel]:first-child > :where(div:first-child) {
+body.player-theatre-active :where(
+    [data-player-stage-panel],
+    [data-player-seasons-panel]
+) > :where(div:first-child) {
     border-color: var(--color-slate-700);
     background: var(--color-slate-900);
 }
 
-body.player-theatre-active [data-player-workspace] > [data-ui-panel]:first-child :where(h2, h3, [data-player-current-episode]) {
+body.player-theatre-active :where(
+    [data-player-stage-panel],
+    [data-player-seasons-panel]
+) > :where(div:first-child) > div > span:first-child {
+    background: var(--color-slate-800);
+    color: var(--color-emerald-400);
+}
+
+body.player-theatre-active [data-player-workspace] :where(h2, h3, [data-player-current-episode]) {
     color: var(--color-slate-100);
 }
 
-body.player-theatre-active [data-player-workspace] > [data-ui-panel]:first-child [data-player-context-bar] {
+body.player-theatre-active [data-player-context-bar] {
     border-color: var(--color-slate-700);
     background: var(--color-slate-800);
 }
 
-body.player-theatre-active [data-player-workspace] > [data-ui-panel]:first-child [data-player-context-bar] > div > div:first-child {
+body.player-theatre-active [data-player-context-bar] > div > div:first-child {
     color: var(--color-slate-200);
+}
+
+body.player-theatre-active [data-player-shell] {
+    width: 100%;
+    max-width: min(100%, calc((100vh - 10rem) * 16 / 9));
+    margin-inline: auto;
+}
+
+@supports (height: 100dvh) {
+    body.player-theatre-active [data-player-shell] {
+        max-width: min(100%, calc((100dvh - 10rem) * 16 / 9));
+    }
 }
 
 body.player-theatre-active [data-player-theatre-secondary] {
     display: none;
+}
+
+body.player-theatre-active [data-player-season-options] {
+    border-color: var(--color-slate-700);
+}
+
+body.player-theatre-active [data-player-season-options] a:not([aria-current='true']) {
+    background: var(--color-slate-800);
+    color: var(--color-slate-200);
+}
+
+body.player-theatre-active [data-player-season-options] a:not([aria-current='true']):hover {
+    background: var(--color-slate-700);
+    color: var(--color-white);
+}
+
+body.player-theatre-active [data-player-episode-option] {
+    background: var(--color-slate-800);
+    color: var(--color-slate-200);
+}
+
+body.player-theatre-active [data-player-episode-option][aria-current='true'] {
+    background: var(--color-emerald-950);
+    color: var(--color-emerald-100);
+}
+
+body.player-theatre-active [data-player-episode-option] :where(span) {
+    color: inherit;
+}
+
+body.player-theatre-active [data-player-episode-option] a:hover {
+    background: var(--color-slate-700);
+}
+
+body.player-theatre-active [data-player-episode-option][aria-current='true'] a:hover {
+    background: var(--color-emerald-900);
+}
+
+body.player-theatre-active [data-player-seasons-loading] {
+    background: color-mix(in oklab, var(--color-slate-950) 88%, transparent);
+    color: var(--color-emerald-300);
 }
 
 @media (max-width: 47.999rem) {
@@ -1034,7 +1121,8 @@ body.player-theatre-active [data-player-theatre-secondary] {
     }
 
     body.player-theatre-active [data-player-workspace-region] {
-        padding-inline: max(0.5rem, var(--app-safe-left), var(--app-safe-right));
+        padding-inline-end: max(0.5rem, var(--app-safe-right));
+        padding-inline-start: max(0.5rem, var(--app-safe-left));
     }
 }
 

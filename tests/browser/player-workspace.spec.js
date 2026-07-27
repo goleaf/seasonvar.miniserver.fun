@@ -14,14 +14,27 @@ test('player workspace keeps theatre mode scoped and keyboard reversible', async
 
     const video = page.locator('video.js-catalog-player');
     const theatre = page.locator('[data-player-theatre-toggle]');
+    const theatreIcon = theatre.locator('[data-player-theatre-icon]');
     const region = page.locator('[data-player-workspace-region]');
+    const seasonsPanel = page.locator('[data-player-seasons-panel]');
 
     await expect(video).toHaveAttribute('data-player-ready', '1');
     await expect(page.locator('[data-player-context-bar]')).toBeVisible();
+    const returnPosition = await page.evaluate(() => {
+        window.__playerTheatreVideo = document.querySelector('video.js-catalog-player');
+
+        return { x: window.scrollX, y: window.scrollY };
+    });
     await theatre.click();
     await expect(page.locator('body')).toHaveClass(/player-theatre-active/);
     await expect(theatre).toHaveAttribute('aria-pressed', 'true');
+    await expect(theatreIcon).toHaveClass(/fa-compress/);
+    await expect(theatre).toBeInViewport();
+    await expect(video).toBeInViewport();
     await expect(page.locator('[data-title-detail-sidebar]')).toBeHidden();
+    await expect(page.locator('[data-site-header]')).toBeHidden();
+    await expect(page.locator('[data-mobile-bottom-navigation]')).toBeHidden();
+    await expect(page.locator('[data-site-footer]')).toBeHidden();
 
     const theatreGeometry = await region.evaluate((element) => ({
         regionWidth: element.getBoundingClientRect().width,
@@ -31,6 +44,9 @@ test('player workspace keeps theatre mode scoped and keyboard reversible', async
 
     expect(Math.abs(theatreGeometry.regionWidth - theatreGeometry.viewportWidth)).toBeLessThanOrEqual(2);
     expect(theatreGeometry.overflow).toBeLessThanOrEqual(1);
+    expect(await seasonsPanel.evaluate(
+        (element) => getComputedStyle(element).backgroundColor,
+    )).not.toBe('rgb(255, 255, 255)');
 
     await page.evaluate(async () => {
         const root = document.querySelector('[data-active-player-session]');
@@ -45,6 +61,27 @@ test('player workspace keeps theatre mode scoped and keyboard reversible', async
     });
     await expect(theatre).toHaveAttribute('aria-pressed', 'true');
     await expect(theatre.locator('[data-player-theatre-label]')).toContainText(/Свернуть театр|Collapse theatre/);
+    expect(await page.evaluate(() => (
+        window.__playerTheatreVideo === document.querySelector('video.js-catalog-player')
+    ))).toBe(true);
+
+    await theatre.click();
+    await expect(page.locator('body')).not.toHaveClass(/player-theatre-active/);
+    await expect(theatre).toHaveAttribute('aria-pressed', 'false');
+    await expect(theatreIcon).toHaveClass(/fa-expand/);
+    await expect.poll(async () => page.evaluate(
+        ({ x, y }) => Math.max(Math.abs(window.scrollX - x), Math.abs(window.scrollY - y)),
+        returnPosition,
+    )).toBeLessThanOrEqual(2);
+    await expect(page.locator('[data-site-header]')).toBeVisible();
+    expect(await page.evaluate(() => (
+        window.__playerTheatreVideo === document.querySelector('video.js-catalog-player')
+    ))).toBe(true);
+
+    await theatre.click();
+    await expect(page.locator('body')).toHaveClass(/player-theatre-active/);
+    await expect(theatre).toBeInViewport();
+    await expect(video).toBeInViewport();
 
     await page.locator('[data-player-shortcuts-open]').click();
     await expect(page.locator('[data-player-shortcuts-dialog]')).toBeVisible();
@@ -56,6 +93,13 @@ test('player workspace keeps theatre mode scoped and keyboard reversible', async
     await expect(page.locator('body')).not.toHaveClass(/player-theatre-active/);
     await expect(theatre).toHaveAttribute('aria-pressed', 'false');
     await expect(theatre).toBeFocused();
+    await expect.poll(async () => page.evaluate(
+        ({ x, y }) => Math.max(Math.abs(window.scrollX - x), Math.abs(window.scrollY - y)),
+        returnPosition,
+    )).toBeLessThanOrEqual(2);
+    expect(await page.evaluate(() => (
+        window.__playerTheatreVideo === document.querySelector('video.js-catalog-player')
+    ))).toBe(true);
 });
 
 test('player recovery source action opens the existing translations menu', async ({ page }, testInfo) => {

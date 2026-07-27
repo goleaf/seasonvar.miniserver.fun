@@ -597,6 +597,14 @@ Article column ограничивает длину строки; `min-w-0`, wrap
   сезоны и основные controls остаются доступны. Это не новая тема портала,
   не fixed overlay и не отдельный scroll container. Повторное действие и
   `Escape` возвращают исходный document flow и focus.
+- При входе в theatre viewport после схлопывания layout обязательно
+  перепривязывается к workspace так, чтобы player и кнопка выхода были видимы.
+  При выходе восстанавливается точная прежняя позиция документа, а focus
+  возвращается без дополнительной прокрутки. Site header, footer и mobile
+  navigation скрываются только на время этого состояния.
+- Main и seasons panels образуют одну контрастную тёмную сцену. Player
+  ограничивается доступной высотой viewport в landscape, но video element
+  остаётся тем же DOM-узлом при входе, Livewire refresh и выходе.
 - В открытом dialog, native/Plyr fullscreen или системном fullscreen первый
   `Escape` принадлежит текущей модальности. Theatre закрывается только после
   неё; выход не разрушает media element, не сбрасывает прогресс и не хранится

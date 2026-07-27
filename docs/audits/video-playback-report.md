@@ -366,6 +366,40 @@ schema отсутствует, поэтому Task 104 не обещает WebVT
 menu и существующий report flow; raw URL/grant и global health mutation
 запрещены.
 
+## Task 112 — завершение theatre lifecycle
+
+Browser reproduction обнаружил, что прежний theatre скрывал большие секции,
+но оставлял старый `window.scrollY`: на `1440×1200` toggle уходил на
+`-252 px`, а на `390×844` — на `-777 px`. Поэтому формально активный режим
+открывал нижнюю часть страницы вместо player и кнопки выхода. RED contracts
+также подтвердили отсутствие icon marker и cancellable frame lifecycle.
+
+Исправление хранит исходную прокрутку только в памяти, после layout mutation
+привязывает viewport к workspace через один cancellable
+`requestAnimationFrame`, а при выходе сначала возвращает document flow, затем
+точные `scrollX`/`scrollY` и focus с `preventScroll`. Cleanup отменяет pending
+frame. Header, footer и mobile navigation скрываются только в theatre;
+main/seasons panels образуют общую тёмную сцену, а video ограничивается
+высотой landscape viewport. Один keyed `wire:ignore`, root
+`wire:ignore.self`, тот же `<video>`, progress, signed playback, routes,
+schema, cache, permissions и PWA media exclusions сохранены.
+
+GREEN evidence: focused PHPUnit — `4 tests`, `70 assertions`; связанный
+backend/security/player набор — `91 tests`, `1220 assertions`; default
+Playwright matrix — `8 passed`, `1 expected skip`; extended matrix desktop,
+mobile, tablet, narrow phone, phone/tablet landscape и TV-like —
+`19 passed`, `2 expected skips`; Chromium/Firefox player lifecycle —
+`16 passed`, `6 expected skips`. Финальный полный PHPUnit прошёл
+`2286 tests`, `2275 passed`, `11 expected skips` и `208335 assertions`.
+Vite собрал `28 modules`, release gate
+подтвердил `30 sources` и `19 assets` с source fingerprint
+`ad32cffb80a933a549898fe30268801bcd5456960aa802e87c407b8e0737ee92`.
+Screenshots desktop, mobile и landscape проверены визуально: toggle/player
+видимы, горизонтального переполнения и светлого разрыва seasons нет.
+Физическое устройство iOS и OS-owned native fullscreen остаются
+`unresolved_device` из прежней playback-матрицы; scoped theatre contract
+проверен responsive Chromium и desktop Firefox.
+
 ## Task 102 — verified formats и атомарный player release
 
 Task 102 закрепляет два release gates. Первый допускает новый media format
