@@ -10,7 +10,7 @@
 | Task 116: восстановление default-входа discovery | `completed: commit cc77728a; push unresolved authentication` | [Task 116 evidence](archive/2026-07-27-discovery-default-route-restoration-evidence.md) |
 | Task 117: восстановление публичных редакционных подборок | `completed: commit b2e97d80; push unresolved authentication` | [Evidence](archive/2026-07-27-public-editorial-collection-restoration-evidence.md) |
 | Task 118: адаптивная панель действий фильтров каталога | `completed: commit d6286c7c; push unresolved authentication` | [Evidence](archive/2026-07-27-catalog-filter-actions-evidence.md) |
-| Task 119: полный редизайн главной страницы | `in_progress: MCP audit completed; visual direction pending approval` | [Compliance matrix](task-119-homepage-redesign-compliance.md) |
+| Task 119: полный редизайн главной страницы | `in_progress: option 1 approved; implementation authorized in main` | [Compliance matrix](task-119-homepage-redesign-compliance.md) |
 
 ## Реестр blocked/unresolved
 
@@ -40,8 +40,8 @@
 | Task 118 implementation и verification | `completed` | [Evidence](archive/2026-07-27-catalog-filter-actions-evidence.md): RED/GREEN; focused `131` tests / `1 268` assertions; full pre-push `2 302` / `208 472`; Playwright `3/3` |
 | Task 119 requirements, versions и existing implementation | `completed` | Laravel Boost: PHP `8.5`, Laravel `13.22.0`, Livewire `4.3.3`, Tailwind `4.3.2`; routes, builder, cards, cache и tests inspected |
 | Task 119 desktop/mobile MCP audit | `completed` | Live `/` проверен на `1440×1200` и `390×844`; постеры homepage-карточек не являются ссылками, страница визуально плоская и чрезмерно длинная |
-| Task 119 design direction и approved specification | `in_progress` | Требуется один выбор интенсивности системных цветных поверхностей; после него оформляются design spec и implementation plan |
-| Task 119 implementation, verification и delivery | `unresolved` | Код не меняется до утверждения design spec; TDD, browser matrix, docs, commit и push запланированы |
+| Task 119 design direction и approved specification | `completed: option 1 approved` | [Design](../superpowers/specs/2026-07-27-homepage-visual-redesign-design.md) |
+| Task 119 implementation, verification и delivery | `in_progress` | Design approved; TDD начинается с кликабельных poster overlays, затем section composition, cache rotation и browser matrix |
 
 ## Последнее подтверждённое evidence
 
@@ -68,8 +68,8 @@
 | critical | Requirements, versions и repository audit | `completed` | Обязательные owners, прежние Task 94/103/111 specs, Laravel Boost docs и установленный stack проверены |
 | critical | Desktop/mobile MCP audit | `completed` | Live `/`: `1440×1200`, `390×844`, accessibility snapshots, screenshots и console log |
 | high | Полный census домашних ссылок и interaction boundaries | `in_progress` | Проверены `home`, `spotlight`, `trend`, latest-media и continue-watching; collection/account/facet actions сохраняются отдельными controls |
-| high | Визуальное направление и design specification | `pending user approval` | Выбор касается интенсивности `emerald/sky/amber/red/slate` tint-поверхностей без dark theme, gradients или случайной палитры |
-| high | Detailed TDD implementation plan | `pending approved design` | Будет создан после письменного утверждения design spec |
+| high | Визуальное направление и design specification | `completed: option 1 approved` | [Design](../superpowers/specs/2026-07-27-homepage-visual-redesign-design.md) |
+| high | Detailed TDD implementation plan | `completed` | [Implementation plan](../superpowers/plans/2026-07-27-homepage-visual-redesign.md) |
 | critical | Кликабельные изображения и карточки | `pending` | Использовать существующий whole-card overlay pattern с сохранением отдельных CTA, taxonomy links, focus order и без nested anchors |
 | high | Новая композиция и системный цвет | `pending` | Секции получают различимый ритм, ограниченные semantic tints и более короткую mobile presentation без скрытия обязательного content contract |
 | critical | Cache/release compatibility | `pending` | Оценить bump homepage `response_contract=2`, Vite build, stale response recovery и ordinary rollback без data restore |

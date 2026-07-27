@@ -2,9 +2,9 @@
 
 Обновлено: 27.07.2026.
 
-Статус: `planning_in_progress`. MCP-аудит и repository census выполнены;
-визуальное направление ожидает утверждения пользователя. Реализация не
-начата.
+Статус: `implementation_authorized`. MCP-аудит и repository census
+выполнены; пользователь утвердил рекомендованный вариант 1 и разрешил
+реализацию только в существующей `main`.
 
 ## Цель
 
@@ -39,7 +39,7 @@
 | Existing architecture до замены | `completed` | Livewire page, builder, card components, cache policy и соседние tests inspected |
 | Laravel 13 / Livewire 4 / Tailwind 4 | `already_compliant` | Версии подтверждены Laravel Boost; package update не требуется |
 | Full-page Livewire route boundary | `already_compliant` | `home` и `localized.home` сохраняются |
-| Светлая тема и системная палитра | `in_progress` | Допустимы semantic tints `emerald`, `sky`, `amber`, `red`, `slate`; dark theme, gradients и случайные цвета исключены |
+| Светлая тема и системная палитра | `completed: design approved` | Amber отделяет trend, sky — updates, emerald — watch/personal return, slate — neutral; red остаётся error-only |
 | Кликабельность постеров | `pending` | Планируется additive whole-card overlay без nested anchors и перехвата вторичных controls |
 | Mobile-first, touch, keyboard и focus | `pending` | Обязательны 44px essential controls, visible `focus-visible`, no page overflow, keyboard path и zoom |
 | Guest/auth section order Task 94 | `already_compliant` | Порядок остаётся server-rendered и не переставляется CSS/JS |
