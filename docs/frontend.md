@@ -530,6 +530,14 @@ JavaScript. Filter apply/cancel, sort, alphabet, view и page size исполь�
 существующие Livewire loading targets, не допускают двойного submit и не
 добавляют frontend dependency.
 
+Панель apply/cancel/reset не переключается в горизонтальный ряд по viewport:
+в узкой desktop sidebar и compact page-flow это один полноширинный
+вертикальный stack. Динамический result count переносится внутри primary CTA,
+а `data-catalog-filter-submit-label`, `data-catalog-filter-cancel`,
+`applyFilters` и `resetAll` остаются совместимыми с существующим
+Livewire/mobile runtime. Контракт проверяется при `320 px`, mobile и desktop:
+44 px touch targets, keyboard focus и отсутствие page overflow.
+
 ## Frontend lifecycle качества подборок Task 101
 
 Public card и detail получают готовый current score из

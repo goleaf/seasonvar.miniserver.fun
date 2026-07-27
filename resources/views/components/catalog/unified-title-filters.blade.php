@@ -190,18 +190,18 @@
             <x-catalog.alphabet-filter :filter-view="$filterView" mobile class="mt-2 border-t border-slate-200 pt-3" />
         </details>
 
-        <div class="flex flex-col gap-2 border-t border-slate-200 pt-4 sm:flex-row sm:items-center">
-            <button type="submit" wire:loading.attr="disabled" wire:target="applyFilters" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2 text-sm font-bold text-white transition hover:bg-emerald-800 disabled:cursor-wait disabled:opacity-60">
-                <x-ui.icon name="fa-solid fa-filter" />
-                <span data-catalog-filter-submit-label>{{ __('catalog.catalog.exact_filters.show_results') }}</span>
+        <div data-catalog-filter-actions class="grid min-w-0 grid-cols-1 gap-2 border-t border-slate-200 pt-4">
+            <button type="submit" wire:loading.attr="disabled" wire:target="applyFilters" class="inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 disabled:cursor-wait disabled:opacity-60">
+                <x-ui.icon name="fa-solid fa-filter shrink-0" />
+                <span data-catalog-filter-submit-label class="min-w-0 break-words text-center leading-5">{{ __('catalog.catalog.exact_filters.show_results') }}</span>
             </button>
-            <button type="button" data-catalog-filter-cancel class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-100">
-                <x-ui.icon name="fa-solid fa-xmark" />
-                <span>{{ __('catalog.catalog.exact_filters.cancel') }}</span>
+            <button type="button" data-catalog-filter-cancel class="inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-2 rounded-control border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
+                <x-ui.icon name="fa-solid fa-xmark shrink-0" />
+                <span class="min-w-0 break-words text-center leading-5">{{ __('catalog.catalog.exact_filters.cancel') }}</span>
             </button>
-            <a href="{{ route('titles.index') }}" rel="nofollow" wire:click.prevent="resetAll" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control px-3 py-2 text-sm font-bold text-slate-600 transition hover:bg-emerald-50 hover:text-emerald-800">
-                <x-ui.icon name="fa-solid fa-rotate-left" />
-                <span>{{ __('catalog.catalog.exact_filters.reset') }}</span>
+            <a href="{{ route('titles.index') }}" rel="nofollow" wire:click.prevent="resetAll" class="inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-2 rounded-control px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-emerald-50 hover:text-emerald-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
+                <x-ui.icon name="fa-solid fa-rotate-left shrink-0" />
+                <span class="min-w-0 break-words text-center leading-5">{{ __('catalog.catalog.exact_filters.reset') }}</span>
             </a>
         </div>
     </form>

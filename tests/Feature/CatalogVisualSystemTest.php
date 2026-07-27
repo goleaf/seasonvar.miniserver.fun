@@ -797,6 +797,37 @@ class CatalogVisualSystemTest extends TestCase
         }
     }
 
+    public function test_catalog_filter_actions_are_a_vertical_full_width_stack(): void
+    {
+        $template = file_get_contents(
+            resource_path('views/components/catalog/unified-title-filters.blade.php'),
+        );
+
+        $this->assertIsString($template);
+
+        $matched = preg_match(
+            '/<div(?=[^>]*data-catalog-filter-actions)[^>]*>(.*?)<\/div>\s*<\/form>/s',
+            $template,
+            $actions,
+        );
+
+        $this->assertSame(1, $matched);
+        $this->assertStringContainsString(
+            'grid min-w-0 grid-cols-1 gap-2',
+            $actions[0],
+        );
+        $this->assertStringNotContainsString('sm:flex-row', $actions[0]);
+        $this->assertSame(3, substr_count($actions[1], 'w-full'));
+        $this->assertSame(3, substr_count($actions[1], 'break-words'));
+        $this->assertSame(3, substr_count($actions[1], 'focus-visible:ring-4'));
+        $this->assertStringContainsString('wire:target="applyFilters"', $actions[1]);
+        $this->assertStringContainsString('data-catalog-filter-cancel', $actions[1]);
+        $this->assertStringContainsString(
+            'wire:click.prevent="resetAll"',
+            $actions[1],
+        );
+    }
+
     public function test_advanced_filter_get_fallback_preserves_the_active_letter(): void
     {
         CatalogTitle::factory()->create();

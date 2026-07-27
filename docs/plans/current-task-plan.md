@@ -9,7 +9,7 @@
 | Task 115: заметные карточки персональных рекомендаций | `completed: commit cc77728a; push unresolved authentication` | [Task 115 evidence](archive/2026-07-27-personalized-series-cards-evidence.md) |
 | Task 116: восстановление default-входа discovery | `completed: commit cc77728a; push unresolved authentication` | [Task 116 evidence](archive/2026-07-27-discovery-default-route-restoration-evidence.md) |
 | Task 117: восстановление публичных редакционных подборок | `completed: commit b2e97d80; push unresolved authentication` | [Evidence](archive/2026-07-27-public-editorial-collection-restoration-evidence.md) |
-| Task 118: адаптивная панель действий фильтров каталога | `in_progress: design approved; implementation pending` | [Design](../superpowers/specs/2026-07-27-catalog-filter-actions-design.md) |
+| Task 118: адаптивная панель действий фильтров каталога | `in_progress: implementation verified; delivery pending` | [Design](../superpowers/specs/2026-07-27-catalog-filter-actions-design.md) |
 
 ## Реестр blocked/unresolved
 
@@ -35,7 +35,7 @@
 | Task 117 root cause и canonical recovery contract | `completed` | 501 строка сохранена; exact allowlist ограничен 10 проверенными source collections |
 | Task 117 implementation и production apply | `completed` | 10 restored/listed; verified backup, quarantine и live integrity checks |
 | Task 118 root cause и утверждённая компоновка | `completed` | `18rem` sidebar конфликтует с `sm:flex-row`; пользователь выбрал три полноширинных действия |
-| Task 118 implementation и verification | `unresolved` | Ожидает RED/GREEN, build и desktop/mobile Playwright |
+| Task 118 implementation и verification | `completed` | RED/GREEN; `131` PHPUnit tests / `1 268` assertions; Vite build; Playwright `3/3` |
 
 ## Последнее подтверждённое evidence
 
@@ -59,8 +59,8 @@ Livewire/GET filter contract: основной CTA и два служебных 
 | critical | Requirements, versions и root-cause audit | `completed` | Laravel `13.22.0`, Tailwind `4.3.2`; `18rem` sidebar + `sm:flex-row` |
 | high | Visual direction и design-spec | `completed: option 1 approved` | [Design](../superpowers/specs/2026-07-27-catalog-filter-actions-design.md) |
 | high | TDD implementation plan | `completed` | [Detailed plan](../superpowers/plans/2026-07-27-catalog-filter-actions.md) |
-| high | Blade implementation и focused verification | `pending` | PHPUnit, Vite и Playwright desktop/phone |
-| medium | Canonical docs, README, CHANGELOG и archive evidence | `pending` | Обновляются после GREEN |
+| high | Blade implementation и focused verification | `completed` | RED/GREEN; `131` PHPUnit tests / `1 268` assertions; Vite build; Playwright `3/3` |
+| medium | Canonical docs, README, CHANGELOG и archive evidence | `in_progress: canonical docs updated` | Archive evidence после финальных gates |
 | critical | Exact commit и push in `main` | `pending` | Посторонние dependency/debugbar изменения исключаются |
 
 Task 118 не меняет migrations, routes, query semantics, API, translations,

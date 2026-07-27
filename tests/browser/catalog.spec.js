@@ -238,6 +238,93 @@ test('catalog keeps URL state, unified filters and responsive geometry', async (
     expect(browserErrors.pageErrors).toEqual([]);
 });
 
+test('catalog filter action stack contains a long result label at every viewport', async ({
+    page,
+    baseURL,
+}, testInfo) => {
+    const browserErrors = await installNetworkGuard(page, baseURL);
+
+    if (testInfo.project.name === 'Narrow Phone Chromium') {
+        await page.setViewportSize({ width: 320, height: 568 });
+    }
+
+    await page.goto('/titles');
+
+    const filters = page.locator('#catalog-filters');
+
+    if (page.viewportSize().width < 1024) {
+        await page.locator('[data-catalog-mobile-filter-trigger]').click();
+        await expect(filters).toHaveAttribute('open', '');
+    } else {
+        await expect(filters.locator('form')).toBeVisible();
+    }
+
+    await expect(page.locator('[data-catalog-filter-groups]')).toBeVisible();
+
+    const actions = filters.locator('[data-catalog-filter-actions]');
+    const submit = actions.locator('button[type="submit"]');
+    const cancel = actions.locator('[data-catalog-filter-cancel]');
+    const reset = actions.getByRole('link', { name: 'Сбросить фильтры' });
+
+    await expect(actions).toBeVisible();
+    await actions.scrollIntoViewIfNeeded();
+    await actions.locator('[data-catalog-filter-submit-label]').evaluate((label) => {
+        label.textContent = 'Показать 33 005 сериалов';
+    });
+
+    const geometry = await actions.evaluate((container) => {
+        const containerBox = container.getBoundingClientRect();
+        const controls = [...container.querySelectorAll(':scope > button, :scope > a')]
+            .map((control) => {
+                const box = control.getBoundingClientRect();
+
+                return {
+                    bottom: box.bottom,
+                    height: box.height,
+                    left: box.left,
+                    right: box.right,
+                    top: box.top,
+                    width: box.width,
+                };
+            });
+
+        return {
+            container: {
+                left: containerBox.left,
+                right: containerBox.right,
+                width: containerBox.width,
+            },
+            controls,
+            pageOverflow: document.documentElement.scrollWidth - window.innerWidth,
+        };
+    });
+
+    expect(geometry.controls).toHaveLength(3);
+
+    for (const control of geometry.controls) {
+        expect(control.height).toBeGreaterThanOrEqual(44);
+        expect(control.left).toBeGreaterThanOrEqual(geometry.container.left - 1);
+        expect(control.right).toBeLessThanOrEqual(geometry.container.right + 1);
+        expect(control.width).toBeGreaterThanOrEqual(geometry.container.width - 1);
+    }
+
+    for (let index = 1; index < geometry.controls.length; index += 1) {
+        expect(geometry.controls[index].top)
+            .toBeGreaterThanOrEqual(geometry.controls[index - 1].bottom);
+    }
+
+    expect(geometry.pageOverflow).toBeLessThanOrEqual(1);
+
+    for (const control of [submit, cancel, reset]) {
+        await control.focus();
+        await expect(control).toBeFocused();
+    }
+
+    expect(browserErrors.localAssetFailures).toEqual([]);
+    expect(browserErrors.consoleErrors).toEqual([]);
+    expect(browserErrors.pageErrors).toEqual([]);
+});
+
 test('authenticated catalog card actions work by keyboard and remain available on touch', async ({ page, baseURL }, testInfo) => {
     const browserErrors = await installNetworkGuard(page, baseURL);
 
