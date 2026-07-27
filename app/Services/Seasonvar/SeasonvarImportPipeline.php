@@ -6,6 +6,7 @@ namespace App\Services\Seasonvar;
 
 use App\Enums\SeasonvarImportFinalizationStage;
 use App\Enums\SeasonvarImportStatus;
+use App\Jobs\RebuildCatalogRecommendations;
 use App\Models\CatalogTitle;
 use App\Models\Season;
 use App\Models\SeasonvarImportRun;
@@ -63,6 +64,7 @@ class SeasonvarImportPipeline
         bool $forceMediaSizes = false,
         ?int $mediaSizeLimit = null,
         ?int $mediaSizeTimeBudgetSeconds = null,
+        bool $queueRecommendations = false,
     ): SeasonvarImportRun {
         $run = $reservedRun ?? SeasonvarImportRun::query()->create([
             'mode' => $argument === null ? 'sitemap' : 'url',
@@ -121,6 +123,7 @@ class SeasonvarImportPipeline
                     $forceMediaSizes,
                     $mediaSizeLimit,
                     $mediaSizeTimeBudgetSeconds,
+                    $queueRecommendations,
                 );
                 $run->refresh();
 
@@ -334,6 +337,7 @@ class SeasonvarImportPipeline
         bool $forceMediaSizes,
         ?int $mediaSizeLimit,
         ?int $mediaSizeTimeBudgetSeconds,
+        bool $queueRecommendations,
     ): void {
         $progress('seasonvar-import-cycle-started', [
             'cycle' => $cycle,
@@ -462,7 +466,9 @@ class SeasonvarImportPipeline
             return;
         }
 
-        $recommendationResult = $this->maintenance->rebuildRecommendations($progress);
+        $recommendationResult = $queueRecommendations
+            ? $this->queueFullRecommendationRebuild($progress)
+            : $this->maintenance->rebuildRecommendations($progress);
         $recommendationSignalPruneResult = $this->maintenance->pruneRecommendationSignals(
             $recommendationResult,
             $progress,
@@ -524,6 +530,27 @@ class SeasonvarImportPipeline
             'recommendations_duration_ms' => $recommendationResult['duration_ms'],
             'recommendation_signals_pruned' => $recommendationSignalPruneResult['deleted'],
         ]);
+    }
+
+    /** @param callable(string, array<string, mixed>): void $progress */
+    private function queueFullRecommendationRebuild(callable $progress): array
+    {
+        RebuildCatalogRecommendations::dispatch();
+
+        $result = [
+            'queued' => true,
+            'deferred' => true,
+            'activated' => false,
+            'gate_passed' => false,
+            'algorithm_version' => null,
+            'titles' => 0,
+            'titles_without_recommendations' => 0,
+            'stored' => 0,
+            'duration_ms' => 0,
+        ];
+        $progress('catalog-recommendations-queued-for-worker', $result);
+
+        return $result;
     }
 
     /**

@@ -245,6 +245,8 @@ return [
         'backfill_page_limit' => (int) env('SEASONVAR_PROVIDER_AVAILABILITY_BACKFILL_PAGE_LIMIT', 2000),
     ],
     'recommendations' => [
+        'worker_timeout' => (int) env('SEASONVAR_RECOMMENDATION_WORKER_TIMEOUT', 840),
+        'unique_seconds' => (int) env('SEASONVAR_RECOMMENDATION_WORKER_UNIQUE_SECONDS', 172800),
         'chunk_size' => (int) env('SEASONVAR_RECOMMENDATION_CHUNK_SIZE', 100),
         'min_score' => (int) env('SEASONVAR_RECOMMENDATION_MIN_SCORE', 600),
         'max_per_title' => (int) env('SEASONVAR_RECOMMENDATION_MAX_PER_TITLE', 12),

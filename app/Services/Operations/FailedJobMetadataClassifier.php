@@ -16,6 +16,7 @@ final class FailedJobMetadataClassifier
         'App\\Jobs\\ImportSeasonvarSourcePage' => 'import_source_page',
         'App\\Jobs\\PrepareSeasonvarImportTitlePage' => 'prepare_title_page',
         'App\\Jobs\\ProcessSeasonvarImportPage' => 'import_page',
+        'App\\Jobs\\RebuildCatalogRecommendations' => 'rebuild_catalog_recommendations',
         'App\\Jobs\\RefreshSeasonvarCatalogTitle' => 'refresh_catalog_title',
         'App\\Jobs\\RunSeasonvarImport' => 'run_import',
         'App\\Jobs\\StartSeasonvarQueuedImport' => 'start_import',

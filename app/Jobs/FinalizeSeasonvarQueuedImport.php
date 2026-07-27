@@ -134,6 +134,13 @@ class FinalizeSeasonvarQueuedImport implements ShouldBeUniqueUntilProcessing, Sh
                 app(SeasonvarImportFinalizationDispatcher::class)
                     ->signalGlobalRun($run);
             } else {
+                $summary = array_key_exists('summary', $run->getAttributes())
+                    ? $run->summary
+                    : null;
+
+                if (data_get($summary, 'last_recommendations.deferred') === true) {
+                    RebuildCatalogRecommendations::dispatch();
+                }
                 $cacheInvalidator->catalogChanged();
             }
         } finally {

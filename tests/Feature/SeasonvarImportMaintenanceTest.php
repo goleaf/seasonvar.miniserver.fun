@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\DTOs\MediaHealthCheckResultData;
+use App\Jobs\RebuildCatalogRecommendations;
 use App\Models\Actor;
 use App\Models\CatalogRelationSourceIdentity;
 use App\Models\CatalogTitle;
@@ -37,6 +38,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class SeasonvarImportMaintenanceTest extends TestCase
@@ -564,6 +566,7 @@ class SeasonvarImportMaintenanceTest extends TestCase
     public function test_it_rebuilds_catalog_title_recommendations_after_import_cycle(): void
     {
         Http::preventStrayRequests();
+        Queue::fake();
         config([
             'seasonvar.media_check.enabled' => false,
             'seasonvar.recommendations.min_score' => 600,
@@ -629,27 +632,16 @@ class SeasonvarImportMaintenanceTest extends TestCase
         $this->artisan('seasonvar:import', ['--no-discovery' => true])
             ->assertExitCode(0);
 
-        $recommendation = CatalogTitleRecommendation::query()
-            ->where('catalog_title_id', $catalogTitle->id)
-            ->where('recommended_title_id', $recommendedTitle->id)
-            ->first();
         $run = SeasonvarImportRun::query()->latest('id')->firstOrFail();
 
-        $this->assertNotNull($recommendation);
-        $this->assertSame(1, $recommendation->rank);
-        $this->assertSame('v6', $recommendation->algorithm_version);
-        $this->assertSame('full', $run->summary['last_recommendations']['mode']);
-        $this->assertSame('v6', $run->summary['last_recommendations']['algorithm_version']);
-        $this->assertSame(2, $run->summary['last_recommendations']['titles']);
-        $this->assertSame(1, $run->summary['last_recommendations']['titles_with_recommendations']);
-        $this->assertSame(1, $run->summary['last_recommendations']['titles_without_recommendations']);
-        $this->assertSame(12, $run->summary['last_recommendations']['max_per_title']);
-        $this->assertGreaterThan(0, $run->summary['last_recommendations']['stored']);
-        $this->assertGreaterThanOrEqual(0, $run->summary['last_recommendations']['duration_ms']);
-        $this->assertTrue($run->summary['last_recommendation_signal_prune']['executed']);
-        $this->assertSame(1, $run->summary['last_recommendation_signal_prune']['checked']);
-        $this->assertSame(1, $run->summary['last_recommendation_signal_prune']['deleted']);
-        $this->assertDatabaseMissing('catalog_title_recommendation_signals', [
+        $this->assertNull(CatalogTitleRecommendation::query()
+            ->where('catalog_title_id', $catalogTitle->id)
+            ->where('recommended_title_id', $recommendedTitle->id)
+            ->first());
+        $this->assertTrue($run->summary['last_recommendations']['queued']);
+        $this->assertTrue($run->summary['last_recommendations']['deferred']);
+        Queue::assertPushed(RebuildCatalogRecommendations::class, 1);
+        $this->assertDatabaseHas('catalog_title_recommendation_signals', [
             'catalog_title_id' => $catalogTitle->id,
             'source' => 'seasonvar_info',
             'signal_type' => 'taxonomy_genre',

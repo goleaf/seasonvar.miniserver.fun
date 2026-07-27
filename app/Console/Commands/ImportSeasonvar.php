@@ -196,6 +196,7 @@ class ImportSeasonvar extends Command
                 forceMediaSizes: (bool) $this->option('force-media-sizes'),
                 mediaSizeLimit: $this->mediaSizeLimit(),
                 mediaSizeTimeBudgetSeconds: $this->mediaSizeTimeBudgetSeconds(),
+                queueRecommendations: $this->argument('url') === null,
             );
 
             if (! $refreshMediaSizes) {

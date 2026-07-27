@@ -275,3 +275,58 @@ release unit и rebuild без data restore.
 - [Design](../superpowers/specs/2026-07-27-player-theatre-video-first-design.md)
 - [Implementation plan](../superpowers/plans/2026-07-27-player-theatre-video-first.md)
 - [Compliance matrix](task-114-player-theatre-video-first-compliance.md)
+
+## Task 120 — полный пересчёт рекомендаций в worker и снижение 502
+
+**Status:** `completed — commit on main; push unresolved (GitHub HTTPS credentials unavailable)`
+
+### Scope и root cause
+
+Production evidence 27.07.2026: `/library` получает repeated nginx `502` после
+100-секундного PHP-FPM timeout, пока synchronous `seasonvar:import` держит
+SQLite writer/load. Laravel log также фиксирует `128M` OOM в
+`CatalogRecommendationCandidateGenerator`/`CatalogTitleRecommendationBuilder`.
+Существующий queued finalizer намеренно deferred full fallback, поэтому общий
+v6 rebuild не попадал в worker.
+
+### Approved implementation
+
+1. `RebuildCatalogRecommendations` — unique Redis job на существующей очереди
+   `seasonvar-import`, active-import release, overlap lock, timeout ниже
+   `retry_after`, full shadow rebuild и cache warm после activation.
+2. Public synchronous command передаёт pipeline explicit `queueRecommendations`
+   handoff; pipeline по умолчанию сохраняет прежний direct-maintenance contract.
+3. Queued finalizer dispatches тот же full job после deferred stage.
+4. Active recommendations остаются до успешной shadow activation; scoped
+   collection job и персональное user-state reranking не меняются.
+
+### Expected paths/contracts
+
+`app/Jobs/RebuildCatalogRecommendations.php`, `app/Jobs/FinalizeSeasonvarQueuedImport.php`,
+`app/Services/Seasonvar/SeasonvarImportPipeline.php`,
+`app/Console/Commands/ImportSeasonvar.php`, `config/seasonvar.php`, focused
+queue/import tests, recommendation/queue/import/performance docs,
+`README.md`, `CHANGELOG.md` and this registry. Routes, schema, API shape,
+translations, permissions and cache key formats remain compatible.
+
+### Compliance matrix
+
+| Requirement | Status | Evidence |
+| --- | --- | --- |
+| Canonical requirements and versions reread | `completed` | `AGENTS.md`, `docs/requirements/index.md`, owners and Laravel Boost app info |
+| Production/maintenance impact, rollback and worker limits | `completed` | `docs/requirements/production-operations.md`, `maintenance-and-upgrades.md`, design |
+| Recommendation architecture and active-shadow safety | `completed` | recommendation v3 spec, existing builder/activator, design |
+| Queue retry/timeout boundary | `completed` | existing `retry_after=1200`, job timeout planned `840` |
+| Test-first implementation | `completed` | RED missing job, GREEN focused `105` tests / `653` assertions |
+| README/technical docs/changelog | `completed` | README, importer/queue/performance docs, design/plan and Russian CHANGELOG updated |
+| Full PHPUnit and Pint | `completed` | `2307` tests, `208533` assertions, `11` skipped; focused suite and Pint green |
+| aaPanel cron switched from sync to `--queued` | `unresolved` | external `/www/server/cron/*` file is outside application scope |
+| nginx systemd health | `unresolved` | aaPanel reports failed unit while live nginx workers serve traffic |
+| Commit and remote delivery | `unresolved` | Commit is on `main`; `git push origin main` requested unavailable GitHub username |
+
+**Protected contracts:** `seasonvar:import`, queued run state/finalization,
+active recommendation rows, `WarmCatalogCaches`, public personalized ranking,
+library authorization and cache separation. No migration or dependency update.
+
+**Detailed design/plan:** [design](../superpowers/specs/2026-07-27-recommendation-worker-design.md),
+[plan](../superpowers/plans/2026-07-27-recommendation-worker.md).
