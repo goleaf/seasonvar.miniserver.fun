@@ -8,7 +8,7 @@
 | Task 114: video-first режим «Театр» | `completed: commit cc77728a; push unresolved authentication` | [Task 114 evidence](archive/2026-07-27-player-theatre-video-first-evidence.md) |
 | Task 115: заметные карточки персональных рекомендаций | `completed: commit cc77728a; push unresolved authentication` | [Task 115 evidence](archive/2026-07-27-personalized-series-cards-evidence.md) |
 | Task 116: восстановление default-входа discovery | `completed: commit cc77728a; push unresolved authentication` | [Task 116 evidence](archive/2026-07-27-discovery-default-route-restoration-evidence.md) |
-| Task 117: восстановление публичных редакционных подборок | `in_progress: implementation/production complete; delivery pending` | [Evidence](archive/2026-07-27-public-editorial-collection-restoration-evidence.md) |
+| Task 117: восстановление публичных редакционных подборок | `completed: commit b2e97d80; push unresolved authentication` | [Evidence](archive/2026-07-27-public-editorial-collection-restoration-evidence.md) |
 
 ## Реестр blocked/unresolved
 
@@ -16,7 +16,7 @@
 | --- | --- | --- |
 | Task 115 inherited browser gate | `unresolved` | Старый PWA poster fixture даёт `404`; focused Task 115 gates прошли |
 | Task 117 inherited PWA browser signal | `unresolved` | Existing `/service-worker.js` возвращает `404`; collection page/local requests проходят |
-| Remote delivery Tasks 113–116 | `unresolved` | `composer.lock` был адресно сохранён и восстановлен без изменения; push дошёл до GitHub HTTPS username prompt, credential helper отсутствует, данные не отправлены |
+| Remote delivery Tasks 113–117 | `unresolved` | Посторонние изменения были адресно сохранены и точно восстановлены; push дошёл до GitHub HTTPS username prompt, credential helper отсутствует, данные не отправлены |
 
 ## Task-specific compliance matrix
 
@@ -56,7 +56,7 @@
 | high | TDD recovery service/command | `completed` | 176 тестов / 1 258 утверждений; Pint, focused PHPStan, Rector |
 | critical | Production backup/writer-safe apply | `completed` | Backup 31 423 373 312 bytes; restore 10; quarantine 897+44; quick/FK green |
 | high | Directory/category/browser verification | `completed` | HTTP 200; 10 cards; 5 roots/31 children; desktop/mobile no overflow |
-| critical | Commit и push в `main` | `pending` | После полного review exact scope |
+| critical | Commit и push в `main` | `unresolved: commit b2e97d80; push authentication` | Exact scope committed; GitHub запросил отсутствующий HTTPS username |
 
 Task 117 не меняет migrations, routes, API shape, sitemap format,
 translations, packages, permissions или cache keys. Data scope ограничен

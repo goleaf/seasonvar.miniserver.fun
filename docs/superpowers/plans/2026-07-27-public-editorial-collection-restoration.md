@@ -44,8 +44,12 @@ Design:
 - [x] Desktop/mobile browser QA `/discover/popular#collections`.
 - [x] Обновить canonical docs, README, CHANGELOG, compliance и archive
   evidence.
-- [ ] Проверить exact staged paths/index, commit в `main` и push; внешний
+- [x] Проверить exact staged paths/index, commit в `main` и push; внешний
   отказ фиксировать как `unresolved`.
+
+Implementation commit: `b2e97d80`. Push дошёл до GitHub HTTPS username
+prompt и зафиксирован как `unresolved`, потому что credential helper
+отсутствует. Посторонние изменения восстановлены точным binary patch.
 
 ## Ожидаемые изменяемые файлы
 

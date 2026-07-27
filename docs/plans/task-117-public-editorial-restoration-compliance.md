@@ -15,4 +15,4 @@
 | Tests/static/browser | `completed` | 2 301 tests / 208 462 assertions; build/static checks; production desktop/mobile: 10 cards, 5/31 tree, no overflow |
 | PWA/browser infrastructure | `unresolved` | Существующий `/service-worker.js` отвечает `404` и даёт один console error; collection local requests/page errors отсутствуют |
 | README/CHANGELOG/docs | `completed` | Canonical docs, visitor history, changelog, maintenance и archive evidence обновлены |
-| Commit/push в `main` | `pending` | Delivery только после verification |
+| Commit/push в `main` | `unresolved` | Implementation commit `b2e97d80`; push остановлен отсутствующим HTTPS credential helper |

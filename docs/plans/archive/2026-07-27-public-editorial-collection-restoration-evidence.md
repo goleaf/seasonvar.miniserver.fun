@@ -117,3 +117,13 @@ Rollback при data error — только проверенный private SQLit
 остановленных writers. Альтернатива — авторизованный exact roll-forward в
 `private + archived`. Broad SQL, hard delete, migration rollback, queue
 clear и global cache flush не применялись.
+
+## Delivery
+
+Exact implementation scope зафиксирован в `main` commit `b2e97d80`.
+Посторонние изменения `composer.lock` и mode
+`storage/debugbar/.gitignore` не вошли в commit, перед push были сохранены
+private binary patch и после остановки HTTPS username prompt восстановлены
+с точным совпадением. Push в `origin/main` остаётся `unresolved`: configured
+HTTPS remote не имеет credential helper, секреты и remote configuration не
+изменялись.
