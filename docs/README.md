@@ -1,6 +1,6 @@
 # Карта документации проекта
 
-Обновлено: 27.07.2026
+Обновлено: 30.07.2026
 
 Этот файл — единый индекс проектной документации. У каждого контракта есть один основной файл-владелец; остальные документы должны ссылаться на него, а не копировать длинные правила. `README.md` остаётся точкой входа и содержит простую историю обновлений для посетителей, `AGENTS.md` — только обязательные инструкции для агентов, а подробный технический журнал ведётся в `CHANGELOG.md`.
 
@@ -12,6 +12,7 @@
 | --- | --- | --- |
 | Обзор и быстрый старт | [`README.md`](../README.md) | Назначение проекта, возможности, основные команды, дорожная карта и простая история обновлений для посетителей. |
 | Канонический порядок требований | [`requirements/index.md`](requirements/index.md) | Обязательный read order, conflict precedence и ссылки на permanent requirement owners. |
+| Models, factories, fixtures и seeders | [`requirements/model-fixtures-and-seeding.md`](requirements/model-fixtures-and-seeding.md), [`models.md`](models.md), [`testing.md`](testing.md) | Valid-by-default factories, meaningful named states, exact exemptions, explicit graph helpers, deterministic fixtures, idempotent reference seeders, fail-closed demo data и verification matrix. |
 | Системная интеграция | [`requirements/system-wide-integration.md`](requirements/system-wide-integration.md), [`system-integration.md`](system-integration.md) | Permanent cross-feature rules, shared identity/visibility/access/notification/audit/storage/cache/search/SEO boundaries, dependency matrix, compatibility adapters и финальная readiness evidence. |
 | Сопровождение и обновления | [`requirements/maintenance-and-upgrades.md`](requirements/maintenance-and-upgrades.md), [`maintenance/dependency-inventory.md`](maintenance/dependency-inventory.md), [`maintenance/runtime-compatibility.md`](maintenance/runtime-compatibility.md), [`maintenance/update-decisions.md`](maintenance/update-decisions.md), [`maintenance/deprecations.md`](maintenance/deprecations.md), [`maintenance/compatibility-adapters.md`](maintenance/compatibility-adapters.md), [`maintenance/technical-debt.md`](maintenance/technical-debt.md), [`maintenance/security-advisories.md`](maintenance/security-advisories.md) | Dependency governance, purpose registry, compatibility/deprecation/debt decisions, staging, production impact, rollback и evidence-backed advisories. Upgrade/removal/review checklists находятся в том же каталоге. |
 | Production operations | [`requirements/production-operations.md`](requirements/production-operations.md), [`deployment.md`](deployment.md), [`environment.md`](environment.md), [`operations/README.md`](operations/README.md) | Permanent production rules, verified environment, in-place deployment, rollback, backup/restore, disaster recovery, incidents, logging/health, providers, service-worker state и ручной acceptance без fake infrastructure. |

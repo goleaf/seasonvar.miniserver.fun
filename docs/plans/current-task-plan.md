@@ -1,4 +1,91 @@
-# Текущая задача — Task 113–119
+# Текущая задача — Task 121
+
+## Task 121 — полная модернизация repository
+
+Цель: привести фактический Seasonvar repository, его канонические требования,
+зависимости, архитектуру, модели, factories, seeders, PHP-тесты, Livewire,
+Blade и Tailwind к единому проверяемому production-grade состоянию на
+PHP `8.5`, Laravel `13`, Livewire `4` и Tailwind CSS `4`, не останавливаясь
+на аудите или документации.
+
+Статус: `in_progress`. Утверждённый пользователем master-prompt является
+design approval; routine approval между аудитом, планом и реализацией не
+требуется. Detailed design, plan и task-specific matrix:
+
+- [Design](../superpowers/specs/2026-07-30-repository-modernization-completion-design.md)
+- [Implementation plan](../superpowers/plans/2026-07-30-repository-modernization-completion.md)
+- [Compliance matrix](task-121-repository-modernization-compliance.md)
+
+### Подтверждённый baseline
+
+- Ветка: существующая `main`, `ahead 20`; branch/worktree не создаются.
+- До task существовал только untracked
+  `global-spacing-audit-home-desktop.png`; он не входит в scope.
+- Runtime: PHP `8.5.8`, Laravel `13.23.0`, Livewire `4.3.3`, Tailwind
+  `4.3.2`, Vite `8.1.4`, PHPUnit `12.5.33`, SQLite `3.46.1`.
+- Full PHP baseline: `2307` tests, `2296` passed, `11` skipped,
+  `208533` assertions.
+- `composer audit --locked` и `npm audit`: zero known advisories.
+- Vite production build прошёл; baseline assets:
+  CSS `221.35 kB` (`45.91 kB` gzip), app JS `45.98 kB`
+  (`14.33 kB` gzip), player JS `72.02 kB` (`17.58 kB` gzip),
+  HLS JS `331.90 kB` (`104.61 kB` gzip).
+- Full `scripts/ci-check.sh full` до тестовой стадии обнаружил один
+  pre-existing defect: stale managed blocks в `README.md`,
+  `docs/CODE_STANDARDS.md`, `docs/UI_STANDARDS.md`,
+  `docs/DATA_RELATIONS.md`, `docs/MAINTENANCE_LOG.md`.
+- Production-style inspection показывает одну pending additive migration
+  `2026_07_27_031500_add_release_lookup_index_to_release_schedule_entries`;
+  production apply не разрешён без writer/backup evidence.
+- Factory RED census: `146` concrete first-party Eloquent models,
+  `11` factory classes и `135` missing factory/`HasFactory` contracts.
+
+### Текущий scope и защищённые contracts
+
+Ожидаемые области изменений уточняются после каждого domain census:
+canonical requirements/docs, Composer/npm manifests и locks, application
+architecture, models/migrations, factories/seeders, Livewire/Blade/Tailwind,
+translations, PHP/browser tests, `README.md` и `CHANGELOG.md`.
+
+Совместимыми должны остаться:
+
+- все существующие публичные route names и URL, read-only API shape и
+  `CatalogTitle` slug binding;
+- единый публичный importer command `seasonvar:import`, one-title
+  season/episode model и запрет хранения imported video bodies;
+- ru/en locale aliases, identity values, validation/API error conventions;
+- policy/gate ownership, premium/region/legal restrictions и server-owned
+  playback/access state;
+- PWA private/media exclusions, signed playback/download boundaries;
+- cache/session/queue ownership, production Redis and local/testing SQLite;
+- существующие user data, additive migration policy и documented rollback;
+- class-based full-page Livewire, passive Blade, CSS-first Tailwind и local
+  assets.
+
+### Execution checklist
+
+| Priority | Workstream | Status |
+| --- | --- | --- |
+| critical | Requirements, Markdown corpus, versions и full-system census | `in_progress` |
+| critical | Task lease, approved design, plan и compliance matrix | `in_progress` |
+| critical | Canonical requirements rewrite before implementation | `pending` |
+| high | Targeted dependency/runtime modernization | `pending` |
+| critical | Factory/seeder safety contract и production guard | `pending` |
+| critical | Model-by-model factory/state/seeding coverage | `pending` |
+| critical | Backend/security/database architecture modernization | `pending` |
+| high | Livewire/Blade/localization/Tailwind/accessibility modernization | `pending` |
+| critical | Focused TDD and full quality gates | `pending` |
+| critical | Final Markdown synchronization and compliance review | `pending` |
+| critical | Exact commit in `main` and factual push attempt | `pending` |
+
+Rollback is pass-specific: dependency lock rollback uses reviewed manifest
+and lock reversal; additive schema changes require down/compatibility proof;
+factory/seeder changes never delete production data; UI changes require Vite
+rebuild and exact cache-contract rotation where markup is response-cached.
+No production migration, data mutation, broad cache flush or secret-bearing
+operation is authorized by this task.
+
+# Исторические задачи — Task 113–119
 
 ## Реестр активных workstreams
 

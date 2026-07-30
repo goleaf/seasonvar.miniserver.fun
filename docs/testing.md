@@ -36,7 +36,11 @@
 - Базовый `Tests\TestCase` вызывает `withoutVite()`, поэтому feature-тесты не зависят от собранного Vite manifest.
 - Для данных каталога использовать существующие фабрики: `CatalogTitle`, `Season`, `Episode`, `LicensedMedia`, `Source`, `SourcePage`, `User`.
 - Livewire-каталог проверяется через `Livewire::withQueryParams(...)->test(CatalogSeries::class)`: URL hydration, нормализация, server-side выдача, reset paginator и групповые/полные сбросы должны оставаться покрыты существующими feature-тестами.
-- Production-данные не сидируются; seeders не являются частью обычного тестового сценария.
+- Production catalog data не сидируются и создаются только каноническим
+  importer. Factories, fixed reference seeders и development/demo seeders
+  являются обязательной частью isolated test coverage по
+  [`requirements/model-fixtures-and-seeding.md`](requirements/model-fixtures-and-seeding.md);
+  demo data обязаны fail closed вне явно разрешённой non-production среды.
 - Cache architecture tests фиксируют canonical key hashing/bounds, TTL+jitter, negative lookup, payload limit, version invalidation, stale fallback, bounded lock timeout, warming uniqueness/overlap/after-commit, private shared-cache bypass и public HTTP validators.
 - Blade audit отвергает `@php`, `@endphp`, PHP tags, request/config/container calls, auth/gate/inject/use directives, infrastructure facades, application static construction/calls, cache/database access и Volt. Livewire security tests продолжают фиксировать URL state, locked tamper protection, Form Objects, renderless actions, visible-only polling и отсутствие больших public model collections; намеренно неиспользуемые Livewire features не симулируются искусственными компонентами.
 - `tests/Unit/TranslationCatalogParityTest.php` является общим contract для всех locale из `config/catalog-collections.php`: он сравнивает набор PHP-файлов с `lang/ru`, recursive key order, scalar types, named placeholders и непустые plural branches, а через AST запрещает duplicate literal keys и горизонтальные непустые массивы. Отдельная проверка values фиксирует единый US English, не переименовывая stable keys.

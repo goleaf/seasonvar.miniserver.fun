@@ -6,6 +6,19 @@
 
 Повторный corpus-pass Task 27 от 18.07.2026 проверил 282 tracked Markdown-файла (62 251 строка) до добавления двух canonical integration documents, прочитал requirement/feature/architecture owners полностью и выполнил repository-wide link/contradiction/legacy scan: 436 Markdown references имели существующие targets. Добавлены только [`requirements/system-wide-integration.md`](requirements/system-wide-integration.md) и [`system-integration.md`](system-integration.md); feature-specific owner documents не дублировались. Exact evidence, непроверенные journeys и ограничения сохранены в [`plans/current-task-plan.md`](plans/current-task-plan.md).
 
+Corpus-pass Task 121 от 30.07.2026 зафиксировал `536` tracked Markdown-файлов
+до реализации: `4` root, `76` project skills, `6` canonical requirements,
+`42` topic owners, `12` maintenance, `9` operations, `12` audits,
+`155` historical approved specs, `175` historical implementation plans,
+`23` task-plan records и `22` archived evidence files. Inventory построен из
+NUL-delimited `git ls-files '*.md'`; ignored `vendor`, `node_modules`,
+coverage/build output не входят в corpus. Исторические specs/plans/archive
+классифицированы как immutable evidence, а не active requirements. Все
+canonical requirement/topic owners перечитываются по scope; новый постоянный
+factory/seeding contract добавлен только в
+[`requirements/model-fixtures-and-seeding.md`](requirements/model-fixtures-and-seeding.md)
+и зарегистрирован в index/map без параллельного `seeding.md`.
+
 ## Изменены
 
 - `CHANGELOG.md`

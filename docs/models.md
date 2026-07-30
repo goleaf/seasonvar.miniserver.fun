@@ -1,6 +1,15 @@
 # Eloquent-модели
 
-Обновлено: 18.07.2026
+Обновлено: 30.07.2026
+
+## Factories и fixtures
+
+Постоянный проверяемый contract для valid-by-default factories, named
+states, relationship helpers, exemptions и safe seed orchestration находится
+только в
+[`requirements/model-fixtures-and-seeding.md`](requirements/model-fixtures-and-seeding.md).
+Этот файл остаётся владельцем доменной семантики моделей и связей; дублировать
+здесь полную seeding matrix нельзя.
 
 ## Правила связей
 

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Feature;
 
 use App\Models\User;
@@ -9,7 +11,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
-class LocalAccountSeederTest extends TestCase
+final class LocalAccountSeederTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -42,5 +44,14 @@ class LocalAccountSeederTest extends TestCase
 
         $this->assertTrue(Gate::forUser($admin)->allows('manage-catalog'));
         $this->assertFalse(Gate::forUser($user)->allows('manage-catalog'));
+    }
+
+    public function test_database_seeder_does_not_create_local_accounts_in_production(): void
+    {
+        $this->app->detectEnvironment(static fn (): string => 'production');
+
+        app(DatabaseSeeder::class)->run();
+
+        $this->assertSame(0, User::query()->count());
     }
 }
